@@ -1,4 +1,4 @@
-import { redis } from "../../config/redis";
+import { redis } from "../../../config/redis";
 import { IInterestedIn } from "./interestedIn.types";
 
 const CACHE_KEY = "interestedIn:all";
