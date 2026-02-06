@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import compression from "compression";
-import interestedInRoutes from "./features/interestedIn/interestedIn.routes";
+import interestedInRoutes from "./features/onboarding/interestedIn/interestedIn.routes";
 
 const app = express();
 
