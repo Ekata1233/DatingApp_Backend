@@ -4,9 +4,8 @@ import genderRoutes from "../features/onboarding/interestedIn/interestedIn.route
 
 const router = Router();
 
-router.use("/interest", interestRoutes);
+router.use("/interested-in", interestRoutes);
 router.use("/api/genders", genderRoutes);
-
 
 export default router;
 

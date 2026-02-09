@@ -1,9 +1,9 @@
-export interface IInterestedOption {
-  label: string;
+export interface IGenderImage {
+  gender: string;
+  image: string;
 }
 
 export interface IInterestedIn {
   title: string;
-  description: string;
-  options: IInterestedOption[];
+  genderImages: IGenderImage[]; // multiple objects
 }
