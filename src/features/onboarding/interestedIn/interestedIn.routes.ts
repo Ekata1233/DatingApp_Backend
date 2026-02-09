@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { create, getAll } from "./interestedIn.controller";
+import { create, getAll,remove } from "./interestedIn.controller";
 
 const router = Router();
 
-router.post("/", create);   // POST /api/interestedIn
-router.get("/", getAll);    // GET  /api/interestedIn
+router.post("/create", create);
+router.get("/get-all", getAll);
+router.delete("/delete", remove);
 
 export default router;

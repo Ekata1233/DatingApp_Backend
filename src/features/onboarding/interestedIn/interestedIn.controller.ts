@@ -1,13 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import {
-  getInterestedInCache,
-  setInterestedInCache,
-  clearInterestedInCache,
-} from "./interestedIn.cache";
-import {
   createInterestedIn,
   getAllInterestedIn,
+  deleteInterestedIn,
 } from "./interestedIn.service";
+import imagekit from "../../../utils/imagekit";
 
 export const create = async (
   req: Request,
@@ -15,10 +12,56 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const data = await createInterestedIn(req.body);
-    await clearInterestedInCache();
+    const { title, gender } = req.body;
 
-    res.status(201).json({ success: true, data });
+    // Ensure we have files
+    if (!req.files || !req.files.images) {
+      return res.status(400).json({
+        success: false,
+        message: "Images are required",
+      });
+    }
+
+    let images = req.files.images;
+    if (!Array.isArray(images)) {
+      images = [images]; // convert single file to array
+    }
+
+    const genders = Array.isArray(gender) ? gender : [gender];
+
+    if (genders.length !== images.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Number of genders and images must match",
+      });
+    }
+
+    // Upload all images to ImageKit
+    const genderImages = await Promise.all(
+      images.map(async (file: any, index: number) => {
+        const uploadResponse = await imagekit.upload({
+          file: file.data,
+          fileName: file.name,
+          folder: "/interested-in",
+        });
+
+        return {
+          gender: genders[index],
+          image: uploadResponse.url,
+        };
+      })
+    );
+
+    // Replace existing document
+    const data = await createInterestedIn({
+      title,
+      genderImages,
+    });
+
+    res.status(201).json({
+      success: true,
+      data,
+    });
   } catch (error) {
     next(error);
   }
@@ -30,16 +73,24 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
-    const cached = await getInterestedInCache();
-
-    if (cached) {
-      return res.json({ success: true, cached: true, data: cached });
-    }
-
     const data = await getAllInterestedIn();
-    await setInterestedInCache(data);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
 
-    res.json({ success: true, cached: false, data });
+export const remove = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    await deleteInterestedIn();
+    res.json({
+      success: true,
+      message: "All InterestedIn data deleted successfully",
+    });
   } catch (error) {
     next(error);
   }

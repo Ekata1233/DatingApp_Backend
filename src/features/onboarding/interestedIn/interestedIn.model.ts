@@ -1,20 +1,21 @@
 import { Schema, model, models } from "mongoose";
 import { IInterestedIn } from "./interestedIn.types";
 
+const GenderImageSchema = new Schema(
+  {
+    gender: { type: String, required: true },
+    image: { type: String, required: true },
+  },
+  { _id: false }
+);
+
 const InterestedInSchema = new Schema<IInterestedIn>(
   {
-    title: { type: String, required: true, index: true },
-    description: { type: String, required: true },
-    options: [
-      {
-        label: { type: String, required: true },
-      },
-    ],
+    title: { type: String, required: true, unique: true },
+    genderImages: { type: [GenderImageSchema], required: true },
   },
   { timestamps: true }
 );
-
-InterestedInSchema.index({ title: 1 });
 
 export const InterestedIn =
   models.InterestedIn ||
