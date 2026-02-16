@@ -1,18 +1,16 @@
-// import { UploadedFile } from "express-fileupload";
-
-// declare global {
-//   namespace Express {
-//     interface Request {
-//       files?: {
-//         [fieldname: string]: UploadedFile | UploadedFile[];
-//       };
-//     }
-//   }
-// }
 // src/types/express-fileupload.d.ts
+import * as express from 'express';
 
-declare module "express-fileupload" {
-  import { RequestHandler } from "express";
+declare global {
+  namespace Express {
+    interface Request {
+      files?: fileUpload.FileArray;
+    }
+  }
+}
+
+declare module 'express-fileupload' {
+  import * as express from 'express';
 
   export interface UploadedFile {
     name: string;
@@ -30,15 +28,10 @@ declare module "express-fileupload" {
     [fieldname: string]: UploadedFile | UploadedFile[];
   }
 
-  function fileUpload(options?: any): RequestHandler;
-  export default fileUpload;
-}
-
-// Extend Express.Request globally
-declare global {
-  namespace Express {
-    interface Request {
-      files?: import("express-fileupload").FileArray;
-    }
+  export interface Options {
+    // Add options if needed
   }
+
+  function fileUpload(options?: Options): express.RequestHandler;
+  export default fileUpload;
 }
