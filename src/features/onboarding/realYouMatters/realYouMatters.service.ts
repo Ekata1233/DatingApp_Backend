@@ -1,10 +1,7 @@
 import { RealYouMatters } from "./realYouMatters.model";
 import { IRealYouMatters } from "./realYouMatters.types";
 
-/**
- * Always keep ONLY ONE document.
- * When creating new → delete old first.
- */
+
 export const createRealYouMatters = async (
   payload: IRealYouMatters
 ): Promise<IRealYouMatters> => {
