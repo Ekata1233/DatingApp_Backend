@@ -1,18 +1,20 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error("MONGODB_URI is not defined");
-}
-
+// Cache global for serverless
 let cached = (global as any).mongoose;
 
 if (!cached) {
   cached = (global as any).mongoose = { conn: null, promise: null };
 }
 
-export async function connectDB() {
+export async function connectDB(): Promise<mongoose.Mongoose> {
+  // Get URI inside function
+  const MONGODB_URI = process.env.MONGODB_URI;
+  if (!MONGODB_URI) {
+    throw new Error("MONGODB_URI environment variable is not defined");
+  }
+
+  // Reuse existing connection
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
