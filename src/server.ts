@@ -4,21 +4,12 @@ dotenv.config();
 import app from "./app";
 import { connectDB } from "./config/db";
 
-const PORT = process.env.PORT || 4000;
-
-const startServer = async () => {
-  try {
-    await connectDB(); // ✅ wait for DB
-
+connectDB()
+  .then(() => {
     console.log("✅ MongoDB Connected");
+  })
+  .catch((err) => {
+    console.error("❌ DB Connection Error:", err);
+  });
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("❌ Database connection failed:", error);
-    process.exit(1); // ❌ stop server if DB fails
-  }
-};
-
-startServer();
+export default app; // ✅ VERY IMPORTANT for Vercel
