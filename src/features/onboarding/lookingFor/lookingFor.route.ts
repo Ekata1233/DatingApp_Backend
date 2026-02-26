@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { create, getAll, remove } from "./lifestyle.controller";
+import { create, getAll, remove } from "./lookingFor.controller";
 
 const router = Router();
 
@@ -8,4 +8,3 @@ router.get("/get-all", getAll);
 router.delete("/delete", remove);
 
 export default router;
-
