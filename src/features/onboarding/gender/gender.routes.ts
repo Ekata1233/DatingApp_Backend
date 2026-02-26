@@ -3,7 +3,7 @@ import * as GenderController from "./gender.controller";
 
 const router = Router();
 
-router.post("/", GenderController.create);
-router.get("/", GenderController.getAll);
+router.post("/create", GenderController.create);
+router.get("/getAll", GenderController.getAll);
 
 export default router;
