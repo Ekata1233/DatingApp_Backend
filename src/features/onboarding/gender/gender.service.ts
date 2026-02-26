@@ -1,28 +1,25 @@
+// gender.service.ts
 import { GenderModel } from "./gender.model";
 import { IGender } from "./gender.types";
 
-export const createGender = async (payload: Partial<IGender>) => {
-  return await GenderModel.create(payload);
+/**
+ * Always keep ONLY ONE document.
+ * When creating new → delete old first.
+ */
+export const createGender = async (payload: IGender): Promise<IGender> => {
+  // Remove existing data
+  await GenderModel.deleteMany({});
+
+  // Insert fresh data
+  return GenderModel.create(payload);
 };
 
-export const getAllGenders = async () => {
-  return await GenderModel.find().sort({ createdAt: -1 });
+// GET ALL (returns array with single document or empty array)
+export const getAllGenders = async (): Promise<IGender[]> => {
+  return GenderModel.find().sort({ createdAt: -1 }).lean();
 };
 
-export const getGenderById = async (id: string) => {
-  return await GenderModel.findById(id);
-};
-
-export const updateGender = async (
-  id: string,
-  payload: Partial<IGender>
-) => {
-  return await GenderModel.findByIdAndUpdate(id, payload, {
-    new: true,
-    runValidators: true,
-  });
-};
-
-export const deleteGender = async (id: string) => {
-  return await GenderModel.findByIdAndDelete(id);
+// DELETE ALL
+export const deleteAllGenders = async (): Promise<void> => {
+  await GenderModel.deleteMany({});
 };
