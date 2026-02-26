@@ -5,6 +5,7 @@ import lifestyleRoutes from "../features/onboarding/lifestyle/lifestyle.routes";
 import realYouMattersRoutes from "../features/onboarding/realYouMatters/realYouMatters.routes";
 import thingsYouLoveRoutes from "../features/onboarding/thingsYouLove/thingsYouLove.routes";
 import lookingForRoutes from "../features/onboarding/lookingFor/lookingFor.route";
+import genderRoutes from "../features/onboarding/gender/gender.routes";
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.use("/lifestyle",lifestyleRoutes)
 router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/lookingFor",lookingForRoutes)
+router.use("/gender",genderRoutes)
 
 export default router;
 
