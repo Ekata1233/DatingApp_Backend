@@ -2,14 +2,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import app from "./app";
-import { connectDB } from "./config/db";
+import connectPostgres, { connectDB } from "./config/db";
 
 const PORT = process.env.PORT || 4000;
 
 const startServer = async () => {
   try {
     await connectDB(); // ✅ wait for DB
-
+    await connectPostgres();
     console.log("✅ MongoDB Connected");
 
     app.listen(PORT, () => {
