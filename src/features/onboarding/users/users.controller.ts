@@ -1,26 +1,3 @@
-// import { fetchAllUsers } from "./users.service";
-
-// export async function getAllUsersController() {
-//   try {
-//     const users = await fetchAllUsers();
-
-//     console.log("users  : ", users);
-
-//     return {
-//       success: true,
-//       data: users,
-//     };
-
-//   } catch (error) {
-//     console.error("Controller Error:", error);
-
-//     return {
-//       success: false,
-//       message: "Failed to fetch users",
-//     };
-//   }
-// }
-
 
 import { Request, Response } from "express";
 import { fetchAllUsers } from "./users.service";

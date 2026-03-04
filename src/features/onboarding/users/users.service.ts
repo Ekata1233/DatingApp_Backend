@@ -6,7 +6,7 @@ export async function fetchAllUsers(): Promise<User[]> {
     const pool = connectPostgres();
 
     const result = await pool.query(
-      "SELECT * FROM users ORDER BY id ASC"
+      "SELECT * FROM users"
     );
 
     return result.rows;
