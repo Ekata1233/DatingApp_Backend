@@ -9,6 +9,8 @@ export const create = async (
   try {
     const gender = await GenderService.createGender(req.body);
 
+    console.log("gender : ", gender);
+
     res.status(201).json({
       success: true,
       message: "Gender created successfully",
