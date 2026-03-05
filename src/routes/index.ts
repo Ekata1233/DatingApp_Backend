@@ -6,7 +6,8 @@ import realYouMattersRoutes from "../features/onboarding/realYouMatters/realYouM
 import thingsYouLoveRoutes from "../features/onboarding/thingsYouLove/thingsYouLove.routes";
 import lookingForRoutes from "../features/onboarding/lookingfor/lookingFor.route";
 import genderRoutes from "../features/onboarding/gender/gender.routes";
-import usersRoutes from "../features/onboarding/users/users.route";
+import userRoutes from "../features/user/mobile-auth/auth.routes";
+import googleRoutes from "../features/user/google-auth/google-auth.routes";
 
 const router = Router();
 
@@ -17,7 +18,8 @@ router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/lookingFor",lookingForRoutes)
 router.use("/gender",genderRoutes)
-router.use("/users",usersRoutes)
-
+// router.use("/users",usersRoutes)
+router.use("/user",userRoutes)
+router.use("/user",googleRoutes)
 export default router;
 
