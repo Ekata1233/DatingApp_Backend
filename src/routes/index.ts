@@ -4,7 +4,7 @@ import sexualOrientationRoutes from "../features/onboarding/sexualorientations/s
 import lifestyleRoutes from "../features/onboarding/lifestyle/lifestyle.routes";
 import realYouMattersRoutes from "../features/onboarding/realYouMatters/realYouMatters.routes";
 import thingsYouLoveRoutes from "../features/onboarding/thingsYouLove/thingsYouLove.routes";
-import lookingForRoutes from "../features/onboarding/lookingFor/lookingFor.route";
+import lookingForRoutes from "../features/onboarding/lookingfor/lookingFor.route";
 import genderRoutes from "../features/onboarding/gender/gender.routes";
 import usersRoutes from "../features/onboarding/users/users.route";
 
