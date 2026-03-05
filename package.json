@@ -23,7 +23,8 @@
     "ioredis": "^5.9.2",
     "mongoose": "^9.1.6",
     "pg": "^8.20.0",
-    "redis": "^5.10.0"
+    "redis": "^5.10.0",
+    "twilio": "^5.12.2"
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",
