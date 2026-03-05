@@ -32,3 +32,4 @@ out/
 
 # Coverage
 coverage/
+/src/generated/prisma

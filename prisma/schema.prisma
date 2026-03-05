@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+
+model User {
+  id                   String       @id @default(uuid()) @db.Uuid
+  name                 String?      @db.VarChar(100)
+  phone_number         String?      @unique @db.VarChar(20)
+  google_id            String?      @db.VarChar(255)
+  is_phone_verified    Boolean      @default(false)
+  onboarding_step      Int          @default(1)
+  onboarding_completed Boolean      @default(false)
+  created_at           DateTime     @default(now())
+
+  profile              UserProfile?
+
+  @@map("users")
+}
+
+model UserProfile {
+  user_id            String    @id @db.Uuid
+  birth_date         DateTime? @db.Date
+  gender             String?   @db.VarChar(30)
+  sexual_orientation String?   @db.VarChar(50)
+  interested_in      String?   @db.VarChar(30)
+  looking_for        String?   @db.VarChar(50)
+  max_distance_km    Int?
+  latitude           Decimal?  @db.Decimal(10, 8)
+  longitude          Decimal?  @db.Decimal(11, 8)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  user               User      @relation(fields: [user_id], references: [id])
+
+  @@map("user_profiles")
+  @@index([gender])
+  @@index([interested_in])
+  @@index([looking_for])
+  @@index([latitude, longitude])
+}
