@@ -1,10 +1,10 @@
-import express from "express";
+import { Router } from "express";
 import {
   sendOtpController,
   verifyOtpController,
 } from "./auth.controller";
 
-const router = express.Router();
+const router = Router();
 
 router.post("/send-otp", sendOtpController);
 router.post("/verify-otp", verifyOtpController);
