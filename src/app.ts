@@ -1,3 +1,4 @@
+import { connectDB } from "./config/db";
 import express from "express";
 import cors from "cors";
 import compression from "compression";
