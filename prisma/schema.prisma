@@ -11,8 +11,9 @@ datasource db {
 model User {
   id                   String       @id @default(uuid()) @db.Uuid
   name                 String?      @db.VarChar(100)
+  email                String?      @unique @db.VarChar(255)
   phone_number         String?      @unique @db.VarChar(20)
-  google_id            String?      @db.VarChar(255)
+  google_id            String?  @unique @db.VarChar(255)
   is_phone_verified    Boolean      @default(false)
   onboarding_step      Int          @default(1)
   onboarding_completed Boolean      @default(false)

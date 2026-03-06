@@ -18,8 +18,8 @@ export const sendOtpController = async (req: Request, res: Response) => {
 
 export const verifyOtpController = async (req: Request, res: Response) => {
   try {
-    const { phoneNumber, otp } = req.body;
 
+    const { phoneNumber, otp } = req.body;
     const user = await verifyOtp(phoneNumber, otp);
 
     res.json({
