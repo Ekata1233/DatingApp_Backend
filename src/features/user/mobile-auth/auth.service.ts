@@ -20,6 +20,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       code: otp,
     });
 
+    console.log("verificationCheck.status : ", verificationCheck.status);
   if (verificationCheck.status === "approved") {
     const user = await prisma.user.upsert({
       where: { phone_number: phoneNumber },

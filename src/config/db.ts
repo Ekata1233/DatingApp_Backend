@@ -61,7 +61,7 @@ export function connectPostgres(): Pool {
   }
 
   const pool = new Pool({
-  connectionString: process.env.POSTGRE_URL,
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
   pool.connect()
