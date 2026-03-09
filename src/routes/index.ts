@@ -3,6 +3,7 @@ import interestRoutes from "../features/onboarding/interestedIn/interestedIn.rou
 import sexualOrientationRoutes from "../features/onboarding/sexualorientations/sexualorientations.routes";
 import lifestyleRoutes from "../features/onboarding/lifestyle/lifestyle.routes";
 import realYouMattersRoutes from "../features/onboarding/realYouMatters/realYouMatters.routes";
+import lookingForRoutes from "../features/onboarding/lookingfor/lookingFor.route";
 import thingsYouLoveRoutes from "../features/onboarding/thingsYouLove/thingsYouLove.routes";
 import genderRoutes from "../features/onboarding/gender/gender.routes";
 import mobileAuthRoutes from "../features/user/mobile-auth/auth.routes";
@@ -15,6 +16,7 @@ const router = Router();
 router.use("/interested-in", interestRoutes);
 router.use("/sexual-orientation",sexualOrientationRoutes)
 router.use("/lifestyle",lifestyleRoutes)
+router.use("/lookingFor",lookingForRoutes)
 router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/gender",genderRoutes)

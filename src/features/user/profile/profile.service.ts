@@ -124,3 +124,31 @@ export const updateInterestedInService = async (
 
   return updatedProfile;
 };
+
+//Looking For 
+export const updateLookingForService = async (
+  userId: string,
+  looking_for: string
+) => {
+
+  const updatedProfile = await prisma.userProfile.upsert({
+    where: { user_id: userId },
+    update: {
+      looking_for
+    },
+    create: {
+      user_id: userId,
+      looking_for
+    }
+  });
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: 7
+    }
+  });
+
+  return updatedProfile;
+};
+

@@ -1,5 +1,5 @@
 import express from "express";
-import { enterBirthDateController, enterGenderController, enterInterestedInController, enterNameController, enterSexualOrientationController } from "./profile.controller";
+import { enterBirthDateController, enterGenderController, enterInterestedInController, enterLookingForController, enterNameController, enterSexualOrientationController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -240,5 +240,47 @@ router.patch("/profile/sexual-orientation", authMiddleware, enterSexualOrientati
 
 router.patch("/profile/interested-in", authMiddleware, enterInterestedInController);
 
+/**
+ * @swagger
+ * /api/user/profile/looking-for:
+ *   patch:
+ *     summary: Update user's relationship preference
+ *     tags: [User Profile]
+ *     description: Saves the type of relationship the logged-in user is looking for.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - looking_for
+ *             properties:
+ *               looking_for:
+ *                 type: string
+ *                 example: "Marriage"
+ *                 enum:
+ *                   - Marriage
+ *                   - Long term
+ *                   - Casual
+ *     responses:
+ *       200:
+ *         description: Relationship preference saved successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Relationship preference saved successfully"
+ *               looking_for: "Marriage"
+ *               onboarding_step: 7
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: Bad request
+ */
+
+router.patch("/profile/looking-for", authMiddleware, enterLookingForController);
 
 export default router;

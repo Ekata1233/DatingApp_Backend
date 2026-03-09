@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { birthDateValidation, nameValidation } from "./profile.validation";
-import { updateBirthDateService, updateGenderService, updateInterestedInService, updateNameService, updateSexualOrientationService } from "./profile.service";
+import { updateBirthDateService, updateGenderService, updateInterestedInService, updateLookingForService, updateNameService, updateSexualOrientationService } from "./profile.service";
 
 export const enterNameController = async (req: Request, res: Response) => {
   try {
@@ -108,6 +108,31 @@ export const enterInterestedInController = async (req: Request, res: Response) =
       message: "Interested in preference saved successfully",
       interested_in: profile.interested_in,
       onboarding_step: 6
+    });
+
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+//Looking for
+export const enterLookingForController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { looking_for } = req.body;
+
+    const profile = await updateLookingForService(userId, looking_for);
+
+    return res.status(200).json({
+      success: true,
+      message: "Relationship preference saved successfully",
+      looking_for: profile.looking_for,
+      onboarding_step: 7
     });
 
   } catch (error: any) {
