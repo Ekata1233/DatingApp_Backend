@@ -11,7 +11,7 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: process.env.PRODUCTION_URL || process.env.TESTING_URL,
+    origin: process.env.PRODUCTION_URL || process.env.TESTING_URL || "http://localhost:3000",
     credentials: true
   })
 );
