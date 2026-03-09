@@ -6,7 +6,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/profile/name:
+ * /api/user/profile/name:
  *   patch:
  *     summary: Update user's name
  *     tags: [User Profile]
