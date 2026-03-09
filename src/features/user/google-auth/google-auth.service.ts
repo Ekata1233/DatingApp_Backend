@@ -5,8 +5,6 @@ import { prisma } from "../../../prisma/prismaClient";
 export const googleLoginService = async (idToken: string) => {
   const googleData = await verifyGoogleToken(idToken);
 
-  console.log("Google Data:", googleData); // Debugging log
-
   const { sub, email, name } = googleData;
 
   const user = await prisma.user.upsert({
@@ -18,7 +16,7 @@ export const googleLoginService = async (idToken: string) => {
   const token = jwt.sign(
     { userId: user.id },
     process.env.JWT_SECRET!,
-    { expiresIn: "30d" }
+    { expiresIn: "7d" }
   );
 
   return { user, token };
