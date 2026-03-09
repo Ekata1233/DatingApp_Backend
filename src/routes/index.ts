@@ -8,7 +8,7 @@ import genderRoutes from "../features/onboarding/gender/gender.routes";
 import mobileAuthRoutes from "../features/user/mobile-auth/auth.routes";
 import googleAuthRoutes from "../features/user/google-auth/google-auth.routes";
 import userManageRoutes from "../features/user/management/user.route";
-import nameRoutes from "../features/user/profile/profile.routes";
+import profileRoutes from "../features/user/profile/profile.routes";
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/gender",genderRoutes)
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,nameRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes)
 
 
 export default router;
