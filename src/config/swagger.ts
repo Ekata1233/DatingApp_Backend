@@ -19,6 +19,16 @@ const options: swaggerJSDoc.Options = {
         description: "Production Server",
       },
     ],
+    tags: [
+      {
+        name: "User Mobile Authentication",
+        description: "OTP login and phone verification APIs",
+      },
+      {
+        name: "Users Management",
+        description: "User management APIs",
+      },
+    ],
   },
 
   apis: ["./src/features/**/*.ts"],

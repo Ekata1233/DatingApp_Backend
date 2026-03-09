@@ -24,8 +24,9 @@ export const verifyOtpController = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      message: "Phone verified",
-      user,
+     message: "Phone verified successfully",
+      token: user.token,
+      user: user.user,
     });
   } catch (error) {
     res.status(400).json({ error: "Invalid OTP" });

@@ -11,7 +11,7 @@ const router = Router();
  * /api/user/get-all:
  *   get:
  *     summary: Get all users
- *     tags: [Users]
+ *     tags: [Users Management]
  *     description: Fetches a list of all users along with their onboarding status.
  *     responses:
  *       200:
@@ -24,7 +24,7 @@ router.get("/get-all", getAllUsersController);
  * /api/user/details/{id}:
  *   get:
  *     summary: Get single user
- *     tags: [Users]
+ *     tags: [Users Management]
  *     description: Fetches details of a single user by their unique ID.
  *     parameters:
  *       - in: path
