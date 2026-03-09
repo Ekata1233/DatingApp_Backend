@@ -12,9 +12,14 @@ const startServer = async () => {
     await connectPostgres();
     console.log("✅ MongoDB Connected");
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
+    // app.listen(PORT, () => {
+    //   console.log(`🚀 Server running on port ${PORT}`);
+    // });
+     if (!process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+      });
+    }
   } catch (error) {
     console.error("❌ Database connection failed:", error);
     process.exit(1); // ❌ stop server if DB fails
@@ -22,3 +27,4 @@ const startServer = async () => {
 };
 
 startServer();
+export default app;
