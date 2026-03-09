@@ -1,4 +1,5 @@
-import { connectDB } from "./config/db";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
 import express from "express";
 import cors from "cors";
 import compression from "compression";
@@ -8,7 +9,12 @@ import routes from "./routes";
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.PRODUCTION_URL || process.env.TESTING_URL,
+    credentials: true
+  })
+);
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -19,6 +25,12 @@ app.use(
     useTempFiles: false,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   })
+);
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec)
 );
 
 // Routes
