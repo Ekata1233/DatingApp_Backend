@@ -21,6 +21,10 @@ const options: swaggerJSDoc.Options = {
     ],
     tags: [
       {
+        name: "Dynamic Onboarding Data",
+        description: "Dynamic onboarding data management APIs",
+      },
+      {
         name: "User Mobile Authentication",
         description: "OTP login and phone verification APIs",
       },

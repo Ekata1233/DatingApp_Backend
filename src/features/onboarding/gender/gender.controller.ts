@@ -63,6 +63,8 @@ export const getAll = async (
   try {
     const data = await GenderService.getAllGenders();
 
+    console.log("gender : ", data);
+
     res.status(200).json({
       success: true,
       data,
