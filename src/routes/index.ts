@@ -16,7 +16,7 @@ const router = Router();
 router.use("/interested-in", interestRoutes);
 router.use("/sexual-orientation",sexualOrientationRoutes)
 router.use("/lifestyle",lifestyleRoutes)
-router.use("/lookingForRoutes",lookingForRoutes)
+router.use("/lookingFor",lookingForRoutes)
 router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/gender",genderRoutes)
