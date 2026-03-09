@@ -9,12 +9,13 @@ import routes from "./routes";
 const app = express();
 
 // Middleware
-app.use(
-  cors({
-    origin: process.env.PRODUCTION_URL || process.env.TESTING_URL || "http://localhost:3000",
-    credentials: true
-  })
-);
+// app.use(
+//   cors({
+//     origin: process.env.PRODUCTION_URL || process.env.TESTING_URL || "http://localhost:3000",
+//     credentials: true
+//   })
+// );
+app.use(cors());
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
