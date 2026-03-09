@@ -35,7 +35,10 @@ const options: swaggerJSDoc.Options = {
     ],
   },
 
-  apis: ["./src/features/**/*.ts"],
+  apis: [
+    "./src/features/**/*.ts", // local dev
+    "./dist/features/**/*.js", // production build
+  ],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
