@@ -8,7 +8,7 @@ const router = Router();
  * /api/user/google-login:
  *   post:
  *     summary: Login with Google
- *     tags: [User Authentication]
+ *     tags: [User Google Authentication]
  *     description: Logs in the user using a Google ID token. Returns JWT token and user details for authenticated sessions.
  *     requestBody:
  *       required: true
