@@ -42,7 +42,6 @@ export const create = async (
       options,
     });
 
-    console.log("gender : ", gender);
 
     res.status(201).json({
       success: true,

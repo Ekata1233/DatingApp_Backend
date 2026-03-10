@@ -51,3 +51,90 @@ model UserProfile {
   @@index([gender, interested_in])
   @@map("user_profiles")
 }
+
+model UserLifestyle {
+  id        String  @id @default(uuid())
+  user_id   String  @unique
+
+  drinking  DrinkingHabit?
+  smoking   SmokingHabit?
+  exercise  ExerciseHabit?
+  pets      Pets?
+
+  user      User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model RealYouMatters {
+  id                 String @id @default(uuid())
+  user_id            String @unique
+
+  communication_style CommunicationStyle?
+  receive_love        ReceiveLove?
+  education_level     EducationLevel?
+  star_sign           StarSign?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model ThingsYouLove {
+  id                  String @id @default(uuid())
+  user_id             String @unique
+
+  creativity          Creativity?
+  fan_favourite       FanFavourite?
+  food_drink          FoodDrink?
+  gaming              Gaming?
+  going_out           GoingOut?
+  music               Music?
+  outdoor_adventure   OutdoorAdventure?
+  social_content      SocialContent?
+  sport_fitness       SportFitness?
+  staying_in          StayingIn?
+  tv_movie            TvMovie?
+  values_causes       ValuesCauses?
+  wellness_lifestyle  WellnessLifestyle?
+
+  users   UserInterest[]
+}
+
+enum DrinkingHabit {
+  NOT_FOR_ME
+  TEETOTAL
+  SOBER_CURIOUS
+  SPECIAL_OCCASIONS
+  WEEKENDS
+  MOST_NIGHTS
+}
+
+enum SmokingHabit {
+  SOCIAL_SMOKER
+  SMOKER_WITH_DRINKING
+  NON_SMOKER
+  SMOKER
+  TRYING_TO_QUIT
+}
+
+enum ExerciseHabit {
+  EVERYDAY
+  OFTEN
+  SOMETIMES
+  RARELY
+  NEVER
+}
+
+enum CommunicationStyle {
+  WHATSAPP_ALL_DAY
+  BIG_TEXTER
+  PHONE_CALLER
+  VIDEO_CHATTER
+  BAD_TEXTER
+  BETTER_IN_PERSON
+}
+
+enum LoveLanguage {
+  THOUGHTFUL_GESTURES
+  PRESENTS
+  TOUCH
+  COMPLIMENTS
+  TIME_TOGETHER
+}
