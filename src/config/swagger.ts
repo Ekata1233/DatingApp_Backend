@@ -14,7 +14,7 @@ const options = {
         description: "Local Server",
       },
       {
-        url: process.env.PRODUCTION_URL || `https://${process.env.PRODUCTION_URL}`,
+        url: process.env.PRODUCTION_URL,
         description: "Production Server",
       },
     ],
