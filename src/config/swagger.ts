@@ -1,4 +1,5 @@
 import swaggerJSDoc from "swagger-jsdoc";
+import path from "path";
 
 const options: swaggerJSDoc.Options = {
   definition: {
@@ -11,11 +12,11 @@ const options: swaggerJSDoc.Options = {
     },
     servers: [
       {
-        url: process.env.TESTING_URL,
+        url: process.env.TESTING_URL || "http://localhost:5000",
         description: "Local Server",
       },
       {
-        url: process.env.PRODUCTION_URL,
+        url: process.env.PRODUCTION_URL || "https://dating-app-backend-plum.vercel.app",
         description: "Production Server",
       },
     ],
@@ -39,9 +40,16 @@ const options: swaggerJSDoc.Options = {
     ],
   },
 
+  // ✅ FIXED: Multiple path patterns for TypeScript/JavaScript
   apis: [
-    "./src/features/**/*.ts", // local dev
-    "./dist/features/**/*.js", // production build
+    // For local development (TypeScript)
+    path.join(__dirname, "../src/features/**/*.ts"),
+    path.join(__dirname, "./src/features/**/*.ts"),
+    
+    // For production build (JavaScript)
+    path.join(__dirname, "../dist/features/**/*.js"),
+    path.join(__dirname, "./dist/features/**/*.js"),
+    path.join(process.cwd(), "dist/features/**/*.js"),
   ],
 };
 
