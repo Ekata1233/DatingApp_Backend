@@ -13,12 +13,12 @@ const options: swaggerJSDoc.Options = {
 
     servers: [
       {
-        url: process.env.TESTING_URL || "http://localhost:4000",
-        description: "Local Server",
-      },
-      {
         url: process.env.PRODUCTION_URL || "https://dating-app-backend-plum.vercel.app",
         description: "Production Server",
+      },
+      {
+        url: process.env.TESTING_URL || "http://localhost:4000",
+        description: "Local Server",
       },
     ],
 
