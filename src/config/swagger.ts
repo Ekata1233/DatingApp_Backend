@@ -1,22 +1,20 @@
 import swaggerJSDoc from "swagger-jsdoc";
-import path from "path";
 
-const options: swaggerJSDoc.Options = {
+const options = {
   definition: {
     openapi: "3.0.0",
     info: {
       title: "Dating App API Documentation",
       version: "1.0.0",
-      description:
-        "API documentation for Dating App built with Node.js, Express, and TypeScript",
+      description: "API documentation for Dating App built with Node.js, Express, and TypeScript",
     },
     servers: [
       {
-        url: process.env.TESTING_URL || "http://localhost:5000",
+        url: process.env.TESTING_URL || "http://localhost:3000",
         description: "Local Server",
       },
       {
-        url: process.env.PRODUCTION_URL || "https://dating-app-backend-plum.vercel.app",
+        url: process.env.PRODUCTION_URL || `https://dating-app-backend-plum.vercel.app/`,
         description: "Production Server",
       },
     ],
@@ -39,18 +37,10 @@ const options: swaggerJSDoc.Options = {
       },
     ],
   },
-
-  // ✅ FIXED: Multiple path patterns for TypeScript/JavaScript
   apis: [
-    // For local development (TypeScript)
-    path.join(__dirname, "../src/features/**/*.ts"),
-    path.join(__dirname, "./src/features/**/*.ts"),
-    
-    // For production build (JavaScript)
-    path.join(__dirname, "../dist/features/**/*.js"),
-    path.join(__dirname, "./dist/features/**/*.js"),
-    path.join(process.cwd(), "dist/features/**/*.js"),
+    "./src/features/**/*.ts",
+    "./dist/features/**/*.js",
   ],
-};
+} as swaggerJSDoc.Options; // Type assertion here
 
 export const swaggerSpec = swaggerJSDoc(options);
