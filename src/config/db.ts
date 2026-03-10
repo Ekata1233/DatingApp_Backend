@@ -25,11 +25,9 @@ export async function connectDB(): Promise<mongoose.Mongoose> {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose
-      .connect(MONGODB_URI)
-      .then((mongooseInstance) => {
-        return mongooseInstance;
-      });
+    cached.promise = mongoose.connect(MONGODB_URI).then((mongooseInstance) => {
+      return mongooseInstance;
+    });
   }
 
   try {
@@ -41,7 +39,6 @@ export async function connectDB(): Promise<mongoose.Mongoose> {
 
   return cached.conn;
 }
-
 
 /* =====================================================
    PostgreSQL Connection (NEW CODE ADDED)
@@ -55,22 +52,52 @@ if (!pgCached) {
   };
 }
 
+// export function connectPostgres(): Pool {
+//   if (pgCached.pool) {
+//     return pgCached.pool;
+//   }
+
+//   const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+//   ssl: { rejectUnauthorized: false },
+// });
+//   pool.connect()
+//     .then(() => {
+//       console.log("PostgreSQL Connected Successfully");
+//     })
+//     .catch((err) => {
+//       console.error("PostgreSQL Connection Error:", err);
+//     });
+
+//   pgCached.pool = pool;
+
+//   return pool;
+// }
+
+// export default connectPostgres;
+
 export function connectPostgres(): Pool {
   if (pgCached.pool) {
     return pgCached.pool;
   }
 
   const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-  pool.connect()
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  pool
+    .query("SELECT 1")
     .then(() => {
-      console.log("PostgreSQL Connected Successfully");
+      console.log("✅ PostgreSQL Connected Successfully");
     })
     .catch((err) => {
-      console.error("PostgreSQL Connection Error:", err);
+      console.error("❌ PostgreSQL Connection Error:", err);
     });
+
+  pool.on("error", (err) => {
+    console.error("Unexpected PostgreSQL error:", err);
+  });
 
   pgCached.pool = pool;
 
