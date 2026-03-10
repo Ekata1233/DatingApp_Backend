@@ -10,9 +10,10 @@ const options: swaggerJSDoc.Options = {
       description:
         "API documentation for Dating App built with Node.js, Express, and TypeScript",
     },
+
     servers: [
       {
-        url: process.env.TESTING_URL || "http://localhost:5000",
+        url: process.env.TESTING_URL || "http://localhost:4000",
         description: "Local Server",
       },
       {
@@ -20,6 +21,7 @@ const options: swaggerJSDoc.Options = {
         description: "Production Server",
       },
     ],
+
     tags: [
       {
         name: "Dynamic Onboarding Data",
@@ -37,20 +39,15 @@ const options: swaggerJSDoc.Options = {
         name: "Users Management",
         description: "User management APIs",
       },
+      {
+        name: "User Profile",
+        description: "User onboarding profile APIs",
+      },
     ],
   },
 
-  // ✅ FIXED: Multiple path patterns for TypeScript/JavaScript
-  apis: [
-    // For local development (TypeScript)
-    path.join(__dirname, "../src/features/**/*.ts"),
-    path.join(__dirname, "./src/features/**/*.ts"),
-    
-    // For production build (JavaScript)
-    path.join(__dirname, "../dist/features/**/*.js"),
-    path.join(__dirname, "./dist/features/**/*.js"),
-    path.join(process.cwd(), "dist/features/**/*.js"),
-  ],
+  // ✅ important fix
+ apis: [path.join(process.cwd(), "src/features/**/*.ts")],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
