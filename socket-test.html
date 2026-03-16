@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Socket Chat Test</title>
+</head>
+
+<body>
+
+<h2>Socket.IO Chat Test</h2>
+
+<h3>Join User</h3>
+<input id="userId" placeholder="Enter User ID (user1 or user2)" />
+<button onclick="join()">Join</button>
+
+<br><br>
+
+<h3>Send Message</h3>
+<input id="receiverId" placeholder="Receiver ID" />
+<input id="msg" placeholder="Message" />
+<button onclick="sendMessage()">Send</button>
+
+<h3>Messages</h3>
+<div id="messages"></div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<script>
+
+const socket = io("http://localhost:4000");
+
+socket.on("connect", () => {
+  console.log("Connected:", socket.id);
+});
+
+function join() {
+
+  const userId = document.getElementById("userId").value;
+
+  socket.emit("join", userId);
+
+  console.log("Joined as:", userId);
+
+}
+
+async function sendMessage() {
+
+  const receiverId = document.getElementById("receiverId").value;
+  const msg = document.getElementById("msg").value;
+
+  const response = await fetch("http://localhost:4000/api/user/message", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      receiverId: receiverId,
+      message: msg
+    })
+  });
+
+  const data = await response.json();
+
+  console.log("Message saved:", data);
+
+}
+
+socket.on("receiveMessage", (data) => {
+
+  console.log("Message received:", data);
+
+  const messageBox = document.getElementById("messages");
+
+  const p = document.createElement("p");
+
+  p.innerText = data.senderId + ": " + data.content;
+
+  messageBox.appendChild(p);
+
+});
+
+</script>
+
+</body>
+</html>
