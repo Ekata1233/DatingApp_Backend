@@ -8,6 +8,7 @@ export interface IThingsYouLoveSection {
 }
 
 export interface IThingsYouLove {
+  flowType: "dating" | "marriage" | "mature";
   title: string;
   description: string;
   sections: IThingsYouLoveSection[];

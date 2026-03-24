@@ -18,6 +18,12 @@ const SectionSchema = new Schema(
 
 const ThingsYouLoveSchema = new Schema<IThingsYouLove>(
   {
+    flowType: {
+      type: String,
+      enum: ["dating", "marriage", "mature"],
+      required: true,
+      index: true,
+    },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
     sections: { type: [SectionSchema], required: true },

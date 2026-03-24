@@ -4,6 +4,7 @@ export interface IGenderImage {
 }
 
 export interface IInterestedIn {
+  flowType: "dating" | "marriage" | "mature";
   title: string;
   genderImages: IGenderImage[]; // multiple objects
 }

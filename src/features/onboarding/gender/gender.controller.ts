@@ -9,9 +9,16 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const { title, options } = req.body;
+    const { flowType,title, options } = req.body;
 
     // Validation
+    if (!flowType) {
+      return res.status(400).json({
+        success: false,
+        message: "flowType is required",
+      });
+    }
+
     if (!title) {
       return res.status(400).json({
         success: false,
@@ -38,6 +45,7 @@ export const create = async (
 
     // This will delete old and create new
     const data = await GenderService.createGender({
+      flowType,
       title,
       options,
     });

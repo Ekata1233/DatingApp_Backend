@@ -11,6 +11,12 @@ const ItemSchema = new Schema(
 
 const LookingForSchema = new Schema<ILookingFor>(
   {
+    flowType: {
+      type: String,
+      enum: ["dating", "marriage", "mature"],
+      required: true,
+      index: true,
+    },
     title: {
       type: String,
       required: true,

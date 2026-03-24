@@ -4,6 +4,7 @@ export interface ILookingForItem {
 }
 
 export interface ILookingFor {
+  flowType: "dating" | "marriage" | "mature";
   title: string;
   items: ILookingForItem[];
 }

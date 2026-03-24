@@ -12,7 +12,14 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const { title, description } = req.body;
+    const { flowType, title, description } = req.body;
+
+    if (!flowType) {
+      return res.status(400).json({
+        success: false,
+        message: "flowType is required",
+      });
+    }
 
     if (!req.files || !req.files.images) {
       return res.status(400).json({
@@ -55,6 +62,7 @@ export const create = async (
     );
 
     const data = await createLookingFor({
+      flowType,
       title,
       items,
     });

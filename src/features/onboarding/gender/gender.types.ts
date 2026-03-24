@@ -3,6 +3,7 @@ export interface IGenderOption {
 }
 
 export interface IGender{
+    flowType: "dating" | "marriage" | "mature";
     title : string;
     options : IGenderOption[];
 }

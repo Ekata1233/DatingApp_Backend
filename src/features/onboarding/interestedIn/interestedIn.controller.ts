@@ -12,9 +12,16 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const { title, gender } = req.body;
+    const { flowType, title, gender } = req.body;
 
     // Ensure we have files
+    if (!flowType) {
+      return res.status(400).json({
+        success: false,
+        message: "flowType is required",
+      });
+    }
+    
     if (!req.files || !req.files.images) {
       return res.status(400).json({
         success: false,
@@ -54,6 +61,7 @@ export const create = async (
 
     // Replace existing document
     const data = await createInterestedIn({
+      flowType,
       title,
       genderImages,
     });

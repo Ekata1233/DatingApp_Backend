@@ -8,6 +8,7 @@ export interface IRealYouMattersSection {
 }
 
 export interface IRealYouMatters {
+  flowType: "dating" | "marriage" | "mature";
   title: string;
   description: string;
   sections: IRealYouMattersSection[];

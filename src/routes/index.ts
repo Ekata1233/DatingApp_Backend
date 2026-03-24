@@ -10,6 +10,7 @@ import mobileAuthRoutes from "../features/user/mobile-auth/auth.routes";
 import googleAuthRoutes from "../features/user/google-auth/google-auth.routes";
 import userManageRoutes from "../features/user/management/user.route";
 import profileRoutes from "../features/user/profile/profile.routes";
+import messageRoutes from "../features/user/messages/message.route";
 
 const router = Router();
 
@@ -21,7 +22,8 @@ router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/gender",genderRoutes)
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
+
 
 
 export default router;

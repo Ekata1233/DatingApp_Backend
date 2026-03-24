@@ -11,6 +11,12 @@ const GenderImageSchema = new Schema(
 
 const InterestedInSchema = new Schema<IInterestedIn>(
   {
+    flowType: {
+      type: String,
+      enum: ["dating", "marriage", "mature"],
+      required: true,
+      index: true,
+    },
     title: { type: String, required: true, unique: true },
     genderImages: { type: [GenderImageSchema], required: true },
   },

@@ -10,6 +10,12 @@ const OptionSchema = new Schema(
 
 const SexualOrientationSchema = new Schema<ISexualOrientation>(
   {
+    flowType: {
+      type: String,
+      enum: ["dating", "marriage", "mature"],
+      required: true,
+      index: true,
+    },
     title: {
       type: String,
       required: true,
