@@ -7,9 +7,7 @@ export const profileValidation = z.object({
     .min(2, "Full name must be at least 2 characters")
     .max(100, "Full name too long"),
 
-  email: z
-    .string()
-    .email("Invalid email address"),
+  email: z.string().email("Invalid email address"),
 
   birth_date: z
     .string()
@@ -26,17 +24,17 @@ export const profileValidation = z.object({
 
       return (
         age > 18 ||
-        (age === 18 &&
-          (monthDiff > 0 || (monthDiff === 0 && dayDiff >= 0)))
+        (age === 18 && (monthDiff > 0 || (monthDiff === 0 && dayDiff >= 0)))
       );
     }, "User must be at least 18 years old"),
 
   height: z
-    .number({ invalid_type_error: "Height must be a number" })
+    .number()
+    .refine((val) => !isNaN(val), {
+      message: "Height must be a number",
+    })
     .min(50, "Height too short")
     .max(300, "Height too tall"),
 
-  gender: z
-    .string()
-    .min(1, "Gender is required"),
+  gender: z.string().min(1, "Gender is required"),
 });

@@ -14,6 +14,7 @@ model User {
   phone_number            String?         @unique @db.VarChar(20)
   is_phone_verified       Boolean         @default(false)
   google_id               String?         @unique @db.VarChar(255)
+  looking_for             String?         @db.VarChar(50)
   birth_date              DateTime?       @db.Date
   height                  Int?
   gender                  String?         @db.VarChar(20)
@@ -25,27 +26,30 @@ model User {
 
   @@index([phone_number])
   @@index([google_id])
+  @@index([looking_for])
   @@index([gender, created_at])
   @@index([created_at])
   @@map("users")
 }
 
 model UserProfile {
-  user_id            String    @id @db.Uuid
-  sexual_orientation String?   @db.VarChar(50)
-  interested_in      String?   @db.VarChar(30)
-  looking_for        String?   @db.VarChar(50)
-  max_distance_km    Int?
-  latitude           Decimal?  @db.Decimal(10,8)
-  longitude          Decimal?  @db.Decimal(11,8)
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  user_id                 String    @id @db.Uuid
+  religion                String?   @db.VarChar(50)
+  community               String?   @db.VarChar(50)
+  interested_in           String?   @db.VarChar(30)
+  sexual_orientation      String?   @db.VarChar(50)
+  max_distance_km         Int?
+  latitude                Decimal?  @db.Decimal(10,8)
+  longitude               Decimal?  @db.Decimal(11,8)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([sexual_orientation])
+  @@index([religion])
+  @@index([community])
   @@index([interested_in])
-  @@index([looking_for])
+  @@index([sexual_orientation])
   @@index([latitude, longitude])
   @@map("user_profiles")
 }

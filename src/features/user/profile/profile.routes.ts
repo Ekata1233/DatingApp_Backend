@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController, enterLookingForController, enterSexualOrientationController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -79,6 +79,51 @@ router.patch("/profile/basic-info", authMiddleware, profileController);
 
 /**
  * @swagger
+ * /api/user/profile/interested-in:
+ *   patch:
+ *     summary: Update user's dating preference
+ *     tags: [User Profile]
+ *     description: Saves who the logged-in user is interested in dating.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - interested_in
+ *             properties:
+ *               interested_in:
+ *                 type: string
+ *                 example: "Women"
+ *                 enum:
+ *                   - Women
+ *                   - Man
+ *                   - Everyone
+ *     responses:
+ *       200:
+ *         description: Interested in preference saved successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Interested in preference saved successfully"
+ *               interested_in: "Women"
+ *               onboarding_step: 6
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: Bad request
+ */
+
+router.patch("/profile/interested-in", authMiddleware, enterInterestedInController);
+
+router.patch("/profile/religion", authMiddleware, ReligionController);
+
+/**
+ * @swagger
  * /api/user/profile/sexual-orientation:
  *   patch:
  *     summary: Update user's sexual orientation
@@ -127,48 +172,7 @@ router.patch("/profile/basic-info", authMiddleware, profileController);
 
 router.patch("/profile/sexual-orientation", authMiddleware, enterSexualOrientationController);
 
-/**
- * @swagger
- * /api/user/profile/interested-in:
- *   patch:
- *     summary: Update user's dating preference
- *     tags: [User Profile]
- *     description: Saves who the logged-in user is interested in dating.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - interested_in
- *             properties:
- *               interested_in:
- *                 type: string
- *                 example: "Women"
- *                 enum:
- *                   - Women
- *                   - Man
- *                   - Everyone
- *     responses:
- *       200:
- *         description: Interested in preference saved successfully
- *         content:
- *           application/json:
- *             example:
- *               success: true
- *               message: "Interested in preference saved successfully"
- *               interested_in: "Women"
- *               onboarding_step: 6
- *       401:
- *         description: Unauthorized
- *       400:
- *         description: Bad request
- */
 
-router.patch("/profile/interested-in", authMiddleware, enterInterestedInController);
 
 /**
  * @swagger
