@@ -1,73 +1,22 @@
 import { prisma } from "../../../prisma/prismaClient";
 
-export const updateNameService = async (userId: string, name: string) => {
+//profile update service
+export const updateProfileService = async (userId: string, fullName: string, email: string, birth_date: string, height: number, gender: string) => {
   if (!userId) throw new Error("User ID is missing");
 
   const user = await prisma.user.update({
     where: { id: userId },
     data: {
-      name,
+      full_name: fullName,
+      email,
+      birth_date: new Date(birth_date),
+      height,
+      gender,
       onboarding_step: 2,
     },
   });
 
   return user;
-};
-
-
-
-// Update Birth Date
-export const updateBirthDateService = async (userId: string, birth_date: string) => {
-  // Ensure profile exists
-  let profile = await prisma.userProfile.findUnique({
-    where: { user_id: userId }
-  });
-
-  if (!profile) {
-    profile = await prisma.userProfile.create({
-      data: { user_id: userId }
-    });
-  }
-
-  const updatedProfile = await prisma.userProfile.update({
-    where: { user_id: userId },
-    data: {
-      birth_date: new Date(birth_date)
-    }
-  });
-
-  // Update onboarding_step in user table
-  await prisma.user.update({
-    where: { id: userId },
-    data: { onboarding_step: 3 } // next step
-  });
-
-  return updatedProfile;
-};
-
-
-//Gender
-export const updateGenderService = async (userId: string, gender: string) => {
-
-  const updatedProfile = await prisma.userProfile.upsert({
-    where: { user_id: userId },
-    update: {
-      gender
-    },
-    create: {
-      user_id: userId,
-      gender
-    }
-  });
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      onboarding_step: 4
-    }
-  });
-
-  return updatedProfile;
 };
 
 //Sexual_Orientation 
