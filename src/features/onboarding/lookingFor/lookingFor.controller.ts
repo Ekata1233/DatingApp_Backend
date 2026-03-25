@@ -9,11 +9,21 @@ import imagekit from "../../../utils/imagekit";
 export const create = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
-    const { flowType, title, description } = req.body;
+const { flowType, title, description } = req.body;
 
+let { options } = req.body;
+
+// ✅ Parse options if string (from form-data)
+if (typeof options === "string") {
+  try {
+    options = JSON.parse(options);
+  } catch (e) {
+    options = [];
+  }
+}
     if (!flowType) {
       return res.status(400).json({
         success: false,
@@ -57,8 +67,9 @@ export const create = async (
         return {
           image: uploadResponse.url,
           description: descriptions[index],
+          options: Array.isArray(options?.[index]) ? options[index] : [],
         };
-      })
+      }),
     );
 
     const data = await createLookingFor({
@@ -79,7 +90,7 @@ export const create = async (
 export const getAll = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const data = await getAllLookingFor();
@@ -92,7 +103,7 @@ export const getAll = async (
 export const remove = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     await deleteLookingFor();
