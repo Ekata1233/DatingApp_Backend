@@ -5,8 +5,19 @@ import { ILookingFor } from "./lookingFor.types";
 export const createLookingFor = async (
   payload: ILookingFor
 ): Promise<ILookingFor> => {
-  await LookingFor.deleteMany({});
-  return LookingFor.create(payload);
+  const { flowType } = payload;
+
+  const data = await LookingFor.findOneAndUpdate(
+    { flowType },           // ✅ find by flowType
+    payload,                // ✅ new data
+    {
+      new: true,            // return updated doc
+      upsert: true,         // create if not exist
+      runValidators: true,
+    }
+  );
+
+  return data;
 };
 
 // GET ALL

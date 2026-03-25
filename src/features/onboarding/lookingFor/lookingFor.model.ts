@@ -5,6 +5,10 @@ const ItemSchema = new Schema(
   {
     image: { type: String, required: true },
     description: { type: String, required: true },
+    options: {
+      type: [String], // ✅ added field
+      default: [],
+    },
   },
   { _id: false }
 );
