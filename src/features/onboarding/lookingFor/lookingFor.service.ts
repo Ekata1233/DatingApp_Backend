@@ -1,18 +1,18 @@
 import { LookingFor } from "./lookingFor.model";
 import { ILookingFor } from "./lookingFor.types";
 
-// CREATE (replace existing document)
+// CREATE (upsert by flowType)
 export const createLookingFor = async (
   payload: ILookingFor
 ): Promise<ILookingFor> => {
   const { flowType } = payload;
 
   const data = await LookingFor.findOneAndUpdate(
-    { flowType },           // ✅ find by flowType
-    payload,                // ✅ new data
+    { flowType },
+    payload,
     {
-      new: true,            // return updated doc
-      upsert: true,         // create if not exist
+      new: true,
+      upsert: true,
       runValidators: true,
     }
   );
@@ -20,9 +20,17 @@ export const createLookingFor = async (
   return data;
 };
 
-// GET ALL
-export const getAllLookingFor = async (): Promise<ILookingFor[]> => {
-  return LookingFor.find().lean();
+// GET ALL (with optional filter)
+export const getAllLookingFor = async (
+  flowType?: string
+): Promise<ILookingFor[]> => {
+  const filter: any = {};
+
+  if (flowType) {
+    filter.flowType = flowType;
+  }
+
+  return LookingFor.find(filter).lean();
 };
 
 // DELETE (all)

@@ -93,7 +93,10 @@ export const getAll = async (
   next: NextFunction,
 ) => {
   try {
-    const data = await getAllLookingFor();
+    const { flowType } = req.query;
+
+    const data = await getAllLookingFor(flowType as string);
+
     res.json({ success: true, data });
   } catch (error) {
     next(error);
