@@ -4,6 +4,14 @@ import { ISexualOrientation } from "./sexualorientations.types";
 const OptionSchema = new Schema(
   {
     label: { type: String, required: true },
+
+    description: {
+      type: String,
+      required: true,        // ✅ required field
+      minlength: 10,         // ✅ minimum length
+      maxlength: 200,        // ✅ maximum length
+      trim: true,            // ✅ clean spaces
+    },
   },
   { _id: false }
 );
