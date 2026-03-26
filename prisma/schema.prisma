@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  
 }
 
 datasource db {
@@ -9,132 +8,48 @@ datasource db {
 }
 
 model User {
-  id                   String       @id @default(uuid()) @db.Uuid
-  name                 String?      @db.VarChar(100)
-  email                String?      @unique @db.VarChar(255)
-  phone_number         String?      @unique @db.VarChar(20)
-  google_id            String?  @unique @db.VarChar(255)
-  is_phone_verified    Boolean      @default(false)
-  onboarding_step      Int          @default(1)
-  onboarding_completed Boolean      @default(false)
-  created_at           DateTime     @default(now())
-  updated_at           DateTime     @updatedAt
-  profile              UserProfile?
+  id                      String          @id @default(uuid()) @db.Uuid
+  full_name               String?         @db.VarChar(100)
+  email                   String?         @unique @db.VarChar(255)
+  phone_number            String?         @unique @db.VarChar(20)
+  is_phone_verified       Boolean         @default(false)
+  google_id               String?         @unique @db.VarChar(255)
+  looking_for             String?         @db.VarChar(50)
+  birth_date              DateTime?       @db.Date
+  height                  Int?
+  gender                  String?         @db.VarChar(20)
+  onboarding_step         Int             @default(1)
+  onboarding_completed    Boolean         @default(false)
+  created_at              DateTime        @default(now())
+  updated_at              DateTime        @updatedAt
+  profile                 UserProfile?
 
   @@index([phone_number])
   @@index([google_id])
+  @@index([looking_for])
+  @@index([gender, created_at])
   @@index([created_at])
   @@map("users")
 }
 
 model UserProfile {
-  user_id            String    @id @db.Uuid
-  birth_date         DateTime? @db.Date
-  gender             String?   @db.VarChar(30)
-  sexual_orientation String?   @db.VarChar(50)
-  interested_in      String?   @db.VarChar(30)
-  looking_for        String?   @db.VarChar(50)
-  max_distance_km    Int?
-  latitude           Decimal?  @db.Decimal(10,8)
-  longitude          Decimal?  @db.Decimal(11,8)
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  user_id                 String    @id @db.Uuid
+  religion                String?   @db.VarChar(50)
+  community               String?   @db.VarChar(50)
+  interested_in           String?   @db.VarChar(30)
+  sexual_orientation      String?   @db.VarChar(50)
+  max_distance_km         Int?
+  latitude                Decimal?  @db.Decimal(10,8)
+  longitude               Decimal?  @db.Decimal(11,8)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([gender])
-  @@index([sexual_orientation])
+  @@index([religion])
+  @@index([community])
   @@index([interested_in])
-  @@index([looking_for])
-  @@index([birth_date])
+  @@index([sexual_orientation])
   @@index([latitude, longitude])
-  @@index([gender, interested_in])
   @@map("user_profiles")
-}
-
-model UserLifestyle {
-  id        String  @id @default(uuid())
-  user_id   String  @unique
-
-  drinking  DrinkingHabit?
-  smoking   SmokingHabit?
-  exercise  ExerciseHabit?
-  pets      Pets?
-
-  user      User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-}
-
-model RealYouMatters {
-  id                 String @id @default(uuid())
-  user_id            String @unique
-
-  communication_style CommunicationStyle?
-  receive_love        ReceiveLove?
-  education_level     EducationLevel?
-  star_sign           StarSign?
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-}
-
-model ThingsYouLove {
-  id                  String @id @default(uuid())
-  user_id             String @unique
-
-  creativity          Creativity?
-  fan_favourite       FanFavourite?
-  food_drink          FoodDrink?
-  gaming              Gaming?
-  going_out           GoingOut?
-  music               Music?
-  outdoor_adventure   OutdoorAdventure?
-  social_content      SocialContent?
-  sport_fitness       SportFitness?
-  staying_in          StayingIn?
-  tv_movie            TvMovie?
-  values_causes       ValuesCauses?
-  wellness_lifestyle  WellnessLifestyle?
-
-  users   UserInterest[]
-}
-
-enum DrinkingHabit {
-  NOT_FOR_ME
-  TEETOTAL
-  SOBER_CURIOUS
-  SPECIAL_OCCASIONS
-  WEEKENDS
-  MOST_NIGHTS
-}
-
-enum SmokingHabit {
-  SOCIAL_SMOKER
-  SMOKER_WITH_DRINKING
-  NON_SMOKER
-  SMOKER
-  TRYING_TO_QUIT
-}
-
-enum ExerciseHabit {
-  EVERYDAY
-  OFTEN
-  SOMETIMES
-  RARELY
-  NEVER
-}
-
-enum CommunicationStyle {
-  WHATSAPP_ALL_DAY
-  BIG_TEXTER
-  PHONE_CALLER
-  VIDEO_CHATTER
-  BAD_TEXTER
-  BETTER_IN_PERSON
-}
-
-enum LoveLanguage {
-  THOUGHTFUL_GESTURES
-  PRESENTS
-  TOUCH
-  COMPLIMENTS
-  TIME_TOGETHER
 }

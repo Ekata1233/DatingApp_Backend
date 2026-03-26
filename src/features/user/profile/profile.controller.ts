@@ -1,20 +1,35 @@
 import { Request, Response } from "express";
-import { birthDateValidation, nameValidation } from "./profile.validation";
-import { updateBirthDateService, updateGenderService, updateInterestedInService, updateLookingForService, updateNameService, updateSexualOrientationService } from "./profile.service";
+import { profileValidation } from "./profile.validation";
+import {
+  updateProfileService,
+  updateInterestedInService,
+  updateReligionService,
+  updateLookingForService,
+  updateSexualOrientationService,
+} from "./profile.service";
 
-export const enterNameController = async (req: Request, res: Response) => {
+export const profileController = async (req: Request, res: Response) => {
   try {
     // now user.id is available
     const userId = (req as any).user.id;
 
-    const { name } = nameValidation.parse(req.body);
+    const { fullName, email, birth_date, height, gender } =
+      profileValidation.parse(req.body);
 
-    const user = await updateNameService(userId, name);
+    const user = await updateProfileService(
+      userId,
+      fullName,
+      email,
+      birth_date,
+      height,
+      gender,
+    );
 
     return res.status(200).json({
       success: true,
-      message: "Name saved successfully",
+      message: "Profile updated successfully",
       onboarding_step: user.onboarding_step,
+      data: user,
     });
   } catch (error: any) {
     return res.status(400).json({
@@ -24,78 +39,11 @@ export const enterNameController = async (req: Request, res: Response) => {
   }
 };
 
-export const enterBirthDateController = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
-    const validated = birthDateValidation.parse(req.body);
-
-    const profile = await updateBirthDateService(userId, validated.birth_date);
-
-    return res.status(200).json({
-      success: true,
-      message: "Birth date saved successfully",
-      birth_date: profile.birth_date
-    });
-
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-//Gender
-export const enterGenderController = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
-
-    const { gender } = req.body;
-
-    const profile = await updateGenderService(userId, gender);
-
-    return res.status(200).json({
-      success: true,
-      message: "Gender saved successfully",
-      gender: profile.gender,
-      onboarding_step: 4
-    });
-
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-//Sexual_Orientation
-export const enterSexualOrientationController = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
-
-    const { sexual_orientation } = req.body;
-
-    const profile = await updateSexualOrientationService(userId, sexual_orientation);
-
-    return res.status(200).json({
-      success: true,
-      message: "Sexual orientation saved successfully",
-      sexual_orientation: profile.sexual_orientation,
-      onboarding_step: 5
-    });
-
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-
-//Interested In 
-export const enterInterestedInController = async (req: Request, res: Response) => {
+//Interested In
+export const enterInterestedInController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
@@ -107,38 +55,116 @@ export const enterInterestedInController = async (req: Request, res: Response) =
       success: true,
       message: "Interested in preference saved successfully",
       interested_in: profile.interested_in,
-      onboarding_step: 6
+      onboarding_step: 6,
     });
-
   } catch (error: any) {
     return res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
 
-//Looking for
-export const enterLookingForController = async (req: Request, res: Response) => {
+//Religion
+export const ReligionController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
+    const { religion, community } = req.body;
+
+    const profile = await updateReligionService(
+      userId,
+      religion,
+      community
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Religion saved successfully",
+      religion: profile.religion,
+      community: profile.community,
+
+      onboarding_step: 5,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+//Sexual_Orientation
+export const enterSexualOrientationController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { sexual_orientation } = req.body;
+
+    const profile = await updateSexualOrientationService(
+      userId,
+      sexual_orientation,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Sexual orientation saved successfully",
+      sexual_orientation: profile.sexual_orientation,
+      onboarding_step: 5,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Looking for
+export const enterLookingForController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const { looking_for } = req.body;
 
-    const profile = await updateLookingForService(userId, looking_for);
+    // ✅ Basic validation
+    if (!looking_for || typeof looking_for !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid looking_for value",
+      });
+    }
+
+    const user = await updateLookingForService(userId, looking_for);
 
     return res.status(200).json({
       success: true,
       message: "Relationship preference saved successfully",
-      looking_for: profile.looking_for,
-      onboarding_step: 7
+      looking_for: user.looking_for,
+      onboarding_step: user.onboarding_step, // ✅ dynamic
     });
-
   } catch (error: any) {
     return res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || "Something went wrong",
     });
   }
 };

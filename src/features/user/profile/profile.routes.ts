@@ -1,16 +1,17 @@
 import express from "express";
-import { enterBirthDateController, enterGenderController, enterInterestedInController, enterLookingForController, enterNameController, enterSexualOrientationController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
 
 /**
  * @swagger
- * /api/user/profile/name:
+ * /api/user/profile/
+ * :
  *   patch:
- *     summary: Update user's name
+ *     summary: Update user profile
  *     tags: [User Profile]
- *     description: Updates the logged-in user's name as part of onboarding. Automatically moves the user to the next onboarding step.
+ *     description: Updates the logged-in user's basic profile details (name, email, birth date, height, gender) and moves onboarding to the next step.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -20,77 +21,51 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *                 example: "Khushi"
- *     responses:
- *       200:
- *         description: Name saved successfully
- *         content:
- *           application/json:
- *             example:
- *               success: true
- *               message: Name saved successfully
- *               onboarding_step: 2
- *       400:
- *         description: Validation or other error
- *         content:
- *           application/json:
- *             example:
- *               success: false
- *               message: "Name must be at least 2 characters"
- *       401:
- *         description: Unauthorized, invalid or missing JWT
- *         content:
- *           application/json:
- *             example:
- *               success: false
- *               message: "Authorization token missing or invalid"
- */
-
-router.patch("/profile/name", authMiddleware, enterNameController);
-
-/**
- * @swagger
- * /api/user/profile/birth-date:
- *   patch:
- *     summary: Update user's birth date
- *     tags: [User Profile]
- *     description: Saves the logged-in user's birth date as part of onboarding. Automatically moves the user to the next onboarding step.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
+ *               - fullName
+ *               - email
  *               - birth_date
+ *               - height
+ *               - gender
  *             properties:
+ *               fullName:
+ *                 type: string
+ *                 example: "Rahul Sharma"
+ *               email:
+ *                 type: string
+ *                 example: "rahul@example.com"
  *               birth_date:
  *                 type: string
  *                 format: date
- *                 example: "1995-06-15"
+ *                 example: "2000-05-15"
+ *               height:
+ *                 type: number
+ *                 example: 170
+ *               gender:
+ *                 type: string
+ *                 example: "male"
  *     responses:
  *       200:
- *         description: Birth date saved successfully
+ *         description: Profile updated successfully
  *         content:
  *           application/json:
  *             example:
  *               success: true
- *               message: "Birth date saved successfully"
- *               onboarding_step: 3
- *               birth_date: "1995-06-15T00:00:00.000Z"
+ *               message: "Profile updated successfully"
+ *               onboarding_step: 2
+ *               data:
+ *                 id: "uuid"
+ *                 full_name: "Rahul Sharma"
+ *                 email: "rahul@example.com"
+ *                 birth_date: "2000-05-15T00:00:00.000Z"
+ *                 height: 170
+ *                 gender: "female"
  *       400:
  *         description: Validation or other error
  *         content:
  *           application/json:
  *             example:
  *               success: false
- *               message: "User must be at least 18 years old"
+ *               message: "Height must be a number"
  *       401:
  *         description: Unauthorized, invalid or missing JWT
  *         content:
@@ -100,15 +75,15 @@ router.patch("/profile/name", authMiddleware, enterNameController);
  *               message: "Authorization token missing or invalid"
  */
 
-router.patch("/profile/birth-date", authMiddleware, enterBirthDateController);
+router.patch("/profile/basic-info", authMiddleware, profileController);
 
 /**
  * @swagger
- * /api/user/profile/gender:
+ * /api/user/profile/interested-in:
  *   patch:
- *     summary: Update user's gender
+ *     summary: Update user's dating preference
  *     tags: [User Profile]
- *     description: Saves the logged-in user's gender during onboarding.
+ *     description: Saves who the logged-in user is interested in dating.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -118,34 +93,34 @@ router.patch("/profile/birth-date", authMiddleware, enterBirthDateController);
  *           schema:
  *             type: object
  *             required:
- *               - gender
+ *               - interested_in
  *             properties:
- *               gender:
+ *               interested_in:
  *                 type: string
- *                 example: "Man"
- *                 description: Select gender from available options
+ *                 example: "Women"
  *                 enum:
- *                   - Man
  *                   - Women
- *                   - Non-Binary
- *                   - Prefer not to say
+ *                   - Man
+ *                   - Everyone
  *     responses:
  *       200:
- *         description: Gender saved successfully
+ *         description: Interested in preference saved successfully
  *         content:
  *           application/json:
  *             example:
  *               success: true
- *               message: "Gender saved successfully"
- *               gender: "Man"
- *               onboarding_step: 4
+ *               message: "Interested in preference saved successfully"
+ *               interested_in: "Women"
+ *               onboarding_step: 6
  *       401:
  *         description: Unauthorized
  *       400:
  *         description: Bad request
  */
- 
-router.patch("/profile/gender", authMiddleware, enterGenderController);
+
+router.patch("/profile/interested-in", authMiddleware, enterInterestedInController);
+
+router.patch("/profile/religion", authMiddleware, ReligionController);
 
 /**
  * @swagger
@@ -197,48 +172,7 @@ router.patch("/profile/gender", authMiddleware, enterGenderController);
 
 router.patch("/profile/sexual-orientation", authMiddleware, enterSexualOrientationController);
 
-/**
- * @swagger
- * /api/user/profile/interested-in:
- *   patch:
- *     summary: Update user's dating preference
- *     tags: [User Profile]
- *     description: Saves who the logged-in user is interested in dating.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - interested_in
- *             properties:
- *               interested_in:
- *                 type: string
- *                 example: "Women"
- *                 enum:
- *                   - Women
- *                   - Man
- *                   - Everyone
- *     responses:
- *       200:
- *         description: Interested in preference saved successfully
- *         content:
- *           application/json:
- *             example:
- *               success: true
- *               message: "Interested in preference saved successfully"
- *               interested_in: "Women"
- *               onboarding_step: 6
- *       401:
- *         description: Unauthorized
- *       400:
- *         description: Bad request
- */
 
-router.patch("/profile/interested-in", authMiddleware, enterInterestedInController);
 
 /**
  * @swagger
