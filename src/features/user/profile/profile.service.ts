@@ -1,4 +1,5 @@
 import { prisma } from "../../../prisma/prismaClient";
+import { getNextStep } from "../../../utils/onboardingFlows";
 
 //profile update service
 export const updateProfileService = async (
@@ -11,6 +12,19 @@ export const updateProfileService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
+   const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+if (!existingUser?.looking_for) {
+  throw new Error("Looking_for is missing");
+}
+
+  // 👉 Calculate next step
+  const currentStep = "BASIC_INFO";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
   const user = await prisma.user.update({
     where: { id: userId },
     data: {
@@ -19,7 +33,8 @@ export const updateProfileService = async (
       birth_date: new Date(birth_date),
       height,
       gender,
-      onboarding_step: 2,
+      onboarding_step: "BASIC_INFO",
+      next_step: nextStep,
     },
   });
 
@@ -31,6 +46,21 @@ export const updateInterestedInService = async (
   userId: string,
   interested_in: string,
 ) => {
+  if (!userId) throw new Error("User ID is missing");
+
+   const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+if (!existingUser?.looking_for) {
+  throw new Error("Looking_for is missing");
+}
+
+  // 👉 Calculate next step
+  const currentStep = "INTRESTED_IN";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
     update: {
@@ -45,7 +75,8 @@ export const updateInterestedInService = async (
   await prisma.user.update({
     where: { id: userId },
     data: {
-      onboarding_step: 6,
+      onboarding_step: currentStep,
+      next_step: nextStep,
     },
   });
 
@@ -58,6 +89,21 @@ export const updateReligionService = async (
   religion: string,
   community: string,
 ) => {
+  if (!userId) throw new Error("User ID is missing");
+
+   const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+if (!existingUser?.looking_for) {
+  throw new Error("Looking_for is missing");
+}
+
+  // 👉 Calculate next step
+  const currentStep = "RELIGION";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
     update: {
@@ -74,7 +120,8 @@ export const updateReligionService = async (
   await prisma.user.update({
     where: { id: userId },
     data: {
-      onboarding_step: 5,
+      onboarding_step: currentStep,
+      next_step: nextStep,
     },
   });
 
@@ -86,6 +133,21 @@ export const updateSexualOrientationService = async (
   userId: string,
   sexual_orientation: string,
 ) => {
+  if (!userId) throw new Error("User ID is missing");
+
+   const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+if (!existingUser?.looking_for) {
+  throw new Error("Looking_for is missing");
+}
+
+  // 👉 Calculate next step
+  const currentStep = "BASIC_INFO";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
     update: {
@@ -100,7 +162,8 @@ export const updateSexualOrientationService = async (
   await prisma.user.update({
     where: { id: userId },
     data: {
-      onboarding_step: 5,
+      onboarding_step: "LOOKING_FOR",
+      next_step: nextStep,
     },
   });
 
@@ -114,11 +177,15 @@ export const updateLookingForService = async (
 ) => {
   if (!userId) throw new Error("User ID is required");
 
+  const currentStep = "LOOKING_FOR";
+  const nextStep = getNextStep("MARRIAGE", currentStep);
+
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       looking_for,
-      onboarding_step: 2, // move to next step
+      onboarding_step: currentStep,
+      next_step: nextStep,
     },
   });
 

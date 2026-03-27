@@ -29,6 +29,7 @@ export const profileController = async (req: Request, res: Response) => {
       success: true,
       message: "Profile updated successfully",
       onboarding_step: user.onboarding_step,
+      next_step: user.next_step,
       data: user,
     });
   } catch (error: any) {
@@ -65,22 +66,14 @@ export const enterInterestedInController = async (
   }
 };
 
-
 //Religion
-export const ReligionController = async (
-  req: Request,
-  res: Response,
-) => {
+export const ReligionController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
     const { religion, community } = req.body;
 
-    const profile = await updateReligionService(
-      userId,
-      religion,
-      community
-    );
+    const profile = await updateReligionService(userId, religion, community);
 
     return res.status(200).json({
       success: true,
@@ -97,7 +90,6 @@ export const ReligionController = async (
     });
   }
 };
-
 
 //Sexual_Orientation
 export const enterSexualOrientationController = async (
@@ -131,7 +123,7 @@ export const enterSexualOrientationController = async (
 //Looking for
 export const enterLookingForController = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user?.id;
@@ -159,7 +151,8 @@ export const enterLookingForController = async (
       success: true,
       message: "Relationship preference saved successfully",
       looking_for: user.looking_for,
-      onboarding_step: user.onboarding_step, // ✅ dynamic
+      onboarding_step: user.onboarding_step,
+      next_step: user.next_step,
     });
   } catch (error: any) {
     return res.status(400).json({

@@ -18,7 +18,8 @@ model User {
   birth_date              DateTime?       @db.Date
   height                  Int?
   gender                  String?         @db.VarChar(20)
-  onboarding_step         Int             @default(1)
+  onboarding_step         String?         @db.VarChar(20)
+  next_step               String?         @db.VarChar(20)
   onboarding_completed    Boolean         @default(false)
   created_at              DateTime        @default(now())
   updated_at              DateTime        @updatedAt
