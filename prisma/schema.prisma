@@ -23,6 +23,7 @@ model User {
   created_at              DateTime        @default(now())
   updated_at              DateTime        @updatedAt
   profile                 UserProfile?
+  about                   UserAbout?
 
   @@index([phone_number])
   @@index([google_id])
@@ -38,6 +39,9 @@ model UserProfile {
   community               String?   @db.VarChar(50)
   interested_in           String?   @db.VarChar(30)
   sexual_orientation      String?   @db.VarChar(50)
+  country                 String?   @db.VarChar(30)
+  state                   String?   @db.VarChar(30)
+  city                    String?   @db.VarChar(30)
   max_distance_km         Int?
   latitude                Decimal?  @db.Decimal(10,8)
   longitude               Decimal?  @db.Decimal(11,8)
@@ -50,6 +54,69 @@ model UserProfile {
   @@index([community])
   @@index([interested_in])
   @@index([sexual_orientation])
+  @@index([country])
+  @@index([state])
+  @@index([city])
   @@index([latitude, longitude])
   @@map("user_profiles")
+}
+
+
+model UserAbout {
+  user_id                    String    @id @db.Uuid
+  maritalStatus              MaritalStatus?
+  childStatus                ChildStatus?
+  numberOfChildren           NumberOfChildren?
+  childLivingArrangement     ChildLivingArrangement?
+  livingSituation            LivingSituation?
+  created_at                 DateTime  @default(now())
+  updated_at                 DateTime  @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([maritalStatus])
+  @@index([childStatus])
+  @@map("user_about")
+}
+
+enum MaritalStatus {
+  NEVER_MARRIED
+  DIVORCED
+  WIDOWED
+  AWAITING_DIVORCE
+  ANNULLED
+}
+
+// Enum for child-related options
+enum ChildStatus {
+  YES
+  NO
+  PREFER_NOT_TO_SAY
+}
+
+// Enum for number of children
+enum NumberOfChildren {
+  ONE
+  TWO
+  THREE
+  FOUR
+  FIVE_PLUS
+}
+
+// Enum for child living arrangement
+enum ChildLivingArrangement {
+  YES
+  NO
+  SOMETIME
+}
+
+// Enum for current living situation
+enum LivingSituation {
+  OWN_HOME
+  LIVING_ALONE
+  WITH_CHILDREN
+  WITH_FAMILY
+  RENTED_HOME
+  SENIOR_LIVING_COMMUNITY
+  OTHER
 }
