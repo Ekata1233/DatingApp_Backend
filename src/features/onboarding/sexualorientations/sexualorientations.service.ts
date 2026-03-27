@@ -5,7 +5,7 @@ import { ISexualOrientation } from "./sexualorientations.types";
 export const createSexualOrientation = async (
   payload: ISexualOrientation
 ): Promise<ISexualOrientation> => {
-  await SexualOrientation.deleteMany({});
+  await SexualOrientation.deleteMany({ flowType: payload.flowType });
   return SexualOrientation.create(payload);
 };
 
@@ -15,6 +15,6 @@ export const getAllSexualOrientation = async (): Promise<ISexualOrientation[]> =
 };
 
 // DELETE ALL
-export const deleteSexualOrientation = async (): Promise<void> => {
-  await SexualOrientation.deleteMany({});
+export const deleteSexualOrientation = async (flowType: string): Promise<void> => {
+  await SexualOrientation.deleteMany({ flowType });
 };
