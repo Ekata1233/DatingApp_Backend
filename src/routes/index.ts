@@ -10,6 +10,7 @@ import googleAuthRoutes from "../features/user/google-auth/google-auth.routes";
 import userManageRoutes from "../features/user/management/user.route";
 import profileRoutes from "../features/user/profile/profile.routes";
 import messageRoutes from "../features/user/messages/message.route";
+import religionRoutes from "../features/onboarding/religion/religion.route";
 
 const router = Router();
 
@@ -19,6 +20,8 @@ router.use("/lifestyle",lifestyleRoutes)
 router.use("/lookingFor",lookingForRoutes)
 router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
+router.use("/religion", religionRoutes);
+
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
 
