@@ -14,7 +14,7 @@ model User {
   phone_number            String?         @unique @db.VarChar(20)
   is_phone_verified       Boolean         @default(false)
   google_id               String?         @unique @db.VarChar(255)
-  looking_for             String?         @db.VarChar(50)
+  looking_for             LookingFor?
   birth_date              DateTime?       @db.Date
   height                  Int?
   gender                  String?         @db.VarChar(20)
@@ -78,6 +78,13 @@ model UserAbout {
   @@index([maritalStatus])
   @@index([childStatus])
   @@map("user_about")
+}
+
+
+enum LookingFor {
+  DATE_TO_MARRY
+  DATING
+  MATURE_CONNECTION
 }
 
 enum MaritalStatus {

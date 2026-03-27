@@ -33,7 +33,7 @@ if (!existingUser?.looking_for) {
       birth_date: new Date(birth_date),
       height,
       gender,
-      onboarding_step: "BASIC_INFO",
+      onboarding_step: currentStep,
       next_step: nextStep,
     },
   });
