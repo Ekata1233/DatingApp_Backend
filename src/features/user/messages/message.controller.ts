@@ -45,3 +45,4 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
 
   res.json(newMessage);
 };
+

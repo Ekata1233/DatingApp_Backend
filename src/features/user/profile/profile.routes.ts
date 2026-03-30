@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, locationController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -216,5 +216,8 @@ router.patch("/profile/sexual-orientation", authMiddleware, enterSexualOrientati
  */
 
 router.patch("/profile/looking-for", authMiddleware, enterLookingForController);
+
+router.patch("/profile/location", authMiddleware, locationController);
+
 
 export default router;
