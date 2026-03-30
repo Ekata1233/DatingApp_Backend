@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { profileValidation } from "./profile.validation";
+import { locationValidation, profileValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -7,6 +7,7 @@ import {
   updateLookingForService,
   updateSexualOrientationService,
   updateLocationService,
+  updateLatLngService,
 } from "./profile.service";
 
 //Basic Info
@@ -183,6 +184,45 @@ export const locationController = async (req: Request, res: Response) => {
       onboarding_step: user.onboarding.onboarding_step,
       next_step: user.onboarding.next_step,
       data: user.profile,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Location
+export const updateLatLngController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { latitude, longitude } = locationValidation.parse(req.body);
+
+    const profile = await updateLatLngService(
+      userId,
+      latitude,
+      longitude
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Location updated successfully",
+      data: {
+        latitude: Number(profile.latitude),
+        longitude: Number(profile.longitude),
+      },
     });
   } catch (error: any) {
     return res.status(400).json({

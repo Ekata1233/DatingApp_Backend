@@ -238,3 +238,26 @@ export const updateLocationService = async (
 };
 
 
+//Location
+export const updateLatLngService = async (
+  userId: string,
+  latitude: number,
+  longitude: number
+) => {
+  if (!userId) throw new Error("User ID is required");
+
+  const profile = await prisma.userProfile.upsert({
+    where: { user_id: userId },
+    update: {
+      latitude,
+      longitude,
+    },
+    create: {
+      user_id: userId,
+      latitude,
+      longitude,
+    },
+  });
+
+  return profile;
+};
