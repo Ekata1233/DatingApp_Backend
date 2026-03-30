@@ -8,6 +8,7 @@ import {
   updateSexualOrientationService,
   updateLocationService,
   updateLatLngService,
+  updateAboutYourselfService
 } from "./profile.service";
 
 //Basic Info
@@ -230,4 +231,49 @@ export const updateLatLngController = async (
       message: error.message,
     });
   }
+};
+
+
+//About Yourself
+export const aboutYourselfController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const {
+      maritalStatus,
+      childStatus,
+      numberOfChildren,
+      childLivingArrangement,
+      livingSituation,
+    } = req.body;
+
+    const user = await updateAboutYourselfService(userId, {
+      maritalStatus,
+      childStatus,
+      numberOfChildren,
+      childLivingArrangement,
+      livingSituation,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "About yourself updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.profile,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+
+
+
+
+
+
+
+
 };
