@@ -11,6 +11,10 @@ import userManageRoutes from "../features/user/management/user.route";
 import profileRoutes from "../features/user/profile/profile.routes";
 import messageRoutes from "../features/user/messages/message.route";
 import religionRoutes from "../features/onboarding/religion/religion.route";
+import educationRoutes from "../features/onboarding/education/education.routes";
+import workDetailsRoutes from "../features/onboarding/workDetails/workDetails.routes";
+import interestHobbiesRoutes from "../features/onboarding/interestHobbies/interestHobbies.routes";
+import dreamsFutureRoutes from "../features/onboarding/dreamsFuture/dreamsFuture.routes";
 
 const router = Router();
 
@@ -21,6 +25,10 @@ router.use("/lookingFor",lookingForRoutes)
 router.use("/realYouMatters",realYouMattersRoutes)
 router.use("/thingsYouLove",thingsYouLoveRoutes)
 router.use("/religion", religionRoutes);
+router.use("/education", educationRoutes);
+router.use("/workDetails", workDetailsRoutes);
+router.use("/interestHobbies", interestHobbiesRoutes);
+router.use("/dreamsFuture", dreamsFutureRoutes);
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
