@@ -1,3 +1,4 @@
+import { ChildLivingArrangement, ChildStatus, LivingSituation, MaritalStatus, NumberOfChildren } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { getNextStep } from "../../../utils/onboardingFlows";
 
@@ -219,6 +220,81 @@ export const updateLocationService = async (
     create: { user_id: userId, country, state, city },
   });
 
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
+
+  return {
+    profile,
+    onboarding: updatedUser,
+  };
+};
+
+//About Yourself
+export const updateAboutYourselfService = async (
+  userId: string,
+  data: {
+    maritalStatus?: MaritalStatus;
+    childStatus?: ChildStatus;
+    numberOfChildren?: NumberOfChildren | null;
+    childLivingArrangement?: ChildLivingArrangement | null;
+    livingSituation?: LivingSituation;
+  }
+) => {
+  if (!userId) throw new Error("User ID is missing");
+
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
+
+  // ✅ Business Validation (IMPORTANT)
+  if (data.childStatus === "NO") {
+    data.numberOfChildren = null;
+    data.childLivingArrangement = null;
+  }
+
+  if (data.childStatus === "YES" && !data.numberOfChildren) {
+    throw new Error("Number of children is required");
+  }
+
+  // ✅ Onboarding Step Logic
+  const currentStep = "ABOUT_YOURSELF";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
+  // ✅ Upsert UserAbout
+  const profile = await prisma.userAbout.upsert({
+    where: { user_id: userId },
+    update: {
+      maritalStatus: data.maritalStatus,
+      childStatus: data.childStatus,
+      numberOfChildren: data.numberOfChildren,
+      childLivingArrangement: data.childLivingArrangement,
+      livingSituation: data.livingSituation,
+    },
+    create: {
+      user_id: userId,
+      maritalStatus: data.maritalStatus,
+      childStatus: data.childStatus,
+      numberOfChildren: data.numberOfChildren,
+      childLivingArrangement: data.childLivingArrangement,
+      livingSituation: data.livingSituation,
+    },
+  });
+
+  // ✅ Update onboarding progress
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
