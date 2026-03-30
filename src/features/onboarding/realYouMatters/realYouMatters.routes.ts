@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { create, getAll, remove } from "./realYouMatters.controller";
+import { create, getAll } from "./realYouMatters.controller";
 
 const router = Router();
 
@@ -17,6 +17,5 @@ router.post("/create", create);      // Create / Replace
  *         description: Real you matters options fetched successfully
  */
 router.get("/get-all", getAll);       // Get single document
-router.delete("/remove", remove);    // Delete
 
 export default router;

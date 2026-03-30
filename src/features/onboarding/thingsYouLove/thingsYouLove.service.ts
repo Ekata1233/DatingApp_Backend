@@ -8,17 +8,32 @@ import { IThingsYouLove } from "./thingsYouLove.types";
 export const createThingsYouLove = async (
   payload: IThingsYouLove
 ): Promise<IThingsYouLove> => {
-  // Remove existing data
-  await ThingsYouLove.deleteMany({});
+  const { flowType } = payload;
 
-  // Insert fresh data
-  return ThingsYouLove.create(payload);
+  const data = await ThingsYouLove.findOneAndUpdate(
+    { flowType }, // ✅ only this flowType
+    payload,
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    }
+  );
+
+  return data;
 };
 
-export const getThingsYouLove = async (): Promise<IThingsYouLove | null> => {
-  return ThingsYouLove.findOne().lean();
+export const getThingsYouLove = async (
+  flowType?: string
+): Promise<IThingsYouLove[] | IThingsYouLove | null> => {
+  if (flowType) {
+    const data = await ThingsYouLove.findOne({ flowType }).lean();
+    return data ? [data] : [];
+  }
+
+  return ThingsYouLove.find().lean();
 };
 
-export const deleteThingsYouLove = async (): Promise<void> => {
-  await ThingsYouLove.deleteMany({});
-};
+// export const deleteThingsYouLove = async (): Promise<void> => {
+//   await ThingsYouLove.deleteMany({});
+// };

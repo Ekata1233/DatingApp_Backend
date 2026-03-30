@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import {
   createRealYouMatters,
   getRealYouMatters,
-  deleteRealYouMatters,
 } from "./realYouMatters.service";
 
 export const create = async (
@@ -24,22 +23,14 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
-    const data = await getRealYouMatters();
+    const { flowType } = req.query;
+
+    const data = await getRealYouMatters(flowType as string);
+
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-export const remove = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    await deleteRealYouMatters();
-    res.json({ success: true, message: "RealYouMatters deleted successfully" });
-  } catch (error) {
-    next(error);
-  }
-};
+
