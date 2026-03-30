@@ -191,3 +191,50 @@ export const updateLookingForService = async (
 
   return updatedUser;
 };
+
+//Location
+export const updateLocationService = async (
+  userId: string,
+  country: string,
+  state: string,
+  city: string,
+) => {
+  if (!userId) throw new Error("User ID is missing");
+
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
+
+  const currentStep = "LOCATION";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
+  const profile = await prisma.userProfile.upsert({
+    where: { user_id: userId },
+    update: { country, state, city },
+    create: { user_id: userId, country, state, city },
+  });
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
+
+  return {
+    profile,
+    onboarding: updatedUser,
+  };
+};
+
+
