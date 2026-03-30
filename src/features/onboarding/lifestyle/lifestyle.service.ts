@@ -8,17 +8,32 @@ import { ILifestyle } from "./lifestyle.types";
 export const createLifestyle = async (
   payload: ILifestyle
 ): Promise<ILifestyle> => {
-  // Remove existing data
-  await Lifestyle.deleteMany({});
+  const { flowType } = payload;
 
-  // Insert fresh data
-  return Lifestyle.create(payload);
+  const data = await Lifestyle.findOneAndUpdate(
+    { flowType }, // ✅ only this flowType
+    payload,
+    {
+      new: true,
+      upsert: true, // create if not exists
+      runValidators: true,
+    }
+  );
+
+  return data;
 };
 
-export const getLifestyle = async (): Promise<ILifestyle | null> => {
-  return Lifestyle.findOne().lean();
+export const getLifestyle = async (
+  flowType?: string
+): Promise<ILifestyle[] | ILifestyle | null> => {
+  if (flowType) {
+    const data = await Lifestyle.findOne({ flowType }).lean();
+    return data ? [data] : [];
+  }
+
+  return Lifestyle.find().lean();
 };
 
-export const deleteLifestyle = async (): Promise<void> => {
-  await Lifestyle.deleteMany({});
-};
+// export const deleteLifestyle = async (): Promise<void> => {
+//   await Lifestyle.deleteMany({});
+// };

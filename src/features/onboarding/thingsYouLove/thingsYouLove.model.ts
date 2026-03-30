@@ -23,6 +23,7 @@ const ThingsYouLoveSchema = new Schema<IThingsYouLove>(
       enum: ["dating", "marriage", "mature"],
       required: true,
       index: true,
+      unique: true,
     },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
