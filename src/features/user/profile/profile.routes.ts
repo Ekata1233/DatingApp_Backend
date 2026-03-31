@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educationWorkController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -280,4 +280,47 @@ router.patch("/profile/about-yourself", authMiddleware,aboutYourselfController);
 router.patch("/profile/location", authMiddleware, updateLocationController);
 router.patch("/profile/answer", authMiddleware, saveUserAnswerController);
 
+
+/**
+ * @swagger
+ * /api/user/profile/education-work:
+ *   patch:
+ *     summary: Update education and work details
+ *     tags: [User Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               highestEdu:
+ *                 type: string
+ *                 example: "B.Tech"
+ *               collegeName:
+ *                 type: string
+ *                 example: "IIT Bombay"
+ *               incomeRange:
+ *                 type: string
+ *                 example: "INR 1 lakh to 2 lakh"
+ *               workingWith:
+ *                 type: string
+ *                 example: "PRIVATE_COMPANY"
+ *               workingAs:
+ *                 type: string
+ *                 example: "Software Engineer"
+ *               companyName:
+ *                 type: string
+ *                 example: "Google"
+ *     responses:
+ *       200:
+ *         description: Education & work updated successfully
+ */
+router.patch(
+  "/profile/education-work",
+  authMiddleware,
+  educationWorkController
+);
 export default router;

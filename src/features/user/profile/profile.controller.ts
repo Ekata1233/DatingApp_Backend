@@ -9,7 +9,8 @@ import {
   updateLocationService,
   updateAddressService,
   updateAboutYourselfService,
-  updateUserAnswerService
+  updateUserAnswerService,
+  updateEduWorkService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -293,6 +294,47 @@ export const saveUserAnswerController = async (
     return res.status(400).json({
       success: false,
       message: error.message || "Something went wrong",
+    });
+  }
+};
+
+//Education & Work
+export const educationWorkController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const {
+      highestEdu,
+      collegeName,
+      incomeRange,
+      workingWith,
+      workingAs,
+      companyName,
+    } = req.body;
+
+    const user = await updateEduWorkService(userId, {
+      highestEdu,
+      collegeName,
+      incomeRange,
+      workingWith,
+      workingAs,
+      companyName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Education & work updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.eduWork,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 };
