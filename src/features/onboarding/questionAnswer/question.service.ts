@@ -20,7 +20,6 @@ export const createQuestionService = async (
   }
 
   const question = await prisma.question.create({
-    where: {},
     data: {
       key,
       title,
