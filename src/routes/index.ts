@@ -16,6 +16,8 @@ import workDetailsRoutes from "../features/onboarding/workDetails/workDetails.ro
 import interestHobbiesRoutes from "../features/onboarding/interestHobbies/interestHobbies.routes";
 import dreamsFutureRoutes from "../features/onboarding/dreamsFuture/dreamsFuture.routes";
 
+import questionRoutes from "../features/onboarding/questionAnswer/question.route";
+
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -29,6 +31,7 @@ router.use("/education", educationRoutes);
 router.use("/workDetails", workDetailsRoutes);
 router.use("/interestHobbies", interestHobbiesRoutes);
 router.use("/dreamsFuture", dreamsFutureRoutes);
+router.use("/question", questionRoutes);
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
