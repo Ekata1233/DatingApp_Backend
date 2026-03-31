@@ -182,13 +182,13 @@ enum WorkingWith {
   NOT_WORKING
 }
 
-
 model Question {
   id          String @id @default(uuid()) @db.Uuid
-  key         String           @unique   // e.g. "drinking", "smoking"
+  key         String           @unique   
   title       String
   category    QuestionCategory
-  isMulti     Boolean          @default(false) // allow multiple answers or not
+  screen      QuestionScreen
+  isMulti     Boolean          @default(false) 
 
   options     QuestionOption[]
   answers     UserAnswer[] 
@@ -200,8 +200,8 @@ model Question {
 model QuestionOption {
   id           String        @id @default(uuid())
   question_id  String @db.Uuid
-  value        String        // e.g. "NON_SMOKER"
-  label        String        // UI text
+  value        String        
+  label        String        
 
   question     Question      @relation(fields: [question_id], references: [id], onDelete: Cascade)
   answers      UserAnswer[]
@@ -223,7 +223,6 @@ model UserAnswer {
 
   created_at   DateTime         @default(now())
 
-  // ✅ prevent duplicate answers (important)
   @@unique([user_id, question_id, option_id])
 
   @@index([user_id])
@@ -235,4 +234,12 @@ enum QuestionCategory {
   DATING
   DATE_TO_MARRY
   MATURE_CONNECTION
+}
+
+enum QuestionScreen{
+  LIFESTYLE
+  REAL_U_MATTERS
+  THINGS_U_LOVE
+  INTEREST_HOBBY
+  DREAM_PLAN
 }

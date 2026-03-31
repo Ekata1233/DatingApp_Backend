@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { locationValidation, profileValidation } from "./profile.validation";
+import { answerValidation, locationValidation, profileValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -8,11 +8,8 @@ import {
   updateSexualOrientationService,
   updateLocationService,
   updateLatLngService,
-  updateAboutYourselfService,
-  
-  updateEduWorkService
+  updateAboutYourselfService
 } from "./profile.service";
-import { IncomeRangeType } from "@prisma/client";
 
 //Basic Info
 export const profileController = async (req: Request, res: Response) => {
@@ -145,7 +142,7 @@ export const enterLookingForController = async (
     const { looking_for } = req.body;
 
     // ✅ Basic validation
-    if (!looking_for || typeof looking_for !== "string") {
+    if (!looking_for || !Object.values(LookingFor).includes(looking_for)) {
       return res.status(400).json({
         success: false,
         message: "Invalid looking_for value",
@@ -236,7 +233,6 @@ export const updateLatLngController = async (
   }
 };
 
-
 //About Yourself
 export const aboutYourselfController = async (req: Request, res: Response) => {
   try {
@@ -272,47 +268,11 @@ export const aboutYourselfController = async (req: Request, res: Response) => {
     });
   }
 
-};
 
 
 
-//Education & Work
-export const educationWorkController = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const userId = (req as any).user.id;
 
-    const {
-      highestEdu,
-      collegeName,
-      incomeRange,
-      workingWith,
-      workingAs,
-      companyName,
-    } = req.body;
 
-    const user = await updateEduWorkService(userId, {
-      highestEdu,
-      collegeName,
-      incomeRange,
-      workingWith,
-      workingAs,
-      companyName,
-    });
 
-    return res.status(200).json({
-      success: true,
-      message: "Education & work updated successfully",
-      onboarding_step: user.onboarding.onboarding_step,
-      next_step: user.onboarding.next_step,
-      data: user.eduWork,
-    });
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
+
 };
