@@ -49,3 +49,8 @@ export const locationValidation = z.object({
     .min(-180)
     .max(180),
 });
+
+export const answerValidation = z.object({
+  questionId: z.string().uuid(),
+  optionIds: z.array(z.string()).min(1),
+});

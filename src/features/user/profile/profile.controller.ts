@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { locationValidation, profileValidation } from "./profile.validation";
+import { answerValidation, locationValidation, profileValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -8,8 +8,10 @@ import {
   updateSexualOrientationService,
   updateLocationService,
   updateLatLngService,
-  updateAboutYourselfService
+  updateAboutYourselfService,
+  updateUserAnswerService
 } from "./profile.service";
+import { LookingFor } from "@prisma/client";
 
 //Basic Info
 export const profileController = async (req: Request, res: Response) => {
@@ -142,7 +144,7 @@ export const enterLookingForController = async (
     const { looking_for } = req.body;
 
     // ✅ Basic validation
-    if (!looking_for || typeof looking_for !== "string") {
+    if (!looking_for || !Object.values(LookingFor).includes(looking_for)) {
       return res.status(400).json({
         success: false,
         message: "Invalid looking_for value",
@@ -233,7 +235,6 @@ export const updateLatLngController = async (
   }
 };
 
-
 //About Yourself
 export const aboutYourselfController = async (req: Request, res: Response) => {
   try {
@@ -269,11 +270,28 @@ export const aboutYourselfController = async (req: Request, res: Response) => {
     });
   }
 
+};
 
+export const saveUserAnswerController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
 
+    const payload = answerValidation.parse(req.body);
 
+    const result = await updateUserAnswerService(userId, payload);
 
-
-
-
+    return res.status(200).json({
+      success: true,
+      message: "Answer saved successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Something went wrong",
+    });
+  }
 };

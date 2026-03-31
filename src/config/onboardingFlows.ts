@@ -1,5 +1,5 @@
 export const ONBOARDING_FLOWS = {
-  MARRIAGE: [
+  DATE_TO_MARRY: [
     "LOOKING_FOR",
     "BASIC_INFO",
     "RELIGION", // step 3

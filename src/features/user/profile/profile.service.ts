@@ -1,6 +1,7 @@
-import { ChildLivingArrangement, ChildStatus, LivingSituation, MaritalStatus, NumberOfChildren } from "@prisma/client";
+import { ChildLivingArrangement, ChildStatus, LivingSituation, LookingFor, MaritalStatus, NumberOfChildren } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { getNextStep } from "../../../utils/onboardingFlows";
+import { SaveAnswerDTO } from "./profile.types";
 
 //profile update service
 export const updateProfileService = async (
@@ -174,12 +175,12 @@ if (!existingUser?.looking_for) {
 //Looking For
 export const updateLookingForService = async (
   userId: string,
-  looking_for: string
+  looking_for: LookingFor
 ) => {
   if (!userId) throw new Error("User ID is required");
 
   const currentStep = "LOOKING_FOR";
-  const nextStep = getNextStep("MARRIAGE", currentStep);
+  const nextStep = getNextStep("DATE_TO_MARRY", currentStep);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -313,7 +314,6 @@ export const updateAboutYourselfService = async (
   };
 };
 
-
 //Location
 export const updateLatLngService = async (
   userId: string,
@@ -336,4 +336,54 @@ export const updateLatLngService = async (
   });
 
   return profile;
+};
+
+//Question Answer
+export const updateUserAnswerService = async (
+  userId: string,
+  payload: SaveAnswerDTO
+) => {
+  if (!userId) throw new Error("Unauthorized");
+
+  const { questionId, optionIds } = payload;
+
+  // 🔍 Check question exists
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    select: { id: true, isMulti: true },
+  });
+
+  if (!question) {
+    throw new Error("Question not found");
+  }
+
+  // ❌ If single select but multiple options sent
+  if (!question.isMulti && optionIds.length > 1) {
+    throw new Error("Only one option allowed for this question");
+  }
+
+  // 🧹 Remove previous answers for this question (important)
+  await prisma.userAnswer.deleteMany({
+    where: {
+      user_id: userId,
+      question_id: questionId,
+    },
+  });
+
+  // 💾 Insert new answers (bulk)
+  const answersData = optionIds.map((optionId) => ({
+    user_id: userId,
+    question_id: questionId,
+    option_id: optionId,
+  }));
+
+  await prisma.userAnswer.createMany({
+    data: answersData,
+    skipDuplicates: true,
+  });
+
+  return {
+    questionId,
+    savedOptions: optionIds,
+  };
 };
