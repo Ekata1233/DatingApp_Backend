@@ -8,8 +8,11 @@ import {
   updateSexualOrientationService,
   updateLocationService,
   updateLatLngService,
-  updateAboutYourselfService
+  updateAboutYourselfService,
+  
+  updateEduWorkService
 } from "./profile.service";
+import { IncomeRangeType } from "@prisma/client";
 
 //Basic Info
 export const profileController = async (req: Request, res: Response) => {
@@ -269,11 +272,47 @@ export const aboutYourselfController = async (req: Request, res: Response) => {
     });
   }
 
+};
 
 
 
+//Education & Work
+export const educationWorkController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
 
+    const {
+      highestEdu,
+      collegeName,
+      incomeRange,
+      workingWith,
+      workingAs,
+      companyName,
+    } = req.body;
 
+    const user = await updateEduWorkService(userId, {
+      highestEdu,
+      collegeName,
+      incomeRange,
+      workingWith,
+      workingAs,
+      companyName,
+    });
 
-
+    return res.status(200).json({
+      success: true,
+      message: "Education & work updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.eduWork,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
