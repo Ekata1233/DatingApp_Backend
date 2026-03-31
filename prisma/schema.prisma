@@ -25,7 +25,7 @@ model User {
   updated_at              DateTime        @updatedAt
   profile                 UserProfile?
   about                   UserAbout?
-
+  eduWork                 UserEduWork?    @relation("UserEduWork")
   @@index([phone_number])
   @@index([google_id])
   @@index([looking_for])
@@ -62,7 +62,6 @@ model UserProfile {
   @@map("user_profiles")
 }
 
-
 model UserAbout {
   user_id                    String    @id @db.Uuid
   maritalStatus              MaritalStatus?
@@ -79,7 +78,6 @@ model UserAbout {
   @@index([childStatus])
   @@map("user_about")
 }
-
 
 enum LookingFor {
   DATE_TO_MARRY
@@ -128,3 +126,73 @@ enum LivingSituation {
   SENIOR_LIVING_COMMUNITY
   OTHER
 }
+
+model UserEduWork {
+  userId        String   @id @db.Uuid
+
+  // Controlled enums instead of string
+  highestEdu    EducationType
+  collegeName   String?  @db.VarChar(100)
+
+  incomeRange   IncomeRangeType
+  minIncome     Int?
+  maxIncome     Int?
+
+  workingWith   WorkingWith?
+  workingAs     WorkingAs?
+  companyName   String?  @db.VarChar(100)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User     @relation("UserEduWork", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([highestEdu])
+  @@index([incomeRange])
+  @@index([workingWith])
+  @@index([highestEdu, incomeRange, workingWith])
+  @@index([minIncome, maxIncome])
+
+  @@map("user_edu_work")
+}
+
+enum EducationType {
+  BCOM
+  CA_CPA
+  CS
+  BSC_BFIN
+  MCOM
+  MENG
+  MS_ENGINEERING
+  AE
+  AET
+  OTHER
+}
+enum IncomeRangeType {
+  UPTO_1_LAKH
+  INR_1_TO_2_LAKH
+  INR_2_TO_4_LAKH
+  INR_4_TO_7_LAKH
+  INR_10_TO_15_LAKH
+  INR_15_TO_20_LAKH
+  INR_20_TO_30_LAKH
+  INR_30_TO_50_LAKH
+  INR_50_TO_75_LAKH
+  ABOVE_75_LAKH
+}
+enum WorkingWith {
+  PRIVATE_COMPANY
+  GOVERNMENT
+  CIVIL_SERVICES
+  SELF_EMPLOYED
+  NOT_WORKING
+}
+
+enum WorkingAs {
+  SOFTWARE_ENGINEER
+  DOCTOR
+  TEACHER
+  BUSINESS_OWNER
+  OTHER
+}
+
