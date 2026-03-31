@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, locationController, aboutYourselfController, updateLatLngController, saveUserAnswerController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -217,7 +217,7 @@ router.patch("/profile/sexual-orientation", authMiddleware, enterSexualOrientati
 
 router.patch("/profile/looking-for", authMiddleware, enterLookingForController);
 
-router.patch("/profile/location", authMiddleware, locationController);
+router.patch("/profile/address", authMiddleware, addressController);
 
 router.patch("/profile/about-yourself", authMiddleware,aboutYourselfController);
 
@@ -277,7 +277,7 @@ router.patch("/profile/about-yourself", authMiddleware,aboutYourselfController);
  *               message: "Unauthorized"
  */
 
-router.patch("/profile/lat-lng", authMiddleware, updateLatLngController);
+router.patch("/profile/location", authMiddleware, updateLocationController);
 router.patch("/profile/answer", authMiddleware, saveUserAnswerController);
 
 export default router;

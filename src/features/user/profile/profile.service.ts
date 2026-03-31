@@ -194,8 +194,8 @@ export const updateLookingForService = async (
   return updatedUser;
 };
 
-//Location
-export const updateLocationService = async (
+//Address
+export const updateAddressService = async (
   userId: string,
   country: string,
   state: string,
@@ -315,7 +315,7 @@ export const updateAboutYourselfService = async (
 };
 
 //Location
-export const updateLatLngService = async (
+export const updateLocationService = async (
   userId: string,
   latitude: number,
   longitude: number

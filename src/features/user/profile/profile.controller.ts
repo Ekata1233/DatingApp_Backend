@@ -7,7 +7,7 @@ import {
   updateLookingForService,
   updateSexualOrientationService,
   updateLocationService,
-  updateLatLngService,
+  updateAddressService,
   updateAboutYourselfService,
   updateUserAnswerService
 } from "./profile.service";
@@ -168,13 +168,13 @@ export const enterLookingForController = async (
   }
 };
 
-//Location
-export const locationController = async (req: Request, res: Response) => {
+//Address
+export const addressController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { country, state, city } = req.body;
 
-    const user = await updateLocationService(
+    const user = await updateAddressService(
       userId,
       country,
       state,
@@ -197,7 +197,7 @@ export const locationController = async (req: Request, res: Response) => {
 };
 
 //Location
-export const updateLatLngController = async (
+export const updateLocationController = async (
   req: Request,
   res: Response
 ) => {
@@ -213,7 +213,7 @@ export const updateLatLngController = async (
 
     const { latitude, longitude } = locationValidation.parse(req.body);
 
-    const profile = await updateLatLngService(
+    const profile = await updateLocationService(
       userId,
       latitude,
       longitude
