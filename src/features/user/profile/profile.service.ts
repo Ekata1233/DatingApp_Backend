@@ -1,4 +1,4 @@
-import { ChildLivingArrangement, ChildStatus, LivingSituation, MaritalStatus, NumberOfChildren } from "@prisma/client";
+import { ChildLivingArrangement, ChildStatus, LivingSituation, LookingFor, MaritalStatus, NumberOfChildren } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { getNextStep } from "../../../utils/onboardingFlows";
 

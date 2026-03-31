@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, locationController, updateLatLngController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, locationController, updateLatLngController, aboutYourselfController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();

@@ -10,6 +10,7 @@ import {
   updateLatLngService,
   updateAboutYourselfService
 } from "./profile.service";
+import { LookingFor } from "@prisma/client";
 
 //Basic Info
 export const profileController = async (req: Request, res: Response) => {
