@@ -14,21 +14,29 @@ model User {
   phone_number            String?         @unique @db.VarChar(20)
   is_phone_verified       Boolean         @default(false)
   google_id               String?         @unique @db.VarChar(255)
-  looking_for             LookingFor?
+
   birth_date              DateTime?       @db.Date
   height                  Int?
   gender                  String?         @db.VarChar(20)
+
+  looking_for             LookingFor?
+
   onboarding_step         String?         @db.VarChar(20)
   next_step               String?         @db.VarChar(20)
   onboarding_completed    Boolean         @default(false)
+
+  last_active_at          DateTime?   
+  deleted_at              DateTime?
   created_at              DateTime        @default(now())
   updated_at              DateTime        @updatedAt
+
   profile                 UserProfile?
   about                   UserAbout?
-  eduWork                 UserEduWork?    @relation("UserEduWork")
+  eduWork                 UserEduWork? @relation("UserEduWork")
+  answer                  UserAnswer[]
+
   @@index([phone_number])
   @@index([google_id])
-  @@index([looking_for])
   @@index([gender, created_at])
   @@index([created_at])
   @@map("users")
@@ -55,9 +63,7 @@ model UserProfile {
   @@index([community])
   @@index([interested_in])
   @@index([sexual_orientation])
-  @@index([country])
-  @@index([state])
-  @@index([city])
+  @@index([country, state, city])
   @@index([latitude, longitude])
   @@map("user_profiles")
 }
@@ -196,3 +202,56 @@ enum WorkingAs {
   OTHER
 }
 
+model Question {
+  id          String @id @default(uuid()) @db.Uuid
+  key         String           @unique   // e.g. "drinking", "smoking"
+  title       String
+  category    QuestionCategory
+  isMulti     Boolean          @default(false) // allow multiple answers or not
+
+  options     QuestionOption[]
+  answers     UserAnswer[] 
+
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+}
+
+model QuestionOption {
+  id           String        @id @default(uuid())
+  question_id  String @db.Uuid
+  value        String        // e.g. "NON_SMOKER"
+  label        String        // UI text
+
+  question     Question      @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  answers      UserAnswer[]
+
+  created_at   DateTime      @default(now())
+
+  @@index([question_id])
+}
+
+model UserAnswer {
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String   @db.Uuid
+  question_id  String   @db.Uuid
+  option_id    String
+
+  user         User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  question     Question         @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  option       QuestionOption   @relation(fields: [option_id], references: [id], onDelete: Cascade)
+
+  created_at   DateTime         @default(now())
+
+  // ✅ prevent duplicate answers (important)
+  @@unique([user_id, question_id, option_id])
+
+  @@index([user_id])
+  @@index([question_id])
+  @@index([option_id])
+}
+
+enum QuestionCategory {
+  DATING
+  DATE_TO_MARRY
+  MATURE_CONNECTION
+}

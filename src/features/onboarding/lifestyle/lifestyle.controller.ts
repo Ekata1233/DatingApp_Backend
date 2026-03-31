@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import {
   createLifestyle,
   getLifestyle,
-  deleteLifestyle,
+  
 } from "./lifestyle.service";
 
 export const create = async (
@@ -24,22 +24,25 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
-    const data = await getLifestyle();
+    const { flowType } = req.query;
+
+    const data = await getLifestyle(flowType as string);
+
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-export const remove = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    await deleteLifestyle();
-    res.json({ success: true, message: "Lifestyle deleted successfully" });
-  } catch (error) {
-    next(error);
-  }
-};
+// export const remove = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     await deleteLifestyle();
+//     res.json({ success: true, message: "Lifestyle deleted successfully" });
+//   } catch (error) {
+//     next(error);
+//   }
+// };

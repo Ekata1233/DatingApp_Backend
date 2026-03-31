@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, locationController, updateLatLngController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -216,5 +216,65 @@ router.patch("/profile/sexual-orientation", authMiddleware, enterSexualOrientati
  */
 
 router.patch("/profile/looking-for", authMiddleware, enterLookingForController);
+
+router.patch("/profile/location", authMiddleware, locationController);
+
+/**
+ * @swagger
+ * /api/user/lnglat:
+ *   patch:
+ *     summary: Update user latitude and longitude
+ *     tags: [User Location]
+ *     description: Updates the logged-in user's latitude and longitude coordinates. This API does NOT affect onboarding steps.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - latitude
+ *               - longitude
+ *             properties:
+ *               latitude:
+ *                 type: number
+ *                 minimum: -90
+ *                 maximum: 90
+ *                 example: 18.5204
+ *               longitude:
+ *                 type: number
+ *                 minimum: -180
+ *                 maximum: 180
+ *                 example: 73.8567
+ *     responses:
+ *       200:
+ *         description: Location coordinates updated successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: "Location updated successfully"
+ *               data:
+ *                 latitude: 18.5204
+ *                 longitude: 73.8567
+ *       400:
+ *         description: Invalid input data
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Latitude must be between -90 and 90"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Unauthorized"
+ */
+
+router.patch("/profile/lnglat", authMiddleware, updateLatLngController);
 
 export default router;

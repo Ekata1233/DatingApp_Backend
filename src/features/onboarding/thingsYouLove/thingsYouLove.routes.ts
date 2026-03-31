@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { create, getAll, remove } from "./thingsYouLove.controller";
+import { create, getAll } from "./thingsYouLove.controller";
 
 const router = Router();
 
@@ -17,6 +17,6 @@ router.post("/create", create);      // Create / Replace
  *         description: Things you love options fetched successfully
  */
 router.get("/get-all", getAll);       // Get single document
-router.delete("/remove", remove);    // Delete
+// router.delete("/remove", remove);    // Delete
 
 export default router;

@@ -1,13 +1,17 @@
 import { Request, Response } from "express";
-import { profileValidation } from "./profile.validation";
+import { locationValidation, profileValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
   updateReligionService,
   updateLookingForService,
   updateSexualOrientationService,
+  updateLocationService,
+  updateLatLngService,
+  updateAboutYourselfService
 } from "./profile.service";
 
+//Basic Info
 export const profileController = async (req: Request, res: Response) => {
   try {
     // now user.id is available
@@ -160,4 +164,116 @@ export const enterLookingForController = async (
       message: error.message || "Something went wrong",
     });
   }
+};
+
+//Location
+export const locationController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { country, state, city } = req.body;
+
+    const user = await updateLocationService(
+      userId,
+      country,
+      state,
+      city
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Location updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.profile,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Location
+export const updateLatLngController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { latitude, longitude } = locationValidation.parse(req.body);
+
+    const profile = await updateLatLngService(
+      userId,
+      latitude,
+      longitude
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Location updated successfully",
+      data: {
+        latitude: Number(profile.latitude),
+        longitude: Number(profile.longitude),
+      },
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+//About Yourself
+export const aboutYourselfController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const {
+      maritalStatus,
+      childStatus,
+      numberOfChildren,
+      childLivingArrangement,
+      livingSituation,
+    } = req.body;
+
+    const user = await updateAboutYourselfService(userId, {
+      maritalStatus,
+      childStatus,
+      numberOfChildren,
+      childLivingArrangement,
+      livingSituation,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "About yourself updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.profile,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+
+
+
+
+
+
+
+
 };

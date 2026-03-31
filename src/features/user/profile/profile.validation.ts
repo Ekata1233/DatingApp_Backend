@@ -38,3 +38,14 @@ export const profileValidation = z.object({
 
   gender: z.string().min(1, "Gender is required"),
 });
+
+export const locationValidation = z.object({
+  latitude: z
+    .number()
+    .min(-90)
+    .max(90),
+  longitude: z
+    .number()
+    .min(-180)
+    .max(180),
+});
