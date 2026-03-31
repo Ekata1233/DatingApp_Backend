@@ -137,7 +137,7 @@ model UserEduWork {
   userId        String   @id @db.Uuid
 
   // Controlled enums instead of string
-  highestEdu    EducationType
+  highestEdu    String?  @db.VarChar(100)
   collegeName   String?  @db.VarChar(100)
 
   incomeRange   IncomeRangeType
@@ -145,7 +145,7 @@ model UserEduWork {
   maxIncome     Int?
 
   workingWith   WorkingWith?
-  workingAs     WorkingAs?
+  workingAs     String?  @db.VarChar(100)
   companyName   String?  @db.VarChar(100)
 
   createdAt     DateTime @default(now())
@@ -162,18 +162,6 @@ model UserEduWork {
   @@map("user_edu_work")
 }
 
-enum EducationType {
-  BCOM
-  CA_CPA
-  CS
-  BSC_BFIN
-  MCOM
-  MENG
-  MS_ENGINEERING
-  AE
-  AET
-  OTHER
-}
 enum IncomeRangeType {
   UPTO_1_LAKH
   INR_1_TO_2_LAKH
@@ -194,13 +182,6 @@ enum WorkingWith {
   NOT_WORKING
 }
 
-enum WorkingAs {
-  SOFTWARE_ENGINEER
-  DOCTOR
-  TEACHER
-  BUSINESS_OWNER
-  OTHER
-}
 
 model Question {
   id          String @id @default(uuid()) @db.Uuid
