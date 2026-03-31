@@ -7,8 +7,10 @@ import {
   updateLookingForService,
   updateSexualOrientationService,
   updateLocationService,
-  updateLatLngService,
-  updateAboutYourselfService
+  updateAddressService,
+  updateAboutYourselfService,
+  updateUserAnswerService,
+  updateEduWorkService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -167,13 +169,13 @@ export const enterLookingForController = async (
   }
 };
 
-//Location
-export const locationController = async (req: Request, res: Response) => {
+//Address
+export const addressController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { country, state, city } = req.body;
 
-    const user = await updateLocationService(
+    const user = await updateAddressService(
       userId,
       country,
       state,
@@ -196,7 +198,7 @@ export const locationController = async (req: Request, res: Response) => {
 };
 
 //Location
-export const updateLatLngController = async (
+export const updateLocationController = async (
   req: Request,
   res: Response
 ) => {
@@ -212,7 +214,7 @@ export const updateLatLngController = async (
 
     const { latitude, longitude } = locationValidation.parse(req.body);
 
-    const profile = await updateLatLngService(
+    const profile = await updateLocationService(
       userId,
       latitude,
       longitude
@@ -269,11 +271,69 @@ export const aboutYourselfController = async (req: Request, res: Response) => {
     });
   }
 
+};
 
+export const saveUserAnswerController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
 
+    const payload = answerValidation.parse(req.body);
 
+    const result = await updateUserAnswerService(userId, payload);
 
+    return res.status(200).json({
+      success: true,
+      message: "Answer saved successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Something went wrong",
+    });
+  }
+};
 
+//Education & Work
+export const educationWorkController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
 
+    const {
+      highestEdu,
+      collegeName,
+      incomeRange,
+      workingWith,
+      workingAs,
+      companyName,
+    } = req.body;
 
+    const user = await updateEduWorkService(userId, {
+      highestEdu,
+      collegeName,
+      incomeRange,
+      workingWith,
+      workingAs,
+      companyName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Education & work updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.eduWork,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };

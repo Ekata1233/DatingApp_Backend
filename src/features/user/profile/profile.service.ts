@@ -1,7 +1,26 @@
 import { ChildLivingArrangement, ChildStatus, LivingSituation, LookingFor, MaritalStatus, NumberOfChildren } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { getNextStep } from "../../../utils/onboardingFlows";
+import { SaveAnswerDTO } from "./profile.types";
 
+// 🔥 Income Range Parser
+const parseIncomeRange = (incomeRange: string) => {
+  if (!incomeRange) return { minIncome: null, maxIncome: null };
+
+  const match = incomeRange
+    .toLowerCase()
+    .match(/(\d+)\s*lakh\s*to\s*(\d+)\s*lakh/);
+
+  if (!match) return { minIncome: null, maxIncome: null };
+
+  const min = parseInt(match[1]) * 100000;
+  const max = parseInt(match[2]) * 100000;
+
+  return {
+    minIncome: min,
+    maxIncome: max,
+  };
+};
 //profile update service
 export const updateProfileService = async (
   userId: string,
@@ -193,8 +212,8 @@ export const updateLookingForService = async (
   return updatedUser;
 };
 
-//Location
-export const updateLocationService = async (
+//Address
+export const updateAddressService = async (
   userId: string,
   country: string,
   state: string,
@@ -314,7 +333,7 @@ export const updateAboutYourselfService = async (
 };
 
 //Location
-export const updateLatLngService = async (
+export const updateLocationService = async (
   userId: string,
   latitude: number,
   longitude: number
@@ -335,4 +354,150 @@ export const updateLatLngService = async (
   });
 
   return profile;
+};
+
+
+//Question Answer
+export const updateUserAnswerService = async (
+  userId: string,
+  payload: SaveAnswerDTO
+) => {
+  if (!userId) throw new Error("Unauthorized");
+
+  const { questionId, optionIds } = payload;
+
+  // 🔍 Check question exists
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    select: { id: true, isMulti: true },
+  });
+
+  if (!question) {
+    throw new Error("Question not found");
+  }
+
+  // ❌ If single select but multiple options sent
+  if (!question.isMulti && optionIds.length > 1) {
+    throw new Error("Only one option allowed for this question");
+  }
+
+  // 🧹 Remove previous answers for this question (important)
+  await prisma.userAnswer.deleteMany({
+    where: {
+      user_id: userId,
+      question_id: questionId,
+    },
+  });
+
+  // 💾 Insert new answers (bulk)
+  const answersData = optionIds.map((optionId) => ({
+    user_id: userId,
+    question_id: questionId,
+    option_id: optionId,
+  }));
+
+  await prisma.userAnswer.createMany({
+    data: answersData,
+    skipDuplicates: true,
+  });
+
+  return {
+    questionId,
+    savedOptions: optionIds,
+  };
+};
+
+
+// ✅ ADD THIS (NEW)
+const mapIncomeToEnum = (incomeRange: string) => {
+  switch (incomeRange) {
+    case "INR 1 lakh to 2 lakh":
+      return "INR_1_TO_2_LAKH";
+    case "INR 2 lakh to 4 lakh":
+      return "INR_2_TO_4_LAKH";
+    case "INR 4 lakh to 7 lakh":
+      return "INR_4_TO_7_LAKH";
+    case "INR 10 lakh to 15 lakh":
+      return "INR_10_TO_15_LAKH";
+    case "INR 15 lakh to 20 lakh":
+      return "INR_15_TO_20_LAKH";
+    default:
+      return null;
+  }
+};
+//Education & Work
+export const updateEduWorkService = async (
+  userId: string,
+  data: {
+    highestEdu?: string;
+    collegeName?: string;
+    incomeRange: string;
+    workingWith?: any;
+    workingAs?: string;
+    companyName?: string;
+  }
+) => {
+  if (!userId) throw new Error("User ID is missing");
+
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
+
+  const currentStep = "EDUCATION_WORK";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
+ const { minIncome, maxIncome } = parseIncomeRange(data.incomeRange);
+
+// ✅ NEW
+const incomeEnum = mapIncomeToEnum(data.incomeRange);
+
+if (!incomeEnum) {
+  throw new Error("Invalid income range");
+}
+
+const eduWork = await prisma.userEduWork.upsert({
+  where: { userId },
+  update: {
+    highestEdu: data.highestEdu,
+    collegeName: data.collegeName,
+    incomeRange: incomeEnum, // ✅ FIXED
+    minIncome,
+    maxIncome,
+    workingWith: data.workingWith,
+    workingAs: data.workingAs,
+    companyName: data.companyName,
+  },
+  create: {
+    userId,
+    highestEdu: data.highestEdu,
+    collegeName: data.collegeName,
+    incomeRange: incomeEnum, // ✅ FIXED
+    minIncome,
+    maxIncome,
+    workingWith: data.workingWith,
+    workingAs: data.workingAs,
+    companyName: data.companyName,
+  },
+});
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
+
+  return {
+    eduWork,
+    onboarding: updatedUser,
+  };
 };
