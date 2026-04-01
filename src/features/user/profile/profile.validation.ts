@@ -54,3 +54,11 @@ export const answerValidation = z.object({
   questionId: z.string().uuid(),
   optionIds: z.array(z.string()).min(1),
 });
+
+//Bio
+export const bioValidation = z.object({
+  bio: z
+    .string()
+    .max(300, "Bio cannot exceed 300 characters")
+    .optional(),
+});

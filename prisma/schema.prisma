@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -34,6 +35,8 @@ model User {
   about                   UserAbout?
   eduWork                 UserEduWork? @relation("UserEduWork")
   answer                  UserAnswer[]
+  photos                  UserPhoto[]
+  bio                     UserBio?
 
   @@index([phone_number])
   @@index([google_id])
@@ -242,4 +245,30 @@ enum QuestionScreen{
   THINGS_U_LOVE
   INTEREST_HOBBY
   DREAM_PLAN
+}
+
+model UserPhoto {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String   @db.Uuid
+  image_url   String   @db.Text
+  is_primary  Boolean  @default(false) // main profile photo
+  order       Int?     // for ordering images (1,2,3...)
+  created_at  DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("user_photos")
+}
+
+model UserBio {
+  user_id     String   @id @db.Uuid
+  bio         String?  @db.VarChar(500)
+  
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_bio")
 }

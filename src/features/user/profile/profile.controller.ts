@@ -10,7 +10,12 @@ import {
   updateAddressService,
   updateAboutYourselfService,
   updateUserAnswerService,
-  updateEduWorkService
+  updateEduWorkService,
+  uploadUserPhotosService,
+  updateUserPhotoService,
+  setPrimaryPhotoService,
+  deleteUserPhotoService,
+  updateUserBioService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -337,4 +342,149 @@ export const educationWorkController = async (
       message: error.message,
     });
   }
+};
+
+export const uploadPhotosController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    if (!req.files || !req.files.images) {
+      return res.status(400).json({
+        success: false,
+        message: "Images are required",
+      });
+    }
+
+    let images = req.files.images;
+
+    if (!Array.isArray(images)) {
+      images = [images];
+    }
+
+    const result = await uploadUserPhotosService(userId, images);
+
+    return res.status(200).json({
+      success: true,
+      message: "Photos uploaded successfully",
+      onboarding_step: result.onboarding.onboarding_step,
+      next_step: result.onboarding.next_step,
+      data: result.photos,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const updatePhotoController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { photoId } = req.params;
+
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({
+        success: false,
+        message: "Image is required",
+      });
+    }
+
+    const image = req.files.image;
+
+    const photo = await updateUserPhotoService(userId, photoId, image);
+
+    return res.status(200).json({
+      success: true,
+      message: "Photo updated successfully",
+      data: photo,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const setPrimaryPhotoController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { photoId } = req.params;
+
+    const photo = await setPrimaryPhotoService(userId, photoId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Primary photo updated",
+      data: photo,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const deletePhotoController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { photoId } = req.params;
+
+    const result = await deleteUserPhotoService(userId, photoId);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Bio
+import { bioValidation } from "./profile.validation";
+import { ZodError } from "zod";
+
+export const updateUserBioController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { bio } = bioValidation.parse(req.body);
+
+    const result = await updateUserBioService(userId, bio);
+
+    return res.status(200).json({
+      success: true,
+      message: "Bio updated successfully",
+      onboarding_step: result.onboarding.onboarding_step,
+      next_step: result.onboarding.next_step,
+      data: result.bio,
+    });
+  } catch (error: any) {
+  if (error instanceof ZodError) {
+    return res.status(400).json({
+      success: false,
+      message: error.issues[0].message, // ✅ FIXED
+    });
+  }
+
+  return res.status(400).json({
+    success: false,
+    message: error.message || "Something went wrong",
+  });
+}
 };
