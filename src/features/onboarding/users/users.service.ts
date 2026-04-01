@@ -16,3 +16,4 @@ export async function fetchAllUsers(): Promise<User[]> {
     throw error;
   }
 }
+

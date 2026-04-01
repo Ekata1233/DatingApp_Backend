@@ -22,3 +22,5 @@ export async function getAllUsersController(req: Request, res: Response) {
     });
   }
 }
+
+
