@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educationWorkController } from "./profile.controller";
+import { profileController, enterInterestedInController,ReligionController, enterLookingForController, enterSexualOrientationController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educationWorkController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -322,5 +322,44 @@ router.patch(
   "/profile/education-work",
   authMiddleware,
   educationWorkController
+);
+
+router.post("/profile/photos", authMiddleware, uploadPhotosController);
+
+router.patch("/profile/photos/:photoId", authMiddleware, updatePhotoController);
+
+router.patch("/profile/photos/:photoId/primary", authMiddleware, setPrimaryPhotoController);
+
+router.delete("/profile/photos/:photoId", authMiddleware, deletePhotoController);
+
+
+
+/**
+ * @swagger
+ * /api/user/profile/bio:
+ *   patch:
+ *     summary: Update user bio
+ *     tags: [User Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bio:
+ *                 type: string
+ *                 maxLength: 300
+ *                 example: "I love traveling and exploring new places."
+ *     responses:
+ *       200:
+ *         description: Bio updated successfully
+ */
+router.patch(
+  "/profile/bio",
+  authMiddleware,
+  updateUserBioController
 );
 export default router;

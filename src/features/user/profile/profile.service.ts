@@ -1,7 +1,15 @@
-import { ChildLivingArrangement, ChildStatus, LivingSituation, LookingFor, MaritalStatus, NumberOfChildren } from "@prisma/client";
+import {
+  ChildLivingArrangement,
+  ChildStatus,
+  LivingSituation,
+  LookingFor,
+  MaritalStatus,
+  NumberOfChildren,
+} from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { getNextStep } from "../../../utils/onboardingFlows";
 import { SaveAnswerDTO } from "./profile.types";
+import imagekit from "../../../utils/imagekit";
 
 // 🔥 Income Range Parser
 const parseIncomeRange = (incomeRange: string) => {
@@ -32,14 +40,14 @@ export const updateProfileService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
-   const existingUser = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findUnique({
     where: { id: userId },
     select: { looking_for: true },
   });
 
-if (!existingUser?.looking_for) {
-  throw new Error("Looking_for is missing");
-}
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
 
   // 👉 Calculate next step
   const currentStep = "BASIC_INFO";
@@ -65,6 +73,7 @@ if (!existingUser?.looking_for) {
 export const updateInterestedInService = async (
   userId: string,
   interested_in: string,
+  sexual_orientation: string,
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
@@ -85,10 +94,12 @@ if (!existingUser?.looking_for) {
     where: { user_id: userId },
     update: {
       interested_in,
+      sexual_orientation,
     },
     create: {
       user_id: userId,
       interested_in,
+      sexual_orientation,
     },
   });
 
@@ -111,14 +122,14 @@ export const updateReligionService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
-   const existingUser = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findUnique({
     where: { id: userId },
     select: { looking_for: true },
   });
 
-if (!existingUser?.looking_for) {
-  throw new Error("Looking_for is missing");
-}
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
 
   // 👉 Calculate next step
   const currentStep = "RELIGION";
@@ -148,52 +159,10 @@ if (!existingUser?.looking_for) {
   return updatedProfile;
 };
 
-//Sexual_Orientation
-export const updateSexualOrientationService = async (
-  userId: string,
-  sexual_orientation: string,
-) => {
-  if (!userId) throw new Error("User ID is missing");
-
-   const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
-if (!existingUser?.looking_for) {
-  throw new Error("Looking_for is missing");
-}
-
-  // 👉 Calculate next step
-  const currentStep = "BASIC_INFO";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
-
-  const updatedProfile = await prisma.userProfile.upsert({
-    where: { user_id: userId },
-    update: {
-      sexual_orientation,
-    },
-    create: {
-      user_id: userId,
-      sexual_orientation,
-    },
-  });
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      onboarding_step: "LOOKING_FOR",
-      next_step: nextStep,
-    },
-  });
-
-  return updatedProfile;
-};
-
 //Looking For
 export const updateLookingForService = async (
   userId: string,
-  looking_for: LookingFor
+  looking_for: LookingFor,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
@@ -266,7 +235,7 @@ export const updateAboutYourselfService = async (
     numberOfChildren?: NumberOfChildren | null;
     childLivingArrangement?: ChildLivingArrangement | null;
     livingSituation?: LivingSituation;
-  }
+  },
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
@@ -336,7 +305,7 @@ export const updateAboutYourselfService = async (
 export const updateLocationService = async (
   userId: string,
   latitude: number,
-  longitude: number
+  longitude: number,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
@@ -359,7 +328,7 @@ export const updateLocationService = async (
 //Question Answer
 export const updateUserAnswerService = async (
   userId: string,
-  payload: SaveAnswerDTO
+  payload: SaveAnswerDTO,
 ) => {
   if (!userId) throw new Error("Unauthorized");
 
@@ -406,7 +375,6 @@ export const updateUserAnswerService = async (
   };
 };
 
-
 // ✅ ADD THIS (NEW)
 const mapIncomeToEnum = (incomeRange: string) => {
   switch (incomeRange) {
@@ -434,7 +402,7 @@ export const updateEduWorkService = async (
     workingWith?: any;
     workingAs?: string;
     companyName?: string;
-  }
+  },
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
@@ -450,39 +418,39 @@ export const updateEduWorkService = async (
   const currentStep = "EDUCATION_WORK";
   const nextStep = getNextStep(existingUser.looking_for, currentStep);
 
- const { minIncome, maxIncome } = parseIncomeRange(data.incomeRange);
+  const { minIncome, maxIncome } = parseIncomeRange(data.incomeRange);
 
-// ✅ NEW
-const incomeEnum = mapIncomeToEnum(data.incomeRange);
+  // ✅ NEW
+  const incomeEnum = mapIncomeToEnum(data.incomeRange);
 
-if (!incomeEnum) {
-  throw new Error("Invalid income range");
-}
+  if (!incomeEnum) {
+    throw new Error("Invalid income range");
+  }
 
-const eduWork = await prisma.userEduWork.upsert({
-  where: { userId },
-  update: {
-    highestEdu: data.highestEdu,
-    collegeName: data.collegeName,
-    incomeRange: incomeEnum, // ✅ FIXED
-    minIncome,
-    maxIncome,
-    workingWith: data.workingWith,
-    workingAs: data.workingAs,
-    companyName: data.companyName,
-  },
-  create: {
-    userId,
-    highestEdu: data.highestEdu,
-    collegeName: data.collegeName,
-    incomeRange: incomeEnum, // ✅ FIXED
-    minIncome,
-    maxIncome,
-    workingWith: data.workingWith,
-    workingAs: data.workingAs,
-    companyName: data.companyName,
-  },
-});
+  const eduWork = await prisma.userEduWork.upsert({
+    where: { userId },
+    update: {
+      highestEdu: data.highestEdu,
+      collegeName: data.collegeName,
+      incomeRange: incomeEnum, // ✅ FIXED
+      minIncome,
+      maxIncome,
+      workingWith: data.workingWith,
+      workingAs: data.workingAs,
+      companyName: data.companyName,
+    },
+    create: {
+      userId,
+      highestEdu: data.highestEdu,
+      collegeName: data.collegeName,
+      incomeRange: incomeEnum, // ✅ FIXED
+      minIncome,
+      maxIncome,
+      workingWith: data.workingWith,
+      workingAs: data.workingAs,
+      companyName: data.companyName,
+    },
+  });
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
@@ -497,6 +465,188 @@ const eduWork = await prisma.userEduWork.upsert({
 
   return {
     eduWork,
+    onboarding: updatedUser,
+  };
+};
+
+// Upload Photos
+export const uploadUserPhotosService = async (userId: string, files: any[]) => {
+  if (!userId) throw new Error("User ID is required");
+
+  if (!files || files.length === 0) {
+    throw new Error("No images provided");
+  }
+
+  // Check looking_for (onboarding dependency)
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
+
+  // Upload all images
+  const uploadedPhotos = await Promise.all(
+    files.map(async (file: any, index: number) => {
+      const uploadResponse = await imagekit.upload({
+        file: file.data,
+        fileName: file.name,
+        folder: "/user-photos",
+      });
+
+      return {
+        user_id: userId,
+        image_url: uploadResponse.url,
+        order: index + 1,
+        is_primary: index === 0, // first image primary
+      };
+    }),
+  );
+
+  // Save in DB
+  await prisma.userPhoto.createMany({
+    data: uploadedPhotos,
+  });
+
+  // ✅ Fetch saved photos with IDs
+  const savedPhotos = await prisma.userPhoto.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: "asc" },
+  });
+
+  // Onboarding step update
+  const currentStep = "LATEST_PHOTOS";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
+
+  return {
+    photos: savedPhotos,
+    onboarding: updatedUser,
+  };
+};
+
+export const updateUserPhotoService = async (
+  userId: string,
+  photoId: string,
+  file: any,
+) => {
+  if (!userId) throw new Error("User ID is required");
+
+  const existingPhoto = await prisma.userPhoto.findUnique({
+    where: { id: photoId },
+  });
+
+  if (!existingPhoto) {
+    throw new Error("Photo not found");
+  }
+
+  const uploadResponse = await imagekit.upload({
+    file: file.data,
+    fileName: file.name,
+    folder: "/user-photos",
+  });
+
+  const updatedPhoto = await prisma.userPhoto.update({
+    where: { id: photoId },
+    data: {
+      image_url: uploadResponse.url,
+    },
+  });
+
+  return updatedPhoto;
+};
+
+export const setPrimaryPhotoService = async (
+  userId: string,
+  photoId: string,
+) => {
+  await prisma.userPhoto.updateMany({
+    where: { user_id: userId },
+    data: { is_primary: false },
+  });
+
+  const photo = await prisma.userPhoto.update({
+    where: { id: photoId },
+    data: { is_primary: true },
+  });
+
+  return photo;
+};
+
+export const deleteUserPhotoService = async (
+  userId: string,
+  photoId: string,
+) => {
+  const photo = await prisma.userPhoto.findUnique({
+    where: { id: photoId },
+  });
+
+  if (!photo) throw new Error("Photo not found");
+
+  await prisma.userPhoto.delete({
+    where: { id: photoId },
+  });
+
+  return { message: "Photo deleted" };
+};
+
+//Bio
+export const updateUserBioService = async (userId: string, bio?: string) => {
+  if (!userId) throw new Error("User ID is required");
+
+  // 🔍 Check onboarding dependency
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
+
+  // ✅ Upsert Bio
+  const userBio = await prisma.userBio.upsert({
+    where: { user_id: userId },
+    update: {
+      bio,
+    },
+    create: {
+      user_id: userId,
+      bio,
+    },
+  });
+
+  // ✅ Onboarding Step
+  const currentStep = "USER_BIO";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
+
+  return {
+    bio: userBio,
     onboarding: updatedUser,
   };
 };

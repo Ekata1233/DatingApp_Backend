@@ -65,5 +65,7 @@ app.get("/api-docs", (req, res) => {
 
 // Routes
 app.use("/api", routes);
-
+app.use(fileUpload({
+  useTempFiles: false,
+}));
 export default app;
