@@ -17,6 +17,7 @@ import interestHobbiesRoutes from "../features/onboarding/interestHobbies/intere
 import dreamsFutureRoutes from "../features/onboarding/dreamsFuture/dreamsFuture.routes";
 
 import questionRoutes from "../features/onboarding/questionAnswer/question.route";
+import blockRoutes from "../features/user/block/block.routes";
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.use("/question", questionRoutes);
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
+router.use("/user",blockRoutes)
 
 
 
