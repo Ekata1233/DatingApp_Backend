@@ -24,7 +24,7 @@ export const blockUserService = async (
   }
 
   // 3. Check already blocked
-  const existingBlock = await prisma.userblock.findUnique({
+  const existingBlock = await prisma.userBlock.findUnique({
     where: {
       blockerId_blockedId: {
         blockerId,
@@ -38,7 +38,7 @@ export const blockUserService = async (
   }
 
   // 4. Create block
-  const block = await prisma.userblock.create({
+  const block = await prisma.userBlock.create({
     data: {
       blockerId,
       blockedId,
