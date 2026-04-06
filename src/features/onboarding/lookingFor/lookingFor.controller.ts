@@ -12,7 +12,7 @@ export const create = async (
   next: NextFunction,
 ) => {
   try {
-const { flowType, title, description } = req.body;
+const { title, description } = req.body;
 
 let { options } = req.body;
 
@@ -24,12 +24,7 @@ if (typeof options === "string") {
     options = [];
   }
 }
-    if (!flowType) {
-      return res.status(400).json({
-        success: false,
-        message: "flowType is required",
-      });
-    }
+
 
     if (!req.files || !req.files.images) {
       return res.status(400).json({
@@ -73,7 +68,6 @@ if (typeof options === "string") {
     );
 
     const data = await createLookingFor({
-      flowType,
       title,
       items,
     });
@@ -93,9 +87,8 @@ export const getAll = async (
   next: NextFunction,
 ) => {
   try {
-    const { flowType } = req.query;
 
-    const data = await getAllLookingFor(flowType as string);
+    const data = await getAllLookingFor();
 
     res.json({ success: true, data });
   } catch (error) {
