@@ -5,10 +5,10 @@ import { ILookingFor } from "./lookingFor.types";
 export const createLookingFor = async (
   payload: ILookingFor
 ): Promise<ILookingFor> => {
-  
+  const { flowType } = payload; // ✅ extract flowType
 
   const data = await LookingFor.findOneAndUpdate(
-    {  },
+    { flowType }, // ✅ match by flowType
     payload,
     {
       new: true,
@@ -20,17 +20,14 @@ export const createLookingFor = async (
   return data;
 };
 
-// GET ALL (with optional filter)
+// GET (same as lifestyle logic)
 export const getAllLookingFor = async (
-): Promise<ILookingFor[]> => {
-  const filter: any = {};
+  flowType?: string
+): Promise<ILookingFor[] | ILookingFor | null> => {
+  if (flowType) {
+    const data = await LookingFor.findOne({ flowType }).lean();
+    return data ? [data] : [];
+  }
 
-  
-
-  return LookingFor.find(filter).lean();
-};
-
-// DELETE (all)
-export const deleteLookingFor = async (): Promise<void> => {
-  await LookingFor.deleteMany({});
+  return LookingFor.find().lean();
 };
