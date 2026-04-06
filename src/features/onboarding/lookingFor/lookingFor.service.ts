@@ -8,7 +8,7 @@ export const createLookingFor = async (
   const { flowType } = payload; // ✅ extract flowType
 
   const data = await LookingFor.findOneAndUpdate(
-    { flowType }, // ✅ match by flowType
+    { flowType }, 
     payload,
     {
       new: true,
