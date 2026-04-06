@@ -20,7 +20,6 @@ export const createLookingFor = async (
   return data;
 };
 
-// GET (same as lifestyle logic)
 export const getAllLookingFor = async (
   flowType?: string
 ): Promise<ILookingFor[] | ILookingFor | null> => {
