@@ -12,7 +12,15 @@ export const create = async (
   next: NextFunction,
 ) => {
   try {
-const { title, description } = req.body;
+const { title, description,flowType  } = req.body;
+
+// ✅ ADD HERE (very top validation)
+if (!flowType) {
+  return res.status(400).json({
+    success: false,
+    message: "flowType is required",
+  });
+}
 
 let { options } = req.body;
 
@@ -68,6 +76,7 @@ if (typeof options === "string") {
     );
 
     const data = await createLookingFor({
+      flowType, 
       title,
       items,
     });
