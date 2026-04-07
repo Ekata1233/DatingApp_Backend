@@ -18,7 +18,7 @@ const InterestedInSchema = new Schema<IInterestedIn>(
       index: true,
        unique: true
     },
-    title: { type: String, required: true, unique: true },
+    title: { type: String, required: true },
     genderImages: { type: [GenderImageSchema], required: true },
   },
   { timestamps: true }
