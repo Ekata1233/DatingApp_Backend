@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { create, getAll,remove } from "./interestedIn.controller";
+import { create, getAll } from "./interestedIn.controller";
 
 const router = Router();
 
@@ -17,6 +17,5 @@ router.post("/create", create);
  *         description: Interested-in options fetched successfully
  */
 router.get("/get-all", getAll);
-router.delete("/delete", remove);
 
 export default router;

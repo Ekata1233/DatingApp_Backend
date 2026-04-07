@@ -16,6 +16,7 @@ const InterestedInSchema = new Schema<IInterestedIn>(
       enum: ["dating", "marriage", "mature"],
       required: true,
       index: true,
+       unique: true
     },
     title: { type: String, required: true, unique: true },
     genderImages: { type: [GenderImageSchema], required: true },
