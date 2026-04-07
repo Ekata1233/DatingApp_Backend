@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { create, getAll, remove } from "./lookingFor.controller";
+import { create, getAll } from "./lookingFor.controller";
 
 const router = Router();
 
@@ -17,6 +17,6 @@ router.post("/create", create);
  *         description: Looking for options fetched successfully
  */
 router.get("/get-all", getAll);
-router.delete("/delete", remove);
+// router.delete("/delete", remove);
 
 export default router;

@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import {
   createLookingFor,
   getAllLookingFor,
-  deleteLookingFor,
 } from "./lookingFor.service";
 import imagekit from "../../../utils/imagekit";
 
@@ -105,18 +104,4 @@ export const getAll = async (
   }
 };
 
-export const remove = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    await deleteLookingFor();
-    res.json({
-      success: true,
-      message: "All LookingFor data deleted successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+
