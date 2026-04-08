@@ -17,5 +17,6 @@ router.post("/create", create);
  *         description: Looking for options fetched successfully
  */
 router.get("/get-all", getAll);
+// router.delete("/delete", remove);
 
 export default router;

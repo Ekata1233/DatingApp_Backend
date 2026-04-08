@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import {
   createInterestedIn,
   getAllInterestedIn,
-  deleteInterestedIn,
 } from "./interestedIn.service";
 import imagekit from "../../../utils/imagekit";
 
@@ -81,25 +80,28 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
-    const data = await getAllInterestedIn();
+    const { flowType } = req.query;
+
+    const data = await getAllInterestedIn(flowType as string);
+
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-export const remove = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    await deleteInterestedIn();
-    res.json({
-      success: true,
-      message: "All InterestedIn data deleted successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// export const remove = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     await deleteInterestedIn();
+//     res.json({
+//       success: true,
+//       message: "All InterestedIn data deleted successfully",
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };

@@ -1,21 +1,35 @@
 import { InterestedIn } from "./interestedIn.model";
 import { IInterestedIn } from "./interestedIn.types";
 
-// CREATE (replace existing document)
+/**
+ * Always keep ONLY ONE document per flowType.
+ * When creating → update if exists, else create.
+ */
 export const createInterestedIn = async (
   payload: IInterestedIn
 ): Promise<IInterestedIn> => {
-  // Delete existing document (if any)
-  await InterestedIn.deleteMany({});
-  return InterestedIn.create(payload);
+  const { flowType } = payload;
+
+  const data = await InterestedIn.findOneAndUpdate(
+    { flowType }, // ✅ only this flowType
+    payload,
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    }
+  );
+
+  return data;
 };
 
-// GET ALL
-export const getAllInterestedIn = async (): Promise<IInterestedIn[]> => {
+export const getAllInterestedIn = async (
+  flowType?: string
+): Promise<IInterestedIn[] | IInterestedIn | null> => {
+  if (flowType) {
+    const data = await InterestedIn.findOne({ flowType }).lean();
+    return data ? [data] : [];
+  }
+
   return InterestedIn.find().lean();
-};
-
-// DELETE (all)
-export const deleteInterestedIn = async (): Promise<void> => {
-  await InterestedIn.deleteMany({});
 };
