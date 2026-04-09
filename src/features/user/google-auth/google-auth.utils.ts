@@ -23,3 +23,4 @@ export const verifyGoogleToken = async (idToken: string) => {
     throw new Error("Invalid Google Token");
   }
 };
+
