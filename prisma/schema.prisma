@@ -37,6 +37,8 @@ model User {
   answer                  UserAnswer[]
   photos                  UserPhoto[]
   bio                     UserBio?
+  swipesGiven             UserSwipe[] @relation("Swiper")
+  swipesReceived          UserSwipe[] @relation("TargetUser")
 
   @@index([phone_number])
   @@index([google_id])
@@ -243,6 +245,7 @@ enum QuestionScreen{
   LIFESTYLE
   REAL_U_MATTERS
   THINGS_U_LOVE
+  HEALTH_WELLNESS
   INTEREST_HOBBY
   DREAM_PLAN
 }
@@ -290,4 +293,32 @@ model UserReport {
   createdAt  DateTime @default(now())
 
   @@unique([reporterId, reportedId])
+}
+
+model UserSwipe {
+  id             String   @id @default(uuid()) @db.Uuid
+  swiperId       String   @db.Uuid
+  targetUserId   String   @db.Uuid
+  action         SwipeAction
+  isMutual       Boolean  @default(false)
+  created_at     DateTime @default(now())
+  swiper         User @relation("Swiper", fields: [swiperId], references: [id], onDelete: Cascade)
+  targetUser     User @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+
+  @@unique([swiperId, targetUserId])
+  @@index([swiperId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([created_at])
+  @@index([swiperId, action])
+  @@index([targetUserId, action])
+
+  @@map("swipes")
+}
+
+enum SwipeAction {
+  LIKE
+  PASS
+  SUPERLIKE
 }
