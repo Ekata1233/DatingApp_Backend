@@ -109,6 +109,7 @@ export const getAll = async (
     const { flowType } = req.query;
 
     const data = await getAllInterestHobbies(flowType as string);
+    console.log("Retrieved Interest & Hobbies:", data);
 
     res.json({
       success: true,
