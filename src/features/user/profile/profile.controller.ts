@@ -5,7 +5,6 @@ import {
   updateInterestedInService,
   updateReligionService,
   updateLookingForService,
-  updateSexualOrientationService,
   updateLocationService,
   updateAddressService,
   updateAboutYourselfService,
@@ -53,7 +52,7 @@ export const profileController = async (req: Request, res: Response) => {
 };
 
 //Interested In
-export const enterInterestedInController = async (
+export const InterestedInController = async (
   req: Request,
   res: Response,
 ) => {
