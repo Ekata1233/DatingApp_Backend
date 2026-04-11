@@ -20,43 +20,69 @@ export const create = async (
       });
     }
 
-    if (!req.files || !req.files.icons) {
-      return res.status(400).json({
-        success: false,
-        message: "Icons are required",
-      });
-    }
+    /* ================= GET EXISTING IMAGES ================= */
+    const existingImages = req.body.existingImages
+      ? Array.isArray(req.body.existingImages)
+        ? req.body.existingImages
+        : [req.body.existingImages]
+      : [];
 
-    let icons = req.files.icons;
-    if (!Array.isArray(icons)) {
-      icons = [icons];
+    /* ================= HANDLE FILES ================= */
+    let icons: any[] = [];
+
+    if (req.files && req.files.icons) {
+      icons = Array.isArray(req.files.icons)
+        ? req.files.icons
+        : [req.files.icons];
     }
 
     const itemNames = Array.isArray(names) ? names : [names];
 
-    if (itemNames.length !== icons.length) {
+    /* ================= VALIDATION ================= */
+    if (itemNames.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Names and icons count must match",
+        message: "At least one item name is required",
       });
     }
 
-    // ✅ Upload icons
-    const items = await Promise.all(
-      icons.map(async (file: any, index: number) => {
-        const uploadResponse = await imagekit.upload({
-          file: file.data,
-          fileName: file.name,
-          folder: "/interest-hobbies",
-        });
+    if (icons.length === 0 && existingImages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one icon is required",
+      });
+    }
 
-        return {
-          name: itemNames[index],
-          icon: uploadResponse.url,
-        };
-      })
-    );
+    /* ================= UPLOAD NEW IMAGES ================= */
+    let uploadedItems: any[] = [];
 
+    if (icons.length > 0) {
+      uploadedItems = await Promise.all(
+        icons.map(async (file: any, index: number) => {
+          const uploadResponse = await imagekit.upload({
+            file: file.data,
+            fileName: file.name,
+            folder: "/interest-hobbies",
+          });
+
+          return {
+            name: itemNames[index] || "Unknown",
+            icon: uploadResponse.url,
+          };
+        })
+      );
+    }
+
+    /* ================= KEEP EXISTING IMAGES ================= */
+    const existingItems = existingImages.map((img: string, index: number) => ({
+      name: itemNames[index] || "Unknown",
+      icon: img,
+    }));
+
+    /* ================= FINAL MERGE ================= */
+    const items = [...existingItems, ...uploadedItems];
+
+    /* ================= SAVE (UPSERT) ================= */
     const data = await createInterestHobbies({
       flowType,
       title,
@@ -73,7 +99,7 @@ export const create = async (
   }
 };
 
-// ✅ GET
+/* ================= GET ================= */
 export const getAll = async (
   req: Request,
   res: Response,
@@ -83,6 +109,7 @@ export const getAll = async (
     const { flowType } = req.query;
 
     const data = await getAllInterestHobbies(flowType as string);
+    console.log("Retrieved Interest & Hobbies:", data);
 
     res.json({
       success: true,
