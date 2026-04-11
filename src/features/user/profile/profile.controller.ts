@@ -52,7 +52,7 @@ export const profileController = async (req: Request, res: Response) => {
 };
 
 //Interested In
-export const enterInterestedInController = async (
+export const InterestedInController = async (
   req: Request,
   res: Response,
 ) => {
@@ -66,10 +66,10 @@ export const enterInterestedInController = async (
     return res.status(200).json({
       success: true,
       message: "Interested in preference saved successfully",
-      interested_in: user.interested_in,
-      sexual_orientation: user.sexual_orientation,
-      onboarding_step: user.onboarding_step,
-      next_step: user.next_step,
+      interested_in: user.updatedProfile.interested_in,
+      sexual_orientation: user.updatedProfile.sexual_orientation,
+      onboarding_step: user.updatedUser.onboarding_step,
+      next_step: user.updatedUser.next_step,
     });
   } catch (error: any) {
     return res.status(400).json({
@@ -91,10 +91,10 @@ export const ReligionController = async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: "Religion saved successfully",
-      religion: profile.religion,
-      community: profile.community,
-
-      onboarding_step: 5,
+      religion: profile.updatedProfile.religion,
+      community: profile.updatedProfile.community,
+onboarding_step: profile.updatedUser.onboarding_step,
+      next_step: profile.updatedUser.next_step,
     });
   } catch (error: any) {
     return res.status(400).json({
@@ -163,7 +163,7 @@ export const addressController = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: "Location updated successfully",
+      message: "Address updated successfully",
       onboarding_step: user.onboarding.onboarding_step,
       next_step: user.onboarding.next_step,
       data: user.profile,
@@ -352,7 +352,7 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
   }
 };
 
-export const updatePhotoController = async (req: Request, res: Response) => {
+export const updatePhotoController = async ( req: Request<{ photoId: string }>, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { photoId } = req.params;
@@ -382,7 +382,7 @@ export const updatePhotoController = async (req: Request, res: Response) => {
 };
 
 export const setPrimaryPhotoController = async (
-  req: Request,
+  req: Request<{ photoId: string }>,
   res: Response
 ) => {
   try {
@@ -405,7 +405,7 @@ export const setPrimaryPhotoController = async (
 };
 
 export const deletePhotoController = async (
-  req: Request,
+   req: Request<{ photoId: string }>,
   res: Response
 ) => {
   try {

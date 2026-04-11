@@ -103,15 +103,22 @@ if (!existingUser?.looking_for) {
     },
   });
 
-  await prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
     },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
   });
 
-  return updatedProfile;
+  return{
+    updatedProfile,
+    updatedUser
+  } ;
 };
 
 //Religion
@@ -148,15 +155,22 @@ export const updateReligionService = async (
     },
   });
 
-  await prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
     },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
   });
 
-  return updatedProfile;
+  return {
+    updatedProfile,
+    updatedUser
+  };
 };
 
 //Looking For
