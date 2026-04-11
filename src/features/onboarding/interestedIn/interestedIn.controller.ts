@@ -13,6 +13,8 @@ export const create = async (
   try {
     const { flowType, title, gender } = req.body;
 
+    console.log("Received InterestedIn Data:", { files: req.files});
+
     // Ensure we have files
     if (!flowType) {
       return res.status(400).json({
