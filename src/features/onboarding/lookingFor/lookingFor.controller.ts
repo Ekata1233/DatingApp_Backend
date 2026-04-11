@@ -95,13 +95,15 @@ export const getAll = async (
   next: NextFunction,
 ) => {
   try {
+    const { flowType } = req.query; // ✅ get from query
 
-    const data = await getAllLookingFor();
+    const data = await getAllLookingFor(flowType as string); // ✅ pass it
 
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
+
 
 

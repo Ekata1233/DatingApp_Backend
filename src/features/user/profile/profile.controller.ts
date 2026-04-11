@@ -5,7 +5,6 @@ import {
   updateInterestedInService,
   updateReligionService,
   updateLookingForService,
-  updateSexualOrientationService,
   updateLocationService,
   updateAddressService,
   updateAboutYourselfService,
@@ -105,34 +104,7 @@ export const ReligionController = async (req: Request, res: Response) => {
   }
 };
 
-//Sexual_Orientation
-export const enterSexualOrientationController = async (
-  req: Request,
-  res: Response,
-) => {
-  try {
-    const userId = (req as any).user.id;
 
-    const { sexual_orientation } = req.body;
-
-    const profile = await updateSexualOrientationService(
-      userId,
-      sexual_orientation,
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Sexual orientation saved successfully",
-      sexual_orientation: profile.sexual_orientation,
-      onboarding_step: 5,
-    });
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
 
 //Looking for
 export const enterLookingForController = async (
