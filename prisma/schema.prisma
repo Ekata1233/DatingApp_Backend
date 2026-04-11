@@ -39,6 +39,8 @@ model User {
   bio                     UserBio?
   swipesGiven             UserSwipe[] @relation("Swiper")
   swipesReceived          UserSwipe[] @relation("TargetUser")
+  matchesAsUser1          UserMatch[] @relation("MatchUser1")
+  matchesAsUser2          UserMatch[] @relation("MatchUser2")
 
   @@index([phone_number])
   @@index([google_id])
@@ -321,4 +323,30 @@ enum SwipeAction {
   LIKE
   PASS
   SUPERLIKE
+}
+
+
+model UserMatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  user1Id     String   @db.Uuid
+  user2Id     String   @db.Uuid
+  matched_at  DateTime @default(now())
+  last_message_at DateTime?
+  is_active   Boolean  @default(true)
+  is_deleted  Boolean  @default(false)
+
+  user1       User @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2       User @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  @@unique([user1Id, user2Id])
+
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([matched_at])
+  @@index([last_message_at])
+  @@index([is_active])
+  @@index([user1Id, is_active])
+  @@index([user2Id, is_active])
+
+  @@map("matches")
 }
