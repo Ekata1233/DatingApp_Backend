@@ -1,9 +1,9 @@
 // modules/user/user.controller.ts
 
 import { Request, Response } from "express";
-import { getSuggestionsService } from "./suggestion.service";
+import { getFeedService } from "./feed.service";
 
-export const getSuggestionsController = async (
+export const getFeedController = async (
   req: Request,
   res: Response
 ) => {
@@ -12,7 +12,7 @@ export const getSuggestionsController = async (
 
     const { cursor, limit = 10 } = req.query;
 
-    const data = await getSuggestionsService({
+    const data = await getFeedService({
       userId,
       cursor: cursor as string,
       limit: Number(limit),
@@ -23,7 +23,7 @@ export const getSuggestionsController = async (
       ...data,
     });
   } catch (error: any) {
-    console.error("Suggestions Error:", error);
+    console.error("Feeds Error:", error);
     res.status(500).json({
       success: false,
       message: error.message,

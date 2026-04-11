@@ -1,18 +1,18 @@
-// modules/user/suggestion.service.ts
+// modules/user/feed.service.ts
 import { prisma } from "../../../prisma/prismaClient";
 
 
-interface SuggestionParams {
+interface FeedParams {
   userId: string;
   cursor?: string;
   limit: number;
 }
 
-export const getSuggestionsService = async ({
+export const getFeedService = async ({
   userId,
   cursor,
   limit,
-}: SuggestionParams) => {
+}: FeedParams) => {
   // 1. Get current user profile
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },

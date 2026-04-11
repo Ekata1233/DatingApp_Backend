@@ -18,6 +18,9 @@ import dreamsFutureRoutes from "../features/onboarding/dreamsFuture/dreamsFuture
 
 import questionRoutes from "../features/onboarding/questionAnswer/question.route";
 import blockRoutes from "../features/user/block/block.routes";
+import reportRoutes from "../features/user/report/report.routes";
+import feedRoutes from "../features/user/feed/feed.routes";
+import detailsRoutes from "../features/user/details/details.routes";
 
 const router = Router();
 
@@ -37,7 +40,9 @@ router.use("/question", questionRoutes);
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
 router.use("/user",blockRoutes)
-
+router.use("/user",reportRoutes)
+router.use("/user",feedRoutes)
+router.use("/user",detailsRoutes)
 
 
 export default router;
