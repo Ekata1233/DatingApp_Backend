@@ -3,6 +3,7 @@ import {
   createQuestionController,
   getQuestionController,
   getQuestionByIdController,
+  deleteQuestionController,
 } from "./question.controller";
 
 
@@ -16,5 +17,7 @@ router.get("/fetch", getQuestionController);
 
 // GET SINGLE QUESTION
 router.get("/question/:id", getQuestionByIdController);
+
+router.delete("/delete/:id", deleteQuestionController);
 
 export default router;
