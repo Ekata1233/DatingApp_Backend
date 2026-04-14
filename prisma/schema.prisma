@@ -25,6 +25,7 @@ model User {
   onboarding_step         String?         @db.VarChar(20)
   next_step               String?         @db.VarChar(20)
   onboarding_completed    Boolean         @default(false)
+  profile_completion      Int             @default(0) 
 
   last_active_at          DateTime?   
   deleted_at              DateTime?
