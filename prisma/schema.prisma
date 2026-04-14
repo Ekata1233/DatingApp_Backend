@@ -41,6 +41,9 @@ model User {
   swipesReceived          UserSwipe[] @relation("TargetUser")
   matchesAsUser1          UserMatch[] @relation("MatchUser1")
   matchesAsUser2          UserMatch[] @relation("MatchUser2")
+  current_subscription_id String?         @unique
+  currentSubscription     UserSubscription? @relation("CurrentSubscription", fields: [current_subscription_id], references: [id])
+  subscriptions           UserSubscription[] @relation("UserSubscriptions")
 
   @@index([phone_number])
   @@index([google_id])
@@ -349,4 +352,43 @@ model UserMatch {
   @@index([user2Id, is_active])
 
   @@map("matches")
+}
+
+
+model UserSubscription {
+  id                    String   @id @default(uuid())
+  userId                String   @db.Uuid
+  user                  User     @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  currentForUser        User?    @relation("CurrentSubscription")
+  type                  SubscriptionType
+  status                String   // ACTIVE, EXPIRED, CANCELLED
+  started_at            DateTime
+  expires_at            DateTime
+  daily_swipe_count     Int       @default(0) 
+  daily_like_count      Int       @default(0) 
+  last_reset_at         DateTime @default(now())
+
+  created_at  DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum SubscriptionType {
+  FREE
+  A
+  B
+  C
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  userId          String
+  subscriptionId  String?
+  amount          Float
+  currency        String
+  provider        String   // razorpay / stripe
+  payment_id      String   // gateway ID
+  status          String   // SUCCESS, FAILED
+
+  created_at      DateTime @default(now())
 }
