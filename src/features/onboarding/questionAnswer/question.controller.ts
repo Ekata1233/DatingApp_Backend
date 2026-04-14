@@ -8,6 +8,7 @@ import {
   createQuestionService,
   getQuestionService,
   getQuestionByIdService,
+  deleteQuestionService,
 } from "./question.service";
 
 // CREATE QUESTION
@@ -76,6 +77,27 @@ export const getQuestionByIdController = async (
     return res.status(200).json({
       success: true,
       data: question,
+    });
+  } catch (error: any) {
+    return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const deleteQuestionController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+
+    const result = await deleteQuestionService(id);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
     });
   } catch (error: any) {
     return res.status(404).json({

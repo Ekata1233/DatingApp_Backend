@@ -77,3 +77,22 @@ export const getQuestionByIdService = async (id: string) => {
 
   return question;
 };
+
+// DELETE QUESTION
+export const deleteQuestionService = async (id: string) => {
+  // check if exists
+  const question = await prisma.question.findUnique({
+    where: { id },
+  });
+
+  if (!question) {
+    throw new Error("Question not found");
+  }
+
+  // delete question (options auto deleted because of Cascade)
+  await prisma.question.delete({
+    where: { id },
+  });
+
+  return { message: "Question deleted successfully" };
+};
