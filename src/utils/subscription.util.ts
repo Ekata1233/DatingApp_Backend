@@ -1,9 +1,16 @@
-import { SUBSCRIPTION_LIMITS } from "../config/subscription";
+import { SUBSCRIPTION_LIMITS, SubscriptionType } from "../config/subscription";
 import { prisma } from "../prisma/prismaClient";
 
-const resetDailyCountsIfNeeded = async (user: any) => {
+type Subscription = {
+  type: SubscriptionType;
+  expires_at: Date;
+  status: string;
+};
+
+// ✅ Reset daily counts
+export const resetDailyCountsIfNeeded = async (subscription: any) => {
   const now = new Date();
-  const lastReset = new Date(user.last_reset_at);
+  const lastReset = new Date(subscription.last_reset_at);
 
   const isNewDay =
     now.getDate() !== lastReset.getDate() ||
@@ -11,8 +18,8 @@ const resetDailyCountsIfNeeded = async (user: any) => {
     now.getFullYear() !== lastReset.getFullYear();
 
   if (isNewDay) {
-    await prisma.user.update({
-      where: { id: user.id },
+    const updated = await prisma.userSubscription.update({
+      where: { id: subscription.id },
       data: {
         daily_swipe_count: 0,
         daily_like_count: 0,
@@ -20,42 +27,25 @@ const resetDailyCountsIfNeeded = async (user: any) => {
       },
     });
 
-    user.daily_swipe_count = 0;
-    user.daily_like_count = 0;
+    return updated;
   }
 
-  return user;
+  return subscription;
 };
 
-
-const getUserLimits = (user: any) => {
+export const getUserLimits = (subscription: Subscription | null) => {
   const now = new Date();
 
-  // If expired → fallback to FREE
-  if (
-    user.subscription_expires_at &&
-    user.subscription_expires_at < now
-  ) {
+  // ❌ No subscription → FREE
+  if (!subscription) {
     return SUBSCRIPTION_LIMITS.FREE;
   }
 
-  return SUBSCRIPTION_LIMITS[userSubscription.type];
-};
-
-export const checkSwipeLimit = async (req, res, next) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-  });
-
-  await resetDailyCountsIfNeeded(user);
-
-  const limits = getUserLimits(user);
-
-  if (user.daily_swipe_count >= limits.swipeLimit) {
-    return res.status(403).json({
-      message: "Swipe limit reached",
-    });
+  // ❌ Expired → FREE
+  if (subscription.expires_at < now || subscription.status !== "ACTIVE") {
+    return SUBSCRIPTION_LIMITS.FREE;
   }
 
-  next();
+  // ✅ Active subscription
+  return SUBSCRIPTION_LIMITS[subscription.type];
 };
