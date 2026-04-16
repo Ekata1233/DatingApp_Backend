@@ -406,12 +406,65 @@ const mapIncomeToEnum = (incomeRange: string) => {
       return null;
   }
 };
-//Education & Work
-export const updateEduWorkService = async (
+
+//Education 
+export const updateEducationService = async (
+
   userId: string,
   data: {
     highestEdu?: string;
     collegeName?: string;
+  },
+) => {
+  if (!userId) throw new Error("User ID is missing");
+
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { looking_for: true },
+  });
+
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
+
+  const currentStep = "EDUCATION";
+  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+
+  const eduWork = await prisma.userEduWork.upsert({
+    where: { userId },
+    update: {
+      highestEdu: data.highestEdu,
+      collegeName: data.collegeName,
+    },
+    create: {
+      userId,
+      highestEdu: data.highestEdu,
+      collegeName: data.collegeName,
+    },
+  });
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
+
+  return {
+    eduWork,
+    onboarding: updatedUser,
+  };
+};
+
+//work
+export const updateWorkService = async (
+
+  userId: string,
+  data: {
     incomeRange: string;
     workingWith?: any;
     workingAs?: string;
@@ -429,7 +482,7 @@ export const updateEduWorkService = async (
     throw new Error("Looking_for is missing");
   }
 
-  const currentStep = "EDUCATION_WORK";
+  const currentStep = "WORK";
   const nextStep = getNextStep(existingUser.looking_for, currentStep);
 
   const { minIncome, maxIncome } = parseIncomeRange(data.incomeRange);
@@ -444,8 +497,6 @@ export const updateEduWorkService = async (
   const eduWork = await prisma.userEduWork.upsert({
     where: { userId },
     update: {
-      highestEdu: data.highestEdu,
-      collegeName: data.collegeName,
       incomeRange: incomeEnum, // ✅ FIXED
       minIncome,
       maxIncome,
@@ -455,8 +506,6 @@ export const updateEduWorkService = async (
     },
     create: {
       userId,
-      highestEdu: data.highestEdu,
-      collegeName: data.collegeName,
       incomeRange: incomeEnum, // ✅ FIXED
       minIncome,
       maxIncome,

@@ -3,7 +3,7 @@ export const ONBOARDING_FLOWS = {
     "LOOKING_FOR",
     "BASIC_INFO",
     "RELIGION", // step 3
-    "LOCATION",
+    "ADDRESS",
     "ABOUT_YOURSELF",
     "EDUCATION",
     "WORK", // step 7
@@ -32,7 +32,7 @@ export const ONBOARDING_FLOWS = {
     "BASIC_INFO",
     "INTERESTED_IN",
     "RELIGION", 
-    "LOCATION",
+    "ADDRESS",
     "ABOUT_YOURSELF",
     "EDUCATION",
     "FINANCIAL_SITUATION", 
