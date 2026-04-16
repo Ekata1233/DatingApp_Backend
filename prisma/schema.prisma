@@ -151,7 +151,7 @@ model UserEduWork {
   highestEdu    String?  @db.VarChar(100)
   collegeName   String?  @db.VarChar(100)
 
-  incomeRange   IncomeRangeType
+  incomeRange   IncomeRangeType?
   minIncome     Int?
   maxIncome     Int?
 

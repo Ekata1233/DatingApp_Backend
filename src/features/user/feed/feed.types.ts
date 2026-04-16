@@ -4,5 +4,6 @@ export interface FeedParams {
   userId: string;
   cursor?: string;
   limit: number;
-   mode: FeedMode;
+  mode: FeedMode;
+  filters?: any;
 }
