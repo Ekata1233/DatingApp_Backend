@@ -6,7 +6,7 @@ export const sendOtp = async (phoneNumber: string) => {
   const verification = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verifications.create({
-      to: "+919272003735",
+      to: "+919309517500",
       channel: "sms",
     });
 
@@ -17,7 +17,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
   const verificationCheck = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verificationChecks.create({
-      to: "+919272003735",
+      to: "+919309517500",
       code: otp,
     });
 
