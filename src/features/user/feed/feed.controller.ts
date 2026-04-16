@@ -16,6 +16,7 @@ export const getFeedController = async (
       userId,
       cursor: cursor as string,
       limit: Number(limit),
+      filter: req.query.filter as string,
     });
 
     res.json({

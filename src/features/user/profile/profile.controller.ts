@@ -9,12 +9,13 @@ import {
   updateAddressService,
   updateAboutYourselfService,
   updateUserAnswerService,
-  updateEduWorkService,
   uploadUserPhotosService,
   updateUserPhotoService,
   setPrimaryPhotoService,
   deleteUserPhotoService,
-  updateUserBioService
+  updateUserBioService,
+  updateEducationService,
+  updateWorkService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -103,8 +104,6 @@ onboarding_step: profile.updatedUser.onboarding_step,
     });
   }
 };
-
-
 
 //Looking for
 export const enterLookingForController = async (
@@ -277,8 +276,8 @@ export const saveUserAnswerController = async (
   }
 };
 
-//Education & Work
-export const educationWorkController = async (
+//Education 
+export const educatioController = async (
   req: Request,
   res: Response
 ) => {
@@ -288,15 +287,44 @@ export const educationWorkController = async (
     const {
       highestEdu,
       collegeName,
+    } = req.body;
+
+    const user = await updateEducationService(userId, {
+      highestEdu,
+      collegeName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Education updated successfully",
+      onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
+      data: user.eduWork,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//work
+export const workController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const {
       incomeRange,
       workingWith,
       workingAs,
       companyName,
     } = req.body;
 
-    const user = await updateEduWorkService(userId, {
-      highestEdu,
-      collegeName,
+    const user = await updateWorkService(userId, {
       incomeRange,
       workingWith,
       workingAs,
@@ -305,7 +333,7 @@ export const educationWorkController = async (
 
     return res.status(200).json({
       success: true,
-      message: "Education & work updated successfully",
+      message: "Work updated successfully",
       onboarding_step: user.onboarding.onboarding_step,
       next_step: user.onboarding.next_step,
       data: user.eduWork,
