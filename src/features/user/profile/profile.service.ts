@@ -213,7 +213,7 @@ export const updateAddressService = async (
     throw new Error("Looking_for is missing");
   }
 
-  const currentStep = "LOCATION";
+  const currentStep = "ADDRESS";
   const nextStep = getNextStep(existingUser.looking_for, currentStep);
 
   const profile = await prisma.userProfile.upsert({
