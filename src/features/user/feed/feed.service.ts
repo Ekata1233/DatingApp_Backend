@@ -34,6 +34,7 @@ export const getFeedService = async ({
   cursor,
   limit,
   mode,
+  filters
 }: FeedParams) => {
   // 1. Get current user profile
   const currentUser = await prisma.user.findUnique({

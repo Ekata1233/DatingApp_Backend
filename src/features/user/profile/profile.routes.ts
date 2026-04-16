@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, InterestedInController,ReligionController, enterLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educationWorkController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController } from "./profile.controller";
+import { profileController, InterestedInController,ReligionController, enterLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -318,9 +318,15 @@ router.patch("/profile/answer", authMiddleware, saveUserAnswerController);
  *         description: Education & work updated successfully
  */
 router.patch(
-  "/profile/education-work",
+  "/profile/education",
   authMiddleware,
-  educationWorkController
+    educatioController
+);
+
+router.patch(
+  "/profile/work",
+  authMiddleware,
+  workController
 );
 
 router.post("/profile/photos", authMiddleware, uploadPhotosController);
