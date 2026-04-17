@@ -120,7 +120,7 @@ export const enterLookingForController = async (
       });
     }
 
-    const { looking_for } = req.body;
+    const { looking_for, looking_for_option } = req.body;
 
     // ✅ Basic validation
     if (!looking_for || !Object.values(LookingFor).includes(looking_for)) {
@@ -130,12 +130,13 @@ export const enterLookingForController = async (
       });
     }
 
-    const user = await updateLookingForService(userId, looking_for);
+    const user = await updateLookingForService(userId, looking_for, looking_for_option);
 
     return res.status(200).json({
       success: true,
       message: "Relationship preference saved successfully",
       looking_for: user.looking_for,
+      looking_for_option: user.looking_for_option,
       onboarding_step: user.onboarding_step,
       next_step: user.next_step,
     });

@@ -21,6 +21,7 @@ model User {
   gender                  String?         @db.VarChar(20)
 
   looking_for             LookingFor?
+  looking_for_option      LookingForOption?
 
   onboarding_step         String?         @db.VarChar(20)
   next_step               String?         @db.VarChar(20)
@@ -100,6 +101,18 @@ enum LookingFor {
   DATE_TO_MARRY
   DATING
   MATURE_CONNECTION
+}
+
+enum LookingForOption{
+  LONG_TERM
+  SHORT_TERM
+  NEW_FRIENDS
+  CASUAL
+  COMPANIONSHIP
+  LIFE_PARTNER
+  TRAVEL_PARTNER
+  EMOTIONAL_SUPPORT
+  FRIENDSHIP_FIRST
 }
 
 enum MaritalStatus {

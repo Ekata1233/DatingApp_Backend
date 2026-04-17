@@ -3,6 +3,7 @@ import {
   ChildStatus,
   LivingSituation,
   LookingFor,
+  LookingForOption,
   MaritalStatus,
   NumberOfChildren,
 } from "@prisma/client";
@@ -177,16 +178,18 @@ export const updateReligionService = async (
 export const updateLookingForService = async (
   userId: string,
   looking_for: LookingFor,
+  looking_for_option: LookingForOption,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
   const currentStep = "LOOKING_FOR";
-  const nextStep = getNextStep("DATE_TO_MARRY", currentStep);
+  const nextStep = getNextStep(looking_for, currentStep);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       looking_for,
+      looking_for_option,
       onboarding_step: currentStep,
       next_step: nextStep,
     },
