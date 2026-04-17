@@ -22,11 +22,15 @@ const MODE_CONFIG = {
   },
 } as const;
 
-const getOppositeGender = (gender: string) => {
-  if (gender === "male") return "female";
-  if (gender === "female") return "male";
+const getOppositeGender = (gender: string): string | undefined => {
+  const g = gender.toLowerCase();
+
+  if (g === "male") return "Female";
+  if (g === "female") return "Male";
+
   return undefined;
 };
+
 
 
 export const getFeedService = async ({
@@ -34,13 +38,15 @@ export const getFeedService = async ({
   cursor,
   limit,
   mode,
-  filters
+  // filters
 }: FeedParams) => {
   // 1. Get current user profile
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
     include: { profile: true },
   });
+
+  console.log("Current User Profile:", currentUser);
 
   if (!currentUser || !currentUser.profile) {
     throw new Error("User profile not found");
@@ -50,6 +56,7 @@ export const getFeedService = async ({
     currentUser.profile;
 
     const { gender } = currentUser;
+console.log("User Gender:", gender);
 
   // 2. Fetch excluded user IDs (swipes + blocks)
   const [swipes, blocks, blockedBy] = await Promise.all([
@@ -79,7 +86,7 @@ export const getFeedService = async ({
   const where: any = {
     id: { notIn: excludedArray },
     deleted_at: null,
-    onboarding_completed: true,
+    // onboarding_completed: true,
   };
 
   // 🔥 GENDER LOGIC
@@ -132,11 +139,11 @@ if (Object.keys(profileFilter).length > 0) {
 
     where,
 
-    include: {
-      profile: true,
-      photos: true,
-      bio: true,
-    },
+    // include: {
+    //   profile: true,
+    //   photos: true,
+    //   bio: true,
+    // },
 
     orderBy: {
       created_at: "desc",

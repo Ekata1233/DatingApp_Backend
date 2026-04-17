@@ -1,3 +1,26 @@
+type Preferences = {
+  minAge?: number;
+  maxAge?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  maxDistance?: number;
+  interestedIn?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  religion?: string;
+  community?: string;
+  maritalStatus?: string;
+  children?: string;
+  livingWith?: string;
+  education?: string;
+  workingWith?: string;
+  annualIncome?: number;
+  drinking?: string;
+  smoking?: string;
+  diet?: string;
+};
+
 export const buildFilterQuery = (filters: any) => {
   const userWhere: any = {};
   const profileWhere: any = {};

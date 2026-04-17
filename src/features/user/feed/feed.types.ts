@@ -5,5 +5,5 @@ export interface FeedParams {
   cursor?: string;
   limit: number;
   mode: FeedMode;
-  filters?: any;
+  // filters?: any;
 }
