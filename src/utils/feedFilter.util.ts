@@ -1,24 +1,46 @@
 type Preferences = {
+  verificationLevel?: string;
   minAge?: number;
   maxAge?: number;
   minHeight?: number;
   maxHeight?: number;
-  maxDistance?: number;
-  interestedIn?: string;
+  religion?: string;
+  community?: string;
   city?: string;
   state?: string;
   country?: string;
-  religion?: string;
-  community?: string;
   maritalStatus?: string;
-  children?: string;
+  childrenPreference?: string;
   livingWith?: string;
-  education?: string;
+  highestEducation?: string;
+  educationArea?:string;
   workingWith?: string;
-  annualIncome?: number;
+  annualIncome?:string;
   drinking?: string;
   smoking?: string;
   diet?: string;
+  profileManaged?:string;
+  mangkik?:string;
+  astroMatch?:string;
+  location?:string;
+  hasBio?:boolean;
+  interests?:string;
+  maxDistance?: number;
+  interestedIn?: string;
+  lookingFor?:string;
+  lannguages?:string;
+  Zodiac:string;
+  occupation?:string;
+  CommunicationStyle?:string;
+  loveStyle?:string;
+  pets?:string;
+  workout?:string;
+  socialMedia?:string;
+  sprirituality?:string;
+  primaryIncomeSource?:string;
+  financialPreference?:string;
+  healthConditionPreference?:string;
+  futureLivingPlans?:string;
 };
 
 export const buildFilterQuery = (filters: any) => {
@@ -35,7 +57,7 @@ export const buildFilterQuery = (filters: any) => {
       const maxDOB = new Date(
         today.getFullYear() - filters.ageMin,
         today.getMonth(),
-        today.getDate()
+        today.getDate(),
       );
       profileWhere.date_of_birth.lte = maxDOB;
     }
@@ -44,7 +66,7 @@ export const buildFilterQuery = (filters: any) => {
       const minDOB = new Date(
         today.getFullYear() - filters.ageMax,
         today.getMonth(),
-        today.getDate()
+        today.getDate(),
       );
       profileWhere.date_of_birth.gte = minDOB;
     }
