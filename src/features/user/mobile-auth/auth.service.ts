@@ -3,10 +3,16 @@ import { prisma } from "../../../prisma/prismaClient";
 import jwt from "jsonwebtoken";
 
 export const sendOtp = async (phoneNumber: string) => {
+  if (!phoneNumber) throw new Error("Phone number is required");
+
+  const formattedNumber = phoneNumber.startsWith("+91")
+    ? phoneNumber
+    : `+91${phoneNumber}`;
+
   const verification = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verifications.create({
-      to: "+919309517500",
+      to: formattedNumber,
       channel: "sms",
     });
 
@@ -14,10 +20,16 @@ export const sendOtp = async (phoneNumber: string) => {
 };
 
 export const verifyOtp = async (phoneNumber: string, otp: string) => {
+   if (!phoneNumber || !otp) throw new Error("Phone & OTP required");
+
+  const formattedNumber = phoneNumber.startsWith("+91")
+    ? phoneNumber
+    : `+91${phoneNumber}`;
+
   const verificationCheck = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verificationChecks.create({
-      to: "+919309517500",
+      to: formattedNumber,
       code: otp,
     });
 
