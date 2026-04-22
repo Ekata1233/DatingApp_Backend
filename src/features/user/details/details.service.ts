@@ -57,7 +57,7 @@ export const getUserDetailsService = async (userId: string) => {
       photos: {
         select: {
           id: true,
-          image_url: true,
+          media_url: true,
           is_primary: true,
         },
         orderBy: {

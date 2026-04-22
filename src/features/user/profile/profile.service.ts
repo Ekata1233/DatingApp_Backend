@@ -552,25 +552,29 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
   }
 
   // Upload all images
-  const uploadedPhotos = await Promise.all(
-    files.map(async (file: any, index: number) => {
-      const uploadResponse = await imagekit.upload({
-        file: file.data,
-        fileName: file.name,
-        folder: "/user-photos",
-      });
+ const uploadedPhotos = await Promise.all(
+  files.map(async (file: any, index: number) => {
 
-      const isVideo = file.mimetype?.startsWith("video");
+    const base64File = file.data.toString("base64"); // ✅ added
 
-      return {
-        user_id: userId,
-        image_url: uploadResponse.url,
-        order: index + 1,
-        is_primary: index === 0,
-        media_type: isVideo ? "video" : "image", // ✅ ADDED
-      };
-    }),
-  );
+    const uploadResponse = await imagekit.upload({
+      file: base64File, // ✅ changed
+      fileName: file.name,
+      folder: "/user-photos",
+    });
+
+    const isVideo = file.mimetype?.startsWith("video");
+
+    return {
+      user_id: userId,
+      media_url: uploadResponse.url,
+      order: index + 1,
+      is_primary: index === 0,
+      media_type: isVideo ? "video" : "image",
+    };
+  }),
+);
+
 
   // Save in DB
   await prisma.userPhoto.createMany({
@@ -629,7 +633,7 @@ export const updateUserPhotoService = async (
   const updatedPhoto = await prisma.userPhoto.update({
     where: { id: photoId },
     data: {
-      image_url: uploadResponse.url,
+      media_url: uploadResponse.url,
       media_type: isVideo ? "video" : "image", // ✅ ADDED
     },
   });
