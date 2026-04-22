@@ -272,9 +272,10 @@ enum QuestionScreen{
 model UserPhoto {
   id          String   @id @default(uuid()) @db.Uuid
   user_id     String   @db.Uuid
-  image_url   String   @db.Text
-  is_primary  Boolean  @default(false) // main profile photo
-  order       Int?     // for ordering images (1,2,3...)
+  media_url   String   @db.Text
+  media_type  String @default("image") // "image" | "video"
+  is_primary  Boolean  @default(false) 
+  order       Int?     
   created_at  DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)

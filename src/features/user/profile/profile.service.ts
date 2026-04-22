@@ -78,14 +78,14 @@ export const updateInterestedInService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
-   const existingUser = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findUnique({
     where: { id: userId },
     select: { looking_for: true },
   });
 
-if (!existingUser?.looking_for) {
-  throw new Error("Looking_for is missing");
-}
+  if (!existingUser?.looking_for) {
+    throw new Error("Looking_for is missing");
+  }
 
   // 👉 Calculate next step
   const currentStep = "INTRESTED_IN";
@@ -116,10 +116,10 @@ if (!existingUser?.looking_for) {
     },
   });
 
-  return{
+  return {
     updatedProfile,
-    updatedUser
-  } ;
+    updatedUser,
+  };
 };
 
 //Religion
@@ -170,7 +170,7 @@ export const updateReligionService = async (
 
   return {
     updatedProfile,
-    updatedUser
+    updatedUser,
   };
 };
 
@@ -410,9 +410,8 @@ const mapIncomeToEnum = (incomeRange: string) => {
   }
 };
 
-//Education 
+//Education
 export const updateEducationService = async (
-
   userId: string,
   data: {
     highestEdu?: string;
@@ -465,7 +464,6 @@ export const updateEducationService = async (
 
 //work
 export const updateWorkService = async (
-
   userId: string,
   data: {
     incomeRange: string;
@@ -562,11 +560,14 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
         folder: "/user-photos",
       });
 
+      const isVideo = file.mimetype?.startsWith("video");
+
       return {
         user_id: userId,
         image_url: uploadResponse.url,
         order: index + 1,
-        is_primary: index === 0, // first image primary
+        is_primary: index === 0,
+        media_type: isVideo ? "video" : "image", // ✅ ADDED
       };
     }),
   );
@@ -610,7 +611,7 @@ export const updateUserPhotoService = async (
   file: any,
 ) => {
   if (!userId) throw new Error("User ID is required");
-
+  const isVideo = file.mimetype?.startsWith("video");
   const existingPhoto = await prisma.userPhoto.findUnique({
     where: { id: photoId },
   });
@@ -629,6 +630,7 @@ export const updateUserPhotoService = async (
     where: { id: photoId },
     data: {
       image_url: uploadResponse.url,
+      media_type: isVideo ? "video" : "image", // ✅ ADDED
     },
   });
 
