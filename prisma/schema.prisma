@@ -17,7 +17,8 @@ model User {
   google_id               String?            @unique @db.VarChar(255)
   birth_date              DateTime?          @db.Date
   height                  Int?
-  gender                  String?            @db.VarChar(20)
+  gender                  Gender?
+  gender_option           GenderOption?
   looking_for             LookingFor?
   onboarding_step         String?            @db.VarChar(20)
   next_step               String?            @db.VarChar(20)
@@ -153,28 +154,28 @@ model UserAnswer {
   @@index([option_id])
 }
 
-model UserPhoto {
-  id         String   @id @default(uuid()) @db.Uuid
-  user_id    String   @db.Uuid
-  is_primary Boolean  @default(false)
-  order      Int?
-  created_at DateTime @default(now())
-  media_type String   @default("image")
-  media_url  String
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  model UserPhoto {
+    id         String   @id @default(uuid()) @db.Uuid
+    user_id    String   @db.Uuid
+    is_primary Boolean  @default(false)
+    order      Int?
+    created_at DateTime @default(now())
+    media_type String   @default("image")
+    media_url  String
+    user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([user_id])
-  @@map("user_photos")
-}
+    @@index([user_id])
+    @@map("user_photos")
+  }
 
-model UserBio {
-  user_id    String   @id @db.Uuid
-  bio        String?  @db.VarChar(500)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  model UserBio {
+    user_id    String   @id @db.Uuid
+    bio        String?  @db.VarChar(500)
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@map("user_bio")
+    @@map("user_bio")
 }
 
 model UserBlock {
@@ -255,6 +256,7 @@ model BoostOption {
   boost_id         String
   label            String
   boostCount       Int
+  timePerBoost     Int
   pricePerBoost    Decimal            @db.Decimal(10, 2)
   discounted_price Decimal            @db.Decimal(10, 2)
   discount_percent Int?
@@ -352,6 +354,26 @@ model Payment {
   payment_id     String
   status         String
   created_at     DateTime @default(now())
+}
+
+enum Gender{
+  MEN
+  WOMEN
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum GenderOption{
+  STRAIGHT
+  GAY
+  LESBIAN
+  AROMATIC
+  ASEXUAL
+  BISEXUAL
+  DEMISEXUAL
+  PANSEXUAL
+  QUEER
+  NOT_LISTED
 }
 
 enum BoostType {

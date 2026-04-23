@@ -15,6 +15,7 @@ import educationRoutes from "../features/onboarding/education/education.routes";
 import workDetailsRoutes from "../features/onboarding/workDetails/workDetails.routes";
 import interestHobbiesRoutes from "../features/onboarding/interestHobbies/interestHobbies.routes";
 import dreamsFutureRoutes from "../features/onboarding/dreamsFuture/dreamsFuture.routes";
+import packageRoutes from "../features/admin/package/package.routes";
 
 import questionRoutes from "../features/onboarding/questionAnswer/question.route";
 import blockRoutes from "../features/user/block/block.routes";
@@ -36,6 +37,7 @@ router.use("/workDetails", workDetailsRoutes);
 router.use("/interestHobbies", interestHobbiesRoutes);
 router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
+router.use("/boost",packageRoutes)
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
@@ -43,6 +45,8 @@ router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)
 router.use("/user",detailsRoutes)
+
+
 
 
 export default router;

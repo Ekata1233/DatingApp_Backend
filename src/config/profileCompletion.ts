@@ -13,15 +13,16 @@ export const PROFILE_WEIGHTS = {
     bio: 5, // Screen 11
   },
 
-  date: {
-    basic_details: 20, // Step 1
-    location: 10, // Step 2
-    interested_in: 10, // Step 3
-    lifestyle: 10, // Step 4
-    real_you: 10, // Step 5
-    interests: 10, // Step 6
-    photos: 20, // Step 7
-    bio: 10, // Step 8
+  dating: {
+    basic_details: 12,
+    location: 8,
+    address: 6,
+    interested_in: 8,
+    lifestyle: 8,
+    real_you: 10,
+    things_you_love: 13,
+    photos: 25,
+    bio: 10,
   },
 
   mature: {
