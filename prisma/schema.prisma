@@ -369,6 +369,42 @@ model UserMatch {
   @@map("matches")
 }
 
+model Package {
+  id            String   @id @default(uuid())
+  name          PackageType
+  title         String   // Boost / Primetime Boost / Super Boost
+  description   String?
+  is_active     Boolean  @default(true)
+  options       PackageOption[]
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("packages")
+}
+
+model PackageOption {
+  id            String   @id @default(uuid())
+  package_id    String
+  label         String   // "20 Boosts", "5 Primetime Boost"
+  quantity      Int      // 20, 5, 12 etc
+  price         Float
+  discounted_price Float?
+  discount_percent Int?
+  is_best_value Boolean @default(false)
+  is_popular    Boolean @default(false)
+  package       Package @relation(fields: [package_id], references: [id], onDelete: Cascade)  
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("package_options")
+}
+
+enum PackageType {
+  BOOST
+  PRIMETIME
+  SUPER
+}
+
 
 model UserSubscription {
   id                    String   @id @default(uuid())
