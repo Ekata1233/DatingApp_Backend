@@ -3,49 +3,44 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id                      String          @id @default(uuid()) @db.Uuid
-  full_name               String?         @db.VarChar(100)
-  email                   String?         @unique @db.VarChar(255)
-  phone_number            String?         @unique @db.VarChar(20)
-  is_phone_verified       Boolean         @default(false)
-  google_id               String?         @unique @db.VarChar(255)
-
-  birth_date              DateTime?       @db.Date
+  id                      String             @id @default(uuid()) @db.Uuid
+  full_name               String?            @db.VarChar(100)
+  email                   String?            @unique @db.VarChar(255)
+  phone_number            String?            @unique @db.VarChar(20)
+  is_phone_verified       Boolean            @default(false)
+  google_id               String?            @unique @db.VarChar(255)
+  birth_date              DateTime?          @db.Date
   height                  Int?
-  gender                  String?         @db.VarChar(20)
-
+  gender                  String?            @db.VarChar(20)
   looking_for             LookingFor?
-  looking_for_option      LookingForOption?
-
-  onboarding_step         String?         @db.VarChar(20)
-  next_step               String?         @db.VarChar(20)
-  onboarding_completed    Boolean         @default(false)
-  profile_completion      Int             @default(0) 
-
-  last_active_at          DateTime?   
+  onboarding_step         String?            @db.VarChar(20)
+  next_step               String?            @db.VarChar(20)
+  onboarding_completed    Boolean            @default(false)
+  last_active_at          DateTime?
   deleted_at              DateTime?
-  created_at              DateTime        @default(now())
-  updated_at              DateTime        @updatedAt
-
-  profile                 UserProfile?
-  about                   UserAbout?
-  eduWork                 UserEduWork? @relation("UserEduWork")
+  created_at              DateTime           @default(now())
+  updated_at              DateTime           @updatedAt
+  current_subscription_id String?            @unique
+  profile_completion      Int                @default(0)
+  looking_for_option      LookingForOption?
   answer                  UserAnswer[]
-  photos                  UserPhoto[]
-  bio                     UserBio?
-  swipesGiven             UserSwipe[] @relation("Swiper")
-  swipesReceived          UserSwipe[] @relation("TargetUser")
-  matchesAsUser1          UserMatch[] @relation("MatchUser1")
-  matchesAsUser2          UserMatch[] @relation("MatchUser2")
-  current_subscription_id String?         @unique
-  currentSubscription     UserSubscription? @relation("CurrentSubscription", fields: [current_subscription_id], references: [id])
   subscriptions           UserSubscription[] @relation("UserSubscriptions")
+  matchesAsUser1          UserMatch[]        @relation("MatchUser1")
+  matchesAsUser2          UserMatch[]        @relation("MatchUser2")
+  swipesGiven             UserSwipe[]        @relation("Swiper")
+  swipesReceived          UserSwipe[]        @relation("TargetUser")
+  about                   UserAbout?
+  bio                     UserBio?
+  eduWork                 UserEduWork?       @relation("UserEduWork")
+  photos                  UserPhoto[]
+  profile                 UserProfile?
+  currentSubscription     UserSubscription?  @relation("CurrentSubscription", fields: [current_subscription_id], references: [id])
 
   @@index([phone_number])
   @@index([google_id])
@@ -55,21 +50,20 @@ model User {
 }
 
 model UserProfile {
-  user_id                 String    @id @db.Uuid
-  religion                String?   @db.VarChar(50)
-  community               String?   @db.VarChar(50)
-  interested_in           String?   @db.VarChar(30)
-  sexual_orientation      String?   @db.VarChar(50)
-  country                 String?   @db.VarChar(30)
-  state                   String?   @db.VarChar(30)
-  city                    String?   @db.VarChar(30)
-  max_distance_km         Int?
-  latitude                Decimal?  @db.Decimal(10,8)
-  longitude               Decimal?  @db.Decimal(11,8)
-  created_at              DateTime  @default(now())
-  updated_at              DateTime  @updatedAt
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id            String   @id @db.Uuid
+  religion           String?  @db.VarChar(50)
+  community          String?  @db.VarChar(50)
+  interested_in      String?  @db.VarChar(30)
+  sexual_orientation String?  @db.VarChar(50)
+  country            String?  @db.VarChar(30)
+  state              String?  @db.VarChar(30)
+  city               String?  @db.VarChar(30)
+  max_distance_km    Int?
+  latitude           Decimal? @db.Decimal(10, 8)
+  longitude          Decimal? @db.Decimal(11, 8)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  user               User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religion])
   @@index([community])
@@ -81,20 +75,295 @@ model UserProfile {
 }
 
 model UserAbout {
-  user_id                    String    @id @db.Uuid
-  maritalStatus              MaritalStatus?
-  childStatus                ChildStatus?
-  numberOfChildren           NumberOfChildren?
-  childLivingArrangement     ChildLivingArrangement?
-  livingSituation            LivingSituation?
-  created_at                 DateTime  @default(now())
-  updated_at                 DateTime  @updatedAt
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                String                  @id @db.Uuid
+  maritalStatus          MaritalStatus?
+  childStatus            ChildStatus?
+  numberOfChildren       NumberOfChildren?
+  childLivingArrangement ChildLivingArrangement?
+  livingSituation        LivingSituation?
+  created_at             DateTime                @default(now())
+  updated_at             DateTime                @updatedAt
+  user                   User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([maritalStatus])
   @@index([childStatus])
   @@map("user_about")
+}
+
+model UserEduWork {
+  userId      String           @id @db.Uuid
+  collegeName String?          @db.VarChar(100)
+  incomeRange IncomeRangeType?
+  minIncome   Int?
+  maxIncome   Int?
+  workingWith WorkingWith?
+  companyName String?          @db.VarChar(100)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  highestEdu  String?          @db.VarChar(100)
+  workingAs   String?          @db.VarChar(100)
+  user        User             @relation("UserEduWork", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([highestEdu])
+  @@index([incomeRange])
+  @@index([workingWith])
+  @@index([highestEdu, incomeRange, workingWith])
+  @@index([minIncome, maxIncome])
+  @@map("user_edu_work")
+}
+
+model Question {
+  id         String           @id @default(uuid()) @db.Uuid
+  key        String           @unique
+  title      String
+  category   QuestionCategory
+  isMulti    Boolean          @default(false)
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+  screen     QuestionScreen
+  options    QuestionOption[]
+  answers    UserAnswer[]
+}
+
+model QuestionOption {
+  id          String       @id @default(uuid())
+  question_id String       @db.Uuid
+  value       String
+  label       String
+  created_at  DateTime     @default(now())
+  question    Question     @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  answers     UserAnswer[]
+
+  @@index([question_id])
+}
+
+model UserAnswer {
+  id          String         @id @default(uuid()) @db.Uuid
+  user_id     String         @db.Uuid
+  question_id String         @db.Uuid
+  option_id   String
+  created_at  DateTime       @default(now())
+  option      QuestionOption @relation(fields: [option_id], references: [id], onDelete: Cascade)
+  question    Question       @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, question_id, option_id])
+  @@index([user_id])
+  @@index([question_id])
+  @@index([option_id])
+}
+
+model UserPhoto {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  is_primary Boolean  @default(false)
+  order      Int?
+  created_at DateTime @default(now())
+  media_type String   @default("image")
+  media_url  String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("user_photos")
+}
+
+model UserBio {
+  user_id    String   @id @db.Uuid
+  bio        String?  @db.VarChar(500)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_bio")
+}
+
+model UserBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model UserReport {
+  id         String   @id @default(uuid())
+  reporterId String
+  reportedId String
+  createdAt  DateTime @default(now())
+
+  @@unique([reporterId, reportedId])
+}
+
+model UserSwipe {
+  id           String      @id @default(uuid()) @db.Uuid
+  swiperId     String      @db.Uuid
+  targetUserId String      @db.Uuid
+  action       SwipeAction
+  isMutual     Boolean     @default(false)
+  created_at   DateTime    @default(now())
+  swiper       User        @relation("Swiper", fields: [swiperId], references: [id], onDelete: Cascade)
+  targetUser   User        @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, targetUserId])
+  @@index([swiperId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([created_at])
+  @@index([swiperId, action])
+  @@index([targetUserId, action])
+  @@map("swipes")
+}
+
+model UserMatch {
+  id              String    @id @default(uuid()) @db.Uuid
+  user1Id         String    @db.Uuid
+  user2Id         String    @db.Uuid
+  matched_at      DateTime  @default(now())
+  last_message_at DateTime?
+  is_active       Boolean   @default(true)
+  is_deleted      Boolean   @default(false)
+  user1           User      @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2           User      @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([matched_at])
+  @@index([last_message_at])
+  @@index([is_active])
+  @@index([user1Id, is_active])
+  @@index([user2Id, is_active])
+  @@map("matches")
+}
+
+model Boost {
+  id          String        @id @default(uuid())
+  name        BoostType     @unique
+  title       String
+  description String?
+  is_active   Boolean       @default(true)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  options     BoostOption[]
+
+  @@map("boosts")
+}
+
+model BoostOption {
+  id               String             @id @default(uuid())
+  boost_id         String
+  label            String
+  boostCount       Int
+  pricePerBoost    Decimal            @db.Decimal(10, 2)
+  discounted_price Decimal            @db.Decimal(10, 2)
+  discount_percent Int?
+  totalPrice       Decimal            @db.Decimal(10, 2)
+  is_best_value    Boolean            @default(false)
+  is_popular       Boolean            @default(false)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+  subscriptions    UserSubscription[]
+  boost            Boost              @relation(fields: [boost_id], references: [id], onDelete: Cascade)
+
+  @@index([boost_id])
+  @@map("boost_options")
+}
+
+model Package {
+  id          String      @id @default(uuid())
+  name        PackageType @unique
+  title       String
+  description String?
+  themeColor  String? // UI color (pink, purple, gold)
+  isActive    Boolean     @default(true)
+
+  plans    PackagePlan[]
+  features PackageFeature[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum PackageType {
+  PREMIUM
+  VIP
+  VIP_ELITE
+}
+
+model PackagePlan {
+  id              String   @id @default(uuid())
+  packageId       String
+  durationMonths  Int // 1, 3, 6
+  originalPrice   Decimal  @db.Decimal(10, 2)
+  discountedPrice Decimal? @db.Decimal(10, 2)
+  discountPercent Float?
+
+  isPopular   Boolean @default(false)
+  isBestValue Boolean @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PackageFeature {
+  id            String  @id @default(uuid())
+  packageId     String
+  label         String // e.g. "Unlimited Swipes"
+  isHighlighted Boolean @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model UserSubscription {
+  id                String             @id @default(uuid())
+  userId            String             @db.Uuid
+  started_at        DateTime
+  expires_at        DateTime
+  daily_swipe_count Int                @default(0)
+  daily_like_count  Int                @default(0)
+  last_reset_at     DateTime           @default(now())
+  created_at        DateTime           @default(now())
+  boostsRemaining   Int?
+  boostsTotal       Int?
+  packageId         String
+  packageOptionId   String
+  pricePaid         Float
+  status            SubscriptionStatus
+  user              User               @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  currentForUser    User?              @relation("CurrentSubscription")
+  BoostOption       BoostOption?       @relation(fields: [boostOptionId], references: [id])
+  boostOptionId     String?
+
+  @@index([userId])
+}
+
+model Payment {
+  id             String   @id @default(uuid())
+  userId         String
+  subscriptionId String?
+  amount         Float
+  currency       String
+  provider       String
+  payment_id     String
+  status         String
+  created_at     DateTime @default(now())
+}
+
+enum BoostType {
+  BOOST
+  PRIMETIME
+  SUPER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }
 
 enum LookingFor {
@@ -103,7 +372,7 @@ enum LookingFor {
   MATURE_CONNECTION
 }
 
-enum LookingForOption{
+enum LookingForOption {
   LONG_TERM
   SHORT_TERM
   NEW_FRIENDS
@@ -123,14 +392,12 @@ enum MaritalStatus {
   ANNULLED
 }
 
-// Enum for child-related options
 enum ChildStatus {
   YES
   NO
   PREFER_NOT_TO_SAY
 }
 
-// Enum for number of children
 enum NumberOfChildren {
   ONE
   TWO
@@ -139,14 +406,12 @@ enum NumberOfChildren {
   FIVE_PLUS
 }
 
-// Enum for child living arrangement
 enum ChildLivingArrangement {
   YES
   NO
   SOMETIME
 }
 
-// Enum for current living situation
 enum LivingSituation {
   OWN_HOME
   LIVING_ALONE
@@ -155,35 +420,6 @@ enum LivingSituation {
   RENTED_HOME
   SENIOR_LIVING_COMMUNITY
   OTHER
-}
-
-model UserEduWork {
-  userId        String   @id @db.Uuid
-
-  // Controlled enums instead of string
-  highestEdu    String?  @db.VarChar(100)
-  collegeName   String?  @db.VarChar(100)
-
-  incomeRange   IncomeRangeType?
-  minIncome     Int?
-  maxIncome     Int?
-
-  workingWith   WorkingWith?
-  workingAs     String?  @db.VarChar(100)
-  companyName   String?  @db.VarChar(100)
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user User     @relation("UserEduWork", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([highestEdu])
-  @@index([incomeRange])
-  @@index([workingWith])
-  @@index([highestEdu, incomeRange, workingWith])
-  @@index([minIncome, maxIncome])
-
-  @@map("user_edu_work")
 }
 
 enum IncomeRangeType {
@@ -198,6 +434,7 @@ enum IncomeRangeType {
   INR_50_TO_75_LAKH
   ABOVE_75_LAKH
 }
+
 enum WorkingWith {
   PRIVATE_COMPANY
   GOVERNMENT
@@ -206,240 +443,23 @@ enum WorkingWith {
   NOT_WORKING
 }
 
-model Question {
-  id          String @id @default(uuid()) @db.Uuid
-  key         String           @unique   
-  title       String
-  category    QuestionCategory
-  screen      QuestionScreen
-  isMulti     Boolean          @default(false) 
-
-  options     QuestionOption[]
-  answers     UserAnswer[] 
-
-  created_at  DateTime         @default(now())
-  updated_at  DateTime         @updatedAt
-}
-
-model QuestionOption {
-  id           String        @id @default(uuid())
-  question_id  String @db.Uuid
-  value        String        
-  label        String        
-
-  question     Question      @relation(fields: [question_id], references: [id], onDelete: Cascade)
-  answers      UserAnswer[]
-
-  created_at   DateTime      @default(now())
-
-  @@index([question_id])
-}
-
-model UserAnswer {
-  id           String   @id @default(uuid()) @db.Uuid
-  user_id      String   @db.Uuid
-  question_id  String   @db.Uuid
-  option_id    String
-
-  user         User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  question     Question         @relation(fields: [question_id], references: [id], onDelete: Cascade)
-  option       QuestionOption   @relation(fields: [option_id], references: [id], onDelete: Cascade)
-
-  created_at   DateTime         @default(now())
-
-  @@unique([user_id, question_id, option_id])
-
-  @@index([user_id])
-  @@index([question_id])
-  @@index([option_id])
-}
-
 enum QuestionCategory {
   DATING
   DATE_TO_MARRY
   MATURE_CONNECTION
 }
 
-enum QuestionScreen{
+enum QuestionScreen {
   LIFESTYLE
   REAL_U_MATTERS
   THINGS_U_LOVE
-  HEALTH_WELLNESS
   INTEREST_HOBBY
   DREAM_PLAN
-}
-
-model UserPhoto {
-  id          String   @id @default(uuid()) @db.Uuid
-  user_id     String   @db.Uuid
-  media_url   String   @db.Text
-  media_type  String @default("image") // "image" | "video"
-  is_primary  Boolean  @default(false) 
-  order       Int?     
-  created_at  DateTime @default(now())
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@map("user_photos")
-}
-
-model UserBio {
-  user_id     String   @id @db.Uuid
-  bio         String?  @db.VarChar(500)
-  
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@map("user_bio")
-}
-
-
-model UserBlock {
-  id         String   @id @default(uuid())
-  blockerId  String
-  blockedId  String
-  createdAt  DateTime @default(now())
-
-  @@unique([blockerId, blockedId])
-}
-
-model UserReport {
-  id         String   @id @default(uuid())
-  reporterId  String
-  reportedId  String
-  createdAt  DateTime @default(now())
-
-  @@unique([reporterId, reportedId])
-}
-
-model UserSwipe {
-  id             String   @id @default(uuid()) @db.Uuid
-  swiperId       String   @db.Uuid
-  targetUserId   String   @db.Uuid
-  action         SwipeAction
-  isMutual       Boolean  @default(false)
-  created_at     DateTime @default(now())
-  swiper         User @relation("Swiper", fields: [swiperId], references: [id], onDelete: Cascade)
-  targetUser     User @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
-
-
-  @@unique([swiperId, targetUserId])
-  @@index([swiperId])
-  @@index([targetUserId])
-  @@index([action])
-  @@index([created_at])
-  @@index([swiperId, action])
-  @@index([targetUserId, action])
-
-  @@map("swipes")
+  HEALTH_WELLNESS
 }
 
 enum SwipeAction {
   LIKE
   PASS
   SUPERLIKE
-}
-
-
-model UserMatch {
-  id          String   @id @default(uuid()) @db.Uuid
-  user1Id     String   @db.Uuid
-  user2Id     String   @db.Uuid
-  matched_at  DateTime @default(now())
-  last_message_at DateTime?
-  is_active   Boolean  @default(true)
-  is_deleted  Boolean  @default(false)
-
-  user1       User @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2       User @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-
-  @@unique([user1Id, user2Id])
-
-  @@index([user1Id])
-  @@index([user2Id])
-  @@index([matched_at])
-  @@index([last_message_at])
-  @@index([is_active])
-  @@index([user1Id, is_active])
-  @@index([user2Id, is_active])
-
-  @@map("matches")
-}
-
-model Package {
-  id            String   @id @default(uuid())
-  name          PackageType
-  title         String   // Boost / Primetime Boost / Super Boost
-  description   String?
-  is_active     Boolean  @default(true)
-  options       PackageOption[]
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-
-  @@map("packages")
-}
-
-model PackageOption {
-  id            String   @id @default(uuid())
-  package_id    String
-  label         String   // "20 Boosts", "5 Primetime Boost"
-  quantity      Int      // 20, 5, 12 etc
-  price         Float
-  discounted_price Float?
-  discount_percent Int?
-  is_best_value Boolean @default(false)
-  is_popular    Boolean @default(false)
-  package       Package @relation(fields: [package_id], references: [id], onDelete: Cascade)  
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-
-  @@map("package_options")
-}
-
-enum PackageType {
-  BOOST
-  PRIMETIME
-  SUPER
-}
-
-
-model UserSubscription {
-  id                    String   @id @default(uuid())
-  userId                String   @db.Uuid
-  user                  User     @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
-  currentForUser        User?    @relation("CurrentSubscription")
-  type                  SubscriptionType
-  status                String   // ACTIVE, EXPIRED, CANCELLED
-  started_at            DateTime
-  expires_at            DateTime
-  daily_swipe_count     Int       @default(0) 
-  daily_like_count      Int       @default(0) 
-  last_reset_at         DateTime @default(now())
-
-  created_at  DateTime @default(now())
-
-  @@index([userId])
-}
-
-enum SubscriptionType {
-  FREE
-  A
-  B
-  C
-}
-
-model Payment {
-  id              String   @id @default(uuid())
-  userId          String
-  subscriptionId  String?
-  amount          Float
-  currency        String
-  provider        String   // razorpay / stripe
-  payment_id      String   // gateway ID
-  status          String   // SUCCESS, FAILED
-
-  created_at      DateTime @default(now())
 }
