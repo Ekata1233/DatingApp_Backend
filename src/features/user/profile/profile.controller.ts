@@ -25,7 +25,7 @@ export const profileController = async (req: Request, res: Response) => {
     // now user.id is available
     const userId = (req as any).user.id;
 
-    const { fullName, email, birth_date, height, gender, genderOptions } =
+    const { fullName, email, birth_date, height, gender, genderOption } =
       profileValidation.parse(req.body);
 
     const user = await updateProfileService(
@@ -35,7 +35,7 @@ export const profileController = async (req: Request, res: Response) => {
       birth_date,
       height,
       gender,
-      genderOptions
+      genderOption
     );
 
     return res.status(200).json({
