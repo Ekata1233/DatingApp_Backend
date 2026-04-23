@@ -37,6 +37,7 @@ export const profileValidation = z.object({
     .max(300, "Height too tall"),
 
   gender: z.string().min(1, "Gender is required"),
+  genderOptions: z.string().optional(),
 });
 
 export const locationValidation = z.object({

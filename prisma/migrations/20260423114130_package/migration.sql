@@ -1,5 +1,14 @@
 -- CreateEnum
-CREATE TYPE "PackageType" AS ENUM ('BOOST', 'PRIMETIME', 'SUPER');
+CREATE TYPE "PackageType" AS ENUM ('PREMIUM', 'VIP', 'VIP_ELITE');
+
+-- CreateEnum
+CREATE TYPE "Gender" AS ENUM ('MEN', 'WOMEN', 'NON_BINARY', 'PREFER_NOT_TO_SAY');
+
+-- CreateEnum
+CREATE TYPE "GenderOption" AS ENUM ('STRAIGHT', 'GAY', 'LESBIAN', 'AROMATIC', 'ASEXUAL', 'BISEXUAL', 'DEMISEXUAL', 'PANSEXUAL', 'QUEER', 'NOT_LISTED');
+
+-- CreateEnum
+CREATE TYPE "BoostType" AS ENUM ('BOOST', 'PRIMETIME', 'SUPER');
 
 -- CreateEnum
 CREATE TYPE "SubscriptionStatus" AS ENUM ('ACTIVE', 'EXPIRED', 'CANCELLED');
@@ -50,7 +59,8 @@ CREATE TABLE "users" (
     "google_id" VARCHAR(255),
     "birth_date" DATE,
     "height" INTEGER,
-    "gender" VARCHAR(20),
+    "gender" "Gender",
+    "gender_option" "GenderOption",
     "looking_for" "LookingFor",
     "onboarding_step" VARCHAR(20),
     "next_step" VARCHAR(20),
@@ -221,34 +231,75 @@ CREATE TABLE "matches" (
 );
 
 -- CreateTable
-CREATE TABLE "packages" (
+CREATE TABLE "boosts" (
     "id" TEXT NOT NULL,
-    "name" "PackageType" NOT NULL,
+    "name" "BoostType" NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "packages_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "boosts_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "package_options" (
+CREATE TABLE "boost_options" (
     "id" TEXT NOT NULL,
-    "package_id" TEXT NOT NULL,
+    "boost_id" TEXT NOT NULL,
     "label" TEXT NOT NULL,
     "boostCount" INTEGER NOT NULL,
-    "pricePerBoost" DOUBLE PRECISION NOT NULL,
-    "discounted_price" DOUBLE PRECISION,
+    "pricePerBoost" DECIMAL(10,2) NOT NULL,
+    "discounted_price" DECIMAL(10,2) NOT NULL,
     "discount_percent" INTEGER,
-    "totalPrice" DOUBLE PRECISION NOT NULL,
+    "totalPrice" DECIMAL(10,2) NOT NULL,
     "is_best_value" BOOLEAN NOT NULL DEFAULT false,
     "is_popular" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "package_options_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "boost_options_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Package" (
+    "id" TEXT NOT NULL,
+    "name" "PackageType" NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "themeColor" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Package_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PackagePlan" (
+    "id" TEXT NOT NULL,
+    "packageId" TEXT NOT NULL,
+    "durationMonths" INTEGER NOT NULL,
+    "originalPrice" DECIMAL(10,2) NOT NULL,
+    "discountedPrice" DECIMAL(10,2),
+    "discountPercent" DOUBLE PRECISION,
+    "isPopular" BOOLEAN NOT NULL DEFAULT false,
+    "isBestValue" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PackagePlan_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PackageFeature" (
+    "id" TEXT NOT NULL,
+    "packageId" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "isHighlighted" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PackageFeature_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -267,6 +318,7 @@ CREATE TABLE "UserSubscription" (
     "packageOptionId" TEXT NOT NULL,
     "pricePaid" DOUBLE PRECISION NOT NULL,
     "status" "SubscriptionStatus" NOT NULL,
+    "boostOptionId" TEXT,
 
     CONSTRAINT "UserSubscription_pkey" PRIMARY KEY ("id")
 );
@@ -422,6 +474,15 @@ CREATE INDEX "matches_user2Id_is_active_idx" ON "matches"("user2Id", "is_active"
 CREATE UNIQUE INDEX "matches_user1Id_user2Id_key" ON "matches"("user1Id", "user2Id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "boosts_name_key" ON "boosts"("name");
+
+-- CreateIndex
+CREATE INDEX "boost_options_boost_id_idx" ON "boost_options"("boost_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Package_name_key" ON "Package"("name");
+
+-- CreateIndex
 CREATE INDEX "UserSubscription_userId_idx" ON "UserSubscription"("userId");
 
 -- AddForeignKey
@@ -467,13 +528,16 @@ ALTER TABLE "matches" ADD CONSTRAINT "matches_user1Id_fkey" FOREIGN KEY ("user1I
 ALTER TABLE "matches" ADD CONSTRAINT "matches_user2Id_fkey" FOREIGN KEY ("user2Id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "package_options" ADD CONSTRAINT "package_options_package_id_fkey" FOREIGN KEY ("package_id") REFERENCES "packages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "boost_options" ADD CONSTRAINT "boost_options_boost_id_fkey" FOREIGN KEY ("boost_id") REFERENCES "boosts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UserSubscription" ADD CONSTRAINT "UserSubscription_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "packages"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PackagePlan" ADD CONSTRAINT "PackagePlan_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "Package"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UserSubscription" ADD CONSTRAINT "UserSubscription_packageOptionId_fkey" FOREIGN KEY ("packageOptionId") REFERENCES "package_options"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PackageFeature" ADD CONSTRAINT "PackageFeature_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "Package"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "UserSubscription" ADD CONSTRAINT "UserSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserSubscription" ADD CONSTRAINT "UserSubscription_boostOptionId_fkey" FOREIGN KEY ("boostOptionId") REFERENCES "boost_options"("id") ON DELETE SET NULL ON UPDATE CASCADE;

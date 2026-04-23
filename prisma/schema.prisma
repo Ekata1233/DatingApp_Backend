@@ -17,7 +17,8 @@ model User {
   google_id               String?            @unique @db.VarChar(255)
   birth_date              DateTime?          @db.Date
   height                  Int?
-  gender                  String?            @db.VarChar(20)
+  gender                  Gender?
+  gender_option           GenderOption?
   looking_for             LookingFor?
   onboarding_step         String?            @db.VarChar(20)
   next_step               String?            @db.VarChar(20)
@@ -237,37 +238,86 @@ model UserMatch {
   @@map("matches")
 }
 
-model Package {
-  id            String             @id @default(uuid())
-  name          PackageType
-  title         String
-  description   String?
-  is_active     Boolean            @default(true)
-  created_at    DateTime           @default(now())
-  updated_at    DateTime           @updatedAt
-  subscriptions UserSubscription[]
-  options       PackageOption[]
+model Boost {
+  id          String        @id @default(uuid())
+  name        BoostType     @unique
+  title       String
+  description String?
+  is_active   Boolean       @default(true)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  options     BoostOption[]
 
-  @@map("packages")
+  @@map("boosts")
 }
 
-model PackageOption {
+model BoostOption {
   id               String             @id @default(uuid())
-  package_id       String
+  boost_id         String
   label            String
   boostCount       Int
-  pricePerBoost    Float
-  discounted_price Float?
+  pricePerBoost    Decimal            @db.Decimal(10, 2)
+  discounted_price Decimal            @db.Decimal(10, 2)
   discount_percent Int?
-  totalPrice       Float
+  totalPrice       Decimal            @db.Decimal(10, 2)
   is_best_value    Boolean            @default(false)
   is_popular       Boolean            @default(false)
   created_at       DateTime           @default(now())
   updated_at       DateTime           @updatedAt
   subscriptions    UserSubscription[]
-  package          Package            @relation(fields: [package_id], references: [id], onDelete: Cascade)
+  boost            Boost              @relation(fields: [boost_id], references: [id], onDelete: Cascade)
 
-  @@map("package_options")
+  @@index([boost_id])
+  @@map("boost_options")
+}
+
+model Package {
+  id          String      @id @default(uuid())
+  name        PackageType @unique
+  title       String
+  description String?
+  themeColor  String? // UI color (pink, purple, gold)
+  isActive    Boolean     @default(true)
+
+  plans    PackagePlan[]
+  features PackageFeature[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum PackageType {
+  PREMIUM
+  VIP
+  VIP_ELITE
+}
+
+model PackagePlan {
+  id              String   @id @default(uuid())
+  packageId       String
+  durationMonths  Int // 1, 3, 6
+  originalPrice   Decimal  @db.Decimal(10, 2)
+  discountedPrice Decimal? @db.Decimal(10, 2)
+  discountPercent Float?
+
+  isPopular   Boolean @default(false)
+  isBestValue Boolean @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PackageFeature {
+  id            String  @id @default(uuid())
+  packageId     String
+  label         String // e.g. "Unlimited Swipes"
+  isHighlighted Boolean @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
 
 model UserSubscription {
@@ -285,10 +335,10 @@ model UserSubscription {
   packageOptionId   String
   pricePaid         Float
   status            SubscriptionStatus
-  package           Package            @relation(fields: [packageId], references: [id])
-  packageOption     PackageOption      @relation(fields: [packageOptionId], references: [id])
   user              User               @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
   currentForUser    User?              @relation("CurrentSubscription")
+  BoostOption       BoostOption?       @relation(fields: [boostOptionId], references: [id])
+  boostOptionId     String?
 
   @@index([userId])
 }
@@ -305,7 +355,27 @@ model Payment {
   created_at     DateTime @default(now())
 }
 
-enum PackageType {
+enum Gender{
+  MEN
+  WOMEN
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum GenderOption{
+  STRAIGHT
+  GAY
+  LESBIAN
+  AROMATIC
+  ASEXUAL
+  BISEXUAL
+  DEMISEXUAL
+  PANSEXUAL
+  QUEER
+  NOT_LISTED
+}
+
+enum BoostType {
   BOOST
   PRIMETIME
   SUPER
