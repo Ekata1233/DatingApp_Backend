@@ -38,7 +38,7 @@ export const updateProfileService = async (
   birth_date: string,
   height: number,
   gender: string,
-  genderOption?: string,
+  gender_option?: string,
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
@@ -63,7 +63,7 @@ export const updateProfileService = async (
       birth_date: new Date(birth_date),
       height,
       gender,
-      genderOption,
+      gender_option,
       onboarding_step: currentStep,
       next_step: nextStep,
     },
