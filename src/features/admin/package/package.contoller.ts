@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { createPackageSchema } from "./package.validation";
-import { createPackageService } from "./package.service";
+import { createPackageService, getPackagesService } from "./package.service";
 
 export const createPackageController = async (req: Request, res: Response) => {
   try {
@@ -18,6 +18,24 @@ export const createPackageController = async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       message: "Package created successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const getPackagesController = async (req: Request, res: Response) => {
+  try {
+    const result = await getPackagesService();
+
+    return res.status(200).json({
+      success: true,
+      message: "Packages fetched successfully",
       data: result,
     });
   } catch (error) {

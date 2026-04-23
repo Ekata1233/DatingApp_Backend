@@ -28,3 +28,16 @@ export const createPackageService = async (data: CreatePackageInput) => {
 
   return result;
 };
+
+export const getPackagesService = async () => {
+  const result = await prisma.package.findMany({
+    include: {
+      options: true
+    },
+    orderBy: {
+      created_at: "desc"
+    }
+  });
+
+  return result;
+};
