@@ -1,6 +1,8 @@
 import {
   ChildLivingArrangement,
   ChildStatus,
+  Gender,
+  GenderOption,
   LivingSituation,
   LookingFor,
   LookingForOption,
@@ -11,6 +13,7 @@ import { prisma } from "../../../prisma/prismaClient";
 import { getNextStep } from "../../../utils/onboardingFlows";
 import { SaveAnswerDTO } from "./profile.types";
 import imagekit from "../../../utils/imagekit";
+import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
 
 // 🔥 Income Range Parser
 const parseIncomeRange = (incomeRange: string) => {
@@ -37,8 +40,8 @@ export const updateProfileService = async (
   email: string,
   birth_date: string,
   height: number,
-  gender: string,
-  gender_option?: string,
+  gender: Gender,
+  gender_option?: GenderOption | null,
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
@@ -67,6 +70,14 @@ export const updateProfileService = async (
       onboarding_step: currentStep,
       next_step: nextStep,
     },
+  });
+
+  // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
   });
 
   return user;
@@ -116,6 +127,14 @@ export const updateInterestedInService = async (
       onboarding_step: true,
       next_step: true,
     },
+  });
+
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
   });
 
   return {
@@ -239,6 +258,14 @@ export const updateAddressService = async (
     },
   });
 
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
+  });
+
   return {
     profile,
     onboarding: updatedUser,
@@ -341,6 +368,14 @@ export const updateLocationService = async (
     },
   });
 
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
+  });
+
   return profile;
 };
 
@@ -386,6 +421,14 @@ export const updateUserAnswerService = async (
   await prisma.userAnswer.createMany({
     data: answersData,
     skipDuplicates: true,
+  });
+
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
   });
 
   return {
@@ -554,29 +597,27 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
   }
 
   // Upload all images
- const uploadedPhotos = await Promise.all(
-  files.map(async (file: any, index: number) => {
+  const uploadedPhotos = await Promise.all(
+    files.map(async (file: any, index: number) => {
+      const base64File = file.data.toString("base64"); // ✅ added
 
-    const base64File = file.data.toString("base64"); // ✅ added
+      const uploadResponse = await imagekit.upload({
+        file: base64File, // ✅ changed
+        fileName: file.name,
+        folder: "/user-photos",
+      });
 
-    const uploadResponse = await imagekit.upload({
-      file: base64File, // ✅ changed
-      fileName: file.name,
-      folder: "/user-photos",
-    });
+      const isVideo = file.mimetype?.startsWith("video");
 
-    const isVideo = file.mimetype?.startsWith("video");
-
-    return {
-      user_id: userId,
-      media_url: uploadResponse.url,
-      order: index + 1,
-      is_primary: index === 0,
-      media_type: isVideo ? "video" : "image",
-    };
-  }),
-);
-
+      return {
+        user_id: userId,
+        media_url: uploadResponse.url,
+        order: index + 1,
+        is_primary: index === 0,
+        media_type: isVideo ? "video" : "image",
+      };
+    }),
+  );
 
   // Save in DB
   await prisma.userPhoto.createMany({
@@ -603,6 +644,14 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
       onboarding_step: true,
       next_step: true,
     },
+  });
+
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
   });
 
   return {
@@ -638,6 +687,14 @@ export const updateUserPhotoService = async (
       media_url: uploadResponse.url,
       media_type: isVideo ? "video" : "image", // ✅ ADDED
     },
+  });
+
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
   });
 
   return updatedPhoto;
@@ -717,6 +774,14 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
       onboarding_step: true,
       next_step: true,
     },
+  });
+
+    // 👉 UPDATE SCORE
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion: score },
   });
 
   return {
