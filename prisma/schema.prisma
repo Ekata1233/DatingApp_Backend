@@ -41,6 +41,8 @@ model User {
   eduWork                 UserEduWork?       @relation("UserEduWork")
   photos                  UserPhoto[]
   profile                 UserProfile?
+  userBoosts              UserBoost[]
+  boostUsages             BoostUsage[] 
   currentSubscription     UserSubscription?  @relation("CurrentSubscription", fields: [current_subscription_id], references: [id])
 
   @@index([phone_number])
@@ -239,7 +241,7 @@ model UserMatch {
 }
 
 model Boost {
-  id          String        @id @default(uuid())
+  id          String        @id @default(uuid()) @db.Uuid
   name        BoostType     @unique
   title       String
   description String?
@@ -247,13 +249,14 @@ model Boost {
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
   options     BoostOption[]
+  userBoosts  UserBoost[]
 
   @@map("boosts")
 }
 
 model BoostOption {
-  id               String             @id @default(uuid())
-  boost_id         String
+  id               String             @id @default(uuid())  @db.Uuid
+  boost_id         String             @db.Uuid
   label            String
   boostCount       Int
   timePerBoost     Int
@@ -267,10 +270,57 @@ model BoostOption {
   updated_at       DateTime           @updatedAt
   subscriptions    UserSubscription[]
   boost            Boost              @relation(fields: [boost_id], references: [id], onDelete: Cascade)
+  userBoosts       UserBoost[]
 
   @@index([boost_id])
   @@map("boost_options")
 }
+
+model UserBoost {
+   id                String      @id @default(uuid()) @db.Uuid  
+
+  user_id           String      @db.Uuid
+  boost_id          String      @db.Uuid   
+  boost_option_id   String      @db.Uuid 
+  total_boosts      Int
+  remaining_boosts  Int
+  start_at          DateTime    @default(now())
+  expires_at        DateTime?
+  is_active         Boolean     @default(true)
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+
+  user              User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  boost             Boost       @relation(fields: [boost_id], references: [id])
+  boostOption       BoostOption @relation(fields: [boost_option_id], references: [id])
+
+  usages            BoostUsage[]
+
+  @@index([user_id])
+  @@index([boost_id])
+  @@map("user_boosts")
+}
+
+model BoostUsage {
+   id            String     @id @default(uuid()) @db.Uuid 
+
+  user_boost_id String     @db.Uuid   
+  user_id       String     @db.Uuid
+  duration      Int // minutes
+  started_at    DateTime   @default(now())
+  ended_at      DateTime?
+  is_active     Boolean    @default(true)
+
+  created_at    DateTime   @default(now())
+
+  userBoost     UserBoost  @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([user_boost_id])
+  @@map("boost_usages")
+}
+
 
 model Package {
   id          String      @id @default(uuid())
@@ -332,26 +382,25 @@ model UserSubscription {
   created_at        DateTime           @default(now())
   boostsRemaining   Int?
   boostsTotal       Int?
-  packageId         String
-  packageOptionId   String
+
   pricePaid         Float
   status            SubscriptionStatus
   user              User               @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
   currentForUser    User?              @relation("CurrentSubscription")
   BoostOption       BoostOption?       @relation(fields: [boostOptionId], references: [id])
-  boostOptionId     String?
+  boostOptionId     String?            @db.Uuid
 
   @@index([userId])
 }
 
 model Payment {
   id             String   @id @default(uuid())
-  userId         String
+  userId         String   @db.Uuid
   subscriptionId String?
   amount         Float
   currency       String
   provider       String
-  payment_id     String
+  payment_id     String   @db.Uuid
   status         String
   created_at     DateTime @default(now())
 }
