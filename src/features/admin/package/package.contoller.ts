@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
 import { createPackageSchema } from "./package.validation";
-import { createPackageService, getPackagesService } from "./package.service";
+import { createBoostService, getBoostsService } from "./package.service";
 
+
+
+// ✅ CREATE BOOST
 export const createPackageController = async (req: Request, res: Response) => {
   try {
     const parsed = createPackageSchema.safeParse(req.body);
@@ -13,11 +16,11 @@ export const createPackageController = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await createPackageService(parsed.data);
+    const result = await createBoostService(parsed.data); // ✅ FIXED
 
     return res.status(201).json({
       success: true,
-      message: "Package created successfully",
+      message: "Boost created successfully",
       data: result,
     });
   } catch (error) {
@@ -29,13 +32,16 @@ export const createPackageController = async (req: Request, res: Response) => {
   }
 };
 
+
+
+// ✅ GET ALL BOOSTS
 export const getPackagesController = async (req: Request, res: Response) => {
   try {
-    const result = await getPackagesService();
+    const result = await getBoostsService(); // ✅ FIXED
 
     return res.status(200).json({
       success: true,
-      message: "Packages fetched successfully",
+      message: "Boosts fetched successfully",
       data: result,
     });
   } catch (error) {

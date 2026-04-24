@@ -1,91 +1,93 @@
 import { prisma } from "../../../prisma/prismaClient";
+import { BoostType } from "@prisma/client";
 import { CreatePackageInput } from "./package.validation";
 
-export const createPackageService = async (data: CreatePackageInput) => {
-  const { options, ...packageData } = data;
+export const createBoostService = async (data: CreatePackageInput) => {
+  const { options, ...boostData } = data;
 
-  // 1. Check if package with same name exists
-  const existingPackage = await prisma.package.findFirst({
-    where: {
-      name: packageData.name,
-    },
-    include: {
-      options: true,
-    },
+  // ✅ enum validation
+  if (!Object.values(BoostType).includes(boostData.name as BoostType)) {
+    throw new Error("Invalid boost type");
+  }
+
+  const boostName = boostData.name as BoostType;
+
+  // ✅ check existing
+  const existingBoost = await prisma.boost.findFirst({
+    where: { name: boostName },
+    include: { options: true },
   });
 
-  // 2. If exists → delete old options + update package
-  if (existingPackage) {
-    // delete old options
-    await prisma.packageOption.deleteMany({
-      where: {
-        package_id: existingPackage.id,
-      },
+  // ✅ UPDATE FLOW
+  if (existingBoost) {
+    await prisma.boostOption.deleteMany({
+      where: { boost_id: existingBoost.id },
     });
 
-    // update package + insert new options
-    const updated = await prisma.package.update({
-      where: {
-        id: existingPackage.id,
-      },
+    const updated = await prisma.boost.update({
+      where: { id: existingBoost.id },
       data: {
-        ...packageData,
+        name: boostName,
+        title: boostData.title,
+        description: boostData.description,
+
         options: {
           create: options.map((opt) => ({
             label: opt.label,
             boostCount: opt.boostCount,
-            pricePerBoost: opt.pricePerBoost,
-            discounted_price: opt.discounted_price ?? null,
+            timePerBoost: opt.timePerBoost,
+
+            pricePerBoost: opt.pricePerBoost.toString(),
+            discounted_price: (opt.discounted_price ?? 0).toString(),
             discount_percent: opt.discount_percent ?? null,
-            totalPrice: opt.totalPrice,
+            totalPrice: opt.totalPrice.toString(),
+
             is_best_value: opt.is_best_value ?? false,
             is_popular: opt.is_popular ?? false,
           })),
         },
       },
-      include: {
-        options: true,
-      },
+      include: { options: true },
     });
 
     return updated;
   }
 
-  // 3. If NOT exists → create new
-  const created = await prisma.package.create({
+  // ✅ CREATE FLOW
+  const created = await prisma.boost.create({
     data: {
-      ...packageData,
+      name: boostName,
+      title: boostData.title,
+      description: boostData.description,
+
       options: {
         create: options.map((opt) => ({
           label: opt.label,
           boostCount: opt.boostCount,
-          pricePerBoost: opt.pricePerBoost,
-          discounted_price: opt.discounted_price ?? null,
+          timePerBoost: opt.timePerBoost,
+
+          pricePerBoost: opt.pricePerBoost.toString(),
+          discounted_price: (opt.discounted_price ?? 0).toString(),
           discount_percent: opt.discount_percent ?? null,
-          totalPrice: opt.totalPrice,
+          totalPrice: opt.totalPrice.toString(),
+
           is_best_value: opt.is_best_value ?? false,
           is_popular: opt.is_popular ?? false,
         })),
       },
     },
-    include: {
-      options: true,
-    },
+    include: { options: true },
   });
 
   return created;
 };
 
 
-export const getPackagesService = async () => {
-  const result = await prisma.package.findMany({
-    include: {
-      options: true
-    },
-    orderBy: {
-      created_at: "desc"
-    }
-  });
 
-  return result;
+// ✅ GET API
+export const getBoostsService = async () => {
+  return prisma.boost.findMany({
+    include: { options: true },
+    orderBy: { created_at: "desc" },
+  });
 };
