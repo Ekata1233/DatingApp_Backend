@@ -6,20 +6,20 @@ import { FeedParams } from "./feed.types";
 export const getGenderFromInterest = (lookingFor: string) => {
   if (lookingFor === "MEN") return ["MEN"];
   if (lookingFor === "WOMEN") return ["WOMEN"];
-  return ["MEN", "WOMEN"]; // EVERYONE
+  return ["MEN", "WOMEN"];
 };
 
-// 🎯 CORE MATCHING LOGIC
 export const getOrientationCompatibility = (orientation: string) => {
   const map: Record<string, string[]> = {
-    STRAIGHT: ["STRAIGHT", "BISEXUAL"],
+    STRAIGHT: ["STRAIGHT"],
     GAY: ["GAY", "BISEXUAL"],
     LESBIAN: ["LESBIAN", "BISEXUAL"],
     BISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL"],
   };
 
-  return map[orientation] || [orientation];
+  return map[orientation?.toUpperCase()] || [];
 };
+
 
 
 export const getFeedService = async ({
@@ -37,8 +37,9 @@ export const getFeedService = async ({
     throw new Error("User profile not found");
   }
 
-  const { interested_in } = currentUser.profile;
+  const { interested_in, sexual_orientation } = currentUser.profile;
   const { gender, gender_option } = currentUser;
+  console.log("Intereste IN :", interested_in, sexual_orientation);
 
   if (!gender || !gender_option || !interested_in) {
     throw new Error("Required fields missing");
@@ -69,26 +70,44 @@ export const getFeedService = async ({
 
   const excludedArray = Array.from(excludedIds);
 
-  const genderFilter = getGenderFromInterest(interested_in);
- const orientationFilter = getOrientationCompatibility(gender_option);
+  const myGender = gender;
+const myInterest = interested_in;
+const myOrientation = sexual_orientation;
 
-  // =========================================
-  // 4. PRIORITY 1 → ORIENTATION MATCH
-  // =========================================
-  
-  const primaryUsers = await prisma.user.findMany({
-    take: limit,
-    where: {
-      id: { notIn: excludedArray },
-      gender: { in: genderFilter },
-      gender_option: { in: orientationFilter },
-      deleted_at: null,
+const genderFilter = getGenderFromInterest(myInterest);
+const orientationFilter = getOrientationCompatibility(myOrientation);
+
+const primaryUsers = await prisma.user.findMany({
+  take: limit,
+  where: {
+    id: { notIn: excludedArray },
+
+    // ✅ 1. I am interested in them
+    gender: { in: genderFilter },
+
+    // ✅ 2. Orientation compatibility
+    gender_option: { in: orientationFilter },
+
+    // ✅ 3. THEY are interested in MY gender
+    profile: {
+      interested_in: {
+        in:
+          myGender === "MEN"
+            ? ["MEN", "EVERYONE"]
+            : ["WOMEN", "EVERYONE"],
+      },
     },
-    orderBy: [
-  { last_active_at: "desc" },
-  { created_at: "desc" }
-]
-  });
+
+    deleted_at: null,
+  },
+  orderBy: [
+    { last_active_at: "desc" },
+    { created_at: "desc" },
+  ],
+});
+
+
+  console.log("Primary Users Found:", primaryUsers);
 
   let users = primaryUsers;
 
@@ -115,6 +134,8 @@ export const getFeedService = async ({
 
     users = [...users, ...fallbackUsers];
   }
+
+  console.log("Total Users Returned:", users);
 
   return {
     users,
