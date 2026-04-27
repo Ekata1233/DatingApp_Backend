@@ -1,8 +1,10 @@
 import { prisma } from "../../../prisma/prismaClient";
 import { FeedParams } from "./feed.types";
+import { buildFilterQuery } from "../../../utils/feedFilter.util";
 
-// utils/match.helper.ts
-
+// -------------------------
+// HELPERS
+// -------------------------
 export const getGenderFromInterest = (lookingFor: string) => {
   if (lookingFor === "MEN") return ["MEN"];
   if (lookingFor === "WOMEN") return ["WOMEN"];
@@ -17,35 +19,56 @@ export const getOrientationCompatibility = (orientation: string) => {
     BISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL"],
   };
 
-  return map[orientation?.toUpperCase()] || [];
+  return map[orientation?.toUpperCase()] || ["STRAIGHT", "BISEXUAL"];
 };
 
-
-
+// -------------------------
+// SERVICE
+// -------------------------
 export const getFeedService = async ({
   userId,
   cursor,
   limit,
+  filters,
 }: FeedParams) => {
-  // 1. Current User
+
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
     include: { profile: true },
   });
 
-  if (!currentUser || !currentUser.profile) {
+  if (!currentUser?.profile) {
     throw new Error("User profile not found");
   }
 
-  const { interested_in, sexual_orientation } = currentUser.profile;
   const { gender, gender_option } = currentUser;
-  console.log("Intereste IN :", interested_in, sexual_orientation);
+  const { interested_in, sexual_orientation } = currentUser.profile;
 
-  if (!gender || !gender_option || !interested_in) {
-    throw new Error("Required fields missing");
-  }
+  // -------------------------
+  // FILTER BUILD
+  // -------------------------
 
-  // 2. Exclusions
+  console.log("CURRENT USER:", JSON.stringify(currentUser, null, 2));
+  const filterQuery = filters
+    ? buildFilterQuery(filters, currentUser)
+    : { where: {} };
+
+    console.log("BUILT FILTER QUERY:", JSON.stringify(filterQuery, null, 2));
+  const userFilters = Object.fromEntries(
+    Object.entries(filterQuery.where || {}).filter(
+      ([k]) => k !== "profile"
+    )
+  );
+
+  console.log("USER FILTERS:", userFilters);
+
+  const profileFilters = filterQuery.where?.profile?.is || {};
+
+  console.log("PROFILE FILTERS:", profileFilters);
+
+  // -------------------------
+  // EXCLUSIONS
+  // -------------------------
   const [swipes, blocks, blockedBy] = await Promise.all([
     prisma.userSwipe.findMany({
       where: { swiperId: userId },
@@ -61,81 +84,95 @@ export const getFeedService = async ({
     }),
   ]);
 
-  const excludedIds = new Set<string>([
-    userId,
-    ...swipes.map((s) => s.targetUserId),
-    ...blocks.map((b) => b.blockedId),
-    ...blockedBy.map((b) => b.blockerId),
-  ]);
+  const excludedArray = Array.from(
+    new Set([
+      userId,
+      ...swipes.map((s) => s.targetUserId),
+      ...blocks.map((b) => b.blockedId),
+      ...blockedBy.map((b) => b.blockerId),
+    ])
+  );
 
-  const excludedArray = Array.from(excludedIds);
+  const genderFilter = getGenderFromInterest(interested_in);
+  const orientationFilter = getOrientationCompatibility(sexual_orientation);
 
-  const myGender = gender;
-const myInterest = interested_in;
-const myOrientation = sexual_orientation;
 
-const genderFilter = getGenderFromInterest(myInterest);
-const orientationFilter = getOrientationCompatibility(myOrientation);
+  // -------------------------
+  // PRIMARY USERS
+  // -------------------------
+  const primaryUsers = await prisma.user.findMany({
+    take: limit,
+    where: {
+      id: { notIn: excludedArray },
 
-const primaryUsers = await prisma.user.findMany({
-  take: limit,
-  where: {
-    id: { notIn: excludedArray },
+      gender: { in: genderFilter },
+      gender_option: { in: orientationFilter },
 
-    // ✅ 1. I am interested in them
-    gender: { in: genderFilter },
+      deleted_at: null,
 
-    // ✅ 2. Orientation compatibility
-    gender_option: { in: orientationFilter },
-
-    // ✅ 3. THEY are interested in MY gender
-    profile: {
-      interested_in: {
-        in:
-          myGender === "MEN"
-            ? ["MEN", "EVERYONE"]
-            : ["WOMEN", "EVERYONE"],
+      // relaxed filters (IMPORTANT FIX)
+      profile_completion: {
+        gte: 20,
       },
+
+      last_active_at: {
+        gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      },
+
+      ...userFilters,
+
+            profile: {
+              is: {
+                ...profileFilters,
+
+                interested_in: {
+                  in:
+                    gender === "MEN"
+                      ? ["MEN", "EVERYONE"]
+                      : ["WOMEN", "EVERYONE"],
+                },
+              },
+            },
     },
 
-    deleted_at: null,
-  },
-  orderBy: [
-    { last_active_at: "desc" },
-    { created_at: "desc" },
-  ],
-});
-
-
-  console.log("Primary Users Found:", primaryUsers);
+    orderBy: [
+      { last_active_at: "desc" },
+      { created_at: "desc" },
+    ],
+  });
 
   let users = primaryUsers;
 
-  // =========================================
-  // 5. PRIORITY 2 → FALLBACK (ONLY GENDER)
-  // =========================================
+  // -------------------------
+  // FALLBACK (IMPORTANT FIX)
+  // -------------------------
   if (users.length < limit) {
-    const remainingLimit = limit - users.length;
-
     const fallbackUsers = await prisma.user.findMany({
-      take: remainingLimit,
+      take: limit - users.length,
       where: {
         id: {
           notIn: [...excludedArray, ...users.map((u) => u.id)],
         },
-        gender: { in: genderFilter },
+
         deleted_at: null,
+
+        ...userFilters,
+
+        profile: {
+          is: {
+            ...profileFilters,
+          },
+        },
       },
+
       orderBy: [
-  { last_active_at: "desc" },
-  { created_at: "desc" }
-]
+        { last_active_at: "desc" },
+        { created_at: "desc" },
+      ],
     });
 
     users = [...users, ...fallbackUsers];
   }
-
-  console.log("Total Users Returned:", users);
 
   return {
     users,

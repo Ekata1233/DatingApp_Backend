@@ -43,6 +43,9 @@ model User {
   profile                 UserProfile?
   userBoosts              UserBoost[]
   boostUsages             BoostUsage[] 
+  boostEvents             BoostEvent[]        @relation("UserBoostEvents", fields: [], references: [])
+  actorEvents             BoostEvent[]        @relation("ActorUser")
+  boostStats              UserBoostStats?
   currentSubscription     UserSubscription?  @relation("CurrentSubscription", fields: [current_subscription_id], references: [id])
 
   @@index([phone_number])
@@ -311,6 +314,11 @@ model BoostUsage {
   ended_at      DateTime?
   is_active     Boolean    @default(true)
 
+  total_views      Int @default(0)
+  total_likes      Int @default(0)
+  total_interests  Int @default(0)
+  total_reach      Int @default(0)
+
   created_at    DateTime   @default(now())
 
   userBoost     UserBoost  @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
@@ -319,6 +327,48 @@ model BoostUsage {
   @@index([user_id])
   @@index([user_boost_id])
   @@map("boost_usages")
+}
+
+model UserBoostStats {
+  id               String  @id @default(uuid()) @db.Uuid
+  user_id          String  @unique @db.Uuid
+
+  total_views      Int @default(0)
+  total_likes      Int @default(0)
+  total_interests  Int @default(0)
+  total_reach      Int @default(0)
+
+  user             User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_boost_stats")
+}
+
+model BoostEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+
+  boost_usage_id String   @db.Uuid
+  user_id        String   @db.Uuid      // boosted user
+  actor_id       String   @db.Uuid      // who performed action
+
+  event_type     EventType
+  created_at     DateTime @default(now())
+
+  boostUsage     BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+
+  user           User @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
+  actor          User @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
+
+  @@index([boost_usage_id])
+  @@index([user_id])
+  @@index([actor_id])
+  @@map("boost_events")
+}
+
+enum EventType {
+  VIEW
+  LIKE
+  INTEREST
+  REACH
 }
 
 

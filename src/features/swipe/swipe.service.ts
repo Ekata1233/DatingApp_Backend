@@ -1,6 +1,6 @@
 // modules/swipe/swipe.service.ts
 
-import { prisma } from "../../../prisma/prismaClient";
+import { prisma } from "../../prisma/prismaClient";
 
 
 interface SwipeParams {

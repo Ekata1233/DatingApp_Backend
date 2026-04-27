@@ -2,7 +2,7 @@
 
 import express from "express";
 import { swipeController } from "./swipe.controller";
-import authMiddleware from "../../../middleware/auth.middleware";
+import authMiddleware from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
