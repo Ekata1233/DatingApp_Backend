@@ -1,14 +1,14 @@
 export type Preferences = {
-  verificationLevel?: string[];   // multi-select
+  verificationLevel?: string[];
+
   location?: {
     city?: string;
     state?: string;
     country?: string;
   };
-  maxDistance?: number;
 
   interestedIn?: string;
-
+  sexualOrientation?: string;
   minAge?: number;
   maxAge?: number;
 
@@ -39,195 +39,100 @@ export type Preferences = {
   socialMedia?: string[];
 };
 
-
-export const buildFilterQuery = (filters: Preferences, currentUser?: any) => {
+export const buildFilterQuery = (filters: Preferences) => {
   const userWhere: any = {};
   const profileWhere: any = {};
-  const AND: any[] = [];
-
-  const today = new Date();
 
   // -------------------------
-  // ✅ AGE → DOB
+  // AGE FILTER
   // -------------------------
   if (filters.minAge || filters.maxAge) {
-    const dobFilter: any = {};
+    const today = new Date();
 
-    if (filters.minAge) {
-      dobFilter.lte = new Date(
-        today.getFullYear() - filters.minAge,
-        today.getMonth(),
-        today.getDate()
-      );
-    }
+    const minDOB = filters.maxAge
+      ? new Date(today.getFullYear() - filters.maxAge, 0, 1)
+      : undefined;
 
-    if (filters.maxAge) {
-      dobFilter.gte = new Date(
-        today.getFullYear() - filters.maxAge,
-        today.getMonth(),
-        today.getDate()
-      );
-    }
+    const maxDOB = filters.minAge
+      ? new Date(today.getFullYear() - filters.minAge, 11, 31)
+      : undefined;
 
-    AND.push({ date_of_birth: dobFilter });
-  }
-
-  // -------------------------
-  // ✅ HEIGHT
-  // -------------------------
-  if (filters.minHeight || filters.maxHeight) {
-    const heightFilter: any = {};
-
-    if (filters.minHeight) heightFilter.gte = filters.minHeight;
-    if (filters.maxHeight) heightFilter.lte = filters.maxHeight;
-
-    AND.push({ height: heightFilter });
-  }
-
-  // -------------------------
-  // ✅ LOCATION
-  // -------------------------
-  if (filters.location?.country) {
-    AND.push({ country: filters.location.country });
-  }
-
-  if (filters.location?.state) {
-    AND.push({ state: filters.location.state });
-  }
-
-  if (filters.location?.city) {
-    AND.push({ city: filters.location.city });
-  }
-
-  // -------------------------
-  // ✅ GENDER + RECIPROCITY
-  // -------------------------
-  if (filters.interestedIn && currentUser?.profile?.gender) {
-    AND.push({
-      gender: filters.interestedIn,
-    });
-
-    AND.push({
-      interested_in: currentUser.profile.gender,
-    });
-  }
-
-  // -------------------------
-  // ✅ VERIFICATION
-  // -------------------------
-  if (filters.verificationLevel?.length) {
-    userWhere.verification_level = {
-      in: filters.verificationLevel,
+    userWhere.birth_date = {
+      ...(minDOB && { gte: minDOB }),
+      ...(maxDOB && { lte: maxDOB }),
     };
   }
 
   // -------------------------
-  // ✅ HAS BIO (STRICT)
+  // HEIGHT FILTER
   // -------------------------
-  if (filters.hasBio) {
-    AND.push({
-      bio: {
-        notIn: [null, ""],
+  if (filters.minHeight || filters.maxHeight) {
+    userWhere.height = {
+      ...(filters.minHeight && { gte: filters.minHeight }),
+      ...(filters.maxHeight && { lte: filters.maxHeight }),
+    };
+  }
+
+  // -------------------------
+  // LOCATION FILTER (UserProfile) ✔ FIXED
+  // -------------------------
+  if (filters.location?.country) {
+    profileWhere.country = filters.location.country;
+  }
+
+  if (filters.location?.state) {
+    profileWhere.state = filters.location.state;
+  }
+
+  if (filters.location?.city) {
+    profileWhere.city = filters.location.city;
+  }
+
+  // -------------------------
+  // INTERESTED IN (FIXED ✔)
+  // -------------------------
+  if (filters.interestedIn) {
+    userWhere.gender = {
+      in: [filters.interestedIn.toUpperCase()],
+    };
+  }
+  // -------------------------
+  // SEXUAL ORIENTATION (✔ FIX)
+  // -------------------------
+  if (filters.sexualOrientation) {
+    const values = Array.isArray(filters.sexualOrientation)
+      ? filters.sexualOrientation
+      : [filters.sexualOrientation];
+
+    userWhere.gender_option = {
+      in: values.map((v) => v.toUpperCase()),
+    };
+  }
+
+  // -------------------------
+  // INTERESTS FILTER (FIXED)
+  // -------------------------
+  if (filters.interests && filters.interests.length > 0) {
+    userWhere.answer = {
+      some: {
+        option: {
+          value: {
+            in: filters.interests.map((v) => v.toLowerCase()),
+          },
+        },
       },
-    });
-  }
-
-  // -------------------------
-  // ✅ INTERESTS
-  // -------------------------
-  if (filters.interests?.length) {
-    AND.push({
-      interests: {
-        hasSome: filters.interests,
-      },
-    });
-  }
-
-  // -------------------------
-  // ✅ LANGUAGES
-  // -------------------------
-  if (filters.languages?.length) {
-    AND.push({
-      languages: {
-        hasSome: filters.languages,
-      },
-    });
-  }
-
-  // -------------------------
-  // ✅ ENUM FILTERS
-  // -------------------------
-  const addArrayFilter = (field: string, values?: string[]) => {
-    if (values?.length) {
-      AND.push({
-        [field]: { in: values },
-      });
-    }
-  };
-
-  addArrayFilter("looking_for", filters.lookingFor);
-  addArrayFilter("zodiac", filters.zodiac);
-  addArrayFilter("marital_status", filters.maritalStatus);
-  addArrayFilter("education", filters.education);
-  addArrayFilter("occupation", filters.occupation);
-  addArrayFilter("communication_style", filters.communicationStyle);
-  addArrayFilter("love_style", filters.loveStyle);
-  addArrayFilter("pets", filters.pets);
-  addArrayFilter("diet", filters.diet);
-  addArrayFilter("drinking", filters.drinking);
-  addArrayFilter("smoking", filters.smoking);
-  addArrayFilter("workout", filters.workout);
-
-  // -------------------------
-  // ✅ SOCIAL MEDIA
-  // -------------------------
-  if (filters.socialMedia?.length) {
-    AND.push({
-      social_media: {
-        hasSome: filters.socialMedia,
-      },
-    });
-  }
-
-  // -------------------------
-  // ✅ ACTIVE USERS ONLY (🔥 important)
-  // -------------------------
-  AND.push({
-    last_active_at: {
-      gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  // -------------------------
-  // ✅ PROFILE COMPLETION
-  // -------------------------
-  AND.push({
-    profile_completion_score: {
-      gte: 50,
-    },
-  });
-
-  // -------------------------
-  // ✅ EXCLUDE SELF
-  // -------------------------
-  if (currentUser?.id) {
-    userWhere.id = { not: currentUser.id };
-  }
-
-  // -------------------------
-  // ✅ FINAL CLEAN BUILD
-  // -------------------------
-  if (AND.length) {
-    profileWhere.AND = AND;
+    };
   }
 
   return {
     where: {
       ...userWhere,
+
       profile: Object.keys(profileWhere).length
-        ? { is: profileWhere }
+        ? {
+            is: profileWhere, // 🔥 THIS is mandatory
+          }
         : undefined,
     },
   };
 };
-

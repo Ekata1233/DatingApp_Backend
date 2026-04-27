@@ -1,17 +1,22 @@
 import { prisma } from "../../../prisma/prismaClient";
+import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { FeedParams } from "./feed.types";
 
-// utils/match.helper.ts
+// =========================
+// HELPERS
+// =========================
 
 export const getGenderFromInterest = (lookingFor: string) => {
-  if (lookingFor === "MEN") return ["MEN"];
-  if (lookingFor === "WOMEN") return ["WOMEN"];
+  const value = lookingFor?.toUpperCase();
+
+  if (value === "MEN") return ["MEN"];
+  if (value === "WOMEN") return ["WOMEN"];
   return ["MEN", "WOMEN"];
 };
 
 export const getOrientationCompatibility = (orientation: string) => {
   const map: Record<string, string[]> = {
-    STRAIGHT: ["STRAIGHT"],
+    STRAIGHT: ["STRAIGHT", "BISEXUAL"],
     GAY: ["GAY", "BISEXUAL"],
     LESBIAN: ["LESBIAN", "BISEXUAL"],
     BISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL"],
@@ -20,12 +25,15 @@ export const getOrientationCompatibility = (orientation: string) => {
   return map[orientation?.toUpperCase()] || [];
 };
 
-
+// =========================
+// FEED SERVICE
+// =========================
 
 export const getFeedService = async ({
   userId,
   cursor,
   limit,
+  filters,
 }: FeedParams) => {
   // 1. Current User
   const currentUser = await prisma.user.findUnique({
@@ -39,13 +47,37 @@ export const getFeedService = async ({
 
   const { interested_in, sexual_orientation } = currentUser.profile;
   const { gender, gender_option } = currentUser;
-  console.log("Intereste IN :", interested_in, sexual_orientation);
 
   if (!gender || !gender_option || !interested_in) {
     throw new Error("Required fields missing");
   }
 
-  // 2. Exclusions
+  // -------------------------
+  // FILTER BUILD
+  // -------------------------
+
+  console.log("CURRENT USER:", JSON.stringify(currentUser, null, 2));
+  console.log("INCOMING FILTERS:", JSON.stringify(filters, null, 2));
+
+  const filterQuery = filters
+    ? buildFilterQuery(filters, currentUser)
+    : { where: {} };
+
+  console.log("BUILT FILTER QUERY:", JSON.stringify(filterQuery, null, 2));
+  const userFilters = Object.fromEntries(
+    Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
+  );
+
+  console.log("USER FILTERS:", userFilters);
+
+  const profileFilters = filterQuery.where?.profile?.is || {};
+
+  console.log("PROFILE FILTERS:", profileFilters);
+
+  // =========================
+  // 2. EXCLUSIONS
+  // =========================
+
   const [swipes, blocks, blockedBy] = await Promise.all([
     prisma.userSwipe.findMany({
       where: { swiperId: userId },
@@ -70,72 +102,83 @@ export const getFeedService = async ({
 
   const excludedArray = Array.from(excludedIds);
 
-  const myGender = gender;
-const myInterest = interested_in;
-const myOrientation = sexual_orientation;
+  // =========================
+  // 3. FILTER PREP
+  // =========================
 
-const genderFilter = getGenderFromInterest(myInterest);
-const orientationFilter = getOrientationCompatibility(myOrientation);
+  const myInterest = interested_in?.toUpperCase();
+  const myOrientation = sexual_orientation?.toUpperCase();
 
-const primaryUsers = await prisma.user.findMany({
-  take: limit,
+  const genderFilter = getGenderFromInterest(myInterest);
+  const orientationFilter = getOrientationCompatibility(myOrientation);
+
+  // =========================
+  // 4. FETCH BASE USERS
+  // =========================
+
+const allUsers = await prisma.user.findMany({
   where: {
     id: { notIn: excludedArray },
-
-    // ✅ 1. I am interested in them
-    gender: { in: genderFilter },
-
-    // ✅ 2. Orientation compatibility
-    gender_option: { in: orientationFilter },
-
-    // ✅ 3. THEY are interested in MY gender
-    profile: {
-      interested_in: {
-        in:
-          myGender === "MEN"
-            ? ["MEN", "EVERYONE"]
-            : ["WOMEN", "EVERYONE"],
-      },
-    },
-
     deleted_at: null,
+
+    // ✅ APPLY USER FILTERS
+    ...userFilters,
+
+    // ✅ APPLY PROFILE FILTERS (THIS WAS MISSING)
+    ...(Object.keys(profileFilters).length > 0 && {
+      profile: {
+        is: profileFilters,
+      },
+    }),
   },
-  orderBy: [
-    { last_active_at: "desc" },
-    { created_at: "desc" },
-  ],
+  include: { profile: true },
 });
 
 
-  console.log("Primary Users Found:", primaryUsers);
+  // =========================
+  // 5. APPLY FILTERS (STEPWISE)
+  // =========================
 
-  let users = primaryUsers;
+  // STEP 1 → Gender match (my preference)
+  const genderMatched = allUsers.filter((user) =>
+    genderFilter.includes(user.gender?.toUpperCase()),
+  );
 
-  // =========================================
-  // 5. PRIORITY 2 → FALLBACK (ONLY GENDER)
-  // =========================================
-  if (users.length < limit) {
-    const remainingLimit = limit - users.length;
+  // STEP 2 → Mutual interest
+  const mutualInterest = genderMatched.filter(
+    (user) =>
+      user.profile?.interested_in?.toUpperCase() === gender?.toUpperCase(),
+  );
 
-    const fallbackUsers = await prisma.user.findMany({
-      take: remainingLimit,
-      where: {
-        id: {
-          notIn: [...excludedArray, ...users.map((u) => u.id)],
-        },
-        gender: { in: genderFilter },
-        deleted_at: null,
-      },
-      orderBy: [
-  { last_active_at: "desc" },
-  { created_at: "desc" }
-]
-    });
+  // STEP 3 → Orientation (they match me)
+  const orientationMatched = mutualInterest.filter((user) =>
+    orientationFilter.includes(user.gender_option?.toUpperCase()),
+  );
 
-    users = [...users, ...fallbackUsers];
-  }
+  // STEP 4 → Reverse orientation (I match them)
+  const finalMatched = orientationMatched.filter((user) => {
+    const theirCompatible = getOrientationCompatibility(
+      user.profile?.sexual_orientation,
+    );
 
-  console.log("Total Users Returned:", users);
+    return theirCompatible.includes(sexual_orientation?.toUpperCase());
+  });
+
+  // =========================
+  // 6. SORT + LIMIT
+  // =========================
+
+  const users = finalMatched
+    .sort((a, b) => {
+      const aTime = a.last_active_at?.getTime() || 0;
+      const bTime = b.last_active_at?.getTime() || 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit);
+
+  // =========================
+  // RESPONSE
+  // =========================
 
   return {
     users,
