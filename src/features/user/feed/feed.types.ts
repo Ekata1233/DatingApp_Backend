@@ -8,5 +8,4 @@ export interface FeedParams {
   limit: number;
   mode: FeedMode;
   filters?: Preferences;
-  // filters?: any;
 }
