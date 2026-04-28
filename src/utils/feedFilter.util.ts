@@ -22,7 +22,6 @@ export type Preferences = {
   languages?: string[];
 
   zodiac?: string[];
-  maritalStatus?: string[];
 
   education?: string[];
   occupation?: string[];
@@ -110,19 +109,72 @@ export const buildFilterQuery = (filters: Preferences) => {
   }
 
   // -------------------------
-  // INTERESTS FILTER (FIXED)
-  // -------------------------
-  if (filters.interests && filters.interests.length > 0) {
-    userWhere.answer = {
+// INTERESTS FILTER BY KEY (FINAL ✔)
+// -------------------------
+if (filters.interests && filters.interests.length > 0) {
+  userWhere.AND = filters.interests.map((group) => ({
+    answer: {
       some: {
         option: {
           value: {
-            in: filters.interests.map((v) => v.toLowerCase()),
+            in: group.values.map((v: string) => v.toLowerCase()),
+          },
+          question: {
+            key: group.key,
           },
         },
       },
-    };
-  }
+    },
+  }));
+}
+
+
+// -------------------------
+// EDUCATION FILTER (✔ SAME PATTERN)
+// -------------------------
+if (filters.education && filters.education.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.education.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "education"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// OCCUPATION FILTER (✔ SAME AS INTERESTS)
+// -------------------------
+if (filters.occupation && filters.occupation.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.occupation.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "occupation"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
 
   return {
     where: {
