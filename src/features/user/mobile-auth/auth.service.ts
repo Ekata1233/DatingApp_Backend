@@ -52,7 +52,7 @@ console.log("Twilio Response:", JSON.stringify(verificationCheck, null, 2));
     });
 
     //Last seen & online status will be handled by presence system, so no need to set it here
-    // await setUserOnline(user.id);
+    await setUserOnline(user.id);
     //end of presence handling
     const token = jwt.sign(
       { userId: user.id },
