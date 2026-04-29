@@ -27,6 +27,8 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
     ? phoneNumber
     : `+91${phoneNumber}`;
 
+    console.log("Verifying OTP for: ", formattedNumber);
+
   const verificationCheck = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verificationChecks.create({
@@ -34,21 +36,23 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       code: otp,
     });
 
+console.log("Twilio Response:", JSON.stringify(verificationCheck, null, 2));
   console.log("verificationCheck.status : ", verificationCheck.status);
+
   if (verificationCheck.status === "approved") {
     const user = await prisma.user.upsert({
-      where: { phone_number: phoneNumber },
+      where: { phone_number: formattedNumber },
       update: {
         is_phone_verified: true,
       },
       create: {
-        phone_number: phoneNumber,
+        phone_number: formattedNumber,
         is_phone_verified: true,
       },
     });
 
     //Last seen & online status will be handled by presence system, so no need to set it here
-    await setUserOnline(user.id);
+    // await setUserOnline(user.id);
     //end of presence handling
     const token = jwt.sign(
       { userId: user.id },

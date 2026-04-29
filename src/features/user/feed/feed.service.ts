@@ -29,7 +29,6 @@ export const getOrientationCompatibility = (orientation: string) => {
 
 const NEW_USER_BOOST_HOURS = 48; // you can change: 24 / 48 / 72
 
-
 // =========================
 // FEED SERVICE
 // =========================
@@ -60,7 +59,6 @@ export const getFeedService = async ({
   // -------------------------
   // FILTER BUILD
   // -------------------------
-
 
   const filterQuery = filters
     ? buildFilterQuery(filters, currentUser)
@@ -114,24 +112,23 @@ export const getFeedService = async ({
   // 4. FETCH BASE USERS
   // =========================
 
-const allUsers = await prisma.user.findMany({
-  where: {
-    id: { notIn: excludedArray },
-    deleted_at: null,
+  const allUsers = await prisma.user.findMany({
+    where: {
+      id: { notIn: excludedArray },
+      deleted_at: null,
 
-    // ✅ APPLY USER FILTERS
-    ...userFilters,
+      // ✅ APPLY USER FILTERS
+      ...userFilters,
 
-    // ✅ APPLY PROFILE FILTERS (THIS WAS MISSING)
-    ...(Object.keys(profileFilters).length > 0 && {
-      profile: {
-        is: profileFilters,
-      },
-    }),
-  },
-  include: { profile: true },
-});
-
+      // ✅ APPLY PROFILE FILTERS (THIS WAS MISSING)
+      ...(Object.keys(profileFilters).length > 0 && {
+        profile: {
+          is: profileFilters,
+        },
+      }),
+    },
+    include: { profile: true },
+  });
 
   // =========================
   // 5. APPLY FILTERS (STEPWISE)
@@ -166,62 +163,87 @@ const allUsers = await prisma.user.findMany({
   // 6. SORT + LIMIT
   // =========================
 
-const users = finalMatched.slice(0, limit);
+  const users = finalMatched
 
+  // =========================
+  // 6.5 ACTIVE BOOST USERS
+  // =========================
 
-    // =========================
-// 7. PRESENCE (REDIS)
-// =========================
+  const activeBoosts = await prisma.boostUsage.findMany({
+    where: {
+      is_active: true,
+      ended_at: {
+        gt: new Date(), // still active
+      },
+    },
+    select: {
+      user_id: true,
+    },
+  });
 
-const userIds = users.map((u) => u.id);
+  // Convert to Set for O(1)
+  const boostedUserIds = new Set(activeBoosts.map((b) => b.user_id));
 
-// 🔥 Fetch from Redis
-const presenceMap = await getUsersPresence(userIds);
+  // =========================
+  // 7. PRESENCE (REDIS)
+  // =========================
 
-// =========================
-// 8. ATTACH LAST SEEN
-// =========================
+  const userIds = users.map((u) => u.id);
 
-const usersWithPresence = users.map((user) => {
-  const presence = presenceMap[user.id];
+  // 🔥 Fetch from Redis
+  const presenceMap = await getUsersPresence(userIds);
 
-   return {
+  // =========================
+  // 8. ATTACH LAST SEEN
+  // =========================
+
+  const usersWithPresence = users.map((user) => {
+    const presence = presenceMap[user.id];
+
+    return {
       ...user,
       isOnline: presence?.isOnline || false,
       lastActiveAt: presence?.lastActiveAt || null, // 👈 important
       lastSeen: formatLastSeen(presence?.lastActiveAt),
       createdAt: user.created_at,
+      isBoosted: boostedUserIds.has(user.id),
     };
-});
+  });
 
-const sortedUsers = usersWithPresence.sort((a, b) => {
-  const now = Date.now();
+  console.log("Users with presence info:", usersWithPresence);
 
-  const aActivity = a.lastActiveAt?.getTime() || 0;
-  const bActivity = b.lastActiveAt?.getTime() || 0;
+  const sortedUsers = usersWithPresence.sort((a, b) => {
+    const now = Date.now();
 
-  const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-  const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const aActivity = a.lastActiveAt?.getTime() || 0;
+    const bActivity = b.lastActiveAt?.getTime() || 0;
 
-  const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
+    const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
 
-  const aIsNew = now - aCreated < boostWindow;
-  const bIsNew = now - bCreated < boostWindow;
+    const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
 
-  // 🔥 1. NEW USER BOOST
-  if (aIsNew && !bIsNew) return -1;
-  if (!aIsNew && bIsNew) return 1;
+    const aIsNew = now - aCreated < boostWindow;
+    const bIsNew = now - bCreated < boostWindow;
 
-  // 🔥 2. RECENT ACTIVITY
-  return bActivity - aActivity;
-});
+    // 🔥 1. PAID BOOST (HIGHEST PRIORITY)
+    if (a.isBoosted && !b.isBoosted) return -1;
+    if (!a.isBoosted && b.isBoosted) return 1;
+
+    // 🔥 2. NEW USER BOOST
+    if (aIsNew && !bIsNew) return -1;
+    if (!aIsNew && bIsNew) return 1;
+
+    // 🔥 3. RECENT ACTIVITY
+    return bActivity - aActivity;
+  });
 
   // =========================
   // RESPONSE
   // =========================
 
   return {
-   users: sortedUsers,
+    users: sortedUsers,
     nextCursor: null,
   };
 };
