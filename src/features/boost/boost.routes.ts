@@ -5,7 +5,7 @@ import authMiddleware from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
-router.post("/upgrade", authMiddleware, upgradeBoostController);
-router.post("/activate", authMiddleware, activateBoostController);
+router.post("/boost/upgrade", authMiddleware, upgradeBoostController);
+router.post("/boost/activate", authMiddleware, activateBoostController);
 
 export default router;

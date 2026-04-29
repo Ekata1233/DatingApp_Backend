@@ -23,6 +23,7 @@ import reportRoutes from "../features/user/report/report.routes";
 import feedRoutes from "../features/user/feed/feed.routes";
 import detailsRoutes from "../features/user/details/details.routes";
 import lastActivityRoutes from "../features/lastActivity/lastActivity.routes";
+import boostRoutes from "../features/boost/boost.routes";
 
 const router = Router();
 
@@ -47,7 +48,11 @@ router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)
 router.use("/user",detailsRoutes)
 
-//last seen & online status will be handled by presence system, so no need to set it here
+//boost upgrade and active route
+router.use("/user",boostRoutes)
+//
+
+//last seen & online status 
 router.use("/user",lastActivityRoutes)
 //end of presence handling
 
