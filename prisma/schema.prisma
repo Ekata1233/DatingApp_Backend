@@ -42,9 +42,9 @@ model User {
   photos                  UserPhoto[]
   profile                 UserProfile?
   userBoosts              UserBoost[]
-  boostUsages             BoostUsage[] 
-  boostEvents             BoostEvent[]        @relation("UserBoostEvents", fields: [], references: [])
-  actorEvents             BoostEvent[]        @relation("ActorUser")
+  boostUsages             BoostUsage[]
+  boostEvents             BoostEvent[]       @relation("BoostedUser")
+  actorEvents             BoostEvent[]       @relation("ActorUser")
   boostStats              UserBoostStats?
   currentSubscription     UserSubscription?  @relation("CurrentSubscription", fields: [current_subscription_id], references: [id])
 
@@ -159,28 +159,28 @@ model UserAnswer {
   @@index([option_id])
 }
 
-  model UserPhoto {
-    id         String   @id @default(uuid()) @db.Uuid
-    user_id    String   @db.Uuid
-    is_primary Boolean  @default(false)
-    order      Int?
-    created_at DateTime @default(now())
-    media_type String   @default("image")
-    media_url  String
-    user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+model UserPhoto {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  is_primary Boolean  @default(false)
+  order      Int?
+  created_at DateTime @default(now())
+  media_type String   @default("image")
+  media_url  String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-    @@index([user_id])
-    @@map("user_photos")
-  }
+  @@index([user_id])
+  @@map("user_photos")
+}
 
-  model UserBio {
-    user_id    String   @id @db.Uuid
-    bio        String?  @db.VarChar(500)
-    created_at DateTime @default(now())
-    updated_at DateTime @updatedAt
-    user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+model UserBio {
+  user_id    String   @id @db.Uuid
+  bio        String?  @db.VarChar(500)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-    @@map("user_bio")
+  @@map("user_bio")
 }
 
 model UserBlock {
@@ -258,7 +258,7 @@ model Boost {
 }
 
 model BoostOption {
-  id               String             @id @default(uuid())  @db.Uuid
+  id               String             @id @default(uuid()) @db.Uuid
   boost_id         String             @db.Uuid
   label            String
   boostCount       Int
@@ -280,24 +280,24 @@ model BoostOption {
 }
 
 model UserBoost {
-   id                String      @id @default(uuid()) @db.Uuid  
+  id String @id @default(uuid()) @db.Uuid
 
-  user_id           String      @db.Uuid
-  boost_id          String      @db.Uuid   
-  boost_option_id   String      @db.Uuid 
-  total_boosts      Int
-  remaining_boosts  Int
-  start_at          DateTime    @default(now())
-  expires_at        DateTime?
-  is_active         Boolean     @default(true)
-  created_at        DateTime    @default(now())
-  updated_at        DateTime    @updatedAt
+  user_id          String    @db.Uuid
+  boost_id         String    @db.Uuid
+  boost_option_id  String    @db.Uuid
+  total_boosts     Int
+  remaining_boosts Int
+  start_at         DateTime  @default(now())
+  expires_at       DateTime?
+  is_active        Boolean   @default(true)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
 
-  user              User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  boost             Boost       @relation(fields: [boost_id], references: [id])
-  boostOption       BoostOption @relation(fields: [boost_option_id], references: [id])
+  user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  boost       Boost       @relation(fields: [boost_id], references: [id])
+  boostOption BoostOption @relation(fields: [boost_option_id], references: [id])
 
-  usages            BoostUsage[]
+  usages BoostUsage[]
 
   @@index([user_id])
   @@index([boost_id])
@@ -305,24 +305,25 @@ model UserBoost {
 }
 
 model BoostUsage {
-   id            String     @id @default(uuid()) @db.Uuid 
+  id String @id @default(uuid()) @db.Uuid
 
-  user_boost_id String     @db.Uuid   
-  user_id       String     @db.Uuid
+  user_boost_id String    @db.Uuid
+  user_id       String    @db.Uuid
   duration      Int // minutes
-  started_at    DateTime   @default(now())
+  started_at    DateTime  @default(now())
   ended_at      DateTime?
-  is_active     Boolean    @default(true)
+  is_active     Boolean   @default(true)
 
-  total_views      Int @default(0)
-  total_likes      Int @default(0)
-  total_interests  Int @default(0)
-  total_reach      Int @default(0)
+  total_views     Int @default(0)
+  total_likes     Int @default(0)
+  total_interests Int @default(0)
+  total_reach     Int @default(0)
 
-  created_at    DateTime   @default(now())
+  created_at DateTime @default(now())
 
-  userBoost     UserBoost  @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
-  user          User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  userBoost   UserBoost    @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  boostEvents BoostEvent[]
 
   @@index([user_id])
   @@index([user_boost_id])
@@ -330,33 +331,33 @@ model BoostUsage {
 }
 
 model UserBoostStats {
-  id               String  @id @default(uuid()) @db.Uuid
-  user_id          String  @unique @db.Uuid
+  id      String @id @default(uuid()) @db.Uuid
+  user_id String @unique @db.Uuid
 
-  total_views      Int @default(0)
-  total_likes      Int @default(0)
-  total_interests  Int @default(0)
-  total_reach      Int @default(0)
+  total_views     Int @default(0)
+  total_likes     Int @default(0)
+  total_interests Int @default(0)
+  total_reach     Int @default(0)
 
-  user             User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("user_boost_stats")
 }
 
 model BoostEvent {
-  id             String   @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  boost_usage_id String   @db.Uuid
-  user_id        String   @db.Uuid      // boosted user
-  actor_id       String   @db.Uuid      // who performed action
+  boost_usage_id String @db.Uuid
+  user_id        String @db.Uuid // boosted user
+  actor_id       String @db.Uuid // who performed action
 
-  event_type     EventType
-  created_at     DateTime @default(now())
+  event_type EventType
+  created_at DateTime  @default(now())
 
-  boostUsage     BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+  boostUsage BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
 
-  user           User @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
-  actor          User @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
+  user  User @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
+  actor User @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
 
   @@index([boost_usage_id])
   @@index([user_id])
@@ -370,7 +371,6 @@ enum EventType {
   INTEREST
   REACH
 }
-
 
 model Package {
   id          String      @id @default(uuid())
@@ -422,23 +422,23 @@ model PackageFeature {
 }
 
 model UserSubscription {
-  id                String             @id @default(uuid())
-  userId            String             @db.Uuid
+  id                String   @id @default(uuid())
+  userId            String   @db.Uuid
   started_at        DateTime
   expires_at        DateTime
-  daily_swipe_count Int                @default(0)
-  daily_like_count  Int                @default(0)
-  last_reset_at     DateTime           @default(now())
-  created_at        DateTime           @default(now())
+  daily_swipe_count Int      @default(0)
+  daily_like_count  Int      @default(0)
+  last_reset_at     DateTime @default(now())
+  created_at        DateTime @default(now())
   boostsRemaining   Int?
   boostsTotal       Int?
 
-  pricePaid         Float
-  status            SubscriptionStatus
-  user              User               @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
-  currentForUser    User?              @relation("CurrentSubscription")
-  BoostOption       BoostOption?       @relation(fields: [boostOptionId], references: [id])
-  boostOptionId     String?            @db.Uuid
+  pricePaid      Float
+  status         SubscriptionStatus
+  user           User               @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  currentForUser User?              @relation("CurrentSubscription")
+  BoostOption    BoostOption?       @relation(fields: [boostOptionId], references: [id])
+  boostOptionId  String?            @db.Uuid
 
   @@index([userId])
 }
@@ -455,14 +455,14 @@ model Payment {
   created_at     DateTime @default(now())
 }
 
-enum Gender{
+enum Gender {
   MEN
   WOMEN
   NON_BINARY
   PREFER_NOT_TO_SAY
 }
 
-enum GenderOption{
+enum GenderOption {
   STRAIGHT
   GAY
   LESBIAN

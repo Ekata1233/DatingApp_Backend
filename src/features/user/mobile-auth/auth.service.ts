@@ -1,6 +1,7 @@
 import { twilioClient, verifyServiceSid } from "../../../config/twilio";
 import { prisma } from "../../../prisma/prismaClient";
 import jwt from "jsonwebtoken";
+import { setUserOnline } from "../../lastActivity/lastActivity.service";
 
 export const sendOtp = async (phoneNumber: string) => {
   if (!phoneNumber) throw new Error("Phone number is required");
@@ -46,6 +47,9 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       },
     });
 
+    //Last seen & online status will be handled by presence system, so no need to set it here
+    await setUserOnline(user.id);
+    //end of presence handling
     const token = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET as string,

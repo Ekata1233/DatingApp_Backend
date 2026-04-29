@@ -4,7 +4,7 @@ import { updateHeartbeat } from "./lastActivity.service";
 // POST /api/presence/heartbeat
 export const heartbeatController = async (req: any, res: any) => {
   try {
-    const { userId } = req.body;
+     const userId = (req as any).user.id;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "UserId required" });
