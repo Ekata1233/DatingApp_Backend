@@ -1,5 +1,7 @@
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
+import { formatLastSeen } from "../../../utils/lastSeen";
+import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { FeedParams } from "./feed.types";
 
 // =========================
@@ -24,6 +26,8 @@ export const getOrientationCompatibility = (orientation: string) => {
 
   return map[orientation?.toUpperCase()] || [];
 };
+
+const NEW_USER_BOOST_HOURS = 48; // you can change: 24 / 48 / 72
 
 // =========================
 // FEED SERVICE
@@ -56,23 +60,15 @@ export const getFeedService = async ({
   // FILTER BUILD
   // -------------------------
 
-  console.log("CURRENT USER:", JSON.stringify(currentUser, null, 2));
-  console.log("INCOMING FILTERS:", JSON.stringify(filters, null, 2));
-
   const filterQuery = filters
     ? buildFilterQuery(filters, currentUser)
     : { where: {} };
 
-  console.log("BUILT FILTER QUERY:", JSON.stringify(filterQuery, null, 2));
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
   );
 
-  console.log("USER FILTERS:", userFilters);
-
   const profileFilters = filterQuery.where?.profile?.is || {};
-
-  console.log("PROFILE FILTERS:", profileFilters);
 
   // =========================
   // 2. EXCLUSIONS
@@ -116,24 +112,23 @@ export const getFeedService = async ({
   // 4. FETCH BASE USERS
   // =========================
 
-const allUsers = await prisma.user.findMany({
-  where: {
-    id: { notIn: excludedArray },
-    deleted_at: null,
+  const allUsers = await prisma.user.findMany({
+    where: {
+      id: { notIn: excludedArray },
+      deleted_at: null,
 
-    // ✅ APPLY USER FILTERS
-    ...userFilters,
+      // ✅ APPLY USER FILTERS
+      ...userFilters,
 
-    // ✅ APPLY PROFILE FILTERS (THIS WAS MISSING)
-    ...(Object.keys(profileFilters).length > 0 && {
-      profile: {
-        is: profileFilters,
-      },
-    }),
-  },
-  include: { profile: true },
-});
-
+      // ✅ APPLY PROFILE FILTERS (THIS WAS MISSING)
+      ...(Object.keys(profileFilters).length > 0 && {
+        profile: {
+          is: profileFilters,
+        },
+      }),
+    },
+    include: { profile: true },
+  });
 
   // =========================
   // 5. APPLY FILTERS (STEPWISE)
@@ -169,19 +164,86 @@ const allUsers = await prisma.user.findMany({
   // =========================
 
   const users = finalMatched
-    .sort((a, b) => {
-      const aTime = a.last_active_at?.getTime() || 0;
-      const bTime = b.last_active_at?.getTime() || 0;
-      return bTime - aTime;
-    })
-    .slice(0, limit);
+
+  // =========================
+  // 6.5 ACTIVE BOOST USERS
+  // =========================
+
+  const activeBoosts = await prisma.boostUsage.findMany({
+    where: {
+      is_active: true,
+      ended_at: {
+        gt: new Date(), // still active
+      },
+    },
+    select: {
+      user_id: true,
+    },
+  });
+
+  // Convert to Set for O(1)
+  const boostedUserIds = new Set(activeBoosts.map((b) => b.user_id));
+
+  // =========================
+  // 7. PRESENCE (REDIS)
+  // =========================
+
+  const userIds = users.map((u) => u.id);
+
+  // 🔥 Fetch from Redis
+  const presenceMap = await getUsersPresence(userIds);
+
+  // =========================
+  // 8. ATTACH LAST SEEN
+  // =========================
+
+  const usersWithPresence = users.map((user) => {
+    const presence = presenceMap[user.id];
+
+    return {
+      ...user,
+      isOnline: presence?.isOnline || false,
+      lastActiveAt: presence?.lastActiveAt || null, // 👈 important
+      lastSeen: formatLastSeen(presence?.lastActiveAt),
+      createdAt: user.created_at,
+      isBoosted: boostedUserIds.has(user.id),
+    };
+  });
+
+  console.log("Users with presence info:", usersWithPresence);
+
+  const sortedUsers = usersWithPresence.sort((a, b) => {
+    const now = Date.now();
+
+    const aActivity = a.lastActiveAt?.getTime() || 0;
+    const bActivity = b.lastActiveAt?.getTime() || 0;
+
+    const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+    const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
+
+    const aIsNew = now - aCreated < boostWindow;
+    const bIsNew = now - bCreated < boostWindow;
+
+    // 🔥 1. PAID BOOST (HIGHEST PRIORITY)
+    if (a.isBoosted && !b.isBoosted) return -1;
+    if (!a.isBoosted && b.isBoosted) return 1;
+
+    // 🔥 2. NEW USER BOOST
+    if (aIsNew && !bIsNew) return -1;
+    if (!aIsNew && bIsNew) return 1;
+
+    // 🔥 3. RECENT ACTIVITY
+    return bActivity - aActivity;
+  });
 
   // =========================
   // RESPONSE
   // =========================
 
   return {
-    users,
+    users: sortedUsers,
     nextCursor: null,
   };
 };
