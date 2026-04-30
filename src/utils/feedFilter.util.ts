@@ -15,11 +15,9 @@ export type Preferences = {
   minHeight?: number;
   maxHeight?: number;
 
-  hasBio?: boolean;
 
   interests?: string[];
-  lookingFor?: string[];
-  languages?: string[];
+   languages?: string[];
 
   zodiac?: string[];
 
@@ -167,6 +165,145 @@ if (filters.occupation && filters.occupation.length > 0) {
             },
             question: {
               key: group.key, // e.g. "occupation"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// COMMUNICATION STYLE FILTER
+// -------------------------
+if (filters.communicationStyle && filters.communicationStyle.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.communicationStyle.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "communication_style"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// PETS FILTER
+// -------------------------
+if (filters.pets && filters.pets.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.pets.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "pets"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// DIET FILTER
+// -------------------------
+if (filters.diet && filters.diet.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.diet.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "diet"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+
+// -------------------------
+// DRINKING FILTER
+// -------------------------
+if (filters.drinking && filters.drinking.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.drinking.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "drinking"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// SMOKING FILTER
+// -------------------------
+if (filters.smoking && filters.smoking.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.smoking.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "smoking"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// WORKOUT FILTER
+// -------------------------
+if (filters.workout && filters.workout.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.workout.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "workout"
             },
           },
         },

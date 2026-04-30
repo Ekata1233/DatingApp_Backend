@@ -1,11 +1,11 @@
 // modules/swipe/swipe.routes.ts
 
 import express from "express";
-import { swipeController } from "./swipe.controller";
+import { swipeUser } from "./swipe.controller";
 import authMiddleware from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
-router.post("/", authMiddleware, swipeController);
+router.post("/swipe", authMiddleware, swipeUser);
 
 export default router;

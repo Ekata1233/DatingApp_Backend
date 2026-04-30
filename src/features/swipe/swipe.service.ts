@@ -1,98 +1,145 @@
-// modules/swipe/swipe.service.ts
+// // modules/swipe/swipe.service.ts
 
-import { prisma } from "../../prisma/prismaClient";
+// import { prisma } from "../../prisma/prismaClient";
+// import { SwipeParams } from "./swipe.types";
 
+// export const swipeService = async ({
+//   userId,
+//   targetUserId,
+//   action,
+// }: SwipeParams) => {
+//   if (userId === targetUserId) {
+//     throw new Error("You cannot swipe yourself");
+//   }
 
-interface SwipeParams {
-  userId: string;
+//   return await prisma.$transaction(async (tx) => {
+//     // 1. Check if already swiped (idempotent)
+//     const existingSwipe = await tx.userSwipe.findUnique({
+//       where: {
+//         swiperId_targetUserId: {
+//           swiperId: userId,
+//           targetUserId,
+//         },
+//       },
+//     });
+
+//     if (existingSwipe) {
+//       return {
+//         message: "Already swiped",
+//         isMatch: existingSwipe.isMutual,
+//       };
+//     }
+
+//     // 2. Check reverse swipe (for MATCH)
+//     const reverseSwipe = await tx.userSwipe.findUnique({
+//       where: {
+//         swiperId_targetUserId: {
+//           swiperId: targetUserId,
+//           targetUserId: userId,
+//         },
+//       },
+//     });
+
+//     let isMatch = false;
+
+//     if (
+//       reverseSwipe &&
+//       reverseSwipe.action === "LIKE" &&
+//       action === "LIKE"
+//     ) {
+//       isMatch = true;
+//     }
+
+//     // 3. Create swipe
+//     const newSwipe = await tx.userSwipe.create({
+//       data: {
+//         swiperId: userId,
+//         targetUserId,
+//         action,
+//         isMutual: isMatch,
+//       },
+//     });
+
+//     // 4. If match → update reverse swipe + create match
+//     if (isMatch) {
+//       await tx.userSwipe.update({
+//         where: {
+//           swiperId_targetUserId: {
+//             swiperId: targetUserId,
+//             targetUserId: userId,
+//           },
+//         },
+//         data: {
+//           isMutual: true,
+//         },
+//       });
+
+//       // OPTIONAL (recommended) → Match table
+//       await tx.userMatch.create({
+//         data: {
+//           user1Id: userId,
+//           user2Id: targetUserId,
+//         },
+//       });
+//     }
+
+//     return {
+//       message: isMatch ? "It's a match!" : "Swipe recorded",
+//       isMatch,
+//       swipe: newSwipe,
+//     };
+//   });
+// };
+
+import {
+  createSwipe,
+  checkReverseLike,
+  createMatch,
+  checkMatchExists,
+} from "./swipe.repository";
+
+export const handleSwipe = async (data: {
+  swiperId: string;
   targetUserId: string;
   action: "LIKE" | "PASS" | "SUPERLIKE";
-}
+}) => {
+  const { swiperId, targetUserId, action } = data;
 
-export const swipeService = async ({
-  userId,
-  targetUserId,
-  action,
-}: SwipeParams) => {
-  if (userId === targetUserId) {
-    throw new Error("You cannot swipe yourself");
+  if (swiperId === targetUserId) {
+    throw new Error("Cannot swipe yourself");
   }
 
-  return await prisma.$transaction(async (tx) => {
-    // 1. Check if already swiped (idempotent)
-    const existingSwipe = await tx.userSwipe.findUnique({
-      where: {
-        swiperId_targetUserId: {
-          swiperId: userId,
-          targetUserId,
-        },
-      },
-    });
+  // 1. Save swipe
+  await createSwipe({ swiperId, targetUserId, action });
 
-    if (existingSwipe) {
-      return {
-        message: "Already swiped",
-        isMatch: existingSwipe.isMutual,
-      };
-    }
+  // Only LIKE / SUPERLIKE can create match
+  if (action === "PASS") {
+    return { matched: false };
+  }
 
-    // 2. Check reverse swipe (for MATCH)
-    const reverseSwipe = await tx.userSwipe.findUnique({
-      where: {
-        swiperId_targetUserId: {
-          swiperId: targetUserId,
-          targetUserId: userId,
-        },
-      },
-    });
+  // 2. Check reverse like
+  const reverse = await checkReverseLike(swiperId, targetUserId);
 
-    let isMatch = false;
+  if (!reverse) {
+    return { matched: false };
+  }
 
-    if (
-      reverseSwipe &&
-      reverseSwipe.action === "LIKE" &&
-      action === "LIKE"
-    ) {
-      isMatch = true;
-    }
+  // 3. Prevent duplicate match
+  const existingMatch = await checkMatchExists(
+    swiperId,
+    targetUserId
+  );
 
-    // 3. Create swipe
-    const newSwipe = await tx.userSwipe.create({
-      data: {
-        swiperId: userId,
-        targetUserId,
-        action,
-        isMutual: isMatch,
-      },
-    });
+  if (existingMatch) {
+    return { matched: true, matchId: existingMatch.id };
+  }
 
-    // 4. If match → update reverse swipe + create match
-    if (isMatch) {
-      await tx.userSwipe.update({
-        where: {
-          swiperId_targetUserId: {
-            swiperId: targetUserId,
-            targetUserId: userId,
-          },
-        },
-        data: {
-          isMutual: true,
-        },
-      });
+  // 4. Create match
+  const match = await createMatch(swiperId, targetUserId);
 
-      // OPTIONAL (recommended) → Match table
-      await tx.match.create({
-        data: {
-          user1Id: userId,
-          user2Id: targetUserId,
-        },
-      });
-    }
-
-    return {
-      message: isMatch ? "It's a match!" : "Swipe recorded",
-      isMatch,
-      swipe: newSwipe,
-    };
-  });
+  return {
+    matched: true,
+    matchId: match.id,
+  };
 };
+

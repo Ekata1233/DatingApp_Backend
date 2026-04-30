@@ -16,7 +16,6 @@ import workDetailsRoutes from "../features/onboarding/workDetails/workDetails.ro
 import interestHobbiesRoutes from "../features/onboarding/interestHobbies/interestHobbies.routes";
 import dreamsFutureRoutes from "../features/onboarding/dreamsFuture/dreamsFuture.routes";
 import packageRoutes from "../features/admin/package/package.routes";
-
 import questionRoutes from "../features/onboarding/questionAnswer/question.route";
 import blockRoutes from "../features/user/block/block.routes";
 import reportRoutes from "../features/user/report/report.routes";
@@ -24,6 +23,7 @@ import feedRoutes from "../features/user/feed/feed.routes";
 import detailsRoutes from "../features/user/details/details.routes";
 import lastActivityRoutes from "../features/lastActivity/lastActivity.routes";
 import boostRoutes from "../features/boost/boost.routes";
+import swipeRoutes from "../features/swipe/swipe.routes";
 
 const router = Router();
 
@@ -55,6 +55,10 @@ router.use("/user",boostRoutes)
 //last seen & online status 
 router.use("/user",lastActivityRoutes)
 //end of presence handling
+
+//swipe routes
+router.use("/user", swipeRoutes);
+//
 
 
 

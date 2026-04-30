@@ -377,7 +377,6 @@ model Package {
   name        PackageType @unique
   title       String
   description String?
-  themeColor  String? // UI color (pink, purple, gold)
   isActive    Boolean     @default(true)
 
   plans    PackagePlan[]
@@ -403,16 +402,21 @@ model PackagePlan {
 
   isPopular   Boolean @default(false)
   isBestValue Boolean @default(false)
+  isActive    Boolean @default(true)
 
   package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([packageId, durationMonths])
+  @@index([packageId])
 }
 
 model PackageFeature {
   id            String  @id @default(uuid())
   packageId     String
+  key           String
   label         String // e.g. "Unlimited Swipes"
   isHighlighted Boolean @default(false)
 
@@ -423,24 +427,25 @@ model PackageFeature {
 
 model UserSubscription {
   id                String   @id @default(uuid())
-  userId            String   @db.Uuid
-  started_at        DateTime
-  expires_at        DateTime
-  daily_swipe_count Int      @default(0)
-  daily_like_count  Int      @default(0)
-  last_reset_at     DateTime @default(now())
-  created_at        DateTime @default(now())
-  boostsRemaining   Int?
-  boostsTotal       Int?
+  user_id           String @unique @db.Uuid
+  packageId         String
+  planId            String
 
-  pricePaid      Float
-  status         SubscriptionStatus
-  user           User               @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
-  currentForUser User?              @relation("CurrentSubscription")
-  BoostOption    BoostOption?       @relation(fields: [boostOptionId], references: [id])
-  boostOptionId  String?            @db.Uuid
+  startDate         DateTime
+  endDate           DateTime
+  status            SubscriptionStatus @default(ACTIVE)
 
-  @@index([userId])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  package           Package     @relation(fields: [packageId], references: [id])
+  plan              PackagePlan @relation(fields: [planId], references: [id])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }
 
 model Payment {

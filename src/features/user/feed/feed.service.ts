@@ -1,7 +1,5 @@
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
-import { formatLastSeen } from "../../../utils/lastSeen";
-import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { FeedParams } from "./feed.types";
 
 // =========================
@@ -26,9 +24,6 @@ export const getOrientationCompatibility = (orientation: string) => {
 
   return map[orientation?.toUpperCase()] || [];
 };
-
-const NEW_USER_BOOST_HOURS = 48; // you can change: 24 / 48 / 72
-
 
 // =========================
 // FEED SERVICE
@@ -61,16 +56,23 @@ export const getFeedService = async ({
   // FILTER BUILD
   // -------------------------
 
+  console.log("CURRENT USER:", JSON.stringify(currentUser, null, 2));
+  console.log("INCOMING FILTERS:", JSON.stringify(filters, null, 2));
 
   const filterQuery = filters
     ? buildFilterQuery(filters, currentUser)
     : { where: {} };
 
+  console.log("BUILT FILTER QUERY:", JSON.stringify(filterQuery, null, 2));
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
   );
 
+  console.log("USER FILTERS:", userFilters);
+
   const profileFilters = filterQuery.where?.profile?.is || {};
+
+  console.log("PROFILE FILTERS:", profileFilters);
 
   // =========================
   // 2. EXCLUSIONS
@@ -166,62 +168,20 @@ const allUsers = await prisma.user.findMany({
   // 6. SORT + LIMIT
   // =========================
 
-const users = finalMatched.slice(0, limit);
-
-
-    // =========================
-// 7. PRESENCE (REDIS)
-// =========================
-
-const userIds = users.map((u) => u.id);
-
-// 🔥 Fetch from Redis
-const presenceMap = await getUsersPresence(userIds);
-
-// =========================
-// 8. ATTACH LAST SEEN
-// =========================
-
-const usersWithPresence = users.map((user) => {
-  const presence = presenceMap[user.id];
-
-   return {
-      ...user,
-      isOnline: presence?.isOnline || false,
-      lastActiveAt: presence?.lastActiveAt || null, // 👈 important
-      lastSeen: formatLastSeen(presence?.lastActiveAt),
-      createdAt: user.created_at,
-    };
-});
-
-const sortedUsers = usersWithPresence.sort((a, b) => {
-  const now = Date.now();
-
-  const aActivity = a.lastActiveAt?.getTime() || 0;
-  const bActivity = b.lastActiveAt?.getTime() || 0;
-
-  const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-  const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-
-  const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
-
-  const aIsNew = now - aCreated < boostWindow;
-  const bIsNew = now - bCreated < boostWindow;
-
-  // 🔥 1. NEW USER BOOST
-  if (aIsNew && !bIsNew) return -1;
-  if (!aIsNew && bIsNew) return 1;
-
-  // 🔥 2. RECENT ACTIVITY
-  return bActivity - aActivity;
-});
+  const users = finalMatched
+    .sort((a, b) => {
+      const aTime = a.last_active_at?.getTime() || 0;
+      const bTime = b.last_active_at?.getTime() || 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit);
 
   // =========================
   // RESPONSE
   // =========================
 
   return {
-   users: sortedUsers,
+    users,
     nextCursor: null,
   };
 };
