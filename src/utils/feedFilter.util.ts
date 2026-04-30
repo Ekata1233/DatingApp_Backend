@@ -312,6 +312,75 @@ if (filters.workout && filters.workout.length > 0) {
   ];
 }
 
+// -------------------------
+// ZODIAC FILTER
+// -------------------------
+if (filters.zodiac && filters.zodiac.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.zodiac.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "zodiac"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// LANGUAGES FILTER
+// -------------------------
+if (filters.languages && filters.languages.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.languages.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "languages"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
+// -------------------------
+// SOCIAL MEDIA FILTER
+// -------------------------
+if (filters.socialMedia && filters.socialMedia.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.socialMedia.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) => v.toLowerCase()),
+            },
+            question: {
+              key: group.key, // e.g. "social_media"
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
 
   return {
     where: {
