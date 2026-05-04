@@ -1,13 +1,13 @@
 import { Request, Response } from "express";
-import { createPackageSchema } from "./package.validation";
-import { createBoostService, getBoostsService } from "./package.service";
+import { createBoostSchema } from "./boost.validation";
+import { createBoostService, getBoostsService } from "./boost.service";
 
 
 
 // ✅ CREATE BOOST
-export const createPackageController = async (req: Request, res: Response) => {
+export const createBoostController = async (req: Request, res: Response) => {
   try {
-    const parsed = createPackageSchema.safeParse(req.body);
+    const parsed = createBoostSchema.safeParse(req.body);
 
     if (!parsed.success) {
       return res.status(400).json({
@@ -35,7 +35,7 @@ export const createPackageController = async (req: Request, res: Response) => {
 
 
 // ✅ GET ALL BOOSTS
-export const getPackagesController = async (req: Request, res: Response) => {
+export const getBoostsController = async (req: Request, res: Response) => {
   try {
     const result = await getBoostsService(); // ✅ FIXED
 

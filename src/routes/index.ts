@@ -22,7 +22,7 @@ import reportRoutes from "../features/user/report/report.routes";
 import feedRoutes from "../features/user/feed/feed.routes";
 import detailsRoutes from "../features/user/details/details.routes";
 import lastActivityRoutes from "../features/lastActivity/lastActivity.routes";
-import boostRoutes from "../features/boost/boost.routes";
+import boostRoutes from "../features/admin/boost/boost.routes";
 import swipeRoutes from "../features/swipe/swipe.routes";
 
 const router = Router();
@@ -39,7 +39,8 @@ router.use("/workDetails", workDetailsRoutes);
 router.use("/interestHobbies", interestHobbiesRoutes);
 router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
-router.use("/boost",packageRoutes)
+router.use("/boost",boostRoutes)
+router.use("/package",packageRoutes)
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
@@ -59,9 +60,5 @@ router.use("/user",lastActivityRoutes)
 //swipe routes
 router.use("/user", swipeRoutes);
 //
-
-
-
-
 export default router;
 
