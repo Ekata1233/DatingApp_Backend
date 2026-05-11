@@ -1,27 +1,29 @@
 import { z } from "zod";
+import { PackageType } from "@prisma/client";
 
 export const createPackageSchema = z.object({
-  name: z.enum(["BOOST", "PRIMETIME", "SUPER"]),
+  name: z.nativeEnum(PackageType),
   title: z.string(),
   description: z.string().optional(),
 
-  options: z.array(
+  plans: z.array(
     z.object({
+      durationMonths: z.number(),
+      originalPrice: z.number(),
+      discountedPrice: z.number().optional(),
+      discountPercent: z.number().optional(),
+      isPopular: z.boolean().optional(),
+      isBestValue: z.boolean().optional(),
+    })
+  ),
+
+  features: z.array(
+    z.object({
+      key: z.string(),
       label: z.string(),
-      boostCount: z.number(),
-      timePerBoost: z.number(), // ✅ MUST BE HERE
-
-      pricePerBoost: z.number(),
-      totalPrice: z.number(),
-
-      discounted_price: z.number().optional(),
-      discount_percent: z.number().optional(),
-
-      is_best_value: z.boolean().optional(),
-      is_popular: z.boolean().optional(),
+      isHighlighted: z.boolean().optional(),
     })
   ),
 });
 
-// ✅ IMPORTANT
 export type CreatePackageInput = z.infer<typeof createPackageSchema>;

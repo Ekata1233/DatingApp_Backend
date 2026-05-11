@@ -1,93 +1,119 @@
 import { prisma } from "../../../prisma/prismaClient";
-import { BoostType } from "@prisma/client";
+import { PackageType } from "@prisma/client";
 import { CreatePackageInput } from "./package.validation";
 
-export const createBoostService = async (data: CreatePackageInput) => {
-  const { options, ...boostData } = data;
+export const createPackageService = async (
+  data: CreatePackageInput
+) => {
+  const { plans, features, ...packageData } = data;
 
-  // ✅ enum validation
-  if (!Object.values(BoostType).includes(boostData.name as BoostType)) {
-    throw new Error("Invalid boost type");
+  // enum validation
+  if (
+    !Object.values(PackageType).includes(
+      packageData.name as PackageType
+    )
+  ) {
+    throw new Error("Invalid package type");
   }
 
-  const boostName = boostData.name as BoostType;
+  const packageName = packageData.name as PackageType;
 
-  // ✅ check existing
-  const existingBoost = await prisma.boost.findFirst({
-    where: { name: boostName },
-    include: { options: true },
+  // check existing package
+  const existingPackage = await prisma.package.findFirst({
+    where: {
+      name: packageName,
+    },
+    include: {
+      plans: true,
+      features: true,
+    },
   });
 
-  // ✅ UPDATE FLOW
-  if (existingBoost) {
-    await prisma.boostOption.deleteMany({
-      where: { boost_id: existingBoost.id },
+  // ---------------- UPDATE FLOW ----------------
+  if (existingPackage) {
+    // delete old plans
+    await prisma.packagePlan.deleteMany({
+      where: {
+        packageId: existingPackage.id,
+      },
     });
 
-    const updated = await prisma.boost.update({
-      where: { id: existingBoost.id },
+    // delete old features
+    await prisma.packageFeature.deleteMany({
+      where: {
+        packageId: existingPackage.id,
+      },
+    });
+
+    const updatedPackage = await prisma.package.update({
+      where: {
+        id: existingPackage.id,
+      },
       data: {
-        name: boostName,
-        title: boostData.title,
-        description: boostData.description,
+        title: packageData.title,
+        description: packageData.description,
 
-        options: {
-          create: options.map((opt) => ({
-            label: opt.label,
-            boostCount: opt.boostCount,
-            timePerBoost: opt.timePerBoost,
+        plans: {
+          create: plans.map((plan) => ({
+            durationMonths: plan.durationMonths,
+            originalPrice: plan.originalPrice,
+            discountedPrice: plan.discountedPrice,
+            discountPercent: plan.discountPercent,
+            isPopular: plan.isPopular ?? false,
+            isBestValue: plan.isBestValue ?? false,
+          })),
+        },
 
-            pricePerBoost: opt.pricePerBoost.toString(),
-            discounted_price: (opt.discounted_price ?? 0).toString(),
-            discount_percent: opt.discount_percent ?? null,
-            totalPrice: opt.totalPrice.toString(),
-
-            is_best_value: opt.is_best_value ?? false,
-            is_popular: opt.is_popular ?? false,
+        features: {
+          create: features.map((feature) => ({
+            key: feature.key,
+            label: feature.label,
+            isHighlighted:
+              feature.isHighlighted ?? false,
           })),
         },
       },
-      include: { options: true },
+      include: {
+        plans: true,
+        features: true,
+      },
     });
 
-    return updated;
+    return updatedPackage;
   }
 
-  // ✅ CREATE FLOW
-  const created = await prisma.boost.create({
+  // ---------------- CREATE FLOW ----------------
+  const createdPackage = await prisma.package.create({
     data: {
-      name: boostName,
-      title: boostData.title,
-      description: boostData.description,
+      name: packageName,
+      title: packageData.title,
+      description: packageData.description,
 
-      options: {
-        create: options.map((opt) => ({
-          label: opt.label,
-          boostCount: opt.boostCount,
-          timePerBoost: opt.timePerBoost,
+      plans: {
+        create: plans.map((plan) => ({
+          durationMonths: plan.durationMonths,
+          originalPrice: plan.originalPrice,
+          discountedPrice: plan.discountedPrice,
+          discountPercent: plan.discountPercent,
+          isPopular: plan.isPopular ?? false,
+          isBestValue: plan.isBestValue ?? false,
+        })),
+      },
 
-          pricePerBoost: opt.pricePerBoost.toString(),
-          discounted_price: (opt.discounted_price ?? 0).toString(),
-          discount_percent: opt.discount_percent ?? null,
-          totalPrice: opt.totalPrice.toString(),
-
-          is_best_value: opt.is_best_value ?? false,
-          is_popular: opt.is_popular ?? false,
+      features: {
+        create: features.map((feature) => ({
+          key: feature.key,
+          label: feature.label,
+          isHighlighted:
+            feature.isHighlighted ?? false,
         })),
       },
     },
-    include: { options: true },
+    include: {
+      plans: true,
+      features: true,
+    },
   });
 
-  return created;
-};
-
-
-
-// ✅ GET API
-export const getBoostsService = async () => {
-  return prisma.boost.findMany({
-    include: { options: true },
-    orderBy: { created_at: "desc" },
-  });
+  return createdPackage;
 };
