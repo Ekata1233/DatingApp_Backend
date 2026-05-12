@@ -321,6 +321,7 @@ model BoostOption {
   totalPrice       Decimal     @db.Decimal(10, 2)
   is_best_value    Boolean     @default(false)
   is_popular       Boolean     @default(false)
+  is_active        Boolean     @default(true)
   created_at       DateTime    @default(now())
   updated_at       DateTime    @updatedAt
   boost            Boost       @relation(fields: [boost_id], references: [id], onDelete: Cascade)
@@ -508,6 +509,24 @@ model Payment {
   payment_id String   @db.Uuid
   status     String
   created_at DateTime @default(now())
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  sender_id   String
+  receiver_id String
+  type        NotificationType
+  message     String
+  is_read     Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  @@index([receiver_id])
+}
+
+enum NotificationType {
+  LIKE
+  MATCH
+  MESSAGE
 }
 
 enum Gender {

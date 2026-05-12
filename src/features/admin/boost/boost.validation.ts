@@ -7,6 +7,7 @@ export const createBoostSchema = z.object({
 
   options: z.array(
     z.object({
+      id: z.string().uuid().optional(), // ✅ ONLY FOR UPDATE FLOW
       label: z.string(),
       boostCount: z.number(),
       timePerBoost: z.number(), // ✅ MUST BE HERE
