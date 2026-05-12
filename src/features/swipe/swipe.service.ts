@@ -91,6 +91,7 @@
 //   });
 // };
 
+import { createNotification } from "../notification/notification.service";
 import {
   createSwipe,
   checkReverseLike,
@@ -116,6 +117,20 @@ export const handleSwipe = async (data: {
   if (action === "PASS") {
     return { matched: false };
   }
+  /**
+   * ----------------------------------------
+   * 2. Send LIKE/SUPERLIKE notification
+   * ----------------------------------------
+   */
+  await createNotification({
+    sender_id: swiperId,
+    receiver_id: targetUserId,
+    type: "LIKE",
+    message:
+      action === "SUPERLIKE"
+        ? "Someone super liked your profile ⭐"
+        : "Someone liked your profile ❤️",
+  });
 
   // 2. Check reverse like
   const reverse = await checkReverseLike(swiperId, targetUserId);
@@ -136,6 +151,28 @@ export const handleSwipe = async (data: {
 
   // 4. Create match
   const match = await createMatch(swiperId, targetUserId);
+
+  /**
+   * ----------------------------------------
+   * 6. Send MATCH notification to both users
+   * ----------------------------------------
+   */
+
+  await Promise.all([
+    createNotification({
+      sender_id: swiperId,
+      receiver_id: targetUserId,
+      type: "MATCH",
+      message: "It's a match 🎉",
+    }),
+
+    createNotification({
+      sender_id: targetUserId,
+      receiver_id: swiperId,
+      type: "MATCH",
+      message: "It's a match 🎉",
+    }),
+  ]);
 
   return {
     matched: true,
