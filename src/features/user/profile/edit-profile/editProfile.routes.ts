@@ -1,5 +1,5 @@
 import express from "express";
-import { updateBasicInfo, updateBio, updateUserEduWork } from "./editProfile.controller";
+import { getQuestionsByScreen, updateBasicInfo, updateBio, updateQuestionAnswers, updateUserEduWork } from "./editProfile.controller";
 import authMiddleware from "../../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -18,4 +18,15 @@ router.patch(
   updateUserEduWork
 );
 
+router.get(
+  "/questions/:screen",
+  authMiddleware,
+  getQuestionsByScreen
+);
+
+router.patch(
+  "/question-answers",
+  authMiddleware,
+  updateQuestionAnswers
+);
 export default router;

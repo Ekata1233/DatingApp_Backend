@@ -139,3 +139,85 @@ export const getUserEduWorkByUserId = async (
     },
   });
 };
+
+////////////////////////////////////////////
+// GET QUESTIONS BY SCREEN
+////////////////////////////////////////////
+
+export const getQuestionsByScreen = async (
+  screen: string,
+  userId: string
+) => {
+
+  return prisma.question.findMany({
+    where: {
+      screen: screen as any,
+    },
+
+    include: {
+      options: true,
+
+      answers: {
+        where: {
+          user_id: userId,
+        },
+      },
+    },
+
+    orderBy: {
+      created_at: "asc",
+    },
+  });
+};
+
+////////////////////////////////////////////
+// FIND QUESTION WITH OPTIONS
+////////////////////////////////////////////
+
+export const findQuestionWithOptions =
+  async (key: string) => {
+
+    return prisma.question.findUnique({
+      where: {
+        key,
+      },
+
+      include: {
+        options: true,
+      },
+    });
+};
+
+////////////////////////////////////////////
+// DELETE USER ANSWERS
+////////////////////////////////////////////
+
+export const deleteUserAnswers =
+  async (
+    tx: any,
+    userId: string,
+    questionId: string
+  ) => {
+
+    return tx.userAnswer.deleteMany({
+      where: {
+        user_id: userId,
+        question_id: questionId,
+      },
+    });
+};
+
+////////////////////////////////////////////
+// CREATE USER ANSWERS
+////////////////////////////////////////////
+
+export const bulkCreateUserAnswers =
+  async (
+    tx: any,
+    data: any[]
+  ) => {
+
+    return tx.userAnswer.createMany({
+      data,
+    });
+};
