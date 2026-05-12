@@ -24,6 +24,8 @@ model User {
   next_step            String?           @db.VarChar(20)
   onboarding_completed Boolean           @default(false)
   last_active_at       DateTime?
+  device_token         String?
+  badge_count          Int               @default(0)
   deleted_at           DateTime?
   created_at           DateTime          @default(now())
   updated_at           DateTime          @updatedAt
