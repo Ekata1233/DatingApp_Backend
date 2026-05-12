@@ -1,8 +1,14 @@
 import { Request, Response } from "express";
-import { updateBasicInfoService, updateBioService, updateQuestionAnswersService } from "./editProfile.service";
+import { updateBasicInfoService, updateBioService } from "./editProfile.service";
 import { updateBasicInfoSchema, updateBioSchema } from "./editProfile.validation";
 import * as userEduWorkService from "./editProfile.service";
+import {
+  updateQuestionAnswerSchema
+} from "./editProfile.validation";
 
+import {
+  updateQuestionAnswersService
+} from "./editProfile.service";
 export const updateBasicInfo = async (
   req: Request,
   res: Response
@@ -102,47 +108,6 @@ export const updateUserEduWork = async (
   }
 };
 
-////////////////////////////////////////////
-// GET QUESTIONS
-////////////////////////////////////////////
-
-export const getQuestionsByScreen =
-  async (
-    req: Request,
-    res: Response
-  ) => {
-
-    try {
-
-      const userId =
-        (req as any).user.id;
-
-      const { screen } = req.params;
-
-      const result =
-        await getQuestionsByScreenService(
-          userId,
-          screen
-        );
-
-      return res.status(200).json({
-        success: true,
-        data: result,
-      });
-
-    } catch (error: any) {
-
-      return res.status(500).json({
-        success: false,
-        message: error.message,
-      });
-    }
-};
-
-////////////////////////////////////////////
-// UPDATE ANSWERS
-////////////////////////////////////////////
-
 export const updateQuestionAnswers =
   async (
     req: Request,
@@ -151,25 +116,54 @@ export const updateQuestionAnswers =
 
     try {
 
-      const userId =
-        (req as any).user.id;
+      const userId = req.user?.id;
+
+      if (!userId) {
+
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized"
+        });
+
+      }
+
+      //-----------------------------------
+      // VALIDATION
+      //-----------------------------------
+
+      const validatedData =
+        updateQuestionAnswerSchema.parse(
+          req.body
+        );
+
+      //-----------------------------------
+      // SERVICE
+      //-----------------------------------
 
       const result =
         await updateQuestionAnswersService(
           userId,
-          req.body
+          validatedData
         );
+
+      //-----------------------------------
+      // RESPONSE
+      //-----------------------------------
 
       return res.status(200).json({
         success: true,
-        data: result,
+        data: result
       });
 
     } catch (error: any) {
 
       return res.status(500).json({
         success: false,
-        message: error.message,
+        message:
+          error.message ||
+          "Internal server error"
       });
+
     }
+
 };

@@ -16,3 +16,9 @@ export const updateBioSchema = z.object({
     .string()
     .max(500, "Bio cannot exceed 500 characters")
 });
+
+export const updateQuestionAnswerSchema =
+  z.object({
+    questionKey: z.string(),
+    optionIds: z.array(z.string().uuid())
+  });

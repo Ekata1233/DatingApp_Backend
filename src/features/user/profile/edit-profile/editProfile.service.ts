@@ -6,12 +6,11 @@ import {
   deleteExistingAnswers,
   createUserAnswers,
   upsertUserBio,
-  findQuestionWithOptions,
-  deleteUserAnswers,
-  bulkCreateUserAnswers,
-  
+  validateQuestionOptions,
+  replaceUserAnswers
 } from "./editProfile.repository";
-import * as userEduWorkRepository from "./editProfile.repository";
+import * as userEduWorkRepository from "./editProfile.service";
+
 
 
 //--------------------------------BASIC INFO UPDATE--------------------------------
@@ -178,121 +177,91 @@ export const updateUserEduWork = async (
   return finalData;
 };
 
-////////////////////////////////////////////
-// GET QUESTIONS BY SCREEN
-////////////////////////////////////////////
 
-export const getQuestionsByScreenService =
-  async (
-    userId: string,
-    screen: string
-  ) => {
-
-    const questions =
-      await getQuestionsByScreen(
-        screen,
-        userId
-      );
-
-    return questions.map((question) => ({
-
-      id: question.id,
-
-      key: question.key,
-
-      title: question.title,
-
-      isMulti: question.isMulti,
-
-      options: question.options.map((option) => ({
-
-        id: option.id,
-
-        label: option.label,
-
-        value: option.value,
-
-        selected: question.answers.some(
-          (answer) =>
-            answer.option_id === option.id
-        ),
-      })),
-    }));
-};
-
-////////////////////////////////////////////
-// UPDATE QUESTION ANSWERS
-////////////////////////////////////////////
 
 export const updateQuestionAnswersService =
   async (
     userId: string,
-    body: any
+    body: {
+      questionKey: string;
+      optionIds: string[];
+    }
   ) => {
 
-    const { answers } = body;
+    const {
+      questionKey,
+      optionIds
+    } = body;
 
-    await prisma.$transaction(
-      async (tx) => {
+    //-----------------------------------
+    // FIND QUESTION
+    //-----------------------------------
 
-        for (const item of answers) {
+    const question =
+      await findQuestionByKey(
+        questionKey
+      );
 
-          const question =
-            await findQuestionWithOptions(
-              item.key
-            );
+    if (!question) {
+      throw new Error(
+        "Question not found"
+      );
+    }
 
-          if (!question) {
+    //-----------------------------------
+    // VALIDATE OPTIONS
+    //-----------------------------------
 
-            throw new Error(
-              `${item.key} question not found`
-            );
-          }
+    const validOptions =
+      await validateQuestionOptions(
+        question.id,
+        optionIds
+      );
 
-          //-----------------------------------
-          // MATCH OPTION IDS
-          //-----------------------------------
+    if (
+      validOptions.length !==
+      optionIds.length
+    ) {
 
-          const optionIds =
-            question.options
-              .filter((option) =>
-                item.values.includes(
-                  option.value
-                )
-              )
-              .map((option) => option.id);
+      throw new Error(
+        "Invalid option selected"
+      );
 
-          //-----------------------------------
-          // DELETE OLD ANSWERS
-          //-----------------------------------
+    }
 
-          await deleteUserAnswers(
-            tx,
-            userId,
-            question.id
-          );
+    //-----------------------------------
+    // SINGLE SELECT VALIDATION
+    //-----------------------------------
 
-          //-----------------------------------
-          // INSERT NEW ANSWERS
-          //-----------------------------------
+    if (
+      !question.isMulti &&
+      optionIds.length > 1
+    ) {
 
-          if (optionIds.length > 0) {
+      throw new Error(
+        "Only one option allowed"
+      );
 
-            await bulkCreateUserAnswers(
-              tx,
+    }
 
-              optionIds.map((optionId) => ({
-                user_id: userId,
-                question_id: question.id,
-                option_id: optionId,
-              }))
-            );
-          }
-        }
-      }
+    //-----------------------------------
+    // UPDATE ANSWERS
+    //-----------------------------------
+
+    await replaceUserAnswers(
+      userId,
+      question.id,
+      optionIds
     );
+
+    //-----------------------------------
+    // RETURN RESPONSE
+    //-----------------------------------
 
     return {
       success: true,
+      message:
+        "Answers updated successfully"
     };
+
 };

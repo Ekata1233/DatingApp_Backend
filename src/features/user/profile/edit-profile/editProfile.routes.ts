@@ -1,5 +1,5 @@
 import express from "express";
-import { getQuestionsByScreen, updateBasicInfo, updateBio, updateQuestionAnswers, updateUserEduWork } from "./editProfile.controller";
+import { updateBasicInfo, updateBio, updateQuestionAnswers, updateUserEduWork } from "./editProfile.controller";
 import authMiddleware from "../../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -17,15 +17,8 @@ router.patch(
   authMiddleware,
   updateUserEduWork
 );
-
-router.get(
-  "/questions/:screen",
-  authMiddleware,
-  getQuestionsByScreen
-);
-
 router.patch(
-  "/question-answers",
+  "/questions",
   authMiddleware,
   updateQuestionAnswers
 );
