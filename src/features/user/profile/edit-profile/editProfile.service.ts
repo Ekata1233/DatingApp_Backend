@@ -5,10 +5,13 @@ import {
   findQuestionByKey,
   deleteExistingAnswers,
   createUserAnswers,
-  upsertUserBio
+  upsertUserBio,
+  findQuestionWithOptions,
+  deleteUserAnswers,
+  bulkCreateUserAnswers,
+  
 } from "./editProfile.repository";
-import * as userEduWorkRepository from "./editProfile.service";
-
+import * as userEduWorkRepository from "./editProfile.repository";
 
 
 //--------------------------------BASIC INFO UPDATE--------------------------------
@@ -173,4 +176,123 @@ export const updateUserEduWork = async (
     await userEduWorkRepository.getUserEduWorkByUserId(userId);
 
   return finalData;
+};
+
+////////////////////////////////////////////
+// GET QUESTIONS BY SCREEN
+////////////////////////////////////////////
+
+export const getQuestionsByScreenService =
+  async (
+    userId: string,
+    screen: string
+  ) => {
+
+    const questions =
+      await getQuestionsByScreen(
+        screen,
+        userId
+      );
+
+    return questions.map((question) => ({
+
+      id: question.id,
+
+      key: question.key,
+
+      title: question.title,
+
+      isMulti: question.isMulti,
+
+      options: question.options.map((option) => ({
+
+        id: option.id,
+
+        label: option.label,
+
+        value: option.value,
+
+        selected: question.answers.some(
+          (answer) =>
+            answer.option_id === option.id
+        ),
+      })),
+    }));
+};
+
+////////////////////////////////////////////
+// UPDATE QUESTION ANSWERS
+////////////////////////////////////////////
+
+export const updateQuestionAnswersService =
+  async (
+    userId: string,
+    body: any
+  ) => {
+
+    const { answers } = body;
+
+    await prisma.$transaction(
+      async (tx) => {
+
+        for (const item of answers) {
+
+          const question =
+            await findQuestionWithOptions(
+              item.key
+            );
+
+          if (!question) {
+
+            throw new Error(
+              `${item.key} question not found`
+            );
+          }
+
+          //-----------------------------------
+          // MATCH OPTION IDS
+          //-----------------------------------
+
+          const optionIds =
+            question.options
+              .filter((option) =>
+                item.values.includes(
+                  option.value
+                )
+              )
+              .map((option) => option.id);
+
+          //-----------------------------------
+          // DELETE OLD ANSWERS
+          //-----------------------------------
+
+          await deleteUserAnswers(
+            tx,
+            userId,
+            question.id
+          );
+
+          //-----------------------------------
+          // INSERT NEW ANSWERS
+          //-----------------------------------
+
+          if (optionIds.length > 0) {
+
+            await bulkCreateUserAnswers(
+              tx,
+
+              optionIds.map((optionId) => ({
+                user_id: userId,
+                question_id: question.id,
+                option_id: optionId,
+              }))
+            );
+          }
+        }
+      }
+    );
+
+    return {
+      success: true,
+    };
 };
