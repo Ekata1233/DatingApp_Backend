@@ -2,6 +2,8 @@
 
 import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
+import { incrementBadgeCount } from "./badge.service";
+import { sendPushNotification } from "./push.service";
 
 export const createNotification = async ({
   sender_id,
@@ -26,6 +28,16 @@ export const createNotification = async ({
   // 🔥 REAL-TIME EMIT
   const io = getIO();
   io.to(receiver_id).emit("new_notification", notification);
+
+   // Badge increment
+  await incrementBadgeCount(receiver_id);
+
+  // Push notification
+  await sendPushNotification(
+    receiver_id,
+    type,
+    message
+  );
 
   return notification;
 };
