@@ -140,84 +140,77 @@ export const getUserEduWorkByUserId = async (
   });
 };
 
-////////////////////////////////////////////
-// GET QUESTIONS BY SCREEN
-////////////////////////////////////////////
-
-export const getQuestionsByScreen = async (
-  screen: string,
-  userId: string
-) => {
-
-  return prisma.question.findMany({
-    where: {
-      screen: screen as any,
-    },
-
-    include: {
-      options: true,
-
-      answers: {
-        where: {
-          user_id: userId,
-        },
-      },
-    },
-
-    orderBy: {
-      created_at: "asc",
-    },
-  });
-};
-
-////////////////////////////////////////////
-// FIND QUESTION WITH OPTIONS
-////////////////////////////////////////////
-
-export const findQuestionWithOptions =
+export const findQuestionByKey =
   async (key: string) => {
 
     return prisma.question.findUnique({
       where: {
-        key,
+        key
       },
-
       include: {
-        options: true,
-      },
+        options: true
+      }
     });
+
 };
-
-////////////////////////////////////////////
-// DELETE USER ANSWERS
-////////////////////////////////////////////
-
-export const deleteUserAnswers =
+export const validateQuestionOptions =
   async (
-    tx: any,
-    userId: string,
-    questionId: string
+    questionId: string,
+    optionIds: string[]
   ) => {
 
-    return tx.userAnswer.deleteMany({
+    return prisma.questionOption.findMany({
       where: {
-        user_id: userId,
         question_id: questionId,
-      },
+        id: {
+          in: optionIds
+        }
+      }
     });
+
 };
-
-////////////////////////////////////////////
-// CREATE USER ANSWERS
-////////////////////////////////////////////
-
-export const bulkCreateUserAnswers =
+export const replaceUserAnswers =
   async (
-    tx: any,
-    data: any[]
+    userId: string,
+    questionId: string,
+    optionIds: string[]
   ) => {
 
-    return tx.userAnswer.createMany({
-      data,
-    });
+    return prisma.$transaction(
+      async (tx) => {
+
+        //-----------------------------------
+        // DELETE OLD ANSWERS
+        //-----------------------------------
+
+        await tx.userAnswer.deleteMany({
+          where: {
+            user_id: userId,
+            question_id: questionId
+          }
+        });
+
+        //-----------------------------------
+        // INSERT NEW ANSWERS
+        //-----------------------------------
+
+        if (optionIds.length > 0) {
+
+          await tx.userAnswer.createMany({
+            data: optionIds.map(
+              (optionId) => ({
+                user_id: userId,
+                question_id: questionId,
+                option_id: optionId
+              })
+            )
+          });
+
+        }
+
+        return true;
+
+      }
+    );
+
 };
