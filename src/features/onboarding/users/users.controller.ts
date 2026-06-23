@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { fetchAllUsers } from "./users.service";
 
 export async function getAllUsersController(req: Request, res: Response) {
+  console.log("Controller hit");
   try {
     const users = await fetchAllUsers();
 

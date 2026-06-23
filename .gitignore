@@ -33,3 +33,6 @@ out/
 # Coverage
 coverage/
 /src/generated/prisma
+
+# Firebase secrets
+src/firebase-service-key.json

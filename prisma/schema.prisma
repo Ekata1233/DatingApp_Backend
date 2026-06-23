@@ -97,7 +97,7 @@ model UserAbout {
   @@map("user_about")
 }
 
-model UserEduWork {
+ model UserEduWork {
   userId String @id @db.Uuid
 
   // Education

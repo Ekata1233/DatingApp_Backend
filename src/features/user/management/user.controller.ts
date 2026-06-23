@@ -22,6 +22,8 @@ export const getAllUsersController = async (req: Request, res: Response) => {
   try {
     const users = await userService.getAllUsers();
 
+    console.log("users list : ", users)
+
     res.status(200).json({
       success: true,
       message: "Users fetched successfully",

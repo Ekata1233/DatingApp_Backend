@@ -61,7 +61,10 @@ app.get("/api-docs", (req, res) => {
   </html>
   `);
 });
-
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
 
 // Routes
 app.use("/api", routes);

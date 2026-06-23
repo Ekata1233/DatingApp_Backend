@@ -9,6 +9,7 @@ export async function fetchAllUsers(): Promise<User[]> {
       "SELECT * FROM users"
     );
 
+    console.log("users : ", result)
     return result.rows;
 
   } catch (error) {
