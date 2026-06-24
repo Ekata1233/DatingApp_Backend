@@ -4,6 +4,9 @@ import {
   createDraftDatePlan,
   updateDraftDatePlan,
   publishDatePlan,
+  discoverDatePlan,
+  skipDatePlan,
+  requestToJoinDatePlan,
 } from "./dateNow.service";
 
 
@@ -79,6 +82,76 @@ export const publishPlanController = async (
     );
 
     res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const discoverDatePlanController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const plan = await discoverDatePlan(
+      userId,
+      req.query.filter as string
+    );
+
+    res.json({
+      success: true,
+      data: plan,
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const skipDatePlanController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const result = await skipDatePlan(
+      userId,
+      req.params.id
+    );
+
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const requestToJoinController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const request = await requestToJoinDatePlan(
+      userId,
+      req.params.id,
+      req.body.message
+    );
+
+    res.json({
+      success: true,
+      data: request,
+    });
   } catch (error: any) {
     res.status(400).json({
       success: false,

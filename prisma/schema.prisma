@@ -50,6 +50,7 @@ model User {
   boostStats           UserBoostStats?
   DatePlan             DatePlan[]
   datePlanRequests     DatePlanRequest[]
+  datePlanSkips        DatePlanSkip[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -550,7 +551,7 @@ enum PlanStatus {
 model DatePlanOption {
   id        String     @id @default(uuid()) @db.Uuid
   type      OptionType
-  label     String  // Coffee
+  label     String // Coffee
   value     String? // coffee
   icon      String? // image url
   sortOrder Int        @default(0)
@@ -561,6 +562,8 @@ model DatePlanOption {
   // Back Relations
 
   activityPlans DatePlan[] @relation("PlanActivity")
+
+  quickTitlePlans DatePlan[] @relation("PlanQuickTitle")
 
   whenPlans DatePlan[] @relation("PlanWhen")
 
@@ -580,13 +583,14 @@ model DatePlanOption {
 }
 
 model DatePlan {
-  id         String  @id @default(uuid()) @db.Uuid
-  userId     String  @db.Uuid
+  id           String  @id @default(uuid()) @db.Uuid
+  userId       String  @db.Uuid
   // Step 1
-  activityId String             @db.Uuid
-  title      String?             
-  note       String?
-  photoUrl   String?
+  activityId   String  @db.Uuid
+  title        String?
+  quickTitleId String? @db.Uuid
+  note         String?
+  photoUrl     String?
 
   // Step 2
   venueName    String?
@@ -595,13 +599,13 @@ model DatePlan {
   venueLng     Float?
 
   // Step 3
-  whenId              String?          @db.Uuid
-  timeId              String?          @db.Uuid
-  durationId          String?          @db.Uuid
-  whoPaysId           String?          @db.Uuid
+  whenId              String?    @db.Uuid
+  timeId              String?    @db.Uuid
+  durationId          String?    @db.Uuid
+  whoPaysId           String?    @db.Uuid
   participantLimit    Int?
-  joinRequestGenderId String?          @db.Uuid
-  visibilityId        String?          @db.Uuid
+  joinRequestGenderId String?    @db.Uuid
+  visibilityId        String?    @db.Uuid
   status              PlanStatus @default(DRAFT)
   eventDateTime       DateTime?
   expiresAt           DateTime?
@@ -613,6 +617,8 @@ model DatePlan {
   user User @relation(fields: [userId], references: [id])
 
   activity DatePlanOption @relation("PlanActivity", fields: [activityId], references: [id])
+
+  quickTitle DatePlanOption? @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
 
   when DatePlanOption? @relation("PlanWhen", fields: [whenId], references: [id])
 
@@ -628,6 +634,7 @@ model DatePlan {
 
   vibes    DatePlanVibe[]
   requests DatePlanRequest[]
+  skips    DatePlanSkip[]
 
   @@index([userId])
   @@index([activityId])
@@ -637,8 +644,8 @@ model DatePlan {
 
 model DatePlanVibe {
   id     String @id @default(uuid())
-  planId String     @db.Uuid
-  vibeId String     @db.Uuid
+  planId String @db.Uuid
+  vibeId String @db.Uuid
 
   plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -658,7 +665,7 @@ enum DatePlanRequestStatus {
 model DatePlanRequest {
   id     String @id @default(uuid())
   // Which plan
-  planId String                     @db.Uuid
+  planId String @db.Uuid
 
   // Who sent request
   requesterId String                @db.Uuid
@@ -675,6 +682,21 @@ model DatePlanRequest {
   @@index([planId])
   @@index([requesterId])
   @@index([status])
+}
+
+model DatePlanSkip {
+  id        String   @id @default(uuid())
+  userId    String   @db.Uuid
+  planId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, planId])
+  @@index([userId])
+  @@index([planId])
 }
 
 enum NotificationType {
