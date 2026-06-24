@@ -548,9 +548,9 @@ enum PlanStatus {
 }
 
 model DatePlanOption {
-  id        String     @id @default(uuid())
+  id        String     @id @default(uuid()) @db.Uuid
   type      OptionType
-  label     String // Coffee
+  label     String  // Coffee
   value     String? // coffee
   icon      String? // image url
   sortOrder Int        @default(0)
@@ -580,11 +580,11 @@ model DatePlanOption {
 }
 
 model DatePlan {
-  id         String  @id @default(uuid())
+  id         String  @id @default(uuid()) @db.Uuid
   userId     String  @db.Uuid
   // Step 1
-  activityId String
-  title      String
+  activityId String             @db.Uuid
+  title      String?             
   note       String?
   photoUrl   String?
 
@@ -595,14 +595,16 @@ model DatePlan {
   venueLng     Float?
 
   // Step 3
-  whenId              String
-  timeId              String
-  durationId          String
-  whoPaysId           String
-  participantLimit    Int
-  joinRequestGenderId String
-  visibilityId        String
-  status              PlanStatus @default(ACTIVE)
+  whenId              String?          @db.Uuid
+  timeId              String?          @db.Uuid
+  durationId          String?          @db.Uuid
+  whoPaysId           String?          @db.Uuid
+  participantLimit    Int?
+  joinRequestGenderId String?          @db.Uuid
+  visibilityId        String?          @db.Uuid
+  status              PlanStatus @default(DRAFT)
+  eventDateTime       DateTime?
+  expiresAt           DateTime?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
@@ -612,17 +614,17 @@ model DatePlan {
 
   activity DatePlanOption @relation("PlanActivity", fields: [activityId], references: [id])
 
-  when DatePlanOption @relation("PlanWhen", fields: [whenId], references: [id])
+  when DatePlanOption? @relation("PlanWhen", fields: [whenId], references: [id])
 
-  time DatePlanOption @relation("PlanTime", fields: [timeId], references: [id])
+  time DatePlanOption? @relation("PlanTime", fields: [timeId], references: [id])
 
-  duration DatePlanOption @relation("PlanDuration", fields: [durationId], references: [id])
+  duration DatePlanOption? @relation("PlanDuration", fields: [durationId], references: [id])
 
-  whoPays DatePlanOption @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
+  whoPays DatePlanOption? @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
 
-  joinRequestGender DatePlanOption @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
+  joinRequestGender DatePlanOption? @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
 
-  visibility DatePlanOption @relation("PlanVisibility", fields: [visibilityId], references: [id])
+  visibility DatePlanOption? @relation("PlanVisibility", fields: [visibilityId], references: [id])
 
   vibes    DatePlanVibe[]
   requests DatePlanRequest[]
@@ -635,8 +637,8 @@ model DatePlan {
 
 model DatePlanVibe {
   id     String @id @default(uuid())
-  planId String
-  vibeId String
+  planId String     @db.Uuid
+  vibeId String     @db.Uuid
 
   plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -656,7 +658,7 @@ enum DatePlanRequestStatus {
 model DatePlanRequest {
   id     String @id @default(uuid())
   // Which plan
-  planId String
+  planId String                     @db.Uuid
 
   // Who sent request
   requesterId String                @db.Uuid

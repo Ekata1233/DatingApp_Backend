@@ -21,13 +21,13 @@ export const sendOtp = async (phoneNumber: string) => {
 };
 
 export const verifyOtp = async (phoneNumber: string, otp: string) => {
-   if (!phoneNumber || !otp) throw new Error("Phone & OTP required");
+  if (!phoneNumber || !otp) throw new Error("Phone & OTP required");
 
   const formattedNumber = phoneNumber.startsWith("+91")
     ? phoneNumber
     : `+91${phoneNumber}`;
 
-    console.log("Verifying OTP for: ", formattedNumber);
+  console.log("Verifying OTP for: ", formattedNumber);
 
   const verificationCheck = await twilioClient.verify.v2
     .services(verifyServiceSid)
@@ -36,7 +36,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       code: otp,
     });
 
-console.log("Twilio Response:", JSON.stringify(verificationCheck, null, 2));
+  console.log("Twilio Response:", JSON.stringify(verificationCheck, null, 2));
   console.log("verificationCheck.status : ", verificationCheck.status);
 
   if (verificationCheck.status === "approved") {
@@ -52,7 +52,7 @@ console.log("Twilio Response:", JSON.stringify(verificationCheck, null, 2));
     });
 
     //Last seen & online status will be handled by presence system, so no need to set it here
-    await setUserOnline(user.id);
+    // await setUserOnline(user.id);
     //end of presence handling
     const token = jwt.sign(
       { userId: user.id },
