@@ -48,6 +48,8 @@ model User {
   boostEvents          BoostEvent[]      @relation("BoostedUser")
   actorEvents          BoostEvent[]      @relation("ActorUser")
   boostStats           UserBoostStats?
+  DatePlan             DatePlan[]
+  datePlanRequests     DatePlanRequest[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -97,7 +99,7 @@ model UserAbout {
   @@map("user_about")
 }
 
- model UserEduWork {
+model UserEduWork {
   userId String @id @db.Uuid
 
   // Education
@@ -514,15 +516,164 @@ model Payment {
 }
 
 model Notification {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   sender_id   String
   receiver_id String
   type        NotificationType
   message     String
-  is_read     Boolean  @default(false)
-  created_at  DateTime @default(now())
+  is_read     Boolean          @default(false)
+  created_at  DateTime         @default(now())
 
   @@index([receiver_id])
+}
+
+enum OptionType {
+  ACTIVITY
+  QUICK_TITLE
+  VIBE
+  WHEN
+  TIME
+  DURATION
+  WHO_PAYS
+  PARTICIPANTS
+  JOIN_REQUEST_GENDER
+  PLAN_VISIBILITY
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+model DatePlanOption {
+  id        String     @id @default(uuid())
+  type      OptionType
+  label     String // Coffee
+  value     String? // coffee
+  icon      String? // image url
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Back Relations
+
+  activityPlans DatePlan[] @relation("PlanActivity")
+
+  whenPlans DatePlan[] @relation("PlanWhen")
+
+  timePlans DatePlan[] @relation("PlanTime")
+
+  durationPlans DatePlan[] @relation("PlanDuration")
+
+  whoPaysPlans DatePlan[] @relation("PlanWhoPays")
+
+  joinRequestGenderPlans DatePlan[] @relation("PlanJoinRequestGender")
+
+  visibilityPlans DatePlan[] @relation("PlanVisibility")
+
+  vibePlans DatePlanVibe[]
+
+  @@index([type, isActive])
+}
+
+model DatePlan {
+  id         String  @id @default(uuid())
+  userId     String  @db.Uuid
+  // Step 1
+  activityId String
+  title      String
+  note       String?
+  photoUrl   String?
+
+  // Step 2
+  venueName    String?
+  venueAddress String?
+  venueLat     Float?
+  venueLng     Float?
+
+  // Step 3
+  whenId              String
+  timeId              String
+  durationId          String
+  whoPaysId           String
+  participantLimit    Int
+  joinRequestGenderId String
+  visibilityId        String
+  status              PlanStatus @default(ACTIVE)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relations
+
+  user User @relation(fields: [userId], references: [id])
+
+  activity DatePlanOption @relation("PlanActivity", fields: [activityId], references: [id])
+
+  when DatePlanOption @relation("PlanWhen", fields: [whenId], references: [id])
+
+  time DatePlanOption @relation("PlanTime", fields: [timeId], references: [id])
+
+  duration DatePlanOption @relation("PlanDuration", fields: [durationId], references: [id])
+
+  whoPays DatePlanOption @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
+
+  joinRequestGender DatePlanOption @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
+
+  visibility DatePlanOption @relation("PlanVisibility", fields: [visibilityId], references: [id])
+
+  vibes    DatePlanVibe[]
+  requests DatePlanRequest[]
+
+  @@index([userId])
+  @@index([activityId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DatePlanVibe {
+  id     String @id @default(uuid())
+  planId String
+  vibeId String
+
+  plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  vibe DatePlanOption @relation(fields: [vibeId], references: [id])
+
+  @@unique([planId, vibeId])
+  @@index([vibeId])
+}
+
+enum DatePlanRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
+model DatePlanRequest {
+  id     String @id @default(uuid())
+  // Which plan
+  planId String
+
+  // Who sent request
+  requesterId String                @db.Uuid
+  status      DatePlanRequestStatus @default(PENDING)
+  message     String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  requester User @relation(fields: [requesterId], references: [id])
+
+  @@unique([planId, requesterId])
+  @@index([planId])
+  @@index([requesterId])
+  @@index([status])
 }
 
 enum NotificationType {
