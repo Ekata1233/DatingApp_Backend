@@ -7,6 +7,9 @@ import {
   requestToJoinController,
   skipDatePlanController,
   discoverDatePlanController,
+  declineDatePlanRequestController,
+  approveDatePlanRequestController,
+  getDatePlanRequestsController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -47,6 +50,24 @@ router.post(
   "/date-plans/:id/request",
   authMiddleware,
   requestToJoinController
+);
+
+router.get(
+  "/date-plans/:planId/requests",
+  authMiddleware,
+  getDatePlanRequestsController
+);
+
+router.patch(
+  "/date-plan-requests/:requestId/approve",
+  authMiddleware,
+  approveDatePlanRequestController
+);
+
+router.patch(
+  "/date-plan-requests/:requestId/decline",
+  authMiddleware,
+  declineDatePlanRequestController
 );
 
 export default router;

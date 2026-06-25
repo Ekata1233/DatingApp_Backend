@@ -228,12 +228,12 @@ export const discoverDatePlan = async (
           requesterId: userId,
         },
       },
-    skips: {
-      none: {
-        userId,
+      skips: {
+        none: {
+          userId,
+        },
       },
     },
-  },
 
     include: {
       user: true,
@@ -312,35 +312,35 @@ export const discoverDatePlan = async (
 
   const plan = ranked[0];
   return {
-  id: plan.id,
+    id: plan.id,
 
-  venueName: plan.venueName,
-  distanceKm: plan.distanceKm,
+    venueName: plan.venueName,
+    distanceKm: plan.distanceKm,
 
-  eventDate: plan.when?.label,
-  eventTime: plan.time?.label,
-  activity: plan.activity?.label,
+    eventDate: plan.when?.label,
+    eventTime: plan.time?.label,
+    activity: plan.activity?.label,
 
-  title: plan.title,
-  note: plan.note,
+    title: plan.title,
+    note: plan.note,
 
-  photoUrl: plan.photoUrl,
+    photoUrl: plan.photoUrl,
 
-  whoPays: plan.whoPays?.label,
+    whoPays: plan.whoPays?.label,
 
-  host: {
-    id: plan.user.id,
-    name: plan.user.full_name,
-    profilePhoto: plan.user.profilePhoto,
-    age: plan.user.birth_date
-      ? Math.floor(
+    host: {
+      id: plan.user.id,
+      name: plan.user.full_name,
+      profilePhoto: plan.user.profilePhoto,
+      age: plan.user.birth_date
+        ? Math.floor(
           (Date.now() -
             new Date(plan.user.birth_date).getTime()) /
-            (365.25 * 24 * 60 * 60 * 1000)
+          (365.25 * 24 * 60 * 60 * 1000)
         )
-      : null,
-  },
-};
+        : null,
+    },
+  };
 };
 
 export const skipDatePlan = async (
@@ -359,7 +359,6 @@ export const skipDatePlan = async (
   };
 };
 
-
 export const requestToJoinDatePlan = async (
   userId: string,
   planId: string,
@@ -370,6 +369,9 @@ export const requestToJoinDatePlan = async (
       id: planId,
     },
   });
+
+  console.log("Plan found:", planId);
+  console.log("User details:", userId);
 
   if (!plan) {
     throw new Error("Date plan not found");
@@ -397,6 +399,263 @@ export const requestToJoinDatePlan = async (
       planId,
       requesterId: userId,
       message,
+    },
+  });
+};
+
+export const getDatePlanRequests = async (
+  userId: string,
+  planId: string
+) => {
+  const plan = await prisma.datePlan.findFirst({
+    where: {
+      id: planId,
+      userId,
+    },
+    include: {
+      activity: true,
+      when: true,
+      time: true,
+      requests: {
+        where: {
+          status: "PENDING",
+        },
+        include: {
+          requester: {
+            include: {
+              photos: {
+                take: 1,
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!plan) {
+    throw new Error("Date plan not found");
+  }
+
+  return {
+    plan: {
+      id: plan.id,
+
+
+      title:
+        plan.title ||
+        plan.quickTitle?.label ||
+        plan.activity.label,
+
+      activity: plan.activity.label,
+
+      date: plan.when?.label,
+
+      time: plan.time?.label,
+
+      venueName: plan.venueName,
+
+      venueAddress: plan.venueAddress,
+
+      photoUrl: plan.photoUrl,
+
+      requestsCount: plan.requests.length,
+
+      participantLimit: plan.participantLimit,
+    },
+
+    requests: plan.requests.map((request) => ({
+      id: request.id,
+
+      status: request.status,
+
+      compatibility: Math.floor(
+        Math.random() * (95 - 75 + 1) + 75
+      ),
+
+      message: request.message,
+
+      requester: {
+        id: request.requester.id,
+
+        name: request.requester.full_name,
+
+        age: request.requester.birth_date
+          ? Math.floor(
+            (Date.now() -
+              new Date(
+                request.requester.birth_date
+              ).getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000)
+          )
+          : null,
+
+        photo:
+          request.requester.photos?.[0]?.photo_url ??
+          null,
+      },
+    })),
+  };
+};
+
+export const approveDatePlanRequest = async (
+  userId: string,
+  requestId: string
+) => {
+  const request = await prisma.datePlanRequest.findUnique({
+    where: {
+      id: requestId,
+    },
+    include: {
+      requester: true,
+      plan: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    throw new Error("Request not found");
+  }
+
+  if (request.plan.userId !== userId) {
+    throw new Error("Not authorized");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const approvedRequest =
+      await tx.datePlanRequest.update({
+        where: {
+          id: requestId,
+        },
+        data: {
+          status: "APPROVED",
+        },
+      });
+
+    await tx.datePlanRequest.updateMany({
+      where: {
+        planId: request.planId,
+
+        id: {
+          not: requestId,
+        },
+
+        status: "PENDING",
+      },
+      data: {
+        status: "DECLINED",
+      },
+    });
+
+     // Create Confirmed Date
+    const confirmedDate =
+      await tx.dateConfirmed.create({
+        data: {
+          planId: request.plan.id,
+
+          hostUserId: request.plan.userId,
+
+          participantId:
+            request.requesterId,
+
+          title:
+            request.plan.title,
+
+          venueName:
+            request.plan.venueName,
+
+          venueAddress:
+            request.plan.venueAddress,
+
+          eventDateTime:
+            request.plan.eventDateTime!,
+
+          status: "UPCOMING",
+        },
+      });
+
+    // Find existing conversation
+    let conversation =
+      await tx.conversation.findFirst({
+        where: {
+          OR: [
+            {
+              user1Id: request.plan.userId,
+              user2Id: request.requesterId,
+            },
+            {
+              user1Id: request.requesterId,
+              user2Id: request.plan.userId,
+            },
+          ],
+        },
+      });
+
+    // Create conversation if not exists
+    if (!conversation) {
+      conversation =
+        await tx.conversation.create({
+          data: {
+            user1Id: request.plan.userId,
+            user2Id: request.requesterId,
+          },
+        });
+    }
+
+    // Create Date Confirmed Message
+    await tx.chatMessage.create({
+      data: {
+        conversationId: conversation.id,
+
+        senderId: null,
+
+        type: "DATE_CONFIRMED",
+
+        metadata: {
+          confirmedDateId:
+            confirmedDate.id,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      confirmedDateId:
+        confirmedDate.id,
+    };
+  });
+};
+
+export const declineDatePlanRequest = async (
+  userId: string,
+  requestId: string
+) => {
+  const request = await prisma.datePlanRequest.findUnique({
+    where: {
+      id: requestId,
+    },
+    include: {
+      plan: true,
+    },
+  });
+
+  if (!request) {
+    throw new Error("Request not found");
+  }
+
+  if (request.plan.userId !== userId) {
+    throw new Error("Not authorized");
+  }
+
+  return prisma.datePlanRequest.update({
+    where: {
+      id: requestId,
+    },
+    data: {
+      status: "DECLINED",
     },
   });
 };

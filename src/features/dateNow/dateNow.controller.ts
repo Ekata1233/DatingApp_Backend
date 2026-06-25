@@ -7,6 +7,9 @@ import {
   discoverDatePlan,
   skipDatePlan,
   requestToJoinDatePlan,
+  getDatePlanRequests,
+  approveDatePlanRequest,
+  declineDatePlanRequest,
 } from "./dateNow.service";
 
 
@@ -123,7 +126,7 @@ export const skipDatePlanController = async (
 
     const result = await skipDatePlan(
       userId,
-      req.params.id
+      req.params.id as string
     );
 
     res.json(result);
@@ -144,9 +147,75 @@ export const requestToJoinController = async (
 
     const request = await requestToJoinDatePlan(
       userId,
-      req.params.id,
+      req.params.id as string,
       req.body.message
     );
+
+    res.json({
+      success: true,
+      data: request,
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getDatePlanRequestsController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const requests =
+      await getDatePlanRequests(
+        userId,
+        req.params.planId as string
+      );
+
+    res.json({
+      success: true,
+      data: requests,
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const approveDatePlanRequestController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const request =
+      await approveDatePlanRequest(
+        userId,
+        req.params.requestId as string
+      );
+
+    res.json({
+      success: true,
+      data: request,
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const declineDatePlanRequestController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const request =
+      await declineDatePlanRequest(
+        userId,
+        req.params.requestId as string
+      );
 
     res.json({
       success: true,

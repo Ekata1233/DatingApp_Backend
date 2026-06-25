@@ -48,9 +48,11 @@ model User {
   boostEvents          BoostEvent[]      @relation("BoostedUser")
   actorEvents          BoostEvent[]      @relation("ActorUser")
   boostStats           UserBoostStats?
-  DatePlan             DatePlan[]
+  datePlan             DatePlan[]
   datePlanRequests     DatePlanRequest[]
   datePlanSkips        DatePlanSkip[]
+  hostedConfirmedDates DateConfirmed[]   @relation("ConfirmedDateHost")
+  joinedConfirmedDates DateConfirmed[]   @relation("ConfirmedDateParticipant")
 
   @@index([phone_number])
   @@index([google_id])
@@ -632,9 +634,10 @@ model DatePlan {
 
   visibility DatePlanOption? @relation("PlanVisibility", fields: [visibilityId], references: [id])
 
-  vibes    DatePlanVibe[]
-  requests DatePlanRequest[]
-  skips    DatePlanSkip[]
+  vibes         DatePlanVibe[]
+  requests      DatePlanRequest[]
+  skips         DatePlanSkip[]
+  DateConfirmed DateConfirmed?
 
   @@index([userId])
   @@index([activityId])
@@ -697,6 +700,65 @@ model DatePlanSkip {
   @@unique([userId, planId])
   @@index([userId])
   @@index([planId])
+}
+
+model DateConfirmed {
+  id            String              @id @default(uuid())     @db.Uuid
+  planId        String              @unique                  @db.Uuid
+  hostUserId    String              @db.Uuid
+  participantId String              @db.Uuid
+  title         String?
+  venueName     String?
+  venueAddress  String?
+  eventDateTime DateTime
+  status        ConfirmedDateStatus
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  plan DatePlan @relation(fields: [planId], references: [id])
+
+  host        User @relation("ConfirmedDateHost", fields: [hostUserId], references: [id])
+  participant User @relation("ConfirmedDateParticipant", fields: [participantId], references: [id])
+}
+
+enum ConfirmedDateStatus {
+  UPCOMING
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Conversation {
+  id        String        @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model ChatMessage {
+  id             String      @id @default(uuid())
+  conversationId String
+  senderId       String?
+  type           MessageType
+  text           String?
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  DATE_CONFIRMED
+  DATE_CANCELLED
+  SYSTEM
 }
 
 enum NotificationType {
