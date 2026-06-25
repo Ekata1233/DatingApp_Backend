@@ -53,6 +53,7 @@ model User {
   datePlanSkips        DatePlanSkip[]
   hostedConfirmedDates DateConfirmed[]   @relation("ConfirmedDateHost")
   joinedConfirmedDates DateConfirmed[]   @relation("ConfirmedDateParticipant")
+  wallet               Wallet?
 
   @@index([phone_number])
   @@index([google_id])
@@ -703,8 +704,8 @@ model DatePlanSkip {
 }
 
 model DateConfirmed {
-  id            String              @id @default(uuid())     @db.Uuid
-  planId        String              @unique                  @db.Uuid
+  id            String              @id @default(uuid()) @db.Uuid
+  planId        String              @unique @db.Uuid
   hostUserId    String              @db.Uuid
   participantId String              @db.Uuid
   title         String?
@@ -751,6 +752,62 @@ model ChatMessage {
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@index([conversationId, createdAt])
+}
+
+model Wallet {
+  id        String   @id @default(uuid())  @db.Uuid
+  userId    String   @unique               @db.Uuid
+  balance   Decimal  @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id            String             @id @default(uuid())   @db.Uuid
+  walletId      String                                    @db.Uuid
+  amount        Decimal
+  type          TransactionType
+  status        TransactionStatus
+  source        TransactionSource?
+  referenceId   String?
+  description   String?
+  balanceBefore Decimal
+  balanceAfter  Decimal
+  createdAt     DateTime           @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+  REFUND
+  PURCHASE
+  REWARD
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum TransactionSource {
+  WALLET_TOPUP
+  PREMIUM_PLAN
+  BOOST_PURCHASE
+  SUPER_LIKE
+  DATE_PLAN_BOOKING
+  DATE_PLAN_REFUND
+  WITHDRAWAL
+  REFERRAL_REWARD
 }
 
 enum MessageType {
