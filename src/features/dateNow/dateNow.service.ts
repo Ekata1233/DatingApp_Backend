@@ -172,8 +172,6 @@ export const discoverDatePlan = async (
     },
   });
 
-  console.log("User Profile:", profile);
-
   const hasLocation =
     profile?.latitude !== null &&
     profile?.latitude !== undefined &&
@@ -186,12 +184,31 @@ export const discoverDatePlan = async (
     gt: now,
   };
 
+  // TODAY
   if (filter === "today") {
+    const start = new Date();
+    start.setUTCHours(0, 0, 0, 0);
+
     const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    end.setUTCHours(23, 59, 59, 999);
 
     dateFilter = {
-      gte: now,
+      gte: start,
+      lte: end,
+    };
+  }
+
+  // TOMORROW
+  else if (filter === "tomorrow") {
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() + 1);
+    start.setUTCHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setUTCHours(23, 59, 59, 999);
+
+    dateFilter = {
+      gte: start,
       lte: end,
     };
   }
@@ -211,12 +228,31 @@ export const discoverDatePlan = async (
           requesterId: userId,
         },
       },
+    skips: {
+      none: {
+        userId,
+      },
     },
+  },
 
     include: {
       user: true,
 
       activity: true,
+
+      quickTitle: true,
+
+      when: true,
+
+      time: true,
+
+      duration: true,
+
+      whoPays: true,
+
+      visibility: true,
+
+      joinRequestGender: true,
 
       vibes: {
         include: {
@@ -226,21 +262,27 @@ export const discoverDatePlan = async (
     },
   });
 
-  console.log("Fetched Plans:", plans);
+  console.log("Fetched Plans:", plans.length);
+
+  if (plans.length === 0) {
+    return null;
+  }
 
   let ranked: any[];
 
   if (hasLocation) {
     ranked = plans
       .map((plan) => {
-        if (!plan.venueLat || !plan.venueLng) return null;
+        let distanceKm = null;
 
-        const distance = calculateDistanceKm(
-          Number(profile!.latitude),
-          Number(profile!.longitude),
-          plan.venueLat,
-          plan.venueLng
-        );
+        if (plan.venueLat && plan.venueLng) {
+          distanceKm = calculateDistanceKm(
+            Number(profile!.latitude),
+            Number(profile!.longitude),
+            plan.venueLat,
+            plan.venueLng
+          );
+        }
 
         const hoursAway =
           ((plan.eventDateTime?.getTime() || now.getTime()) -
@@ -249,12 +291,16 @@ export const discoverDatePlan = async (
 
         return {
           ...plan,
-          distanceKm: Number(distance.toFixed(1)),
-          score: distance * 5 + hoursAway,
+          distanceKm: distanceKm
+            ? Number(distanceKm.toFixed(1))
+            : null,
+
+          score:
+            (distanceKm ?? 999) * 5 +
+            Math.max(hoursAway, 0),
         };
       })
-      .filter(Boolean)
-      .sort((a: any, b: any) => a.score - b.score);
+      .sort((a, b) => a.score - b.score);
   } else {
     ranked = plans.sort((a, b) => {
       const aTime = a.eventDateTime?.getTime() || 0;
@@ -264,7 +310,37 @@ export const discoverDatePlan = async (
     });
   }
 
-  return ranked[0] || null;
+  const plan = ranked[0];
+  return {
+  id: plan.id,
+
+  venueName: plan.venueName,
+  distanceKm: plan.distanceKm,
+
+  eventDate: plan.when?.label,
+  eventTime: plan.time?.label,
+  activity: plan.activity?.label,
+
+  title: plan.title,
+  note: plan.note,
+
+  photoUrl: plan.photoUrl,
+
+  whoPays: plan.whoPays?.label,
+
+  host: {
+    id: plan.user.id,
+    name: plan.user.full_name,
+    profilePhoto: plan.user.profilePhoto,
+    age: plan.user.birth_date
+      ? Math.floor(
+          (Date.now() -
+            new Date(plan.user.birth_date).getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000)
+        )
+      : null,
+  },
+};
 };
 
 export const skipDatePlan = async (
