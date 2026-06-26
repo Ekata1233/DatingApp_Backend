@@ -1,5 +1,3 @@
-
-
 import { OptionType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 
@@ -7,6 +5,7 @@ export const upsertDatePlanOptionsService = async (
   type: OptionType,
   options: any[]
 ) => {
+  // Industry-level transaction with proper timeout and error handling
   return prisma.$transaction(async (tx) => {
     const incomingValues = options.map((item) => item.value);
 
@@ -48,18 +47,41 @@ export const upsertDatePlanOptionsService = async (
           },
         });
       } else {
-        // Create NEW record
-        // Even if same value exists with isActive=false
-        await tx.datePlanOption.create({
-          data: {
+        // Check for inactive record to reactivate
+        const existingInactive = await tx.datePlanOption.findFirst({
+          where: {
             type,
-            label: item.label,
             value: item.value,
-            icon: item.icon,
-            sortOrder: item.sortOrder ?? 0,
-            isActive: true,
+            isActive: false,
           },
         });
+
+        if (existingInactive) {
+          // Reactivate the inactive record
+          await tx.datePlanOption.update({
+            where: {
+              id: existingInactive.id,
+            },
+            data: {
+              label: item.label,
+              icon: item.icon,
+              sortOrder: item.sortOrder ?? 0,
+              isActive: true,
+            },
+          });
+        } else {
+          // Create NEW record
+          await tx.datePlanOption.create({
+            data: {
+              type,
+              label: item.label,
+              value: item.value,
+              icon: item.icon,
+              sortOrder: item.sortOrder ?? 0,
+              isActive: true,
+            },
+          });
+        }
       }
     }
 
@@ -72,6 +94,10 @@ export const upsertDatePlanOptionsService = async (
         sortOrder: "asc",
       },
     });
+  }, {
+    // Industry-level transaction options to prevent timeout errors
+    timeout: 30000, // 30 seconds - plenty of time for bulk operations
+    maxWait: 10000, // 10 seconds max wait for transaction to start
   });
 };
 
@@ -93,4 +119,3 @@ export const getOptionsByTypeService = async (
     },
   });
 };
-
