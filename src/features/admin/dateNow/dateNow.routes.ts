@@ -8,6 +8,7 @@ import {
 
 const router = express.Router();
 
+// No multer needed - uses existing file handling middleware
 router.post("/create-options", upsertDatePlanOptions);
 router.get("/options", getOptions);
 
