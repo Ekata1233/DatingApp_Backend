@@ -60,41 +60,59 @@ export const upsertDatePlanOptions = async (
         errors: [
           {
             field: "options",
-            message: "options is required as JSON string",
+            message: "options is required",
             received: undefined
           }
         ]
       });
     }
 
-    // ============ VALIDATION 4: Parse and validate options JSON ============
+    // ============ PARSE OPTIONS (Handle both string and array) ============
     let options: OptionItem[] = [];
     let rawOptions = req.body.options;
-    
-    try {
-      // Clean the JSON string
-      let cleanedOptions = rawOptions;
-      cleanedOptions = cleanedOptions.replace(/,(\s*[}\]])/g, '$1');
-      cleanedOptions = cleanedOptions.replace(/,\s*\]/g, ']');
-      cleanedOptions = cleanedOptions.replace(/,\s*\}/g, '}');
-      options = JSON.parse(cleanedOptions);
-    } catch (e) {
+
+    // If options is a string, parse it as JSON
+    if (typeof rawOptions === 'string') {
+      try {
+        // Clean the JSON string
+        let cleanedOptions = rawOptions;
+        cleanedOptions = cleanedOptions.replace(/,(\s*[}\]])/g, '$1');
+        cleanedOptions = cleanedOptions.replace(/,\s*\]/g, ']');
+        cleanedOptions = cleanedOptions.replace(/,\s*\}/g, '}');
+        options = JSON.parse(cleanedOptions);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              field: "options",
+              message: "Invalid JSON format. Must be a valid JSON string",
+              received: rawOptions,
+              example: '[{"label":"New York","value":"ny","sortOrder":1}]',
+              hint: "Check for trailing commas, missing quotes, or invalid characters"
+            }
+          ]
+        });
+      }
+    } else if (Array.isArray(rawOptions)) {
+      // If it's already an array, use it directly
+      options = rawOptions;
+    } else {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
         errors: [
           {
             field: "options",
-            message: "Invalid JSON format. Must be a valid JSON string",
-            received: rawOptions,
-            example: '[{"label":"New York","value":"ny","sortOrder":1}]',
-            hint: "Check for trailing commas, missing quotes, or invalid characters"
+            message: "Options must be a valid JSON string or array",
+            received: typeof rawOptions
           }
         ]
       });
     }
 
-    // ============ VALIDATION 5: Check if options is array ============
+    // ============ VALIDATION 4: Check if options is array ============
     if (!Array.isArray(options)) {
       return res.status(400).json({
         success: false,
@@ -109,7 +127,7 @@ export const upsertDatePlanOptions = async (
       });
     }
 
-    // ============ VALIDATION 6: Check if options is not empty ============
+    // ============ VALIDATION 5: Check if options is not empty ============
     if (options.length === 0) {
       return res.status(400).json({
         success: false,
@@ -124,7 +142,7 @@ export const upsertDatePlanOptions = async (
       });
     }
 
-    // ============ VALIDATION 7: Validate each option ============
+    // ============ VALIDATION 6: Validate each option ============
     const optionErrors: Array<{ field: string; message: string; index: number }> = [];
 
     options.forEach((opt, index) => {
@@ -174,7 +192,7 @@ export const upsertDatePlanOptions = async (
       });
     }
 
-    // ============ HANDLE ICONS (OPTIONAL) ============
+    // ============ HANDLE ICONS (COMPLETELY OPTIONAL) ============
     const files = req.files as any;
     let iconFiles: any[] = [];
 
@@ -185,23 +203,11 @@ export const upsertDatePlanOptions = async (
         iconFiles = [iconFiles];
       }
 
-      // ============ VALIDATE FILE COUNT (IF FILES PROVIDED) ============
-      if (iconFiles.length > 0 && iconFiles.length !== options.length) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: [
-            {
-              field: "icons",
-              message: `Number of icons (${iconFiles.length}) must match number of options (${options.length})`,
-              expected: options.length,
-              received: iconFiles.length
-            }
-          ]
-        });
-      }
+      // ============ REMOVED: File count validation ============
+      // No longer checking if icon count matches options count
+      // Icons are completely optional, can be any number (0 to N)
 
-      // ============ VALIDATE EACH FILE ============
+      // ============ VALIDATE EACH FILE (if files exist) ============
       const fileErrors: Array<{ field: string; message: string; fileName: string }> = [];
 
       iconFiles.forEach((file: any, index: number) => {
@@ -254,15 +260,20 @@ export const upsertDatePlanOptions = async (
       // ============ UPLOAD FILES TO IMAGEKIT ============
       try {
         const uploadPromises = iconFiles.map(async (file: any, index: number) => {
+          // Determine which option this icon belongs to
+          // If more files than options, assign to the corresponding index
+          // If more options than files, some options won't have icons
+          const optionIndex = index < options.length ? index : options.length - 1;
+          
           const uploadResponse = await imagekit.upload({
             file: file.data,
-            fileName: `${Date.now()}-${options[index].value}-${file.name}`,
+            fileName: `${Date.now()}-${options[optionIndex]?.value || 'option'}-${file.name}`,
             folder: "/date-plan-options",
           });
 
           return {
             url: uploadResponse.url,
-            index
+            index: optionIndex
           };
         });
 
@@ -270,7 +281,9 @@ export const upsertDatePlanOptions = async (
 
         // Map uploaded icons to options
         iconUrls.forEach(({ url, index }) => {
-          options[index].icon = url;
+          if (options[index]) {
+            options[index].icon = url;
+          }
         });
       } catch (error: any) {
         return res.status(500).json({
@@ -279,10 +292,6 @@ export const upsertDatePlanOptions = async (
           error: error.message || "Failed to upload images to ImageKit"
         });
       }
-    } else {
-      // If no icons provided, keep existing icons or set to null
-      // For new options without icons, icon will be undefined
-      console.log("No icons provided. Options will be created without icons.");
     }
 
     // ============ FINAL VALIDATION: Zod ============
