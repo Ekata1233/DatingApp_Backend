@@ -36,12 +36,18 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       code: otp,
     });
 
-  console.log("Twilio Response:", JSON.stringify(verificationCheck, null, 2));
-  console.log("verificationCheck.status : ", verificationCheck.status);
 
-  if (verificationCheck.status === "approved") {
-    const user = await prisma.user.upsert({
-      where: { phone_number: formattedNumber },
+  if (verificationCheck.status !== "approved") {
+    throw new Error("Invalid OTP");
+  }
+
+  // Transaction starts here
+  const user = await prisma.$transaction(async (tx) => {
+    // Create user if doesn't exist
+    const user = await tx.user.upsert({
+      where: {
+        phone_number: formattedNumber,
+      },
       update: {
         is_phone_verified: true,
       },
@@ -51,22 +57,37 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       },
     });
 
-    //Last seen & online status will be handled by presence system, so no need to set it here
-    // await setUserOnline(user.id);
-    //end of presence handling
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "7d" },
-    );
+    // Create wallet only if it doesn't exist
+    await tx.wallet.upsert({
+      where: {
+        userId: user.id,
+      },
+      update: {}, // Nothing to update
+      create: {
+        userId: user.id,
+        balance: 0,
+      },
+    });
 
-    return {
-      user,
-      token,
-    };
-  }
+    return user;
+  });
 
-  throw new Error("Invalid OTP");
+  //LAST SEEEN AND ONLINE PRESENCE HANDLING
+  // await setUserOnline(user.id);
+  //end of presence handling
+
+  const token = jwt.sign(
+    { userId: user.id },
+    process.env.JWT_SECRET as string,
+    {
+      expiresIn: "7d",
+    }
+  );
+
+  return {
+    user,
+    token,
+  };
 };
 
 

@@ -686,3 +686,95 @@ export const declineDatePlanRequest = async (
     },
   });
 };
+
+export const topUpDatePlanPackage = async (
+  userId: string,
+  packageId: string
+) => {
+  return prisma.$transaction(async (tx) => {
+    const planPackage = await tx.datePlanPackage.findFirst({
+      where: {
+        id: packageId,
+        isActive: true,
+      },
+    });
+
+    if (!planPackage) {
+      throw new Error("Invalid package");
+    }
+
+     const wallet = await tx.wallet.findUnique({
+      where: {
+        userId,
+      },
+    });
+
+    if (!wallet) {
+      throw new Error("Wallet not found");
+    }
+
+    if (wallet.balance.lt(planPackage.price)) {
+      throw new Error("Insufficient wallet balance");
+    }
+
+    const userDatePlanStats = await tx.userDatePlanStats.findUnique({
+      where: {
+        userId,
+      },
+    });
+
+    if (!userDatePlanStats) {
+      throw new Error("User date plan stats not found");
+    }
+
+    const balanceBefore = wallet.balance;
+    const balanceAfter = wallet.balance.minus(planPackage.price);
+
+    // Deduct wallet balance
+    await tx.wallet.update({
+      where: {
+        userId,
+      },
+      data: {
+        balance: balanceAfter,
+      },
+    });
+
+    // Wallet transaction
+    await tx.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+        amount: planPackage.price,
+        type: TransactionType.PURCHASE,
+        status: TransactionStatus.SUCCESS,
+        source: TransactionSource.DATE_PLAN_BOOKING,
+        referenceId: planPackage.id,
+        description: `Purchased ${planPackage.title}`,
+        balanceBefore,
+        balanceAfter,
+      },
+    });
+
+    const updatedStats = await tx.userDatePlanStats.update({
+      where: {
+        userId,
+      },
+      data: {
+        balance: {
+          increment: planPackage.planCount,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      purchasedPackage: {
+        id: planPackage.id,
+        title: planPackage.title,
+        plans: planPackage.planCount,
+        coins: planPackage.price,
+      },
+      remainingPlans: updatedStats.balance,
+    };
+  });
+};

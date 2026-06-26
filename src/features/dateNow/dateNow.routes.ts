@@ -10,6 +10,7 @@ import {
   declineDatePlanRequestController,
   approveDatePlanRequestController,
   getDatePlanRequestsController,
+  topUpDatePlanPackageController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -68,6 +69,12 @@ router.patch(
   "/date-plan-requests/:requestId/decline",
   authMiddleware,
   declineDatePlanRequestController
+);
+
+router.post(
+  "/date-plans/top-up-package",
+  authMiddleware,
+  topUpDatePlanPackageController
 );
 
 export default router;

@@ -80,3 +80,58 @@ export const getOptionsByTypeService = async (
     },
   });
 };
+
+export const createDatePlanPackage = async (payload: {
+  title: string;
+  description?: string;
+  planCount: number;
+  price: number;
+  pricePerPlan: number;
+  discount?: number;
+  isPopular?: boolean;
+  isActive?: boolean;
+  sortOrder?: number;
+}) => {
+  return prisma.datePlanPackage.create({
+    data: payload,
+  });
+};
+
+export const updateDatePlanPackage = async (
+  id: string,
+  payload: {
+    title?: string;
+    description?: string;
+    planCount?: number;
+    price?: number;
+    pricePerPlan?: number;
+    discount?: number;
+    isPopular?: boolean;
+    isActive?: boolean;
+    sortOrder?: number;
+  }
+) => {
+  const packageData = await prisma.datePlanPackage.findUnique({
+    where: { id },
+  });
+
+  if (!packageData) {
+    throw new Error("Date plan package not found");
+  }
+
+  return prisma.datePlanPackage.update({
+    where: { id },
+    data: payload,
+  });
+};
+
+export const getDatePlanPackages = async () => {
+  return prisma.datePlanPackage.findMany({
+    where: {
+      isActive: true,
+    },
+    orderBy: {
+      sortOrder: "asc",
+    },
+  });
+};

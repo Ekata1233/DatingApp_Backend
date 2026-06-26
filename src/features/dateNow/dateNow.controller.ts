@@ -10,6 +10,7 @@ import {
   getDatePlanRequests,
   approveDatePlanRequest,
   declineDatePlanRequest,
+  topUpDatePlanPackage,
 } from "./dateNow.service";
 
 
@@ -225,6 +226,40 @@ export const declineDatePlanRequestController = async (req: Request, res: Respon
     res.status(400).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+export const topUpDatePlanPackageController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const { packageId } = req.body;
+
+    const result = await topUpDatePlanPackage(userId, packageId);
+
+    res.status(200).json({
+      success: true,
+      message: "Date plan package top-up successful",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Top Up Date Plan Package Error:", error);
+
+    res.status(400).json({
+      success: false,
+      message: error.message || "Failed to top up date plan package",
     });
   }
 };
