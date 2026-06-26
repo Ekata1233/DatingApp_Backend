@@ -1,25 +1,14 @@
 import { z } from "zod";
+import { OptionType } from "@prisma/client";
+
+const optionSchema = z.object({
+  label: z.string().min(1, "Label is required"),
+  value: z.string().min(1, "Value is required"),
+  icon: z.string().url().optional(),
+  sortOrder: z.number().optional().default(0),
+});
 
 export const upsertDatePlanOptionsSchema = z.object({
-  type: z.enum([
-    "ACTIVITY",
-    "QUICK_TITLE",
-    "VIBE",
-    "WHEN",
-    "TIME",
-    "WHO_PAYS",
-    "PARTICIPANTS",
-    "JOIN_REQUEST_GENDER",
-    "PLAN_VISIBILITY",
-  ]),
-  options: z.array(
-    z.object({
-      id: z.string().uuid().optional(),
-      label: z.string().min(1),
-      value: z.string().optional(),
-      icon: z.string().optional(),
-      sortOrder: z.number().optional(),
-      isActive: z.boolean().optional(),
-    })
-  ),
+  type: z.nativeEnum(OptionType),
+  options: z.array(optionSchema).min(1, "At least one option is required"),
 });
