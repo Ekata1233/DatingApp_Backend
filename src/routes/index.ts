@@ -25,7 +25,8 @@ import detailsRoutes from "../features/user/details/details.routes";
 import lastActivityRoutes from "../features/lastActivity/lastActivity.routes";
 import boostRoutes from "../features/admin/boost/boost.routes";
 import swipeRoutes from "../features/swipe/swipe.routes";
-import dateNowRoutes from "../features/admin/dateNow/dateNow.routes";
+import dateNowAdminRoutes from "../features/admin/dateNow/dateNow.routes";
+import dateNowRoutes from "../features/dateNow/dateNow.routes";
 
 const router = Router();
 
@@ -62,9 +63,12 @@ router.use("/user",lastActivityRoutes)
 //swipe routes
 router.use("/user", swipeRoutes);
 //
+
+router.use("/user", dateNowRoutes);
+
 router.use(
   "/date-now",
-  dateNowRoutes
+  dateNowAdminRoutes
 );
 export default router;
 
