@@ -9,51 +9,52 @@ datasource db {
 }
 
 model User {
-  id                   String            @id @default(uuid()) @db.Uuid
-  full_name            String?           @db.VarChar(100)
-  email                String?           @unique @db.VarChar(255)
-  phone_number         String?           @unique @db.VarChar(20)
-  is_phone_verified    Boolean           @default(false)
-  google_id            String?           @unique @db.VarChar(255)
-  birth_date           DateTime?         @db.Date
+  id                   String             @id @default(uuid()) @db.Uuid
+  full_name            String?            @db.VarChar(100)
+  email                String?            @unique @db.VarChar(255)
+  phone_number         String?            @unique @db.VarChar(20)
+  is_phone_verified    Boolean            @default(false)
+  google_id            String?            @unique @db.VarChar(255)
+  birth_date           DateTime?          @db.Date
   height               Int?
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  onboarding_step      String?           @db.VarChar(20)
-  next_step            String?           @db.VarChar(20)
-  onboarding_completed Boolean           @default(false)
+  onboarding_step      String?            @db.VarChar(20)
+  next_step            String?            @db.VarChar(20)
+  onboarding_completed Boolean            @default(false)
   last_active_at       DateTime?
   device_token         String?
-  badge_count          Int               @default(0)
+  badge_count          Int                @default(0)
   deleted_at           DateTime?
-  created_at           DateTime          @default(now())
-  updated_at           DateTime          @updatedAt
-  profile_completion   Int               @default(0)
+  created_at           DateTime           @default(now())
+  updated_at           DateTime           @updatedAt
+  profile_completion   Int                @default(0)
   looking_for_option   LookingForOption?
   answer               UserAnswer[]
-  matchesAsUser1       UserMatch[]       @relation("MatchUser1")
-  matchesAsUser2       UserMatch[]       @relation("MatchUser2")
-  swipesGiven          UserSwipe[]       @relation("Swiper")
-  swipesReceived       UserSwipe[]       @relation("TargetUser")
+  matchesAsUser1       UserMatch[]        @relation("MatchUser1")
+  matchesAsUser2       UserMatch[]        @relation("MatchUser2")
+  swipesGiven          UserSwipe[]        @relation("Swiper")
+  swipesReceived       UserSwipe[]        @relation("TargetUser")
   about                UserAbout?
   bio                  UserBio?
-  eduWork              UserEduWork?      @relation("UserEduWork")
+  eduWork              UserEduWork?       @relation("UserEduWork")
   skills               UserSkill[]
   photos               UserPhoto[]
   profile              UserProfile?
   userBoosts           UserBoost[]
   boostUsages          BoostUsage[]
   userPackages         UserPackage[]
-  boostEvents          BoostEvent[]      @relation("BoostedUser")
-  actorEvents          BoostEvent[]      @relation("ActorUser")
+  boostEvents          BoostEvent[]       @relation("BoostedUser")
+  actorEvents          BoostEvent[]       @relation("ActorUser")
   boostStats           UserBoostStats?
   datePlan             DatePlan[]
   datePlanRequests     DatePlanRequest[]
   datePlanSkips        DatePlanSkip[]
-  hostedConfirmedDates DateConfirmed[]   @relation("ConfirmedDateHost")
-  joinedConfirmedDates DateConfirmed[]   @relation("ConfirmedDateParticipant")
+  hostedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateHost")
+  joinedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateParticipant")
   wallet               Wallet?
+  datePlanStats        UserDatePlanStats?
 
   @@index([phone_number])
   @@index([google_id])
@@ -531,13 +532,26 @@ model Notification {
   @@index([receiver_id])
 }
 
+model DatePlanPackage {
+  id           String  @id @default(uuid()) @db.Uuid
+  title        String
+  description  String?
+  planCount    Int
+  price        Decimal @db.Decimal(10, 2)
+  pricePerPlan Decimal @db.Decimal(10, 2)
+  discount     Int?
+  isPopular    Boolean @default(false)
+  isActive     Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum OptionType {
   ACTIVITY
   QUICK_TITLE
   VIBE
-  WHEN
-  TIME
-  DURATION
   WHO_PAYS
   JOIN_REQUEST_GENDER
   PLAN_VISIBILITY
@@ -568,12 +582,6 @@ model DatePlanOption {
 
   quickTitlePlans DatePlan[] @relation("PlanQuickTitle")
 
-  whenPlans DatePlan[] @relation("PlanWhen")
-
-  timePlans DatePlan[] @relation("PlanTime")
-
-  durationPlans DatePlan[] @relation("PlanDuration")
-
   whoPaysPlans DatePlan[] @relation("PlanWhoPays")
 
   joinRequestGenderPlans DatePlan[] @relation("PlanJoinRequestGender")
@@ -602,9 +610,7 @@ model DatePlan {
   venueLng     Float?
 
   // Step 3
-  whenId              String?    @db.Uuid
-  timeId              String?    @db.Uuid
-  durationId          String?    @db.Uuid
+  duration            Int?
   whoPaysId           String?    @db.Uuid
   participantLimit    Int?
   joinRequestGenderId String?    @db.Uuid
@@ -622,12 +628,6 @@ model DatePlan {
   activity DatePlanOption @relation("PlanActivity", fields: [activityId], references: [id])
 
   quickTitle DatePlanOption? @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
-
-  when DatePlanOption? @relation("PlanWhen", fields: [whenId], references: [id])
-
-  time DatePlanOption? @relation("PlanTime", fields: [timeId], references: [id])
-
-  duration DatePlanOption? @relation("PlanDuration", fields: [durationId], references: [id])
 
   whoPays DatePlanOption? @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
 
@@ -729,6 +729,16 @@ enum ConfirmedDateStatus {
   NO_SHOW
 }
 
+model UserDatePlanStats {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
 model Conversation {
   id        String        @id @default(uuid())
   user1Id   String
@@ -755,8 +765,8 @@ model ChatMessage {
 }
 
 model Wallet {
-  id        String   @id @default(uuid())  @db.Uuid
-  userId    String   @unique               @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
   balance   Decimal  @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -766,8 +776,8 @@ model Wallet {
 }
 
 model WalletTransaction {
-  id            String             @id @default(uuid())   @db.Uuid
-  walletId      String                                    @db.Uuid
+  id            String             @id @default(uuid()) @db.Uuid
+  walletId      String             @db.Uuid
   amount        Decimal
   type          TransactionType
   status        TransactionStatus

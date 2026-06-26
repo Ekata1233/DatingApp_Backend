@@ -7,7 +7,6 @@ export const upsertDatePlanOptionsSchema = z.object({
     "VIBE",
     "WHEN",
     "TIME",
-    "DURATION",
     "WHO_PAYS",
     "PARTICIPANTS",
     "JOIN_REQUEST_GENDER",

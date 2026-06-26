@@ -22,11 +22,11 @@ export interface UpdateDatePlanInput {
 
   venueLng?: number;
 
-  whenId?: string;
+  eventDate?: string; 
 
-  timeId?: string;
+  eventTime?: string;
 
-  durationId?: string;
+  duration?: string;
 
   whoPaysId?: string;
 

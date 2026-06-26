@@ -21,12 +21,6 @@ export const updateDraftSchema = z.object({
 
   venueLng: z.number().optional(),
 
-  whenId: z.string().uuid().optional(),
-
-  timeId: z.string().uuid().optional(),
-
-  durationId: z.string().uuid().optional(),
-
   whoPaysId: z.string().uuid().optional(),
 
   participantLimit: z.number().min(1).optional(),

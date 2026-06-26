@@ -51,14 +51,23 @@ export const updateDraftDatePlan = async (
     throw new Error("Plan not found");
   }
 
-  const { vibeIds, ...planData } = payload;
+  const { vibeIds, eventDate, eventTime, ...planData } = payload;
+
+  let eventDateTime: Date | undefined;
+
+  if (eventDate && eventTime) {
+    eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
+  }
 
   const updatedPlan = await prisma.$transaction(async (tx) => {
     await tx.datePlan.update({
       where: {
         id: planId,
       },
-      data: planData,
+      data: {
+        ...planData,
+        ...(eventDateTime && { eventDateTime }),
+      },
     });
 
     if (vibeIds) {
@@ -93,52 +102,72 @@ export const publishDatePlan = async (
   planId: string,
   userId: string
 ) => {
-  const plan = await prisma.datePlan.findFirst({
-    where: {
-      id: planId,
-      userId,
-    },
-    include: {
-      vibes: true,
-    },
+  return prisma.$transaction(async (tx) => {
+    const plan = await tx.datePlan.findFirst({
+      where: {
+        id: planId,
+        userId,
+      },
+      include: {
+        vibes: true,
+      },
+    });
+
+    if (!plan) {
+      throw new Error("Plan not found");
+    }
+
+    if (!plan.activityId) {
+      throw new Error("Activity is required");
+    }
+
+    if (!plan.visibilityId) {
+      throw new Error("Visibility is required");
+    }
+
+    if (plan.status === PlanStatus.ACTIVE) {
+      throw new Error("Plan is already published");
+    }
+
+    const userPlanStats = await tx.userDatePlanStats.findUnique({
+      where: {
+        userId,
+      },
+    });
+
+    if (!userPlanStats) {
+      throw new Error("User date plan stats not found");
+    }
+
+    if (userPlanStats.balance <= 0) {
+      throw new Error("You don't have any date plan credits.");
+    }
+
+    await tx.userDatePlanStats.update({
+      where: {
+        userId,
+      },
+      data: {
+        balance: {
+          decrement: 1,
+        },
+      },
+    });
+
+    await tx.datePlan.update({
+      where: {
+        id: planId,
+      },
+      data: {
+        status: PlanStatus.ACTIVE,
+      },
+    });
+
+    return {
+      success: true,
+      remainingCredits: userPlanStats.balance - 1,
+    };
   });
-
-  if (!plan) {
-    throw new Error("Plan not found");
-  }
-
-  if (!plan.activityId) {
-    throw new Error("Activity is required");
-  }
-
-  if (!plan.whenId) {
-    throw new Error("When is required");
-  }
-
-  if (!plan.timeId) {
-    throw new Error("Time is required");
-  }
-
-  if (!plan.durationId) {
-    throw new Error("Duration is required");
-  }
-
-  if (!plan.visibilityId) {
-    throw new Error("Visibility is required");
-  }
-
-  await prisma.datePlan.update({
-    where: {
-      id: planId,
-    },
-    data: {
-      status: PlanStatus.ACTIVE,
-    },
-  });
-
-  return {
-    success: true,
-  };
 };
 
 const calculateDistanceKm = (
@@ -242,12 +271,6 @@ export const discoverDatePlan = async (
 
       quickTitle: true,
 
-      when: true,
-
-      time: true,
-
-      duration: true,
-
       whoPays: true,
 
       visibility: true,
@@ -275,7 +298,7 @@ export const discoverDatePlan = async (
       .map((plan) => {
         let distanceKm = null;
 
-        if (plan.venueLat && plan.venueLng) {
+        if (plan.venueLat != null && plan.venueLng != null) {
           distanceKm = calculateDistanceKm(
             Number(profile!.latitude),
             Number(profile!.longitude),
@@ -291,9 +314,10 @@ export const discoverDatePlan = async (
 
         return {
           ...plan,
-          distanceKm: distanceKm
-            ? Number(distanceKm.toFixed(1))
-            : null,
+          distanceKm:
+            distanceKm !== null
+              ? Number(distanceKm.toFixed(1))
+              : null,
 
           score:
             (distanceKm ?? 999) * 5 +
@@ -311,23 +335,32 @@ export const discoverDatePlan = async (
   }
 
   const plan = ranked[0];
+  const eventDate = plan.eventDateTime
+    ? plan.eventDateTime.toISOString().split("T")[0]
+    : null;
+
+  const eventTime = plan.eventDateTime
+    ? plan.eventDateTime.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+    : null;
   return {
     id: plan.id,
 
     venueName: plan.venueName,
     distanceKm: plan.distanceKm,
-
-    eventDate: plan.when?.label,
-    eventTime: plan.time?.label,
     activity: plan.activity?.label,
 
     title: plan.title,
     note: plan.note,
 
     photoUrl: plan.photoUrl,
-
+    eventDate,
+    eventTime,
     whoPays: plan.whoPays?.label,
-
+    duration: plan.duration,
     host: {
       id: plan.user.id,
       name: plan.user.full_name,
@@ -414,8 +447,6 @@ export const getDatePlanRequests = async (
     },
     include: {
       activity: true,
-      when: true,
-      time: true,
       requests: {
         where: {
           status: "PENDING",
@@ -448,10 +479,6 @@ export const getDatePlanRequests = async (
         plan.activity.label,
 
       activity: plan.activity.label,
-
-      date: plan.when?.label,
-
-      time: plan.time?.label,
 
       venueName: plan.venueName,
 
