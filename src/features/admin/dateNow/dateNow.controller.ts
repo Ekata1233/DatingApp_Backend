@@ -13,7 +13,7 @@ import imagekit from "../../../utils/imagekit";
 interface OptionItem {
   label: string;
   value: string;
-  icon?: string;
+  icon?: string | null;
   sortOrder?: number;
 }
 
@@ -145,6 +145,15 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
     }> = [];
 
     options.forEach((opt, index) => {
+      if (!opt || typeof opt !== 'object') {
+        optionErrors.push({
+          field: `options[${index}]`,
+          message: `Option at index ${index} is invalid`,
+          index,
+        });
+        return;
+      }
+
       if (!opt.label || opt.label.trim() === "") {
         optionErrors.push({
           field: `options[${index}].label`,
@@ -162,7 +171,7 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
       }
 
       const duplicateIndex = options.findIndex(
-        (o, i) => i !== index && o.value === opt.value,
+        (o, i) => i !== index && o && o.value === opt.value,
       );
       if (duplicateIndex !== -1) {
         optionErrors.push({
@@ -205,36 +214,28 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
     let iconFileMap: Map<number, any> = new Map();
 
     if (files) {
-      // Case 1: files is an array (multer with array('icons'))
       if (Array.isArray(files)) {
-        // For array approach, files are in order: icons[0], icons[1], icons[2], etc.
         files.forEach((file, index) => {
           iconFileMap.set(index, file);
         });
         console.log(`📁 Found ${iconFileMap.size} files in array`);
-      }
-      // Case 2: files is an object with field names
-      else if (typeof files === 'object' && !Array.isArray(files)) {
-        // Get all keys that start with 'icons'
+      } else if (typeof files === 'object' && !Array.isArray(files)) {
         const iconKeys = Object.keys(files).filter(key => key.startsWith('icons'));
         
         if (iconKeys.length > 0) {
           console.log(`📁 Found ${iconKeys.length} icon field(s): ${iconKeys.join(', ')}`);
           
           iconKeys.forEach(key => {
-            // Extract index from key like 'icons[0]' -> 0
             const match = key.match(/\[(\d+)\]/);
             if (match) {
               const index = parseInt(match[1]);
               const file = files[key];
-              // If multiple files for same key, take the first one
               const fileData = Array.isArray(file) ? file[0] : file;
               if (fileData) {
                 iconFileMap.set(index, fileData);
                 console.log(`  ✅ Mapped ${key} -> option index ${index}`);
               }
             } else if (key === 'icons') {
-              // Handle 'icons' without index (for array approach)
               const fileData = Array.isArray(files.icons) ? files.icons : [files.icons];
               fileData.forEach((file: any, idx: number) => {
                 iconFileMap.set(idx, file);
@@ -248,10 +249,8 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
       }
     }
 
-    // ============ LOG FILE DETAILS ============
     console.log(`📁 Total icon files found: ${iconFileMap.size}`);
     
-    // Log each file with its index
     for (const [index, file] of iconFileMap.entries()) {
       console.log(`  File for option ${index}:`);
       console.log(`    Name: ${file.originalname || file.name}`);
@@ -276,7 +275,6 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
         continue;
       }
 
-      // Check file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         fileErrors.push({
           field: `icons[${index}]`,
@@ -285,7 +283,6 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
         });
       }
 
-      // Check file type
       const validMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
       if (!file.mimetype || !validMimeTypes.includes(file.mimetype)) {
         fileErrors.push({
@@ -295,7 +292,6 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
         });
       }
 
-      // Check if file has data
       if (!file.buffer && !file.data) {
         fileErrors.push({
           field: `icons[${index}]`,
@@ -313,12 +309,11 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
       });
     }
 
-    // ============ UPLOAD FILES TO IMAGEKIT (Index-wise) ============
+    // ============ UPLOAD FILES TO IMAGEKIT ============
     if (iconFileMap.size > 0) {
       try {
         console.log(`🔄 Uploading ${iconFileMap.size} icon(s) to ImageKit...`);
         
-        // Upload each file and assign to its specific option index
         const uploadPromises = Array.from(iconFileMap.entries()).map(async ([optionIndex, file]) => {
           console.log(`  Uploading file for option ${optionIndex}: ${file.originalname || file.name}`);
           
@@ -338,7 +333,21 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
 
         const uploadResults = await Promise.all(uploadPromises);
 
-        // Map uploaded icons to options
+        // ============ CRITICAL FIX: Set icons for uploaded files ============
+        // First, set all icons to null (will be overridden for uploaded files)
+        options.forEach((opt, index) => {
+          if (opt) {
+            // Check if this index has a file uploaded
+            const hasFile = uploadResults.some(result => result.optionIndex === index);
+            if (!hasFile) {
+              // If no file uploaded for this option, set icon to null
+              opt.icon = null;
+              console.log(`  ❌ Setting icon to null for option ${index}: ${opt.label}`);
+            }
+          }
+        });
+
+        // Then set icons for uploaded files
         uploadResults.forEach(({ url, optionIndex }) => {
           if (options[optionIndex]) {
             options[optionIndex].icon = url;
@@ -356,19 +365,54 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
         });
       }
     } else {
-      console.log('ℹ️ No icons to upload');
+      // ============ If no icons uploaded, set all icons to null ============
+      console.log('ℹ️ No icons to upload - setting all icons to null');
+      options.forEach((opt, index) => {
+        if (opt) {
+          opt.icon = null;
+          console.log(`  ❌ Setting icon to null for option ${index}: ${opt.label}`);
+        }
+      });
     }
+
+    console.log('📦 Final options with icons:');
+    options.forEach((opt, index) => {
+      if (opt) {
+        console.log(`  Option ${index + 1}: ${opt.label} -> Icon: ${opt.icon || '❌ No icon'}`);
+      }
+    });
 
     // ============ FINAL VALIDATION: Zod ============
     try {
+      // Filter out any invalid options before validation
+      const validOptions = options
+        .filter(opt => opt && typeof opt === 'object' && opt.label && opt.value)
+        .map(opt => ({
+          ...opt,
+          icon: opt.icon || null, // Ensure icon is explicitly null if not provided
+        }));
+
+      if (validOptions.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              field: "options",
+              message: "No valid options found",
+            },
+          ],
+        });
+      }
+
       const validated = upsertDatePlanOptionsSchema.parse({
         type,
-        options,
+        options: validOptions,
       });
 
       const result = await upsertDatePlanOptionsService(
         validated.type,
-        validated.options,
+        validated.options as any,
       );
 
       return res.status(200).json({
@@ -377,6 +421,7 @@ export const upsertDatePlanOptions = async (req: Request, res: Response) => {
         data: result,
       });
     } catch (error: any) {
+      console.error('❌ Zod validation error:', error);
       if (error.name === "ZodError") {
         return res.status(400).json({
           success: false,
