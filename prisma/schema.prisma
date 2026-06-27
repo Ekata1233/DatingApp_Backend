@@ -54,7 +54,7 @@ model User {
   hostedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateHost")
   joinedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateParticipant")
   wallet               Wallet?
-  datePlanStats        UserDatePlanStats?
+  datePlanStats        DatePlanUserStats?
 
   @@index([phone_number])
   @@index([google_id])
@@ -561,6 +561,7 @@ enum PlanStatus {
   DRAFT
   ACTIVE
   COMPLETED
+  BOOKED
   CANCELLED
   EXPIRED
 }
@@ -729,7 +730,7 @@ enum ConfirmedDateStatus {
   NO_SHOW
 }
 
-model UserDatePlanStats {
+model DatePlanUserStats {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @unique @db.Uuid
   balance   Int      @default(0)

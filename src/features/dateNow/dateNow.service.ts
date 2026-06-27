@@ -129,7 +129,7 @@ export const publishDatePlan = async (
       throw new Error("Plan is already published");
     }
 
-    const userPlanStats = await tx.userDatePlanStats.findUnique({
+    const userPlanStats = await tx.datePlanUserStats.findUnique({
       where: {
         userId,
       },
@@ -143,7 +143,7 @@ export const publishDatePlan = async (
       throw new Error("You don't have any date plan credits.");
     }
 
-    await tx.userDatePlanStats.update({
+    await tx.datePlanUserStats.update({
       where: {
         userId,
       },
@@ -250,6 +250,7 @@ export const discoverDatePlan = async (
         not: userId,
       },
 
+      DateConfirmed: null,
       eventDateTime: dateFilter,
 
       requests: {
@@ -265,7 +266,19 @@ export const discoverDatePlan = async (
     },
 
     include: {
-      user: true,
+      user: {
+        include: {
+          photos: {
+            where: {
+              is_primary: true,
+            },
+            select: {
+              media_url: true,
+            },
+            take: 1,
+          },
+        },
+      },
 
       activity: true,
 
@@ -354,6 +367,7 @@ export const discoverDatePlan = async (
     activity: plan.activity?.label,
 
     title: plan.title,
+    quickTitle: plan.quickTitle?.label,
     note: plan.note,
 
     photoUrl: plan.photoUrl,
@@ -364,7 +378,10 @@ export const discoverDatePlan = async (
     host: {
       id: plan.user.id,
       name: plan.user.full_name,
-      profilePhoto: plan.user.profilePhoto,
+      profilePhoto:
+        plan.user.photos.length > 0
+          ? plan.user.photos[0].media_url
+          : null,
       age: plan.user.birth_date
         ? Math.floor(
           (Date.now() -
@@ -577,6 +594,15 @@ export const approveDatePlanRequest = async (
       },
     });
 
+    await tx.datePlan.update({
+      where: {
+        id: request.planId,
+      },
+      data: {
+        status: "BOOKED",
+      },
+    });
+
     // Create Confirmed Date
     const confirmedDate =
       await tx.dateConfirmed.create({
@@ -703,7 +729,7 @@ export const topUpDatePlanPackage = async (
       throw new Error("Invalid package");
     }
 
-     const wallet = await tx.wallet.findUnique({
+    const wallet = await tx.wallet.findUnique({
       where: {
         userId,
       },
@@ -717,7 +743,7 @@ export const topUpDatePlanPackage = async (
       throw new Error("Insufficient wallet balance");
     }
 
-    const userDatePlanStats = await tx.userDatePlanStats.findUnique({
+    const userDatePlanStats = await tx.datePlanUserStats.findUnique({
       where: {
         userId,
       },
@@ -755,7 +781,7 @@ export const topUpDatePlanPackage = async (
       },
     });
 
-    const updatedStats = await tx.userDatePlanStats.update({
+    const updatedStats = await tx.datePlanUserStats.update({
       where: {
         userId,
       },

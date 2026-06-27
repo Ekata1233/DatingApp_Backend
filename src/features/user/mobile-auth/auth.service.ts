@@ -69,6 +69,18 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       },
     });
 
+    // Create Date Plan Stats only if it doesn't exist
+    await tx.datePlanUserStats.upsert({
+      where: {
+        userId: user.id,
+      },
+      update: {},
+      create: {
+        userId: user.id,
+        balance: 0, // Optional since your schema has @default(0)
+      },
+    });
+
     return user;
   });
 
