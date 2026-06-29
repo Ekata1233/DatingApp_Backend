@@ -11,6 +11,7 @@ import {
   approveDatePlanRequestController,
   getDatePlanRequestsController,
   topUpDatePlanPackageController,
+  getMyDatePlanRequestsController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -77,4 +78,9 @@ router.post(
   topUpDatePlanPackageController
 );
 
+router.get(
+  "/my-date-plan-requests",
+  authMiddleware,
+  getMyDatePlanRequestsController
+);
 export default router;

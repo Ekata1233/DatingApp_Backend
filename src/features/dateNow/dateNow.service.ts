@@ -804,3 +804,86 @@ export const topUpDatePlanPackage = async (
     };
   });
 };
+
+export const getMyDatePlanRequests = async (userId: string) => {
+  const requests = await prisma.datePlanRequest.findMany({
+    where: {
+      requesterId: userId,
+    },
+
+    include: {
+      plan: {
+        include: {
+          activity: true,
+          quickTitle: true,
+          whoPays: true,
+          visibility: true,
+          joinRequestGender: true,
+
+          vibes: {
+            include: {
+              vibe: true,
+            },
+          },
+
+          user: {
+            include: {
+              photos: {
+                where: {
+                  is_primary: true,
+                },
+                select: {
+                  media_url: true,
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+      },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return requests.map((request) => ({
+    id: request.id,
+    status: request.status,
+    message: request.message,
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+
+    plan: {
+      id: request.plan.id,
+      title: request.plan.title,
+      
+      note: request.plan.note,
+      venueName: request.plan.venueName,
+      eventDateTime: request.plan.eventDateTime,
+      duration: request.plan.duration,
+      photoUrl: request.plan.photoUrl,
+
+      activity: request.plan.activity?.label,
+      quickTitle: request.plan.quickTitle?.label,
+      whoPays: request.plan.whoPays?.label,
+      visibility: request.plan.visibility?.label,
+      joinRequestGender: request.plan.joinRequestGender?.label,
+
+      vibes: request.plan.vibes.map((vibe) => ({
+        id: vibe.vibe.id,
+        label: vibe.vibe.label,
+      })),
+
+      host: {
+        id: request.plan.user.id,
+        name: request.plan.user.full_name,
+        profilePhoto:
+          request.plan.user.photos.length > 0
+            ? request.plan.user.photos[0].media_url
+            : null,
+      },
+    },
+  }));
+};
