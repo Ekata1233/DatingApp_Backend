@@ -12,6 +12,7 @@ import {
   getDatePlanRequestsController,
   topUpDatePlanPackageController,
   getMyDatePlanRequestsController,
+  cancelDatePlanRequestController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -83,4 +84,11 @@ router.get(
   authMiddleware,
   getMyDatePlanRequestsController
 );
+
+router.patch(
+  "/date-plans/:planId/cancel-request",
+  authMiddleware,
+  cancelDatePlanRequestController
+);
+  
 export default router;

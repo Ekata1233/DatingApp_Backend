@@ -1,6 +1,11 @@
 // Date Now Service
 import { prisma } from "../../prisma/prismaClient";
-import { PlanStatus } from "@prisma/client";
+import {
+  PlanStatus,
+  TransactionType,
+  TransactionStatus,
+  TransactionSource,
+} from "@prisma/client";
 import { UpdateDatePlanInput } from "./dateNow.types";
 
 export const createDraftDatePlan = async (
@@ -743,14 +748,19 @@ export const topUpDatePlanPackage = async (
       throw new Error("Insufficient wallet balance");
     }
 
-    const userDatePlanStats = await tx.datePlanUserStats.findUnique({
+    let userDatePlanStats = await tx.datePlanUserStats.findUnique({
       where: {
         userId,
       },
     });
 
     if (!userDatePlanStats) {
-      throw new Error("User date plan stats not found");
+      userDatePlanStats = await tx.datePlanUserStats.create({
+        data: {
+          userId,
+          balance: 0,
+        },
+      });
     }
 
     const balanceBefore = wallet.balance;
@@ -858,7 +868,7 @@ export const getMyDatePlanRequests = async (userId: string) => {
     plan: {
       id: request.plan.id,
       title: request.plan.title,
-      
+
       note: request.plan.note,
       venueName: request.plan.venueName,
       eventDateTime: request.plan.eventDateTime,
@@ -886,4 +896,43 @@ export const getMyDatePlanRequests = async (userId: string) => {
       },
     },
   }));
+};
+
+export const cancelDatePlanRequest = async (
+  userId: string,
+  planId: string
+) => {
+  const request = await prisma.datePlanRequest.findFirst({
+    where: {
+      planId,
+      requesterId: userId,
+    },
+  });
+
+  if (!request) {
+    throw new Error("Request not found");
+  }
+
+  if (request.status === "APPROVED") {
+    throw new Error("Approved request cannot be cancelled");
+  }
+
+  if (request.status === "DECLINED") {
+    throw new Error("Request has already been declined");
+  }
+
+  if (request.status === "CANCELLED") {
+    throw new Error("Request has already been cancelled");
+  }
+
+  const cancelledRequest = await prisma.datePlanRequest.update({
+    where: {
+      id: request.id,
+    },
+    data: {
+      status: "CANCELLED",
+    },
+  });
+
+  return cancelledRequest;
 };
