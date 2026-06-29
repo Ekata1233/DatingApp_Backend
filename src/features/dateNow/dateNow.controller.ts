@@ -14,10 +14,9 @@ import {
   getMyDatePlanRequests,
 } from "./dateNow.service";
 
-
 export const createDraftController = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
@@ -49,17 +48,14 @@ export const createDraftController = async (
   }
 };
 
-export const updateDraftController = async (
-  req: Request,
-  res: Response
-) => {
+export const updateDraftController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
     const plan = await updateDraftDatePlan(
       req.params.id as string,
       userId,
-      req.body
+      req.body,
     );
 
     res.json({
@@ -74,17 +70,11 @@ export const updateDraftController = async (
   }
 };
 
-export const publishPlanController = async (
-  req: Request,
-  res: Response
-) => {
+export const publishPlanController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
-    const result = await publishDatePlan(
-      req.params.id as string,
-      userId
-    );
+    const result = await publishDatePlan(req.params.id as string, userId);
 
     res.json(result);
   } catch (error: any) {
@@ -97,15 +87,12 @@ export const publishPlanController = async (
 
 export const discoverDatePlanController = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user.id;
 
-    const plan = await discoverDatePlan(
-      userId,
-      req.query.filter as string
-    );
+    const plan = await discoverDatePlan(userId, req.query.filter as string);
 
     res.json({
       success: true,
@@ -119,17 +106,11 @@ export const discoverDatePlanController = async (
   }
 };
 
-export const skipDatePlanController = async (
-  req: Request,
-  res: Response
-) => {
+export const skipDatePlanController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
-    const result = await skipDatePlan(
-      userId,
-      req.params.id as string
-    );
+    const result = await skipDatePlan(userId, req.params.id as string);
 
     res.json(result);
   } catch (error: any) {
@@ -140,17 +121,18 @@ export const skipDatePlanController = async (
   }
 };
 
-export const requestToJoinController = async (
-  req: Request,
-  res: Response
-) => {
+export const requestToJoinController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+    const message = req.body?.message || undefined;
     const request = await requestToJoinDatePlan(
       userId,
       req.params.id as string,
-      req.body.message
+      message
     );
 
     res.json({
@@ -165,15 +147,17 @@ export const requestToJoinController = async (
   }
 };
 
-export const getDatePlanRequestsController = async (req: Request, res: Response) => {
+export const getDatePlanRequestsController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
-    const requests =
-      await getDatePlanRequests(
-        userId,
-        req.params.planId as string
-      );
+    const requests = await getDatePlanRequests(
+      userId,
+      req.params.planId as string,
+    );
 
     res.json({
       success: true,
@@ -187,15 +171,17 @@ export const getDatePlanRequestsController = async (req: Request, res: Response)
   }
 };
 
-export const approveDatePlanRequestController = async (req: Request, res: Response) => {
+export const approveDatePlanRequestController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
-    const request =
-      await approveDatePlanRequest(
-        userId,
-        req.params.requestId as string
-      );
+    const request = await approveDatePlanRequest(
+      userId,
+      req.params.requestId as string,
+    );
 
     res.json({
       success: true,
@@ -209,15 +195,17 @@ export const approveDatePlanRequestController = async (req: Request, res: Respon
   }
 };
 
-export const declineDatePlanRequestController = async (req: Request, res: Response) => {
+export const declineDatePlanRequestController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
-    const request =
-      await declineDatePlanRequest(
-        userId,
-        req.params.requestId as string
-      );
+    const request = await declineDatePlanRequest(
+      userId,
+      req.params.requestId as string,
+    );
 
     res.json({
       success: true,
@@ -233,7 +221,7 @@ export const declineDatePlanRequestController = async (req: Request, res: Respon
 
 export const topUpDatePlanPackageController = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
@@ -267,7 +255,7 @@ export const topUpDatePlanPackageController = async (
 
 export const getMyDatePlanRequestsController = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user.id;

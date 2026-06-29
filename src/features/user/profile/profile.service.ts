@@ -50,13 +50,11 @@ export const updateProfileService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+
 
   // 👉 Calculate next step
   const currentStep = "BASIC_INFO";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const user = await prisma.user.update({
     where: { id: userId },
@@ -96,13 +94,11 @@ export const updateInterestedInService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+  
 
   // 👉 Calculate next step
   const currentStep = "INTRESTED_IN";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -156,13 +152,11 @@ export const updateReligionService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+
 
   // 👉 Calculate next step
   const currentStep = "RELIGION";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -233,12 +227,10 @@ export const updateAddressService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+ 
 
   const currentStep = "ADDRESS";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const profile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -290,9 +282,7 @@ export const updateAboutYourselfService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+ 
 
   // ✅ Business Validation (IMPORTANT)
   if (data.childStatus === "NO") {
@@ -306,7 +296,7 @@ export const updateAboutYourselfService = async (
 
   // ✅ Onboarding Step Logic
   const currentStep = "ABOUT_YOURSELF";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   // ✅ Upsert UserAbout
   const profile = await prisma.userAbout.upsert({
@@ -364,7 +354,7 @@ export const updateLocationService = async (
     create: {
       user_id: userId,
       latitude,
-      longitude,
+      longitude, 
     },
   });
 
@@ -470,12 +460,10 @@ export const updateEducationService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+ 
 
   const currentStep = "EDUCATION";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const eduWork = await prisma.userEduWork.upsert({
     where: { userId },
@@ -524,12 +512,10 @@ export const updateWorkService = async (
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+
 
   const currentStep = "WORK";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const { minIncome, maxIncome } = parseIncomeRange(data.incomeRange);
 
@@ -592,9 +578,7 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+ 
 
   // Upload all images
   const uploadedPhotos = await Promise.all(
@@ -632,7 +616,7 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
 
   // Onboarding step update
   const currentStep = "LATEST_PHOTOS";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -744,9 +728,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
     select: { looking_for: true },
   });
 
-  if (!existingUser?.looking_for) {
-    throw new Error("Looking_for is missing");
-  }
+ 
 
   // ✅ Upsert Bio
   const userBio = await prisma.userBio.upsert({
@@ -762,7 +744,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
 
   // ✅ Onboarding Step
   const currentStep = "USER_BIO";
-  const nextStep = getNextStep(existingUser.looking_for, currentStep);
+  const nextStep = getNextStep( currentStep);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
