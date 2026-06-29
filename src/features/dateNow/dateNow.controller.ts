@@ -12,6 +12,7 @@ import {
   declineDatePlanRequest,
   topUpDatePlanPackage,
   getMyDatePlanRequests,
+  cancelDatePlanRequest,
 } from "./dateNow.service";
 
 
@@ -281,6 +282,31 @@ export const getMyDatePlanRequestsController = async (
     });
   } catch (error: any) {
     res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const cancelDatePlanRequestController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const request = await cancelDatePlanRequest(
+      userId,
+      req.params.planId as string
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Request cancelled successfully",
+      data: request,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
       success: false,
       message: error.message,
     });

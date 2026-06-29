@@ -887,3 +887,42 @@ export const getMyDatePlanRequests = async (userId: string) => {
     },
   }));
 };
+
+export const cancelDatePlanRequest = async (
+  userId: string,
+  planId: string
+) => {
+  const request = await prisma.datePlanRequest.findFirst({
+    where: {
+      planId,
+      requesterId: userId,
+    },
+  });
+
+  if (!request) {
+    throw new Error("Request not found");
+  }
+
+  if (request.status === "APPROVED") {
+    throw new Error("Approved request cannot be cancelled");
+  }
+
+  if (request.status === "DECLINED") {
+    throw new Error("Request has already been declined");
+  }
+
+  if (request.status === "CANCELLED") {
+    throw new Error("Request has already been cancelled");
+  }
+
+  const cancelledRequest = await prisma.datePlanRequest.update({
+    where: {
+      id: request.id,
+    },
+    data: {
+      status: "CANCELLED",
+    },
+  });
+
+  return cancelledRequest;
+};
