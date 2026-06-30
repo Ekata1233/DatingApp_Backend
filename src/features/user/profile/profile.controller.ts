@@ -289,11 +289,15 @@ export const educatioController = async (
     const {
       highestEdu,
       collegeName,
+      degree,
+      graduationYear,
     } = req.body;
 
     const user = await updateEducationService(userId, {
       highestEdu,
       collegeName,
+      degree,
+      graduationYear,
     });
 
     return res.status(200).json({

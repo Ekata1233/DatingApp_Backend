@@ -64,20 +64,20 @@ model User {
 }
 
 model UserProfile {
-  user_id            String   @id @db.Uuid
-  religion           String?  @db.VarChar(50)
-  community          String?  @db.VarChar(50)
-  interested_in      String?  @db.VarChar(30)
-  sexual_orientation String?  @db.VarChar(50)
-  country            String?  @db.VarChar(30)
-  state              String?  @db.VarChar(30)
-  city               String?  @db.VarChar(30)
+  user_id            String        @id @db.Uuid
+  religion           String?       @db.VarChar(50)
+  community          String?       @db.VarChar(50)
+  interested_in      Gender?
+  sexual_orientation GenderOption?
+  country            String?       @db.VarChar(30)
+  state              String?       @db.VarChar(30)
+  city               String?       @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal? @db.Decimal(10, 8)
-  longitude          Decimal? @db.Decimal(11, 8)
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
-  user               User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  latitude           Decimal?      @db.Decimal(10, 8)
+  longitude          Decimal?      @db.Decimal(11, 8)
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+  user               User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religion])
   @@index([community])
@@ -108,9 +108,9 @@ model UserEduWork {
   userId String @id @db.Uuid
 
   // Education
-  highestEdu     String? @db.VarChar(100)
-  degree         String? @db.VarChar(100)
-  collegeName    String? @db.VarChar(100)
+  highestEdu     HighestEducation?
+  degree         String?           @db.VarChar(100)
+  collegeName    String?           @db.VarChar(100)
   graduationYear Int?
 
   // Work
@@ -138,6 +138,16 @@ model UserEduWork {
   @@index([highestEdu, incomeRange, workingWith])
   @@index([minIncome, maxIncome])
   @@map("user_edu_work")
+}
+
+enum HighestEducation {
+  HIGH_SCHOOL
+  DIPLOMA
+  ITI
+  UNDERGRADUATE
+  BACHELOR
+  MASTER
+  DOCTORATE
 }
 
 enum WorkStyle {
@@ -840,6 +850,7 @@ enum Gender {
   WOMEN
   NON_BINARY
   PREFER_NOT_TO_SAY
+  EVERYONE
 }
 
 enum GenderOption {
