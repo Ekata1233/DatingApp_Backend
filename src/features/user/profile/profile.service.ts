@@ -470,11 +470,15 @@ export const updateEducationService = async (
     update: {
       highestEdu: data.highestEdu,
       collegeName: data.collegeName,
+      degree: data.degree,
+      graduationYear: data.graduationYear,
     },
     create: {
       userId,
       highestEdu: data.highestEdu,
       collegeName: data.collegeName,
+      degree: data.degree,
+      graduationYear: data.graduationYear,
     },
   });
   const updatedUser = await prisma.user.update({

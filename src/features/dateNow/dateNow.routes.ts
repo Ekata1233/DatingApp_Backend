@@ -13,7 +13,7 @@ import {
   topUpDatePlanPackageController,
   getMyDatePlanRequestsController,
   cancelDatePlanRequestController,
-  getDatePlansController,
+  testMatchScoreController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -92,7 +92,10 @@ router.patch(
   cancelDatePlanRequestController
 );
 
-
-
+router.post(
+  "/test-match-score",
+  authMiddleware,
+  testMatchScoreController
+);
   
 export default router;

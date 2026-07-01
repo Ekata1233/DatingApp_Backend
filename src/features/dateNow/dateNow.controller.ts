@@ -13,7 +13,7 @@ import {
   topUpDatePlanPackage,
   getMyDatePlanRequests,
   cancelDatePlanRequest,
-  getDatePlansService,
+  testMatchScore,
 } from "./dateNow.service";
 
 export const createDraftController = async (
@@ -302,5 +302,32 @@ export const cancelDatePlanRequestController = async (
   }
 };
 
+export const testMatchScoreController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { targetUserId } = req.body;
 
+    if (!targetUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "targetUserId is required",
+      });
+    }
 
+    const result = await testMatchScore(
+      userId,
+      targetUserId
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
