@@ -7,7 +7,8 @@ import {
   getDatePlanPackagesController,
   updateDatePlanPackageController,
   createDatePlanPackageController,
-  getDatePlansController
+  getDatePlansController,
+  getDatePlanDetailsController
 } from "./dateNow.controller";
 
 const router = express.Router();
@@ -35,5 +36,9 @@ router.get(
  
   getDatePlansController
 );
-
+router.get(
+  "/date-plans/:planId",
+ 
+  getDatePlanDetailsController
+);
 export default router;

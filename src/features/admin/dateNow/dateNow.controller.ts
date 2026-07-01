@@ -7,6 +7,7 @@ import {
   updateDatePlanPackage,
   getDatePlanPackages,
   getDatePlansService,
+  getDatePlanDetailsService,
 } from "./dateNow.service";
 import { upsertDatePlanOptionsSchema } from "./dateNow.Validation";
 import imagekit from "../../../utils/imagekit";
@@ -539,6 +540,24 @@ export const getDatePlansController = async (
       search,
       status,
     });
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getDatePlanDetailsController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { planId } = req.params;
+
+    const result = await getDatePlanDetailsService(planId);
 
     return res.status(200).json(result);
   } catch (error: any) {

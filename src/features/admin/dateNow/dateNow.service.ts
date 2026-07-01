@@ -238,7 +238,6 @@ export const getDatePlansService = async ({
               },
               take: 1,
             },
-            
           },
         },
         quickTitle: {
@@ -299,6 +298,180 @@ export const getDatePlansService = async ({
       limit,
       total,
       totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+export const getDatePlanDetailsService = async (planId: string) => {
+  const plan = await prisma.datePlan.findUnique({
+    where: {
+      id: planId,
+    },
+
+    include: {
+      user: {
+        select: {
+          id: true,
+          full_name: true,
+
+          photos: {
+            where: {
+              is_primary: true,
+            },
+            take: 1,
+            select: {
+              media_url: true,
+            },
+          },
+        },
+      },
+
+      activity: {
+        select: {
+          label: true,
+          icon: true,
+        },
+      },
+
+      quickTitle: {
+        select: {
+          label: true,
+          icon: true,
+        },
+      },
+
+      whoPays: {
+        select: {
+          label: true,
+        },
+      },
+
+      joinRequestGender: {
+        select: {
+          label: true,
+        },
+      },
+
+      visibility: {
+        select: {
+          label: true,
+        },
+      },
+
+      vibes: {
+        include: {
+          vibe: true,
+        },
+      },
+
+      requests: {
+        include: {
+          requester: {
+            select: {
+              id: true,
+              full_name: true,
+
+              photos: {
+                where: {
+                  is_primary: true,
+                },
+                take: 1,
+                select: {
+                  media_url: true,
+                },
+              },
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+
+      DateConfirmed: true,
+    },
+  });
+
+  if (!plan) {
+    throw new Error("Date Plan not found");
+  }
+
+  return {
+    success: true,
+
+    data: {
+      id: plan.id,
+
+      host: {
+        id: plan.user.id,
+        name: plan.user.full_name,
+        profileImage: plan.user.photos[0]?.media_url ?? null,
+      },
+
+      activity: plan.activity,
+
+      title: plan.title,
+
+      quickTitle: plan.quickTitle,
+
+      note: plan.note,
+
+      photoUrl: plan.photoUrl,
+
+      venueName: plan.venueName,
+
+      venueAddress: plan.venueAddress,
+
+      venueLat: plan.venueLat,
+
+      venueLng: plan.venueLng,
+
+      duration: plan.duration,
+
+      participantLimit: plan.participantLimit,
+
+      status: plan.status,
+
+      eventDateTime: plan.eventDateTime,
+
+      expiresAt: plan.expiresAt,
+
+      createdAt: plan.createdAt,
+
+      updatedAt: plan.updatedAt,
+
+      whoPays: plan.whoPays,
+
+      joinRequestGender: plan.joinRequestGender,
+
+      visibility: plan.visibility,
+
+      vibes: plan.vibes.map((v) => ({
+        id: v.vibe.id,
+        label: v.vibe.label,
+        icon: v.vibe.icon,
+      })),
+
+      totalRequests: plan.requests.length,
+
+      requests: plan.requests.map((r) => ({
+        id: r.id,
+
+        status: r.status,
+
+        message: r.message,
+
+        createdAt: r.createdAt,
+
+        requester: {
+          id: r.requester.id,
+          name: r.requester.full_name,
+          profileImage: r.requester.photos[0]?.media_url ?? null,
+        },
+      })),
+
+      confirmedDate: plan.DateConfirmed,
     },
   };
 };
