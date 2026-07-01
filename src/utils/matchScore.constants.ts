@@ -1,4 +1,4 @@
-import { ageScore, bioScore, buildAnswerMap, communicationScore, degreeScore, dietScore, drinkScore, educationScore, genderPreferenceScore, graduationYearScore, heightScore, interestScore, languageScore, loveLanguageScore, occupationScore, orientationScore, petScore, photoScore, profileCompletenessScore, smokeScore, workoutScore, zodiacScore } from "./matchScore";
+import { ageScore, bioScore, buildAnswerMap, communicationScore, creativityScore, degreeScore, dietScore, drinkScore, educationScore, genderPreferenceScore, getAnswerValues, graduationYearScore, heightScore, languageScore, loveLanguageScore, multiSelectScore, occupationScore, orientationScore, petScore, photoScore, profileCompletenessScore, smokeScore, workoutScore, zodiacScore } from "./matchScore";
 
 export function calculateMatchScore(me: any, user: any) {
 
@@ -44,18 +44,16 @@ export function calculateMatchScore(me: any, user: any) {
         user.height
     );
 
-    score += occupationScore(
-        me.profile.occupation,
-        user.profile.occupation
-    );
-
     // score += drinkScore(
     //     me.profile.drinking,
     //     user.profile.drinking
     // );
-    
+
     const myAnswers = buildAnswerMap(me.answer);
     const otherAnswers = buildAnswerMap(user.answer);
+
+    console.log("myAnswers", myAnswers);
+    console.log("otherAnswers", otherAnswers);
 
     score += drinkScore(
         myAnswers["drinking"],
@@ -63,49 +61,115 @@ export function calculateMatchScore(me: any, user: any) {
     );
 
     score += smokeScore(
-        me.profile.smoking,
-        user.profile.smoking
+        myAnswers["smoking"],
+        otherAnswers["smoking"]
     );
 
     score += workoutScore(
-        me.profile.workout,
-        user.profile.workout
-    );
-
-    score += dietScore(
-        me.profile.diet,
-        user.profile.diet
+        myAnswers["workout"],
+        otherAnswers["workout"]
     );
 
     score += petScore(
-        me.profile.pet,
-        user.profile.pet
+        myAnswers["pets"],
+        otherAnswers["pets"]
+    );
+
+    score += dietScore(
+        myAnswers["diet"],
+        otherAnswers["diet"]
     );
 
     score += communicationScore(
-        me.profile.communication_style,
-        user.profile.communication_style
+        myAnswers["communication_style"],
+        otherAnswers["communication_style"]
     );
 
     score += loveLanguageScore(
-        me.profile.love_language,
-        user.profile.love_language
+        myAnswers["love_language"],
+        otherAnswers["love_language"]
     );
 
-    score += interestScore(
-        me.profile.interests,
-        user.profile.interests
+    score += occupationScore(
+        myAnswers["occupation"],
+        otherAnswers["occupation"]
+    );
+
+    // Zodiac
+    score += zodiacScore(
+        myAnswers["star_sign"],
+        otherAnswers["star_sign"]
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "creativity"),
+        getAnswerValues(user.answer, "creativity")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "fan_favorites"),
+        getAnswerValues(user.answer, "fan_favorites")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "food_and_drinks"),
+        getAnswerValues(user.answer, "food_and_drinks")
+    );
+
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "gaming"),
+        getAnswerValues(user.answer, "gaming")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "going_out"),
+        getAnswerValues(user.answer, "going_out")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "music"),
+        getAnswerValues(user.answer, "music")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "outdoors_and_adventure"),
+        getAnswerValues(user.answer, "outdoors_and_adventure")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "social_and_content"),
+        getAnswerValues(user.answer, "social_and_content")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "sports_and_fitness"),
+        getAnswerValues(user.answer, "sports_and_fitness")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "staying_in"),
+        getAnswerValues(user.answer, "staying_in")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "tv_and_movies"),
+        getAnswerValues(user.answer, "tv_and_movies")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "values_and_causes"),
+        getAnswerValues(user.answer, "values_and_causes")
+    );
+
+    score += multiSelectScore(
+        getAnswerValues(me.answer, "wellness_and_lifestyle"),
+        getAnswerValues(user.answer, "wellness_and_lifestyle")
     );
 
     score += languageScore(
         me.profile.languages,
         user.profile.languages
-    );
-
-    // Zodiac
-    score += zodiacScore(
-        me.profile.star_sign,
-        user.profile.star_sign
     );
 
     // Bio

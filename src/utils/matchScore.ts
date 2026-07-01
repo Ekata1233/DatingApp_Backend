@@ -38,14 +38,17 @@ const WORKOUT_LEVEL: Record<string, number> = {
   EVERY_DAY: 3,
 };
 
-const OCCUPATION_GROUP: Record<string, string> = {
-  STUDENT: "education",
-  INTERN: "education",
+export const OCCUPATION_GROUP: Record<string, string> = {
+  // Education
+  student: "education",
+  intern: "education",
+  trade_school: "education",
 
-  EMPLOYED: "career",
-  SELF_EMPLOYED: "career",
-  FREELANCER: "career",
-  ENTREPRENEUR: "career",
+  // Career
+  employed: "career",
+  self_employed: "career",
+  freelancer: "career",
+  entrepreneur: "career",
 };
 
 // =======================
@@ -252,48 +255,6 @@ export function heightScore(
   return 1;
 }
 
-// =======================
-// COMPATIBLE_SIGNS 
-// =======================
-const COMPATIBLE_SIGNS = [
-  ["ARIES", "LEO"],
-  ["ARIES", "SAGITTARIUS"],
-
-  ["TAURUS", "VIRGO"],
-  ["TAURUS", "CAPRICORN"],
-
-  ["GEMINI", "LIBRA"],
-  ["GEMINI", "AQUARIUS"],
-
-  ["CANCER", "SCORPIO"],
-  ["CANCER", "PISCES"],
-
-  ["LEO", "SAGITTARIUS"],
-
-  ["VIRGO", "CAPRICORN"],
-
-  ["LIBRA", "AQUARIUS"],
-
-  ["SCORPIO", "PISCES"],
-];
-
-export function zodiacScore(
-  my?: string,
-  other?: string
-) {
-  if (!my || !other) return 0;
-
-  if (my === other) return 2;
-
-  const compatible = COMPATIBLE_SIGNS.some(
-    ([a, b]) =>
-      (a === my && b === other) ||
-      (a === other && b === my)
-  );
-
-  return compatible ? 2 : 1;
-}
-
 
 // =======================
 // DRINK
@@ -312,12 +273,10 @@ export function drinkScore(my?: string, other?: string) {
 // =======================
 // SMOKE
 // =======================
-
 export function smokeScore(my?: string, other?: string) {
-
   return scoreByDistance(
-    SMOKE_LEVEL[my ?? ""],
-    SMOKE_LEVEL[other ?? ""],
+    SMOKE_LEVEL[my?.toUpperCase() ?? ""],
+    SMOKE_LEVEL[other?.toUpperCase() ?? ""],
     3
   );
 }
@@ -325,32 +284,41 @@ export function smokeScore(my?: string, other?: string) {
 // =======================
 // WORKOUT
 // =======================
-
 export function workoutScore(my?: string, other?: string) {
-
   return scoreByDistance(
-    WORKOUT_LEVEL[my ?? ""],
-    WORKOUT_LEVEL[other ?? ""],
+    WORKOUT_LEVEL[my?.toUpperCase() ?? ""],
+    WORKOUT_LEVEL[other?.toUpperCase() ?? ""],
     3
   );
 }
 
 // =======================
-// OCCUPATION
+// PET
 // =======================
-
-export function occupationScore(my?: string, other?: string) {
+const PET_GROUP: Record<string, string> = {
+  DOG: "pet",
+  CAT: "pet",
+  FISH: "pet",
+  BIRD: "pet",
+  HAMSTER: "pet",
+  RABBIT: "pet",
+  TURTLE: "pet",
+  REPTILE: "pet",
+  AMPHIBIAN: "pet",
+  ALL_THE_PETS: "pet",
+  OTHER: "pet",
+  PET_FREE: "none",
+  ALLERGIC_TO_PETS: "none",
+  WANT_A_PET: "future",
+  DONT_HAVE_BUT_LOVE: "future",
+};
+export function petScore(my?: string, other?: string) {
 
   if (!my || !other)
     return 0;
-
   if (my === other)
     return 3;
-
-  if (
-    OCCUPATION_GROUP[my] &&
-    OCCUPATION_GROUP[my] === OCCUPATION_GROUP[other]
-  )
+  if (PET_GROUP[my] === PET_GROUP[other])
     return 2;
 
   return 1;
@@ -359,31 +327,151 @@ export function occupationScore(my?: string, other?: string) {
 // =======================
 // COMMUNICATION STYLE
 // =======================
+const COMMUNICATION_GROUP: Record<string, string> = {
+  stay_on_whatsapp_all_day: "text",
+  big_time_texter: "text",
+  slow_to_answer_on_whatsapp: "text",
+  bad_texter: "text",
 
+  phone_caller: "call",
+  video_chatter: "call",
+
+  better_in_person: "in_person",
+};
 export function communicationScore(my?: string, other?: string) {
+  if (!my || !other) return 0;
+  // Exact same preference
+  if (my === other) {
+    return 5;
+  }
+  const myGroup = COMMUNICATION_GROUP[my];
+  const otherGroup = COMMUNICATION_GROUP[other];
+  // Same communication style (e.g. both are texters)
+  if (myGroup && myGroup === otherGroup) {
+    return 4;
+  }
+  // Text ↔ Call are somewhat compatible
+  const compatibleGroups = ["text", "call"];
 
-  if (!my || !other)
-    return 0;
-
-  return my === other ? 5 : 2;
+  if (
+    compatibleGroups.includes(myGroup) &&
+    compatibleGroups.includes(otherGroup)
+  ) {
+    return 2.5;
+  }
+  // Better in person doesn't match well with text/call preferences
+  return 1;
 }
 
 // =======================
 // LOVE LANGUAGE
 // =======================
-
+const LOVE_LANGUAGE_GROUP: Record<string, string> = {
+  words_of_affirmation: "emotional",
+  thoughtful_gestures: "emotional",
+  quality_time: "presence",
+  physical_touch: "physical",
+  gifts: "gifts",
+};
 export function loveLanguageScore(my?: string, other?: string) {
+  if (!my || !other) return 0;
+  // Exact same love language
+  if (my === other) {
+    return 5;
+  }
 
-  if (!my || !other)
-    return 0;
+  const myGroup = LOVE_LANGUAGE_GROUP[my];
+  const otherGroup = LOVE_LANGUAGE_GROUP[other];
 
-  return my === other ? 5 : 2;
+  // Similar love languages
+  if (myGroup === otherGroup) {
+    return 4;
+  }
+  // Presence and emotional are fairly compatible
+  const compatibleGroups = [
+    ["emotional", "presence"],
+    ["presence", "emotional"],
+  ];
+  const isCompatible = compatibleGroups.some(
+    ([a, b]) => myGroup === a && otherGroup === b
+  );
+  if (isCompatible) {
+    return 3;
+  }
+  // Everything else has low compatibility
+  return 1;
+}
+
+// =======================
+// OCCUPATION
+// =======================
+export function occupationScore(my?: string, other?: string) {
+  if (!my || !other) return 0;
+
+  const myOccupation = my.toLowerCase();
+  const otherOccupation = other.toLowerCase();
+  // Exact occupation
+  if (myOccupation === otherOccupation) {
+    return 3;
+  }
+  const myGroup = OCCUPATION_GROUP[myOccupation];
+  const otherGroup = OCCUPATION_GROUP[otherOccupation];
+
+  // Same stage (education or career)
+  if (myGroup && myGroup === otherGroup) {
+    return 2;
+  }
+  // Different stages
+  return 1;
+}
+
+// =======================
+// COMPATIBLE_SIGNS 
+// =======================
+const COMPATIBLE_SIGNS: Record<string, string[]> = {
+  aries: ["leo", "sagittarius", "gemini", "aquarius"],
+
+  taurus: ["virgo", "capricorn", "cancer", "pisces"],
+
+  gemini: ["libra", "aquarius", "aries", "leo"],
+
+  cancer: ["scorpio", "pisces", "taurus", "virgo"],
+
+  leo: ["aries", "sagittarius", "gemini", "libra"],
+
+  virgo: ["taurus", "capricorn", "cancer", "scorpio"],
+
+  libra: ["gemini", "aquarius", "leo", "sagittarius"],
+
+  scorpio: ["cancer", "pisces", "virgo", "capricorn"],
+
+  sagittarius: ["aries", "leo", "libra", "aquarius"],
+
+  capricorn: ["taurus", "virgo", "scorpio", "pisces"],
+
+  aquarius: ["gemini", "libra", "aries", "sagittarius"],
+
+  pisces: ["cancer", "scorpio", "taurus", "capricorn"],
+};
+export function zodiacScore(my?: string, other?: string) {
+  if (!my || !other) return 0;
+  const mySign = my.toLowerCase();
+  const otherSign = other.toLowerCase();
+  // Same sign
+  if (mySign === otherSign) {
+    return 2;
+  }
+  // Traditionally compatible
+  if (COMPATIBLE_SIGNS[mySign]?.includes(otherSign)) {
+    return 2;
+  }
+  // Everything else
+  return 1;
 }
 
 // =======================
 // DIET
 // =======================
-
 const DIET_COMPATIBILITY = [
   ["VEGETARIAN", "EGGETARIAN"],
   ["VEGETARIAN", "VEGAN"],
@@ -404,58 +492,37 @@ export function dietScore(my?: string, other?: string) {
   return compatible ? 2 : 1;
 }
 
-// =======================
-// PET
-// =======================
-
-const PET_GROUP: Record<string, string> = {
-  DOG: "pet",
-  CAT: "pet",
-  FISH: "pet",
-  BIRD: "pet",
-  HAMSTER: "pet",
-  RABBIT: "pet",
-  TURTLE: "pet",
-  REPTILE: "pet",
-  AMPHIBIAN: "pet",
-
-  PET_FREE: "none",
-
-  WANT_A_PET: "future",
-  DONT_HAVE_BUT_LOVE: "future",
-};
-
-export function petScore(my?: string, other?: string) {
-
-  if (!my || !other)
-    return 0;
-
-  if (my === other)
-    return 3;
-
-  if (PET_GROUP[my] === PET_GROUP[other])
-    return 2;
-
-  return 1;
-}
 
 // =======================
-// INTERESTS
+// CREATIVITY SCORE
 // =======================
+export function creativityScore(
+  my: string[] = [],
+  other: string[] = []
+): number {
+  console.log("my", my);
+  console.log("other", other);
+  if (!my.length || !other.length) return 0;
 
-export function interestScore(
-  myInterests: string[] = [],
-  otherInterests: string[] = []
-) {
+  const mySet = new Set(my.map(i => i.toLowerCase()));
+  const otherSet = new Set(other.map(i => i.toLowerCase()));
 
-  if (!myInterests.length || !otherInterests.length)
-    return 0;
+  let common = 0;
 
-  const common = myInterests.filter(i =>
-    otherInterests.includes(i)
-  );
+  for (const interest of mySet) {
+    if (otherSet.has(interest)) {
+      common++;
+    }
+  }
 
-  return Math.min((common.length / 10) * 15, 15);
+  // Score out of 5
+  if (common >= 5) return 5;
+  if (common === 4) return 4.5;
+  if (common === 3) return 4;
+  if (common === 2) return 3;
+  if (common === 1) return 2;
+
+  return 0;
 }
 
 // =======================
@@ -547,4 +614,30 @@ export function buildAnswerMap(answers: any[]) {
     map[answer.question.key] = answer.option.value;
     return map;
   }, {} as Record<string, string>);
+}
+
+export function getAnswerValues(answers: any[], key: string): string[] {
+  return answers
+    .filter((a) => a.question.key === key)
+    .map((a) => a.option.value);
+}
+
+export function multiSelectScore(
+  my: string[] = [],
+  other: string[] = []
+): number {
+  if (!my.length || !other.length) return 0;
+
+  const mySet = new Set(my.map(v => v.toLowerCase()));
+  const otherSet = new Set(other.map(v => v.toLowerCase()));
+
+  const common = [...mySet].filter(v => otherSet.has(v)).length;
+
+  if (common >= 5) return 5;
+  if (common === 4) return 4.5;
+  if (common === 3) return 4;
+  if (common === 2) return 3;
+  if (common === 1) return 2;
+
+  return 0;
 }
