@@ -238,6 +238,7 @@ export const getDatePlansService = async ({
               },
               take: 1,
             },
+            
           },
         },
         quickTitle: {
