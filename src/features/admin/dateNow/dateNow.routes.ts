@@ -6,7 +6,8 @@ import {
   getOptions,
   getDatePlanPackagesController,
   updateDatePlanPackageController,
-  createDatePlanPackageController
+  createDatePlanPackageController,
+  getDatePlansController
 } from "./dateNow.controller";
 
 const router = express.Router();
@@ -27,6 +28,12 @@ router.patch(
 router.get(
   "/date-plan-packages",
   getDatePlanPackagesController
+);
+
+router.get(
+  "/date-plans",
+ 
+  getDatePlansController
 );
 
 export default router;

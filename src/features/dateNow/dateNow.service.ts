@@ -201,11 +201,33 @@ export const discoverDatePlan = async (
   userId: string,
   filter?: string
 ) => {
-  const profile = await prisma.userProfile.findUnique({
+  const me = await prisma.user.findUnique({
     where: {
-      user_id: userId,
+      id: userId,
+    },
+    include: {
+      profile: true,
+
+      eduWork: true,
+
+      bio: true,
+
+      photos: true,
+
+      answer: {
+        include: {
+          question: true,
+          option: true,
+        },
+      },
     },
   });
+
+  if (!me) {
+    throw new Error("User not found");
+  }
+
+  const profile = me.profile;
 
   const hasLocation =
     profile?.latitude !== null &&
@@ -274,28 +296,27 @@ export const discoverDatePlan = async (
     include: {
       user: {
         include: {
-          photos: {
-            where: {
-              is_primary: true,
+          profile: true,
+
+          eduWork: true,
+
+          bio: true,
+
+          answer: {
+            include: {
+              question: true,
+              option: true,
             },
-            select: {
-              media_url: true,
-            },
-            take: 1,
           },
+
+          photos: true,
         },
       },
-
       activity: true,
-
       quickTitle: true,
-
       whoPays: true,
-
       visibility: true,
-
       joinRequestGender: true,
-
       vibes: {
         include: {
           vibe: true,
@@ -315,6 +336,10 @@ export const discoverDatePlan = async (
   if (hasLocation) {
     ranked = plans
       .map((plan) => {
+        const matchScore = calculateMatchScore(
+          me,
+          plan.user
+        );
         let distanceKm = null;
 
         if (plan.venueLat != null && plan.venueLng != null) {
@@ -333,6 +358,7 @@ export const discoverDatePlan = async (
 
         return {
           ...plan,
+          matchScore,
           distanceKm:
             distanceKm !== null
               ? Number(distanceKm.toFixed(1))
@@ -367,7 +393,7 @@ export const discoverDatePlan = async (
     : null;
   return {
     id: plan.id,
-
+    matchScore: plan.matchScore,
     venueName: plan.venueName,
     distanceKm: plan.distanceKm,
     activity: plan.activity?.label,

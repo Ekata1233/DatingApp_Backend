@@ -1,4 +1,4 @@
-import { ageScore, bioScore, buildAnswerMap, communicationScore, creativityScore, degreeScore, dietScore, drinkScore, educationScore, genderPreferenceScore, getAnswerValues, graduationYearScore, heightScore, languageScore, loveLanguageScore, multiSelectScore, occupationScore, orientationScore, petScore, photoScore, profileCompletenessScore, smokeScore, workoutScore, zodiacScore } from "./matchScore";
+import { ageScore, bioScore, buildAnswerMap, communicationScore, degreeScore, dietScore, drinkScore, educationScore, genderPreferenceScore, getAnswerValues, graduationYearScore, heightScore, languageScore, loveLanguageScore, multiSelectScore, occupationScore, orientationScore, petScore, photoScore, profileCompletenessScore, smokeScore, workoutScore, zodiacScore } from "./matchScore";
 
 export function calculateMatchScore(me: any, user: any) {
 
@@ -185,8 +185,15 @@ export function calculateMatchScore(me: any, user: any) {
     );
 
     // Optional profile completeness
-    score += profileCompletenessScore(me);
-    score += profileCompletenessScore(user);
+    score += Math.min(
+        profileCompletenessScore(me),
+        profileCompletenessScore(user)
+    );
 
-    return Math.round(score);
+    const MAX_SCORE = 170;
+
+    return {
+        score,
+        percentage: Math.round((score / MAX_SCORE) * 100),
+    };
 }

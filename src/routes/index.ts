@@ -67,7 +67,7 @@ router.use("/user", swipeRoutes);
 router.use("/user", dateNowRoutes);
 
 router.use(
-  "/date-now",
+  "/admin/date-now",
   dateNowAdminRoutes
 );
 export default router;

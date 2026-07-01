@@ -492,39 +492,6 @@ export function dietScore(my?: string, other?: string) {
   return compatible ? 2 : 1;
 }
 
-
-// =======================
-// CREATIVITY SCORE
-// =======================
-export function creativityScore(
-  my: string[] = [],
-  other: string[] = []
-): number {
-  console.log("my", my);
-  console.log("other", other);
-  if (!my.length || !other.length) return 0;
-
-  const mySet = new Set(my.map(i => i.toLowerCase()));
-  const otherSet = new Set(other.map(i => i.toLowerCase()));
-
-  let common = 0;
-
-  for (const interest of mySet) {
-    if (otherSet.has(interest)) {
-      common++;
-    }
-  }
-
-  // Score out of 5
-  if (common >= 5) return 5;
-  if (common === 4) return 4.5;
-  if (common === 3) return 4;
-  if (common === 2) return 3;
-  if (common === 1) return 2;
-
-  return 0;
-}
-
 // =======================
 // LANGUAGE
 // =======================

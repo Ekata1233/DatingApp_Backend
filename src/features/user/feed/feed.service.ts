@@ -1,6 +1,7 @@
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
+import { calculateMatchScore } from "../../../utils/matchScore.constants";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { FeedParams } from "./feed.types";
 
@@ -42,7 +43,22 @@ export const getFeedService = async ({
   // 1. Current User
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
-    include: { profile: true },
+    include: {
+      profile: true,
+
+      eduWork: true,
+
+      bio: true,
+
+      photos: true,
+
+      answer: {
+        include: {
+          question: true,
+          option: true,
+        },
+      },
+    },
   });
 
   if (!currentUser || !currentUser.profile) {
@@ -127,7 +143,22 @@ export const getFeedService = async ({
         },
       }),
     },
-    include: { profile: true },
+    include: {
+      profile: true,
+
+      eduWork: true,
+
+      bio: true,
+
+      photos: true,
+
+      answer: {
+        include: {
+          question: true,
+          option: true,
+        },
+      },
+    },
   });
 
   // =========================
@@ -200,8 +231,14 @@ export const getFeedService = async ({
   const usersWithPresence = users.map((user) => {
     const presence = presenceMap[user.id];
 
+    const matchScore = calculateMatchScore(
+      currentUser,
+      user
+    );
+
     return {
       ...user,
+      matchScore,
       isOnline: presence?.isOnline || false,
       lastActiveAt: presence?.lastActiveAt || null, // 👈 important
       lastSeen: formatLastSeen(presence?.lastActiveAt),
@@ -234,8 +271,13 @@ export const getFeedService = async ({
     if (aIsNew && !bIsNew) return -1;
     if (!aIsNew && bIsNew) return 1;
 
-    // 🔥 3. RECENT ACTIVITY
+    // 🔥 3. Match Score
+    if (a.matchScore !== b.matchScore) {
+      return Number(b.matchScore) - Number(a.matchScore);
+    }
+    // 🔥 4. RECENT ACTIVITY
     return bActivity - aActivity;
+
   });
 
   // =========================
