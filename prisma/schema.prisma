@@ -67,8 +67,8 @@ model UserProfile {
   user_id            String   @id @db.Uuid
   religion           String?  @db.VarChar(50)
   community          String?  @db.VarChar(50)
-  interested_in      String?  @db.VarChar(30)
-  sexual_orientation String?  @db.VarChar(50)
+  interested_in      Gender?
+  sexual_orientation GenderOption?
   country            String?  @db.VarChar(30)
   state              String?  @db.VarChar(30)
   city               String?  @db.VarChar(30)
@@ -776,6 +776,165 @@ model Wallet {
   transactions WalletTransaction[]
 }
 
+model Event {
+  id        String      @id @default(uuid()) @db.Uuid
+  //---------------------------------
+  // Step 1
+  //---------------------------------
+  eventType Type?
+  title     String?
+  status    EventStatus @default(DRAFT)
+
+  //---------------------------------
+  // Step 2
+  //---------------------------------
+  city            String?
+  eventPartner    String?
+  officialPartner Boolean @default(false)
+
+  //---------------------------------
+  // Step 3
+  //---------------------------------
+  eventDate   DateTime?
+  startTime   String?
+  endTime     String?
+  venueName   String?
+  fullAddress String?   @db.Text
+  latitude    Float?
+  longitude   Float?
+
+  //---------------------------------
+  // Step 4
+  //--------------------------------
+  entryPrice  Decimal?     @db.Decimal(10, 2)
+  capacity    Int?
+  minAge      Int?
+  maxAge      Int?
+  genderMix   GenderMix?
+  eventIntent EventIntent?
+
+  //---------------------------------
+  // Step 5
+  //---------------------------------
+  heroImage     String?
+  galleryImages EventGallery[]
+  aboutEvent    String?          @db.Text
+  amenities     EventAmenity[]
+  itinerary     EventItinerary[]
+  whyShouldCome EventWhyCome[]
+
+  //---------------------------------
+  // Step 6
+  //---------------------------------
+  safetyFeatures  EventSafety[]
+  dressCode       DressCode?
+  refundWindow    Int?
+  termsConditions String?       @db.Text
+
+  //---------------------------------
+  // Step Progress
+  //--------------------------------
+  currentStep    Int       @default(1)
+  basicsDone     Boolean   @default(false)
+  hostDone       Boolean   @default(false)
+  venueDone      Boolean   @default(false)
+  ticketDone     Boolean   @default(false)
+  experienceDone Boolean   @default(false)
+  safetyDone     Boolean   @default(false)
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([city])
+  @@index([eventDate])
+  @@index([currentStep])
+}
+
+model EventGallery {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  imageUrl  String
+  sortOrder Int      @default(0)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model EventAmenity {
+  id        String  @id @default(uuid()) @db.Uuid
+  eventId   String  @db.Uuid
+  name      String
+  icon      String?
+  sortOrder Int     @default(0)
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventItinerary {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  time        String
+  title       String
+  description String?
+  icon        String?
+  sortOrder   Int     @default(0)
+  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventWhyCome {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  title       String
+  description String?
+  icon        String?
+  sortOrder   Int     @default(0)
+  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventSafety {
+  id      String @id @default(uuid()) @db.Uuid
+  eventId String @db.Uuid
+  title   String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+enum EventStatus {
+  DRAFT
+  LIVE
+  SOLD_OUT
+  CANCELLED
+}
+
+enum Type {
+  SIGNATURE_MIXER
+  SPEED_DATING
+  WINE_TASTING
+  SUPPER_CLUB
+  BRUNCH_SOCIAL
+  ROOFTOP_MIXER
+}
+
+enum GenderMix {
+  FIFTY_FIFTY
+  WOMEN_LED
+  MEN_LED
+  OPEN
+}
+
+enum EventIntent {
+  MIXED
+  SERIOUS
+  CASUAL
+}
+
+enum DressCode {
+  CASUAL
+  SMART_CASUAL
+  SEMI_FORMAL
+  FORMAL
+  COCKTAIL
+  TRADITIONAL
+}
+
 model WalletTransaction {
   id            String             @id @default(uuid()) @db.Uuid
   walletId      String             @db.Uuid
@@ -840,6 +999,7 @@ enum Gender {
   WOMEN
   NON_BINARY
   PREFER_NOT_TO_SAY
+  EVERYONE
 }
 
 enum GenderOption {
