@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, InterestedInController,ReligionController, enterLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController } from "./profile.controller";
+import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -214,7 +214,7 @@ router.patch("/profile/religion", authMiddleware, ReligionController);
  *         description: Bad request
  */
 
-router.patch("/profile/looking-for", authMiddleware, enterLookingForController);
+router.patch("/profile/looking-for", authMiddleware, updateLookingForController);
 
 router.patch("/profile/address", authMiddleware, addressController);
 

@@ -16,26 +16,28 @@ export const ONBOARDING_FLOWS = {
   ],
 
   DATING: [
-    "LOOKING_FOR",
     "BASIC_INFO",
-    "INTRESTED_IN", 
+    "INTRESTED_IN",
+    "LOOKING_FOR",
     "lIFESTYLE",
     "REAL_YOU",
     "THINGS_LOVE",
     "LATEST_PHOTOS",
     "MORE_ABOUT",
-    "BIO"
+    "BIO",
+    "RELIGION",
+    "EDUCATION"
   ],
 
   MATURE: [
     "LOOKING_FOR",
     "BASIC_INFO",
     "INTERESTED_IN",
-    "RELIGION", 
+    "RELIGION",
     "ADDRESS",
     "ABOUT_YOURSELF",
     "EDUCATION",
-    "FINANCIAL_SITUATION", 
+    "FINANCIAL_SITUATION",
     "lIFESTYLE",
     "HEALTH_WELLNESS",
     "INTEREST_HOBBIES",

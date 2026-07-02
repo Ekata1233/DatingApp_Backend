@@ -3,7 +3,7 @@ import {
   createLookingFor,
   getAllLookingFor,
 } from "./lookingFor.service";
-import imagekit from "../../../utils/imagekit";
+import imagekit from "../../../../utils/imagekit";
 
 export const create = async (
   req: Request,
