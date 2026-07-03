@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { answerValidation, locationValidation, profileValidation } from "./profile.validation";
+import { answerValidation, familyProfileValidation, locationValidation, profileValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -15,7 +15,8 @@ import {
   deleteUserPhotoService,
   updateUserBioService,
   updateEducationService,
-  updateWorkService
+  updateWorkService,
+  updateFamilyProfileService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -82,20 +83,27 @@ export const InterestedInController = async (
 };
 
 //Religion
-export const ReligionController = async (req: Request, res: Response) => {
+export const ReligionController = async (
+  req: Request,
+  res: Response
+) => {
   try {
     const userId = (req as any).user.id;
 
-    const { religion, community } = req.body;
+    const { religionId, communityId } = req.body;
 
-    const profile = await updateReligionService(userId, religion, community);
+    const profile = await updateReligionService(
+      userId,
+      Number(religionId),
+      Number(communityId)
+    );
 
     return res.status(200).json({
       success: true,
       message: "Religion saved successfully",
-      religion: profile.religion,
-      community: profile.community
+      data: profile,
     });
+
   } catch (error: any) {
     return res.status(400).json({
       success: false,
@@ -360,6 +368,62 @@ export const workController = async (
   }
 };
 
+//Family Profile
+export const FamilyProfileController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const body = familyProfileValidation.parse(req.body);
+
+    const user = await updateFamilyProfileService(userId, body);
+
+    return res.status(200).json({
+      success: true,
+      message: "Family profile updated successfully.",
+      data: user.updatedProfile,
+      onboarding_step: user.updatedUser.onboarding_step,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Languages
+export const LanguageController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { languageIds } = req.body;
+
+    const languages = await updateLanguageService(
+      userId,
+      languageIds
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Languages saved successfully",
+      data: languages,
+    });
+
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Photos
 export const uploadPhotosController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;

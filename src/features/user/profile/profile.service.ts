@@ -29,13 +29,6 @@ export const updateProfileService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
-
-
   // 👉 Calculate next step
   const currentStep = "BASIC_INFO";
   const nextStep = getNextStep(currentStep);
@@ -119,29 +112,54 @@ export const updateInterestedInService = async (
 //Religion
 export const updateReligionService = async (
   userId: string,
-  religion: string,
-  community: string,
+  religionId: number,
+  communityId: number
 ) => {
-  if (!userId) throw new Error("User ID is missing");
-  // 👉 Calculate next step
+  if (!userId) {
+    throw new Error("User ID is missing");
+  }
+
+  // Validate community belongs to religion
+  const community = await prisma.community.findUnique({
+    where: {
+      id: communityId,
+    },
+  });
+
+  if (!community) {
+    throw new Error("Community not found");
+  }
+
+  if (community.religionId !== religionId) {
+    throw new Error("Selected community does not belong to selected religion");
+  }
+
   const currentStep = "RELIGION";
-  const nextStep = getNextStep( currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const updatedProfile = await prisma.userProfile.upsert({
-    where: { user_id: userId },
+    where: {
+      user_id: userId,
+    },
     update: {
-      religion,
-      community,
+      religionId,
+      communityId,
     },
     create: {
       user_id: userId,
-      religion,
-      community,
+      religionId,
+      communityId,
+    },
+    include: {
+      religion: true,
+      community: true,
     },
   });
 
   await prisma.user.update({
-    where: { id: userId },
+    where: {
+      id: userId,
+    },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
@@ -179,7 +197,7 @@ export const updateReligionService = async (
 //LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION 
 export const updateLookingForService = async (
   userId: string,
-  intentionId: string,
+  intentionId: number,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
@@ -198,7 +216,6 @@ export const updateLookingForService = async (
     },
   });
 };
-
 
 //Address
 export const updateAddressService = async (
@@ -465,11 +482,11 @@ export const updateEducationService = async (
 export const updateWorkService = async (
   userId: string,
  data: {
-    professionId?: string;
-    employmentTypeId?: string;
-    experienceId?: string;
-    ambitionId?: string;
-    salaryRangeId?: string;
+    professionId?: number;
+    employmentTypeId?: number;
+    experienceId?: number;
+    ambitionId?: number;
+    salaryRangeId?: number;
   }
 ) => {
   if (!userId) {
@@ -517,6 +534,147 @@ export const updateWorkService = async (
     eduWork,
     onboarding,
   };
+};
+
+//Family Profile
+export const updateFamilyProfileService = async (
+  userId: string,
+  data: {
+    familyStatusId?: number;
+    familyTypeId?: number;
+
+    fatherOccupationId?: number;
+    fatherOrganisationId?: number;
+
+    motherOccupationId?: number;
+    motherOrganisationId?: number;
+
+    siblingRelationId?: number;
+    siblingOccupationId?: number;
+    siblingMaritalId?: number;
+
+    familyHomeId?: number;
+    nativePlaceId?: number;
+
+    familyIncomeId?: number;
+  }
+) => {
+  if (!userId) throw new Error("User ID is missing");
+
+  const currentStep = "FAMILY_DETAILS";
+  const nextStep = getNextStep(currentStep);
+
+  const updatedProfile = await prisma.userFamilyProfile.upsert({
+    where: {
+      userId,
+    },
+    update: {
+      ...data,
+    },
+    create: {
+      userId,
+      ...data,
+    },
+  });
+
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep,
+    },
+    select: {
+      onboarding_step: true,
+    },
+  });
+
+  // Update Profile Completion Score
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      profile_completion: score,
+    },
+  });
+
+  return {
+    updatedProfile,
+    updatedUser,
+  };
+};
+
+//language
+export const updateLanguageService = async (
+  userId: string,
+  languageIds: number[]
+) => {
+  if (!userId) {
+    throw new Error("User ID is missing");
+  }
+
+  if (!languageIds.length) {
+    throw new Error("Please select at least one language");
+  }
+
+  const currentStep = "LANGUAGE";
+  const nextStep = getNextStep(currentStep);
+
+  await prisma.$transaction(async (tx) => {
+    // Ensure UserProfile exists
+    await tx.userProfile.upsert({
+      where: {
+        user_id: userId,
+      },
+      update: {},
+      create: {
+        user_id: userId,
+      },
+    });
+
+    // Remove old languages
+    await tx.userLanguage.deleteMany({
+      where: {
+        userId,
+      },
+    });
+
+    // Add new languages
+    await tx.userLanguage.createMany({
+      data: languageIds.map((languageId) => ({
+        userId,
+        languageId,
+      })),
+    });
+
+    await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        onboarding_step: currentStep,
+        next_step: nextStep,
+      },
+    });
+  });
+
+  return prisma.userLanguage.findMany({
+    where: {
+      userId,
+    },
+    include: {
+      language: true,
+    },
+    orderBy: {
+      language: {
+        priority: "asc",
+      },
+    },
+  });
 };
 
 // Upload Photos
@@ -599,6 +757,7 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
   };
 };
 
+// Update Photo
 export const updateUserPhotoService = async (
   userId: string,
   photoId: string,

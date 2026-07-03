@@ -1,5 +1,5 @@
 import express from "express";
-import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController } from "./profile.controller";
+import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController } from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -329,6 +329,18 @@ router.patch(
   workController
 );
 
+router.patch(
+  "/profile/family",
+  authMiddleware,
+  FamilyProfileController
+);
+
+router.patch(
+  "/profile/languages",
+  authMiddleware,
+  LanguageController
+);
+
 router.post("/profile/photos", authMiddleware, uploadPhotosController);
 
 router.patch("/profile/photos/:photoId", authMiddleware, updatePhotoController);
@@ -336,7 +348,6 @@ router.patch("/profile/photos/:photoId", authMiddleware, updatePhotoController);
 router.patch("/profile/photos/:photoId/primary", authMiddleware, setPrimaryPhotoController);
 
 router.delete("/profile/photos/:photoId", authMiddleware, deletePhotoController);
-
 
 
 /**

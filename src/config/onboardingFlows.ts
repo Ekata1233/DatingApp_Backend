@@ -26,7 +26,8 @@ export const ONBOARDING_FLOWS = {
     "MORE_ABOUT",
     "BIO",
     "RELIGION",
-    "EDUCATION"
+    "EDUCATION",
+    "FAMILY_DETAILS"
   ],
 
   MATURE: [

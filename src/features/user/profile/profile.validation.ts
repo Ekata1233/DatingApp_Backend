@@ -64,3 +64,23 @@ export const bioValidation = z.object({
     .max(300, "Bio cannot exceed 300 characters")
     .optional(),
 });
+
+export const familyProfileValidation = z.object({
+  familyStatusId: z.number().int().optional(),
+  familyTypeId: z.number().int().optional(),
+
+  fatherOccupationId: z.number().int().optional(),
+  fatherOrganisationId: z.number().int().optional(),
+
+  motherOccupationId: z.number().int().optional(),
+  motherOrganisationId: z.number().int().optional(),
+
+  siblingRelationId: z.number().int().optional(),
+  siblingOccupationId: z.number().int().optional(),
+  siblingMaritalId: z.number().int().optional(),
+
+  familyHomeId: z.number().int().optional(),
+  nativePlaceId: z.number().int().optional(),
+
+  familyIncomeId: z.number().int().optional(),
+});

@@ -20,7 +20,7 @@ model User {
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  intentionId          String?            @db.Uuid
+  intentionId          Int?
   onboarding_step      String?            @db.VarChar(20)
   next_step            String?            @db.VarChar(20)
   onboarding_completed Boolean            @default(false)
@@ -40,7 +40,7 @@ model User {
   about                UserAbout?
   bio                  UserBio?
   eduWork              UserEduWork?       @relation("UserEduWork")
-  familyProfile       UserFamilyProfile? @relation("UserFamilyProfile")
+  familyProfile        UserFamilyProfile? @relation("UserFamilyProfile")
   skills               UserSkill[]
   photos               UserPhoto[]
   profile              UserProfile?
@@ -67,28 +67,88 @@ model User {
 }
 
 model UserProfile {
-  user_id            String        @id @db.Uuid
-  religion           String?       @db.VarChar(50)
-  community          String?       @db.VarChar(50)
+  user_id            String         @id @db.Uuid
+  religionId         Int?
+  religion           Religion?      @relation(fields: [religionId], references: [id])
+  communityId        Int?
+  community          Community?     @relation(fields: [communityId], references: [id])
+  languages          UserLanguage[]
   interested_in      Gender?
   sexual_orientation GenderOption?
-  country            String?       @db.VarChar(30)
-  state              String?       @db.VarChar(30)
-  city               String?       @db.VarChar(30)
+  country            String?        @db.VarChar(30)
+  state              String?        @db.VarChar(30)
+  city               String?        @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal?      @db.Decimal(10, 8)
-  longitude          Decimal?      @db.Decimal(11, 8)
-  created_at         DateTime      @default(now())
-  updated_at         DateTime      @updatedAt
-  user               User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  latitude           Decimal?       @db.Decimal(10, 8)
+  longitude          Decimal?       @db.Decimal(11, 8)
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+  user               User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([religion])
-  @@index([community])
+  @@index([religionId])
+  @@index([communityId])
   @@index([interested_in])
   @@index([sexual_orientation])
   @@index([country, state, city])
   @@index([latitude, longitude])
   @@map("user_profiles")
+}
+
+model UserLanguage {
+  userId     String      @db.Uuid
+  languageId Int
+  user       UserProfile @relation(fields: [userId], references: [user_id], onDelete: Cascade)
+  language   Language    @relation(fields: [languageId], references: [id])
+  createdAt  DateTime    @default(now())
+
+  @@id([userId, languageId])
+  @@index([languageId])
+  @@index([userId])
+  @@map("user_languages")
+}
+
+model Religion {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique @db.VarChar(100)
+  priority    Int           @default(0)
+  active      Boolean       @default(true)
+  communities Community[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  UserProfile UserProfile[]
+
+  @@index([active])
+  @@map("religions")
+}
+
+model Community {
+  id           Int           @id @default(autoincrement())
+  religionId   Int
+  religion     Religion      @relation(fields: [religionId], references: [id], onDelete: Cascade)
+  name         String        @db.VarChar(100)
+  priority     Int           @default(0)
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  userProfiles UserProfile[]
+
+  @@unique([religionId, name])
+  @@index([religionId])
+  @@index([active])
+  @@map("communities")
+}
+
+model Language {
+  id        Int            @id @default(autoincrement())
+  name      String         @unique @db.VarChar(50)
+  priority  Int            @default(0)
+  active    Boolean        @default(true)
+  users     UserLanguage[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([active])
+  @@map("languages")
 }
 
 model UserAbout {
@@ -117,15 +177,15 @@ model UserEduWork {
   graduationYear Int?
 
   // Work
-  professionId     String?         @db.Uuid
+  professionId     Int?
   profession       Profession?     @relation(fields: [professionId], references: [id], onDelete: SetNull)
-  employmentTypeId String?         @db.Uuid
+  employmentTypeId Int?
   employmentType   EmploymentType? @relation(fields: [employmentTypeId], references: [id], onDelete: SetNull)
-  experienceId     String?         @db.Uuid
+  experienceId     Int?
   experience       Experience?     @relation(fields: [experienceId], references: [id], onDelete: SetNull)
-  ambitionId       String?         @db.Uuid
+  ambitionId       Int?
   ambition         Ambition?       @relation(fields: [ambitionId], references: [id], onDelete: SetNull)
-  salaryRangeId    String?         @db.Uuid
+  salaryRangeId    Int?
   salaryRange      SalaryRange?    @relation(fields: [salaryRangeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -239,7 +299,7 @@ model FamilyIncome {
 }
 
 model Profession {
-  id           String        @id @default(uuid()) @db.Uuid
+  id           Int           @id @default(autoincrement())
   name         String        @unique
   isActive     Boolean       @default(true)
   userEduWorks UserEduWork[]
@@ -250,7 +310,7 @@ model Profession {
 }
 
 model EmploymentType {
-  id           String        @id @default(uuid()) @db.Uuid
+  id           Int           @id @default(autoincrement())
   name         String        @unique
   isActive     Boolean       @default(true)
   userEduWorks UserEduWork[]
@@ -261,7 +321,7 @@ model EmploymentType {
 }
 
 model Experience {
-  id           String        @id @default(uuid()) @db.Uuid
+  id           Int           @id @default(autoincrement())
   title        String        @unique // Fresher, 1 yr exp, 3 yrs exp
   sortOrder    Int?
   isActive     Boolean       @default(true)
@@ -273,7 +333,7 @@ model Experience {
 }
 
 model Ambition {
-  id           String        @id @default(uuid()) @db.Uuid
+  id           Int           @id @default(autoincrement())
   title        String        @unique
   isActive     Boolean       @default(true)
   userEduWorks UserEduWork[]
@@ -284,7 +344,7 @@ model Ambition {
 }
 
 model SalaryRange {
-  id           String        @id @default(uuid()) @db.Uuid
+  id           Int           @id @default(autoincrement())
   title        String        @unique // ₹10–20 LPA
   minSalary    Int?
   maxSalary    Int?
@@ -466,7 +526,7 @@ model UserMatch {
 }
 
 model Intention {
-  id             String  @id @default(uuid()) @db.Uuid
+  id             Int     @id @default(autoincrement())
   title          String
   description    String?
   option         String?
