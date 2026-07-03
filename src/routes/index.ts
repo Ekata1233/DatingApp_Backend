@@ -27,6 +27,7 @@ import boostRoutes from "../features/admin/boost/boost.routes";
 import swipeRoutes from "../features/swipe/swipe.routes";
 import dateNowAdminRoutes from "../features/admin/dateNow/dateNow.routes";
 import dateNowRoutes from "../features/dateNow/dateNow.routes";
+import intentionRoutes from "../features/admin/onboarding/intention/intention.routes";
 
 const router = Router();
 
@@ -44,6 +45,8 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
+router.use("/intention",intentionRoutes)
+
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
