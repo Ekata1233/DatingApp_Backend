@@ -20,7 +20,7 @@ model User {
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  intentionId          Int?
+  intentionId          String?            @db.Uuid
   onboarding_step      String?            @db.VarChar(20)
   next_step            String?            @db.VarChar(20)
   onboarding_completed Boolean            @default(false)
@@ -526,18 +526,24 @@ model UserMatch {
 }
 
 model Intention {
-  id             Int     @id @default(autoincrement())
-  title          String
-  description    String?
-  option         String?
+  id          String            @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  sortOrder   Int               @default(0)
+  isActive    Boolean           @default(true)
+  options     IntentionOption[]
+  users       User[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model IntentionOption {
+  id             String    @id @default(uuid()) @db.Uuid
+  option         String
   optDescription String?
-  sortOrder      Int     @default(0)
-  isActive       Boolean @default(true)
-
-  users User[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  intentionId    String    @db.Uuid
+  intention      Intention @relation(fields: [intentionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
 }
 
 model Boost {
