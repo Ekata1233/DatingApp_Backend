@@ -3,7 +3,7 @@ import {
   createDreamsFuture,
   getAllDreamsFuture,
 } from "./dreamsFuture.service";
-import imagekit from "../../../utils/imagekit";
+import imagekit from "../../../../utils/imagekit";
 
 export const create = async (
   req: Request,

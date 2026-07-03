@@ -61,9 +61,9 @@ export const InterestedInController = async (
   try {
     const userId = (req as any).user.id;
 
-    const { interested_in,sexual_orientation } = req.body;
+    const { interested_in, sexual_orientation } = req.body;
 
-    const user = await updateInterestedInService(userId, interested_in,sexual_orientation);
+    const user = await updateInterestedInService(userId, interested_in, sexual_orientation);
 
     return res.status(200).json({
       success: true,
@@ -93,10 +93,8 @@ export const ReligionController = async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: "Religion saved successfully",
-      religion: profile.updatedProfile.religion,
-      community: profile.updatedProfile.community,
-onboarding_step: profile.updatedUser.onboarding_step,
-      next_step: profile.updatedUser.next_step,
+      religion: profile.religion,
+      community: profile.community
     });
   } catch (error: any) {
     return res.status(400).json({
@@ -107,7 +105,7 @@ onboarding_step: profile.updatedUser.onboarding_step,
 };
 
 //Looking for
-export const enterLookingForController = async (
+export const updateLookingForController = async (
   req: Request,
   res: Response,
 ) => {
@@ -121,23 +119,34 @@ export const enterLookingForController = async (
       });
     }
 
-    const { looking_for, looking_for_option } = req.body;
+    const { intentionId } = req.body;
 
-    // ✅ Basic validation
-    if (!looking_for || !Object.values(LookingFor).includes(looking_for)) {
+    // Basic validation
+    if (!intentionId) {
       return res.status(400).json({
         success: false,
-        message: "Invalid looking_for value",
+        message: "intentionId is required",
+      });
+    }
+    const intention = await prisma.intention.findUnique({
+      where: {
+        id: intentionId,
+      },
+    });
+
+    if (!intention) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid intention",
       });
     }
 
-    const user = await updateLookingForService(userId, looking_for, looking_for_option);
+    const user = await updateLookingForService(userId, intentionId);
 
     return res.status(200).json({
       success: true,
       message: "Relationship preference saved successfully",
-      looking_for: user.looking_for,
-      looking_for_option: user.looking_for_option,
+      intention: user.intention,
       onboarding_step: user.onboarding_step,
       next_step: user.next_step,
     });
@@ -166,7 +175,6 @@ export const addressController = async (req: Request, res: Response) => {
       success: true,
       message: "Address updated successfully",
       onboarding_step: user.onboarding.onboarding_step,
-      next_step: user.onboarding.next_step,
       data: user.profile,
     });
   } catch (error: any) {
@@ -304,7 +312,6 @@ export const educatioController = async (
       success: true,
       message: "Education updated successfully",
       onboarding_step: user.onboarding.onboarding_step,
-      next_step: user.onboarding.next_step,
       data: user.eduWork,
     });
   } catch (error: any) {
@@ -386,7 +393,7 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
   }
 };
 
-export const updatePhotoController = async ( req: Request<{ photoId: string }>, res: Response) => {
+export const updatePhotoController = async (req: Request<{ photoId: string }>, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { photoId } = req.params;
@@ -439,7 +446,7 @@ export const setPrimaryPhotoController = async (
 };
 
 export const deletePhotoController = async (
-   req: Request<{ photoId: string }>,
+  req: Request<{ photoId: string }>,
   res: Response
 ) => {
   try {
@@ -463,6 +470,7 @@ export const deletePhotoController = async (
 //Bio
 import { bioValidation } from "./profile.validation";
 import { ZodError } from "zod";
+import { prisma } from "../../../prisma/prismaClient";
 
 export const updateUserBioController = async (
   req: Request,
@@ -483,16 +491,16 @@ export const updateUserBioController = async (
       data: result.bio,
     });
   } catch (error: any) {
-  if (error instanceof ZodError) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: error.issues[0].message, // ✅ FIXED
+      });
+    }
+
     return res.status(400).json({
       success: false,
-      message: error.issues[0].message, // ✅ FIXED
+      message: error.message || "Something went wrong",
     });
   }
-
-  return res.status(400).json({
-    success: false,
-    message: error.message || "Something went wrong",
-  });
-}
 };

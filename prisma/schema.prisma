@@ -20,6 +20,7 @@ model User {
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
+  intentionId          String? @db.Uuid
   onboarding_step      String?            @db.VarChar(20)
   next_step            String?            @db.VarChar(20)
   onboarding_completed Boolean            @default(false)
@@ -55,6 +56,7 @@ model User {
   joinedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateParticipant")
   wallet               Wallet?
   datePlanStats        DatePlanUserStats?
+  intention            Intention? @relation(fields: [intentionId], references: [id])
 
   @@index([phone_number])
   @@index([google_id])
@@ -105,7 +107,7 @@ model UserAbout {
 }
 
 model UserEduWork {
-  userId String @id @db.Uuid
+  userId         String @id @db.Uuid
 
   // Education
   highestEdu     String? @db.VarChar(100)
@@ -114,7 +116,7 @@ model UserEduWork {
   graduationYear Int?
 
   // Work
-  workingWith WorkingWith?
+  workingWith    WorkingWith?
   workingAs   String?      @db.VarChar(100)
   companyName String?      @db.VarChar(100)
   workStyle   WorkStyle?
@@ -302,6 +304,21 @@ model UserMatch {
   @@index([user1Id, is_active])
   @@index([user2Id, is_active])
   @@map("matches")
+}
+
+model Intention {
+  id                    String   @id @default(uuid()) @db.Uuid
+  title                 String
+  description           String?
+  option                String?
+  optDescription        String?
+  sortOrder             Int      @default(0)
+  isActive              Boolean  @default(true)
+
+  users                 User[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Boost {

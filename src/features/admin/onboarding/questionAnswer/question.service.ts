@@ -1,5 +1,5 @@
 import { QuestionCategory,QuestionScreen } from "@prisma/client";
-import { prisma } from "../../../prisma/prismaClient";
+import { prisma } from "../../../../prisma/prismaClient";
 
 // CREATE QUESTION
 export const createQuestionService = async (

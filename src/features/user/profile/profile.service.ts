@@ -146,14 +146,6 @@ export const updateReligionService = async (
   community: string,
 ) => {
   if (!userId) throw new Error("User ID is missing");
-
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
-
-
   // 👉 Calculate next step
   const currentStep = "RELIGION";
   const nextStep = getNextStep( currentStep);
@@ -171,47 +163,65 @@ export const updateReligionService = async (
     },
   });
 
-  const updatedUser = await prisma.user.update({
+  await prisma.user.update({
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
     },
-    select: {
-      onboarding_step: true,
-      next_step: true,
-    },
   });
 
-  return {
-    updatedProfile,
-    updatedUser,
-  };
+  return updatedProfile;
 };
 
-//Looking For
+//Looking For [FOR THE MARRIAGE , DATING , MATURE CONNECTIONS]
+// export const updateLookingForService = async (
+//   userId: string,
+//   looking_for: LookingFor,
+//   looking_for_option: LookingForOption,
+
+// ) => {
+//   if (!userId) throw new Error("User ID is required");
+
+//   const currentStep = "LOOKING_FOR";
+//   const nextStep = getNextStep(looking_for, currentStep);
+
+//   const updatedUser = await prisma.user.update({
+//     where: { id: userId },
+//     data: {
+//       looking_for,
+//       looking_for_option,
+//       onboarding_step: currentStep,
+//       next_step: nextStep,
+//     },
+//   });
+
+//   return updatedUser;
+// };
+
+//LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION 
 export const updateLookingForService = async (
   userId: string,
-  looking_for: LookingFor,
-  looking_for_option: LookingForOption,
+  intentionId: string,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
   const currentStep = "LOOKING_FOR";
-  const nextStep = getNextStep(looking_for, currentStep);
+  const nextStep = getNextStep(currentStep);
 
-  const updatedUser = await prisma.user.update({
+  return prisma.user.update({
     where: { id: userId },
     data: {
-      looking_for,
-      looking_for_option,
+      intentionId,
       onboarding_step: currentStep,
       next_step: nextStep,
     },
+    include: {
+      intention: true,
+    },
   });
-
-  return updatedUser;
 };
+
 
 //Address
 export const updateAddressService = async (
@@ -246,7 +256,6 @@ export const updateAddressService = async (
     },
     select: {
       onboarding_step: true,
-      next_step: true,
     },
   });
 
@@ -489,7 +498,6 @@ export const updateEducationService = async (
     },
     select: {
       onboarding_step: true,
-      next_step: true,
     },
   });
 
