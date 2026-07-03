@@ -40,6 +40,7 @@ model User {
   about                UserAbout?
   bio                  UserBio?
   eduWork              UserEduWork?       @relation("UserEduWork")
+  familyProfile       UserFamilyProfile? @relation("UserFamilyProfile")
   skills               UserSkill[]
   photos               UserPhoto[]
   profile              UserProfile?
@@ -141,6 +142,100 @@ model UserEduWork {
   @@index([ambitionId])
   @@index([salaryRangeId])
   @@map("user_edu_work")
+}
+
+model UserFamilyProfile {
+  id                   String        @id @default(uuid()) @db.Uuid
+  userId               String        @unique @db.Uuid
+  user                 User          @relation("UserFamilyProfile", fields: [userId], references: [id])
+  familyStatusId       Int?
+  familyStatus         MasterValue?  @relation("FamilyStatus", fields: [familyStatusId], references: [id])
+  familyTypeId         Int?
+  familyType           MasterValue?  @relation("FamilyType", fields: [familyTypeId], references: [id])
+  fatherOccupationId   Int?
+  fatherOccupation     MasterValue?  @relation("FatherOccupation", fields: [fatherOccupationId], references: [id])
+  fatherOrganisationId Int?
+  fatherOrganisation   MasterValue?  @relation("FatherOrganisation", fields: [fatherOrganisationId], references: [id])
+  motherOccupationId   Int?
+  motherOccupation     MasterValue?  @relation("MotherOccupation", fields: [motherOccupationId], references: [id])
+  motherOrganisationId Int?
+  motherOrganisation   MasterValue?  @relation("MotherOrganisation", fields: [motherOrganisationId], references: [id])
+  siblingRelationId    Int?
+  siblingRelation      MasterValue?  @relation("SiblingRelation", fields: [siblingRelationId], references: [id])
+  siblingOccupationId  Int?
+  siblingOccupation    MasterValue?  @relation("SiblingOccupation", fields: [siblingOccupationId], references: [id])
+  siblingMaritalId     Int?
+  siblingMarital       MasterValue?  @relation("SiblingMarital", fields: [siblingMaritalId], references: [id])
+  familyHomeId         Int?
+  familyHome           MasterValue?  @relation("FamilyHome", fields: [familyHomeId], references: [id])
+  nativePlaceId        Int?
+  nativePlace          MasterValue?  @relation("NativePlace", fields: [nativePlaceId], references: [id])
+  familyIncomeId       Int?
+  familyIncome         FamilyIncome? @relation(fields: [familyIncomeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([familyStatusId])
+  @@index([familyTypeId])
+  @@index([fatherOccupationId])
+  @@index([motherOccupationId])
+  @@index([familyHomeId])
+  @@index([nativePlaceId])
+  @@index([familyIncomeId])
+  @@map("user_family_profiles")
+}
+
+model MasterCategory {
+  id        Int           @id @default(autoincrement())
+  code      String        @unique
+  title     String
+  values    MasterValue[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("master_categories")
+}
+
+model MasterValue {
+  id         Int            @id @default(autoincrement())
+  categoryId Int
+  category   MasterCategory @relation(fields: [categoryId], references: [id])
+  value      String
+  priority   Int            @default(0)
+  active     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+
+  // UserFamilyProfile Relations
+  familyStatuses      UserFamilyProfile[] @relation("FamilyStatus")
+  familyTypes         UserFamilyProfile[] @relation("FamilyType")
+  fatherOccupations   UserFamilyProfile[] @relation("FatherOccupation")
+  fatherOrganisations UserFamilyProfile[] @relation("FatherOrganisation")
+  motherOccupations   UserFamilyProfile[] @relation("MotherOccupation")
+  motherOrganisations UserFamilyProfile[] @relation("MotherOrganisation")
+  siblingRelations    UserFamilyProfile[] @relation("SiblingRelation")
+  siblingOccupations  UserFamilyProfile[] @relation("SiblingOccupation")
+  siblingMaritals     UserFamilyProfile[] @relation("SiblingMarital")
+  familyHomes         UserFamilyProfile[] @relation("FamilyHome")
+  nativePlaces        UserFamilyProfile[] @relation("NativePlace")
+
+  @@index([categoryId])
+  @@map("master_values")
+}
+
+model FamilyIncome {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(100)
+  minAmount Int?
+  maxAmount Int?
+  priority  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userProfiles UserFamilyProfile[]
+
+  @@map("family_income")
 }
 
 model Profession {
