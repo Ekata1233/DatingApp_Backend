@@ -331,25 +331,26 @@ export const workController = async (
     const userId = (req as any).user.id;
 
     const {
-      incomeRange,
-      workingWith,
-      workingAs,
-      companyName,
+      professionId,
+      employmentTypeId,
+      experienceId,
+      ambitionId,
+      salaryRangeId,
     } = req.body;
 
-    const user = await updateWorkService(userId, {
-      incomeRange,
-      workingWith,
-      workingAs,
-      companyName,
+    const result = await updateWorkService(userId, {
+      professionId,
+      employmentTypeId,
+      experienceId,
+      ambitionId,
+      salaryRangeId,
     });
 
     return res.status(200).json({
       success: true,
-      message: "Work updated successfully",
-      onboarding_step: user.onboarding.onboarding_step,
-      next_step: user.onboarding.next_step,
-      data: user.eduWork,
+      message: "Work details updated successfully",
+      onboarding_step: result.onboarding.onboarding_step,
+      data: result.eduWork,
     });
   } catch (error: any) {
     return res.status(400).json({

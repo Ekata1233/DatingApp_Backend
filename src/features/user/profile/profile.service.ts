@@ -1,6 +1,7 @@
 import {
   ChildLivingArrangement,
   ChildStatus,
+  EducationLevel,
   Gender,
   GenderOption,
   LivingSituation,
@@ -15,24 +16,7 @@ import { SaveAnswerDTO } from "./profile.types";
 import imagekit from "../../../utils/imagekit";
 import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
 
-// 🔥 Income Range Parser
-const parseIncomeRange = (incomeRange: string) => {
-  if (!incomeRange) return { minIncome: null, maxIncome: null };
 
-  const match = incomeRange
-    .toLowerCase()
-    .match(/(\d+)\s*lakh\s*to\s*(\d+)\s*lakh/);
-
-  if (!match) return { minIncome: null, maxIncome: null };
-
-  const min = parseInt(match[1]) * 100000;
-  const max = parseInt(match[2]) * 100000;
-
-  return {
-    minIncome: min,
-    maxIncome: max,
-  };
-};
 //profile update service
 export const updateProfileService = async (
   userId: string,
@@ -84,17 +68,10 @@ export const updateProfileService = async (
 //Interested In
 export const updateInterestedInService = async (
   userId: string,
-  interested_in: string,
-  sexual_orientation: string,
+  interested_in: Gender,
+  sexual_orientation: GenderOption,
 ) => {
   if (!userId) throw new Error("User ID is missing");
-
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
-  
 
   // 👉 Calculate next step
   const currentStep = "INTRESTED_IN";
@@ -436,40 +413,17 @@ export const updateUserAnswerService = async (
   };
 };
 
-// ✅ ADD THIS (NEW)
-const mapIncomeToEnum = (incomeRange: string) => {
-  switch (incomeRange) {
-    case "INR 1 lakh to 2 lakh":
-      return "INR_1_TO_2_LAKH";
-    case "INR 2 lakh to 4 lakh":
-      return "INR_2_TO_4_LAKH";
-    case "INR 4 lakh to 7 lakh":
-      return "INR_4_TO_7_LAKH";
-    case "INR 10 lakh to 15 lakh":
-      return "INR_10_TO_15_LAKH";
-    case "INR 15 lakh to 20 lakh":
-      return "INR_15_TO_20_LAKH";
-    default:
-      return null;
-  }
-};
-
 //Education
 export const updateEducationService = async (
   userId: string,
   data: {
-    highestEdu?: string;
+     highestEdu?: EducationLevel;
+    degree?: string;
     collegeName?: string;
+    graduationYear?: number;
   },
 ) => {
   if (!userId) throw new Error("User ID is missing");
-
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
- 
 
   const currentStep = "EDUCATION";
   const nextStep = getNextStep( currentStep);
@@ -510,69 +464,58 @@ export const updateEducationService = async (
 //work
 export const updateWorkService = async (
   userId: string,
-  data: {
-    incomeRange: string;
-    workingWith?: any;
-    workingAs?: string;
-    companyName?: string;
-  },
+ data: {
+    professionId?: string;
+    employmentTypeId?: string;
+    experienceId?: string;
+    ambitionId?: string;
+    salaryRangeId?: string;
+  }
 ) => {
-  if (!userId) throw new Error("User ID is missing");
-
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
-
-
-  const currentStep = "WORK";
-  const nextStep = getNextStep( currentStep);
-
-  const { minIncome, maxIncome } = parseIncomeRange(data.incomeRange);
-
-  // ✅ NEW
-  const incomeEnum = mapIncomeToEnum(data.incomeRange);
-
-  if (!incomeEnum) {
-    throw new Error("Invalid income range");
+  if (!userId) {
+    throw new Error("User ID is missing");
   }
 
+  const currentStep = "WORK";
+  const nextStep = getNextStep(currentStep);
+
   const eduWork = await prisma.userEduWork.upsert({
-    where: { userId },
+    where: {
+      userId,
+    },
     update: {
-      incomeRange: incomeEnum, // ✅ FIXED
-      minIncome,
-      maxIncome,
-      workingWith: data.workingWith,
-      workingAs: data.workingAs,
-      companyName: data.companyName,
+      professionId: data.professionId,
+      employmentTypeId: data.employmentTypeId,
+      experienceId: data.experienceId,
+      ambitionId: data.ambitionId,
+      salaryRangeId: data.salaryRangeId,
     },
     create: {
       userId,
-      incomeRange: incomeEnum, // ✅ FIXED
-      minIncome,
-      maxIncome,
-      workingWith: data.workingWith,
-      workingAs: data.workingAs,
-      companyName: data.companyName,
+      professionId: data.professionId,
+      employmentTypeId: data.employmentTypeId,
+      experienceId: data.experienceId,
+      ambitionId: data.ambitionId,
+      salaryRangeId: data.salaryRangeId,
     },
   });
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
+
+  const onboarding = await prisma.user.update({
+    where: {
+      id: userId,
+    },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
     },
     select: {
       onboarding_step: true,
-      next_step: true,
     },
   });
 
   return {
     eduWork,
-    onboarding: updatedUser,
+    onboarding,
   };
 };
 

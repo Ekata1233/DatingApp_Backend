@@ -1,3 +1,4 @@
+import { Gender, GenderOption } from "@prisma/client";
 import { z } from "zod";
 
 // ✅ FULL PROFILE VALIDATION
@@ -36,8 +37,8 @@ export const profileValidation = z.object({
     .min(50, "Height too short")
     .max(300, "Height too tall"),
 
-  gender: z.string().min(1, "Gender is required"),
-  gender_option: z.string().optional(),
+  gender: z.nativeEnum(Gender),
+  gender_option: z.nativeEnum(GenderOption),
 });
 
 export const locationValidation = z.object({

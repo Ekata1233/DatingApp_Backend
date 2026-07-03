@@ -20,7 +20,7 @@ model User {
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  intentionId          String? @db.Uuid
+  intentionId          String?            @db.Uuid
   onboarding_step      String?            @db.VarChar(20)
   next_step            String?            @db.VarChar(20)
   onboarding_completed Boolean            @default(false)
@@ -56,7 +56,7 @@ model User {
   joinedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateParticipant")
   wallet               Wallet?
   datePlanStats        DatePlanUserStats?
-  intention            Intention? @relation(fields: [intentionId], references: [id])
+  intention            Intention?         @relation(fields: [intentionId], references: [id])
 
   @@index([phone_number])
   @@index([google_id])
@@ -66,20 +66,20 @@ model User {
 }
 
 model UserProfile {
-  user_id            String   @id @db.Uuid
-  religion           String?  @db.VarChar(50)
-  community          String?  @db.VarChar(50)
+  user_id            String        @id @db.Uuid
+  religion           String?       @db.VarChar(50)
+  community          String?       @db.VarChar(50)
   interested_in      Gender?
   sexual_orientation GenderOption?
-  country            String?  @db.VarChar(30)
-  state              String?  @db.VarChar(30)
-  city               String?  @db.VarChar(30)
+  country            String?       @db.VarChar(30)
+  state              String?       @db.VarChar(30)
+  city               String?       @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal? @db.Decimal(10, 8)
-  longitude          Decimal? @db.Decimal(11, 8)
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
-  user               User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  latitude           Decimal?      @db.Decimal(10, 8)
+  longitude          Decimal?      @db.Decimal(11, 8)
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+  user               User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religion])
   @@index([community])
@@ -107,24 +107,25 @@ model UserAbout {
 }
 
 model UserEduWork {
-  userId         String @id @db.Uuid
+  userId String @id @db.Uuid
 
   // Education
-  highestEdu     String? @db.VarChar(100)
-  degree         String? @db.VarChar(100)
-  collegeName    String? @db.VarChar(100)
+  highestEdu     EducationLevel?
+  degree         String?         @db.VarChar(100)
+  collegeName    String?         @db.VarChar(100)
   graduationYear Int?
 
   // Work
-  workingWith    WorkingWith?
-  workingAs   String?      @db.VarChar(100)
-  companyName String?      @db.VarChar(100)
-  workStyle   WorkStyle?
-
-  // Income
-  incomeRange IncomeRangeType?
-  minIncome   Int?
-  maxIncome   Int?
+  professionId     String?         @db.Uuid
+  profession       Profession?     @relation(fields: [professionId], references: [id], onDelete: SetNull)
+  employmentTypeId String?         @db.Uuid
+  employmentType   EmploymentType? @relation(fields: [employmentTypeId], references: [id], onDelete: SetNull)
+  experienceId     String?         @db.Uuid
+  experience       Experience?     @relation(fields: [experienceId], references: [id], onDelete: SetNull)
+  ambitionId       String?         @db.Uuid
+  ambition         Ambition?       @relation(fields: [ambitionId], references: [id], onDelete: SetNull)
+  salaryRangeId    String?         @db.Uuid
+  salaryRange      SalaryRange?    @relation(fields: [salaryRangeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -134,20 +135,83 @@ model UserEduWork {
   @@index([highestEdu])
   @@index([degree])
   @@index([graduationYear])
-  @@index([workingWith])
-  @@index([workStyle])
-  @@index([incomeRange])
-  @@index([highestEdu, incomeRange, workingWith])
-  @@index([minIncome, maxIncome])
+  @@index([professionId])
+  @@index([employmentTypeId])
+  @@index([experienceId])
+  @@index([ambitionId])
+  @@index([salaryRangeId])
   @@map("user_edu_work")
 }
 
-enum WorkStyle {
-  REMOTE
-  HYBRID
-  OFFICE
-  FREELANCER
-  BUSINESS_OWNER
+model Profession {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique
+  isActive     Boolean       @default(true)
+  userEduWorks UserEduWork[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("professions")
+}
+
+model EmploymentType {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique
+  isActive     Boolean       @default(true)
+  userEduWorks UserEduWork[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("employment_types")
+}
+
+model Experience {
+  id           String        @id @default(uuid()) @db.Uuid
+  title        String        @unique // Fresher, 1 yr exp, 3 yrs exp
+  sortOrder    Int?
+  isActive     Boolean       @default(true)
+  userEduWorks UserEduWork[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("experiences")
+}
+
+model Ambition {
+  id           String        @id @default(uuid()) @db.Uuid
+  title        String        @unique
+  isActive     Boolean       @default(true)
+  userEduWorks UserEduWork[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("ambitions")
+}
+
+model SalaryRange {
+  id           String        @id @default(uuid()) @db.Uuid
+  title        String        @unique // ₹10–20 LPA
+  minSalary    Int?
+  maxSalary    Int?
+  isActive     Boolean       @default(true)
+  userEduWorks UserEduWork[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("salary_ranges")
+}
+
+enum EducationLevel {
+  HIGH_SCHOOL
+  ITI
+  DIPLOMA
+  UNDERGRADUATE
+  BACHELOR
+  POSTGRADUATE
+  MASTER
+  MPHIL
+  PHD
+  POST_DOCTORATE
 }
 
 model Skill {
@@ -307,18 +371,18 @@ model UserMatch {
 }
 
 model Intention {
-  id                    String   @id @default(uuid()) @db.Uuid
-  title                 String
-  description           String?
-  option                String?
-  optDescription        String?
-  sortOrder             Int      @default(0)
-  isActive              Boolean  @default(true)
+  id             String  @id @default(uuid()) @db.Uuid
+  title          String
+  description    String?
+  option         String?
+  optDescription String?
+  sortOrder      Int     @default(0)
+  isActive       Boolean @default(true)
 
-  users                 User[]
+  users User[]
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Boost {
