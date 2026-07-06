@@ -32,6 +32,7 @@ import professionRoutes from "../features/admin/onboarding/profession/profession
 import employmentTypeRoutes from "../features/admin/onboarding/employmentType/employmentType.route";
 import ExperienceRoutes from "../features/admin/onboarding/experience/experience.routes";
 import ambitionRoutes from "../features/admin/onboarding/ambition/ambition.routes";
+import salaryRangeRoutes from "../features/admin/onboarding/salaryRange/salaryRange.routes";
 
 const router = Router();
 
@@ -50,11 +51,11 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes);
 
 
 
-router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes);
+router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes);
 
 
 // router.use("/users",usersRoutes)
