@@ -16,7 +16,8 @@ import {
   updateUserBioService,
   updateEducationService,
   updateWorkService,
-  updateFamilyProfileService
+  updateFamilyProfileService,
+  updateLanguageService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -156,7 +157,6 @@ export const updateLookingForController = async (
       message: "Relationship preference saved successfully",
       intention: user.intention,
       onboarding_step: user.onboarding_step,
-      next_step: user.next_step,
     });
   } catch (error: any) {
     return res.status(400).json({

@@ -197,7 +197,7 @@ export const updateReligionService = async (
 //LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION 
 export const updateLookingForService = async (
   userId: string,
-  intentionId: number,
+  intentionId: string,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
@@ -209,7 +209,6 @@ export const updateLookingForService = async (
     data: {
       intentionId,
       onboarding_step: currentStep,
-      next_step: nextStep,
     },
     include: {
       intention: true,
@@ -685,13 +684,6 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
     throw new Error("No images provided");
   }
 
-  // Check looking_for (onboarding dependency)
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
- 
 
   // Upload all images
   const uploadedPhotos = await Promise.all(
@@ -835,14 +827,6 @@ export const deleteUserPhotoService = async (
 //Bio
 export const updateUserBioService = async (userId: string, bio?: string) => {
   if (!userId) throw new Error("User ID is required");
-
-  // 🔍 Check onboarding dependency
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
- 
 
   // ✅ Upsert Bio
   const userBio = await prisma.userBio.upsert({
