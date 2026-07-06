@@ -1,12 +1,22 @@
 import { Router } from "express";
-import { create, getAll } from "./religion.controller";
+import {
+  create,
+  update,
+  getAll,
+  getOne,
+  remove,
+} from "./religion.controller";
 
 const router = Router();
 
-// ✅ CREATE / UPDATE
 router.post("/create", create);
 
-// ✅ GET ALL (optional flowType filter → ?flowType=dating)
+router.put("/update/:id", update);
+
 router.get("/get-all", getAll);
+
+router.get("/get/:id", getOne);
+
+router.delete("/remove/:id", remove);
 
 export default router;

@@ -10,14 +10,14 @@ import {
 
 const router = Router();
 
-router.post("/create", create);
+router.post("/profession/create", create);
 
-router.put("/update/:id", update);
+router.put("/profession/update/:id", update);
 
-router.get("/get-all", getAll);
+router.get("/profession/get-all", getAll);
 
-router.get("/get/:id", getOne);
+router.get("/profession/get/:id", getOne);
 
-router.delete("/remove/:id", remove);
+router.delete("/profession/remove/:id", remove);
 
 export default router;

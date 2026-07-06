@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from "express";
+
 import {
-  createReligionData,
-  updateReligionData,
-  getAllReligionData,
-  getReligionById,
-  removeReligionData,
-} from "./religion.service";
+  createEmploymentType,
+  updateEmploymentType,
+  getAllEmploymentType,
+  getEmploymentTypeById,
+  removeEmploymentType,
+} from "./employmentType.service";
 
 /**
  * Create
@@ -16,11 +17,16 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const data = await createReligionData(req.body);
+    const { name, isActive } = req.body;
+
+    const data = await createEmploymentType({
+      name,
+      isActive,
+    });
 
     res.status(201).json({
       success: true,
-      message: "Religion created successfully",
+      message: "Employment Type created successfully",
       data,
     });
   } catch (err) {
@@ -39,11 +45,16 @@ export const update = async (
   try {
     const id = Number(req.params.id);
 
-    const data = await updateReligionData(id, req.body);
+    const { name, isActive } = req.body;
+
+    const data = await updateEmploymentType(id, {
+      name,
+      isActive,
+    });
 
     res.json({
       success: true,
-      message: "Religion updated successfully",
+      message: "Employment Type updated successfully",
       data,
     });
   } catch (err) {
@@ -60,7 +71,7 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
-    const data = await getAllReligionData();
+    const data = await getAllEmploymentType();
 
     res.json({
       success: true,
@@ -82,7 +93,7 @@ export const getOne = async (
   try {
     const id = Number(req.params.id);
 
-    const data = await getReligionById(id);
+    const data = await getEmploymentTypeById(id);
 
     res.json({
       success: true,
@@ -104,11 +115,11 @@ export const remove = async (
   try {
     const id = Number(req.params.id);
 
-    await removeReligionData(id);
+    await removeEmploymentType(id);
 
     res.json({
       success: true,
-      message: "Religion deleted successfully",
+      message: "Employment Type deleted successfully",
     });
   } catch (err) {
     next(err);
