@@ -1,16 +1,28 @@
-export type FlowType = "dating" | "marriage" | "mature";
+export interface ICommunity {
+  name: string;
+  priority: number;
+  active: boolean;
+}
 
 export interface IReligion {
   name: string;
-  communities: string[]; // ✅ changed to string array
+  priority: number;
+  active: boolean;
+  communities: ICommunity[];
 }
 
-export interface IReligionData {
-  _id?: string;
-  flowType: FlowType;
-  title: string;
+export interface IReligionPayload {
   religions: IReligion[];
+}
 
-  createdAt?: string;
-  updatedAt?: string;
+export interface IUpdateReligionPayload {
+  id: string;
+  name?: string;
+  priority?: number;
+  active?: boolean;
+  communities?: ICommunity[];
+}
+
+export interface IRemoveReligionPayload {
+  ids: string[];
 }
