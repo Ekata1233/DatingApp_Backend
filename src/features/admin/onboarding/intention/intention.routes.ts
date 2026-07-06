@@ -12,6 +12,7 @@ router.post("/create", create);
 
 // Get
 router.get("/get-all", getAll);
+router.get("/intention/get", getAll);
 
 // Delete
 router.delete("/delete", remove);

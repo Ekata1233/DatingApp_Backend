@@ -30,7 +30,10 @@ import dateNowRoutes from "../features/dateNow/dateNow.routes";
 import intentionRoutes from "../features/admin/onboarding/intention/intention.routes";
 import professionRoutes from "../features/admin/onboarding/profession/profession.route";
 import employmentTypeRoutes from "../features/admin/onboarding/employmentType/employmentType.route";
+import ExperienceRoutes from "../features/admin/onboarding/experience/experience.routes";
+import ambitionRoutes from "../features/admin/onboarding/ambition/ambition.routes";
 import promptRoutes from "../features/admin/onboarding/prompt/prompt.routes";
+import familyProfileRoutes from "../features/admin/onboarding/familyProfile/familyProfile.routes";
 
 const router = Router();
 
@@ -49,7 +52,9 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,promptRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,promptRoutes,familyProfileRoutes);
+
+router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,promptRoutes);
 
 // router.use("/users",usersRoutes)
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
@@ -77,4 +82,3 @@ router.use(
   dateNowAdminRoutes
 );
 export default router;
-

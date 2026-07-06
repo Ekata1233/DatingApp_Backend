@@ -6,6 +6,8 @@ import {
   getAllEmploymentType,
   getEmploymentTypeById,
   removeEmploymentType,
+  getActiveEmploymentType,
+  
 } from "./employmentType.service";
 
 /**
@@ -120,6 +122,25 @@ export const remove = async (
     res.json({
       success: true,
       message: "Employment Type deleted successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+export const getActive = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const data = await getActiveEmploymentType();
+
+    res.json({
+      success: true,
+      data,
     });
   } catch (err) {
     next(err);

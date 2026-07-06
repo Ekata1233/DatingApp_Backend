@@ -17,5 +17,6 @@ router.post("/create", create);
  *         description: Interested-in options fetched successfully
  */
 router.get("/get-all", getAll);
+router.get("/interested-in/get", getAll);
 
 export default router;

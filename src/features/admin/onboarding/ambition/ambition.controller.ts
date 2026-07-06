@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 
 import {
-  createProfession,
-  updateProfession,
-  getAllProfession,
-  getProfessionById,
-  removeProfession,
-  getActiveProfession,
-} from "./profession.service";
+  createAmbition,
+  updateAmbition,
+  getAllAmbition,
+  getActiveAmbition,
+  getAmbitionById,
+  removeAmbition,
+} from "./ambition.service";
 
 /**
  * Create
@@ -18,16 +18,16 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const { name, isActive } = req.body;
+    const { title, isActive } = req.body;
 
-    const data = await createProfession({
-      name,
+    const data = await createAmbition({
+      title,
       isActive,
     });
 
     res.status(201).json({
       success: true,
-      message: "Profession created successfully",
+      message: "Ambition created successfully",
       data,
     });
   } catch (err) {
@@ -46,16 +46,16 @@ export const update = async (
   try {
     const id = Number(req.params.id);
 
-    const { name, isActive } = req.body;
+    const { title, isActive } = req.body;
 
-    const data = await updateProfession(id, {
-      name,
+    const data = await updateAmbition(id, {
+      title,
       isActive,
     });
 
     res.json({
       success: true,
-      message: "Profession updated successfully",
+      message: "Ambition updated successfully",
       data,
     });
   } catch (err) {
@@ -64,7 +64,7 @@ export const update = async (
 };
 
 /**
- * Get All
+ * Get All (Admin)
  */
 export const getAll = async (
   req: Request,
@@ -72,7 +72,27 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
-    const data = await getAllProfession();
+    const data = await getAllAmbition();
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get Active (Onboarding)
+ */
+export const getActive = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const data = await getActiveAmbition();
 
     res.json({
       success: true,
@@ -94,7 +114,7 @@ export const getOne = async (
   try {
     const id = Number(req.params.id);
 
-    const data = await getProfessionById(id);
+    const data = await getAmbitionById(id);
 
     res.json({
       success: true,
@@ -116,28 +136,11 @@ export const remove = async (
   try {
     const id = Number(req.params.id);
 
-    await removeProfession(id);
+    await removeAmbition(id);
 
     res.json({
       success: true,
-      message: "Profession deleted successfully",
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getActive = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const data = await getActiveProfession();
-
-    res.json({
-      success: true,
-      data,
+      message: "Ambition deleted successfully",
     });
   } catch (err) {
     next(err);

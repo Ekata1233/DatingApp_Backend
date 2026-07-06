@@ -6,6 +6,7 @@ import {
   getAll,
   getOne,
   remove,
+  getActive,
 } from "./profession.controller";
 
 const router = Router();
@@ -19,5 +20,6 @@ router.get("/profession/get-all", getAll);
 router.get("/profession/get/:id", getOne);
 
 router.delete("/profession/remove/:id", remove);
+router.get("/professions/get", getActive);
 
 export default router;
