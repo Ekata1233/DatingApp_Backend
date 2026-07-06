@@ -267,77 +267,77 @@ export const updateAddressService = async (
 };
 
 //About Yourself
-export const updateAboutYourselfService = async (
-  userId: string,
-  data: {
-    maritalStatus?: MaritalStatus;
-    childStatus?: ChildStatus;
-    numberOfChildren?: NumberOfChildren | null;
-    childLivingArrangement?: ChildLivingArrangement | null;
-    livingSituation?: LivingSituation;
-  },
-) => {
-  if (!userId) throw new Error("User ID is missing");
+// export const updateAboutYourselfService = async (
+//   userId: string,
+//   data: {
+//     maritalStatus?: MaritalStatus;
+//     childStatus?: ChildStatus;
+//     numberOfChildren?: NumberOfChildren | null;
+//     childLivingArrangement?: ChildLivingArrangement | null;
+//     livingSituation?: LivingSituation;
+//   },
+// ) => {
+//   if (!userId) throw new Error("User ID is missing");
 
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
+//   const existingUser = await prisma.user.findUnique({
+//     where: { id: userId },
+//     select: { looking_for: true },
+//   });
 
  
 
-  // ✅ Business Validation (IMPORTANT)
-  if (data.childStatus === "NO") {
-    data.numberOfChildren = null;
-    data.childLivingArrangement = null;
-  }
+//   // ✅ Business Validation (IMPORTANT)
+//   if (data.childStatus === "NO") {
+//     data.numberOfChildren = null;
+//     data.childLivingArrangement = null;
+//   }
 
-  if (data.childStatus === "YES" && !data.numberOfChildren) {
-    throw new Error("Number of children is required");
-  }
+//   if (data.childStatus === "YES" && !data.numberOfChildren) {
+//     throw new Error("Number of children is required");
+//   }
 
-  // ✅ Onboarding Step Logic
-  const currentStep = "ABOUT_YOURSELF";
-  const nextStep = getNextStep( currentStep);
+//   // ✅ Onboarding Step Logic
+//   const currentStep = "ABOUT_YOURSELF";
+//   const nextStep = getNextStep( currentStep);
 
-  // ✅ Upsert UserAbout
-  const profile = await prisma.userAbout.upsert({
-    where: { user_id: userId },
-    update: {
-      maritalStatus: data.maritalStatus,
-      childStatus: data.childStatus,
-      numberOfChildren: data.numberOfChildren,
-      childLivingArrangement: data.childLivingArrangement,
-      livingSituation: data.livingSituation,
-    },
-    create: {
-      user_id: userId,
-      maritalStatus: data.maritalStatus,
-      childStatus: data.childStatus,
-      numberOfChildren: data.numberOfChildren,
-      childLivingArrangement: data.childLivingArrangement,
-      livingSituation: data.livingSituation,
-    },
-  });
+//   // ✅ Upsert UserAbout
+//   const profile = await prisma.userAbout.upsert({
+//     where: { user_id: userId },
+//     update: {
+//       maritalStatus: data.maritalStatus,
+//       childStatus: data.childStatus,
+//       numberOfChildren: data.numberOfChildren,
+//       childLivingArrangement: data.childLivingArrangement,
+//       livingSituation: data.livingSituation,
+//     },
+//     create: {
+//       user_id: userId,
+//       maritalStatus: data.maritalStatus,
+//       childStatus: data.childStatus,
+//       numberOfChildren: data.numberOfChildren,
+//       childLivingArrangement: data.childLivingArrangement,
+//       livingSituation: data.livingSituation,
+//     },
+//   });
 
-  // ✅ Update onboarding progress
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      onboarding_step: currentStep,
-      next_step: nextStep,
-    },
-    select: {
-      onboarding_step: true,
-      next_step: true,
-    },
-  });
+//   // ✅ Update onboarding progress
+//   const updatedUser = await prisma.user.update({
+//     where: { id: userId },
+//     data: {
+//       onboarding_step: currentStep,
+//       next_step: nextStep,
+//     },
+//     select: {
+//       onboarding_step: true,
+//       next_step: true,
+//     },
+//   });
 
-  return {
-    profile,
-    onboarding: updatedUser,
-  };
-};
+//   return {
+//     profile,
+//     onboarding: updatedUser,
+//   };
+// };
 
 //Location
 export const updateLocationService = async (
@@ -790,6 +790,7 @@ export const updateUserPhotoService = async (
   return updatedPhoto;
 };
 
+//primary photo
 export const setPrimaryPhotoService = async (
   userId: string,
   photoId: string,
@@ -807,6 +808,7 @@ export const setPrimaryPhotoService = async (
   return photo;
 };
 
+//Delete Photo
 export const deleteUserPhotoService = async (
   userId: string,
   photoId: string,
@@ -868,4 +870,85 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
     bio: userBio,
     onboarding: updatedUser,
   };
+};
+
+//prompt
+export const updateUserPromptService = async (
+  userId: string,
+  prompts: {
+    promptId: string;
+    answer: string;
+  }[]
+) => {
+  if (!userId) {
+    throw new Error("User ID is missing");
+  }
+
+  if (!prompts.length) {
+    throw new Error("Please select at least one prompt");
+  }
+
+  if (prompts.length > 3) {
+    throw new Error("You can select maximum 3 prompts");
+  }
+
+  const currentStep = "PROMPTS";
+  const nextStep = getNextStep(currentStep);
+
+  await prisma.$transaction(async (tx) => {
+    // Ensure UserProfile exists
+    await tx.userProfile.upsert({
+      where: {
+        user_id: userId,
+      },
+      update: {},
+      create: {
+        user_id: userId,
+      },
+    });
+
+    // Remove previous prompts
+    await tx.userPrompt.deleteMany({
+      where: {
+        userId,
+      },
+    });
+
+    // Insert new prompts
+    await tx.userPrompt.createMany({
+      data: prompts.map((item, index) => ({
+        userId,
+        promptId: item.promptId,
+        answer: item.answer.trim(),
+        displayOrder: index + 1,
+      })),
+    });
+
+    // Update onboarding step
+    await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        onboarding_step: currentStep,
+        next_step: nextStep,
+      },
+    });
+  });
+
+  return prisma.userPrompt.findMany({
+    where: {
+      userId,
+    },
+    include: {
+      prompt: {
+        include: {
+          category: true,
+        },
+      },
+    },
+    orderBy: {
+      displayOrder: "asc",
+    },
+  });
 };
