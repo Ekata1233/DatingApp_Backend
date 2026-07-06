@@ -63,3 +63,14 @@ export const removeProfession = async (id: number) => {
     },
   });
 };
+
+export const getActiveProfession = async () => {
+  return await prisma.profession.findMany({
+    where: {
+      isActive: true,
+    },
+    orderBy: {
+      id: "asc",
+    },
+  });
+};

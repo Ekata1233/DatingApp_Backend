@@ -69,3 +69,14 @@ export const removeEmploymentType = async (
     },
   });
 };
+
+export const getActiveEmploymentType = async () => {
+  return prisma.employmentType.findMany({
+    where: {
+      isActive: true,
+    },
+    orderBy: {
+      id: "asc",
+    },
+  });
+};
