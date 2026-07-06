@@ -1,5 +1,8 @@
 import express from "express";
-import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController, aboutYourselfController, saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController } from "./profile.controller";
+import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController,
+  //  aboutYourselfController, 
+   saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController, 
+   UserPromptController} from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -218,7 +221,8 @@ router.patch("/profile/looking-for", authMiddleware, updateLookingForController)
 
 router.patch("/profile/address", authMiddleware, addressController);
 
-router.patch("/profile/about-yourself", authMiddleware,aboutYourselfController);
+// router.patch("/profile/about-yourself", authMiddleware,aboutYourselfController);
+
 
 /**
  * @swagger
@@ -377,5 +381,12 @@ router.patch(
   "/profile/bio",
   authMiddleware,
   updateUserBioController
+);
+
+//prompt
+router.patch(
+  "/profile/prompts",
+  authMiddleware,
+  UserPromptController
 );
 export default router;

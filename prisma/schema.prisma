@@ -58,6 +58,7 @@ model User {
   wallet               Wallet?
   datePlanStats        DatePlanUserStats?
   intention            Intention?         @relation(fields: [intentionId], references: [id])
+  userPrompts          UserPrompt[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -463,6 +464,53 @@ model UserBio {
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("user_bio")
+}
+
+model UserPrompt {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  promptId     String   @db.Uuid
+  answer       String   @db.VarChar(300)
+  displayOrder Int      @default(1)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, promptId])
+  @@index([userId])
+  @@index([promptId])
+  @@map("user_prompts")
+}
+
+model PromptCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  priority    Int      @default(0)
+  active      Boolean  @default(true)
+  prompts     Prompt[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("prompt_categories")
+}
+
+model Prompt {
+  id          String         @id @default(uuid()) @db.Uuid
+  categoryId  String         @db.Uuid
+  question    String         @db.VarChar(255)
+  active      Boolean        @default(true)
+  priority    Int            @default(0)
+  maxLength   Int            @default(200)
+  category    PromptCategory @relation(fields: [categoryId], references: [id])
+  userPrompts UserPrompt[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([categoryId])
+  @@index([active])
+  @@map("prompts")
 }
 
 model UserBlock {

@@ -17,10 +17,10 @@ const router = Router();
 /**
  * Admin
  */
-router.post("/create", create);
-router.put("/update/:id", update);
-router.get("/get-all", getAll);
-router.get("/get-one/:id", getOne);
-router.delete("/remove/:id", remove);
+router.post("/ambitions/create", create);
+router.put("/ambitions/update/:id", update);
+router.get("/ambitions/get-all", getAll);
+router.get("/ambitions/get-one/:id", getOne);
+router.delete("/ambitions/remove/:id", remove);
 router.get("/ambitions/get", getActive);
 export default router;

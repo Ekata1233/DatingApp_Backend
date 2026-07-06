@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { answerValidation, familyProfileValidation, locationValidation, profileValidation } from "./profile.validation";
+import { answerValidation, familyProfileValidation, locationValidation, profileValidation, promptValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -7,7 +7,7 @@ import {
   updateLookingForService,
   updateLocationService,
   updateAddressService,
-  updateAboutYourselfService,
+  // updateAboutYourselfService,
   updateUserAnswerService,
   uploadUserPhotosService,
   updateUserPhotoService,
@@ -17,7 +17,8 @@ import {
   updateEducationService,
   updateWorkService,
   updateFamilyProfileService,
-  updateLanguageService
+  updateLanguageService,
+  updateUserPromptService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -233,41 +234,41 @@ export const updateLocationController = async (
 };
 
 //About Yourself
-export const aboutYourselfController = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.id;
+// export const aboutYourselfController = async (req: Request, res: Response) => {
+//   try {
+//     const userId = (req as any).user.id;
 
-    const {
-      maritalStatus,
-      childStatus,
-      numberOfChildren,
-      childLivingArrangement,
-      livingSituation,
-    } = req.body;
+//     const {
+//       maritalStatus,
+//       childStatus,
+//       numberOfChildren,
+//       childLivingArrangement,
+//       livingSituation,
+//     } = req.body;
 
-    const user = await updateAboutYourselfService(userId, {
-      maritalStatus,
-      childStatus,
-      numberOfChildren,
-      childLivingArrangement,
-      livingSituation,
-    });
+//     const user = await updateAboutYourselfService(userId, {
+//       maritalStatus,
+//       childStatus,
+//       numberOfChildren,
+//       childLivingArrangement,
+//       livingSituation,
+//     });
 
-    return res.status(200).json({
-      success: true,
-      message: "About yourself updated successfully",
-      onboarding_step: user.onboarding.onboarding_step,
-      next_step: user.onboarding.next_step,
-      data: user.profile,
-    });
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
+//     return res.status(200).json({
+//       success: true,
+//       message: "About yourself updated successfully",
+//       onboarding_step: user.onboarding.onboarding_step,
+//       next_step: user.onboarding.next_step,
+//       data: user.profile,
+//     });
+//   } catch (error: any) {
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
 
-};
+// };
 
 //Save answer
 export const saveUserAnswerController = async (
@@ -566,6 +567,31 @@ export const updateUserBioController = async (
     return res.status(400).json({
       success: false,
       message: error.message || "Something went wrong",
+    });
+  }
+};
+
+//prompt
+export const UserPromptController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { prompts } = promptValidation.parse(req.body);
+
+    const data = await updateUserPromptService(userId, prompts);
+
+    return res.status(200).json({
+      success: true,
+      message: "Prompts saved successfully",
+      data,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 };

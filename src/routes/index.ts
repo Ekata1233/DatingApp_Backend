@@ -50,7 +50,7 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes);
 
 
 

@@ -65,6 +65,7 @@ export const bioValidation = z.object({
     .optional(),
 });
 
+//family profile
 export const familyProfileValidation = z.object({
   familyStatusId: z.number().int().optional(),
   familyTypeId: z.number().int().optional(),
@@ -83,4 +84,17 @@ export const familyProfileValidation = z.object({
   nativePlaceId: z.number().int().optional(),
 
   familyIncomeId: z.number().int().optional(),
+});
+
+//prompt
+export const promptValidation = z.object({
+  prompts: z
+    .array(
+      z.object({
+        promptId: z.string().uuid(),
+        answer: z.string().trim().min(1).max(300),
+      })
+    )
+    .min(1)
+    .max(3),
 });
