@@ -7,13 +7,15 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
+
     const data = await IntentionService.createIntention(req.body);
 
-    res.status(200).json({
+    res.json({
       success: true,
-      message: "Intention saved successfully.",
+      message: "Saved Successfully",
       data,
     });
+
   } catch (error) {
     next(error);
   }
@@ -25,12 +27,14 @@ export const getAll = async (
   next: NextFunction
 ) => {
   try {
+
     const data = await IntentionService.getAllIntentions();
 
     res.json({
       success: true,
       data,
     });
+
   } catch (error) {
     next(error);
   }
@@ -42,12 +46,14 @@ export const remove = async (
   next: NextFunction
 ) => {
   try {
+
     await IntentionService.deleteIntention();
 
     res.json({
       success: true,
-      message: "Deleted successfully.",
+      message: "Deleted Successfully",
     });
+
   } catch (error) {
     next(error);
   }

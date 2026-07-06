@@ -4,29 +4,63 @@ import { IIntention } from "./intention.types";
 export const createIntention = async (
   payload: IIntention
 ) => {
-  // Check if a record already exists
-  const existing = await prisma.intention.findFirst();
 
-  // If exists -> update
+  const existing = await prisma.intention.findFirst({
+    include: {
+      options: true,
+    },
+  });
+
+  // UPDATE
   if (existing) {
     return prisma.intention.update({
       where: {
         id: existing.id,
       },
-      data: payload,
+
+      data: {
+        title: payload.title,
+        description: payload.description,
+        sortOrder: payload.sortOrder,
+        isActive: payload.isActive,
+
+        options: {
+          deleteMany: {},
+
+          create: payload.options,
+        },
+      },
+
+      include: {
+        options: true,
+      },
     });
   }
 
-  // Else create new
+  // CREATE
+
   return prisma.intention.create({
-    data: payload,
+    data: {
+      title: payload.title,
+      description: payload.description,
+      sortOrder: payload.sortOrder,
+      isActive: payload.isActive,
+
+      options: {
+        create: payload.options,
+      },
+    },
+
+    include: {
+      options: true,
+    },
   });
 };
 
 export const getAllIntentions = async () => {
   return prisma.intention.findMany({
-    orderBy: {
-      sortOrder: "asc",
+    include: {
+      options: true,
     },
   });
 };

@@ -1,10 +1,13 @@
+export interface IIntentionOption {
+  option: string;
+  optDescription?: string;
+}
+
 export interface IIntention {
   title: string;
   description?: string;
-  option?: string;
-  optDescription?: string;
   sortOrder?: number;
   isActive?: boolean;
-}
 
-export interface IUpdateIntention extends Partial<IIntention> {}
+  options: IIntentionOption[];
+}
