@@ -33,6 +33,8 @@ import employmentTypeRoutes from "../features/admin/onboarding/employmentType/em
 import ExperienceRoutes from "../features/admin/onboarding/experience/experience.routes";
 import ambitionRoutes from "../features/admin/onboarding/ambition/ambition.routes";
 import salaryRangeRoutes from "../features/admin/onboarding/salaryRange/salaryRange.routes";
+import promptRoutes from "../features/admin/onboarding/prompt/prompt.routes";
+import familyProfileRoutes from "../features/admin/onboarding/familyProfile/familyProfile.routes";
 
 const router = Router();
 
@@ -51,7 +53,7 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes);
 
 
 
@@ -84,4 +86,3 @@ router.use(
   dateNowAdminRoutes
 );
 export default router;
-

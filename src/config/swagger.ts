@@ -32,15 +32,7 @@ const options: swaggerJSDoc.Options = {
         description: "OTP login and phone verification APIs",
       },
       {
-        name: "User Google Authentication",
-        description: "Google login and email verification APIs",
-      },
-      {
-        name: "Users Management",
-        description: "User management APIs",
-      },
-      {
-        name: "User Profile",
+        name: "User Onboarding",
         description: "User onboarding profile APIs",
       },
     ],
