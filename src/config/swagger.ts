@@ -31,6 +31,10 @@ const options: swaggerJSDoc.Options = {
         name: "User Mobile Authentication",
         description: "OTP login and phone verification APIs",
       },
+      {
+        name: "User Profile",
+        description: "All Onboarding Steps APIs",
+      },
     ],
 
     // ✅ Add this section
@@ -47,7 +51,10 @@ const options: swaggerJSDoc.Options = {
   },
 
   // ✅ important fix
-  apis: [path.join(process.cwd(), "src/features/**/*.ts")],
+  apis: [
+    path.join(process.cwd(), "src/features/**/*.ts"),
+    path.join(process.cwd(), "dist/features/**/*.js"),
+  ],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
