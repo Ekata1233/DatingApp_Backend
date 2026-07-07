@@ -1,5 +1,4 @@
 import swaggerJSDoc from "swagger-jsdoc";
-import path from "path";
 
 const options: swaggerJSDoc.Options = {
   definition: {
@@ -51,7 +50,9 @@ const options: swaggerJSDoc.Options = {
   },
 
   // ✅ important fix
-  apis: [path.join(process.cwd(), "src/features/**/*.ts")],
+  apis: [
+    "src/features/**/*.ts",
+  ],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
