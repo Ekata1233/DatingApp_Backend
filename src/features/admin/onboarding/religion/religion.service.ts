@@ -8,28 +8,87 @@ export const createReligionData = async (
   payload: IReligionPayload
 ) => {
   return prisma.$transaction(async (tx) => {
-    await tx.community.deleteMany();
-    await tx.religion.deleteMany();
+
+    const createdReligions = [];
 
     for (const religion of payload.religions) {
-      const createdReligion = await tx.religion.create({
-        data: {
+
+      // Check if religion already exists
+      const existingReligion = await tx.religion.findFirst({
+        where: {
           name: religion.name,
-          priority: religion.priority,
-          active: religion.active,
         },
       });
 
-      if (religion.communities.length > 0) {
-        await tx.community.createMany({
-          data: religion.communities.map((community) => ({
-            religionId: createdReligion.id,
-            name: community.name,
-            priority: community.priority,
-            active: community.active,
-          })),
+      let religionId: number;
+
+      if (existingReligion) {
+
+        // Update Religion
+        const updatedReligion = await tx.religion.update({
+          where: {
+            id: existingReligion.id,
+          },
+          data: {
+            priority: religion.priority,
+            active: religion.active,
+          },
         });
+
+        religionId = updatedReligion.id;
+
+      } else {
+
+        // Create Religion
+        const createdReligion = await tx.religion.create({
+          data: {
+            name: religion.name,
+            priority: religion.priority,
+            active: religion.active,
+          },
+        });
+
+        religionId = createdReligion.id;
       }
+
+      // Add Communities
+      for (const community of religion.communities) {
+
+        const existingCommunity = await tx.community.findFirst({
+          where: {
+            religionId,
+            name: community.name,
+          },
+        });
+
+        if (existingCommunity) {
+
+          await tx.community.update({
+            where: {
+              id: existingCommunity.id,
+            },
+            data: {
+              priority: community.priority,
+              active: community.active,
+            },
+          });
+
+        } else {
+
+          await tx.community.create({
+            data: {
+              religionId,
+              name: community.name,
+              priority: community.priority,
+              active: community.active,
+            },
+          });
+
+        }
+
+      }
+
+      createdReligions.push(religionId);
     }
 
     return tx.religion.findMany({
@@ -44,6 +103,7 @@ export const createReligionData = async (
         priority: "asc",
       },
     });
+
   });
 };
 
