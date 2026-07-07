@@ -96,3 +96,97 @@ export const deleteQuestionService = async (id: string) => {
 
   return { message: "Question deleted successfully" };
 };
+
+export const updateQuestionService = async (
+  id: string,
+  title: string,
+  isMulti: boolean
+) => {
+  const existing = await prisma.question.findUnique({
+    where: { id },
+  });
+
+  if (!existing) {
+    throw new Error("Question not found");
+  }
+
+  return prisma.question.update({
+    where: { id },
+    data: {
+      title,
+      isMulti,
+    },
+    include: {
+      options: true,
+    },
+  });
+};
+export const addQuestionOptionService = async (
+  question_id: string,
+  value: string,
+  label: string
+) => {
+  const question = await prisma.question.findUnique({
+    where: {
+      id: question_id,
+    },
+  });
+
+  if (!question) {
+    throw new Error("Question not found");
+  }
+
+  return prisma.questionOption.create({
+    data: {
+      question_id,
+      value,
+      label,
+    },
+  });
+};
+export const updateQuestionOptionService = async (
+  optionId: string,
+  value: string,
+  label: string
+) => {
+  const option = await prisma.questionOption.findUnique({
+    where: {
+      id: optionId,
+    },
+  });
+
+  if (!option) {
+    throw new Error("Option not found");
+  }
+
+  return prisma.questionOption.update({
+    where: {
+      id: optionId,
+    },
+    data: {
+      value,
+      label,
+    },
+  });
+};
+export const deleteQuestionOptionService = async (
+  optionId: string
+) => {
+  const option = await prisma.questionOption.findUnique({
+    where: {
+      id: optionId,
+    },
+  });
+
+  if (!option) {
+    throw new Error("Option not found");
+  }
+
+  await prisma.questionOption.delete({
+    where: {
+      id: optionId,
+    },
+  });
+
+  return true;
+};
