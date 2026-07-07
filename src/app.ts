@@ -55,18 +55,18 @@ app.get("/api-docs", (req, res) => {
           layout: "StandaloneLayout",
 
           operationsSorter: function (a, b) {
-  const orderA =
-    a.get("operation")?.get("x-sort-order") ??
-    a.get("operation")?.toJS()?.["x-sort-order"] ??
-    999;
+          const orderA =
+            a.get("operation")?.get("x-sort-order") ??
+            a.get("operation")?.toJS()?.["x-sort-order"] ??
+            999;
 
-  const orderB =
-    b.get("operation")?.get("x-sort-order") ??
-    b.get("operation")?.toJS()?.["x-sort-order"] ??
-    999;
+          const orderB =
+            b.get("operation")?.get("x-sort-order") ??
+            b.get("operation")?.toJS()?.["x-sort-order"] ??
+            999;
 
-  return orderA - orderB;
-}
+          return orderA - orderB;
+        }
         });
       };
     </script>

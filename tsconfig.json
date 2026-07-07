@@ -29,6 +29,9 @@
   "exclude": ["prisma.config.ts"]
 }
 
+
+
+
 // {
 //   "compilerOptions": {
 //     "target": "ES2020",
