@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { swaggerSpec } from "../config/swagger";
+import { swaggerSpec } from "../src/config/swagger";
 
 fs.writeFileSync(
   path.join(__dirname, "../src/config/swagger.generated.json"),
