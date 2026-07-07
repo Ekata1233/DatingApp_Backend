@@ -5,10 +5,10 @@ const options: swaggerJSDoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Dating App API Documentation",
+      title: "Welvors API Documentation",
       version: "1.0.0",
       description:
-        "API documentation for Dating App built with Node.js, Express, and TypeScript",
+        "API documentation for Welvors built with Node.js, Express, and TypeScript",
     },
 
     servers: [
@@ -24,16 +24,12 @@ const options: swaggerJSDoc.Options = {
 
     tags: [
       {
-        name: "Dynamic Onboarding Data",
-        description: "Dynamic onboarding data management APIs",
+        name: "Onboarding Dynamic Data",
+        description: "Mobile screen data management APIs",
       },
       {
         name: "User Mobile Authentication",
         description: "OTP login and phone verification APIs",
-      },
-      {
-        name: "User Onboarding",
-        description: "User onboarding profile APIs",
       },
     ],
   },

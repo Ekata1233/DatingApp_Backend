@@ -32,6 +32,7 @@ export const getAll = async (
 
     res.json({
       success: true,
+      message: "Looking For options fetched successfully",
       data,
     });
 

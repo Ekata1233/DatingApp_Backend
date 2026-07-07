@@ -137,6 +137,7 @@ export const getActive = async (
 
     res.json({
       success: true,
+      message: "Profession options fetched successfully",
       data,
     });
   } catch (err) {

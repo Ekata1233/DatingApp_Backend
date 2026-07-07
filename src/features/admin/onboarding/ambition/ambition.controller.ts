@@ -96,6 +96,7 @@ export const getActive = async (
 
     res.json({
       success: true,
+      message: "Ambition options fetched successfully",
       data,
     });
   } catch (err) {

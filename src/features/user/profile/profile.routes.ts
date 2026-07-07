@@ -226,7 +226,7 @@ router.patch("/profile/address", authMiddleware, addressController);
 
 /**
  * @swagger
- * /api/user/lnglat:
+ * /api/profile/location:
  *   patch:
  *     summary: Update user latitude and longitude
  *     tags: [User Location]

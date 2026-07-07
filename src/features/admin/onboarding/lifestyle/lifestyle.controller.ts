@@ -28,7 +28,7 @@ export const getAll = async (
 
     const data = await getLifestyle(flowType as string);
 
-    res.json({ success: true, data });
+    res.json({ success: true, message: "Lifestyle question options fetched successfully", data });
   } catch (error) {
     next(error);
   }

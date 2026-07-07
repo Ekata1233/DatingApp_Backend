@@ -140,6 +140,7 @@ export const getActive = async (
 
     res.json({
       success: true,
+      message: "Employment Type options fetched successfully",
       data,
     });
   } catch (err) {

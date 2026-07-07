@@ -56,6 +56,7 @@ export const getActiveExperienceController = async (
 
     return res.status(200).json({
       success: true,
+      message: "Experience options fetched successfully",
       data,
     })
   } catch (error: any) {

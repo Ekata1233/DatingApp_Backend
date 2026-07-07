@@ -52,7 +52,21 @@ app.get("/api-docs", (req, res) => {
             SwaggerUIBundle.presets.apis,
             SwaggerUIStandalonePreset
           ],
-          layout: "StandaloneLayout"
+          layout: "StandaloneLayout",
+
+          operationsSorter: function (a, b) {
+  const orderA =
+    a.get("operation")?.get("x-sort-order") ??
+    a.get("operation")?.toJS()?.["x-sort-order"] ??
+    999;
+
+  const orderB =
+    b.get("operation")?.get("x-sort-order") ??
+    b.get("operation")?.toJS()?.["x-sort-order"] ??
+    999;
+
+  return orderA - orderB;
+}
         });
       };
     </script>
