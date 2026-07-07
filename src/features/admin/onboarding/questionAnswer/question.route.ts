@@ -4,6 +4,10 @@ import {
   getQuestionController,
   getQuestionByIdController,
   deleteQuestionController,
+  updateQuestionController,
+  deleteQuestionOptionController,
+  updateQuestionOptionController,
+  addQuestionOptionController,
 } from "./question.controller";
 
 
@@ -19,5 +23,8 @@ router.get("/fetch", getQuestionController);
 router.get("/question/:id", getQuestionByIdController);
 
 router.delete("/delete/:id", deleteQuestionController);
-
+router.put("/update/:id", updateQuestionController);
+router.post("/:questionId/options", addQuestionOptionController);
+router.put("/options/:optionId", updateQuestionOptionController);
+router.delete("/options/:optionId", deleteQuestionOptionController);
 export default router;
