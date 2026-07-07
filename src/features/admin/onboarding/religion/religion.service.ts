@@ -152,3 +152,91 @@ export const removeReligionData = async (id: number) => {
     });
   });
 };
+
+export const updateReligionOnly = async (
+  id: number,
+  payload: {
+    name?: string;
+    priority?: number;
+    active?: boolean;
+  }
+) => {
+  return prisma.religion.update({
+    where: { id },
+    data: {
+      ...(payload.name !== undefined && { name: payload.name }),
+      ...(payload.priority !== undefined && { priority: payload.priority }),
+      ...(payload.active !== undefined && { active: payload.active }),
+    },
+    include: {
+      communities: {
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
+  });
+};
+
+export const addCommunityToReligion = async (
+  religionId: number,
+  payload: {
+    name: string;
+    priority: number;
+    active: boolean;
+  }
+) => {
+  return prisma.community.create({
+    data: {
+      religionId,
+      name: payload.name,
+      priority: payload.priority,
+      active: payload.active,
+    },
+  });
+};
+export const updateCommunityData = async (
+  communityId: number,
+  payload: {
+    name?: string;
+    priority?: number;
+    active?: boolean;
+  }
+) => {
+  return prisma.community.update({
+    where: {
+      id: communityId,
+    },
+    data: {
+      ...(payload.name !== undefined && { name: payload.name }),
+      ...(payload.priority !== undefined && { priority: payload.priority }),
+      ...(payload.active !== undefined && { active: payload.active }),
+    },
+  });
+};
+export const deleteCommunityData = async (
+  communityId: number
+) => {
+  return prisma.community.delete({
+    where: {
+      id: communityId,
+    },
+  });
+};
+export const deleteReligionWithCommunities = async (
+  religionId: number
+) => {
+  return prisma.$transaction(async (tx) => {
+    await tx.community.deleteMany({
+      where: {
+        religionId,
+      },
+    });
+
+    return tx.religion.delete({
+      where: {
+        id: religionId,
+      },
+    });
+  });
+};
