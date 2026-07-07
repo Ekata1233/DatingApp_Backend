@@ -1,6 +1,20 @@
 import swaggerJSDoc from "swagger-jsdoc";
 import path from "path";
 
+
+console.log("process.cwd():", process.cwd());
+console.log("__dirname:", __dirname);
+
+console.log(
+  "src path:",
+  path.join(process.cwd(), "src/features/**/*.ts")
+);
+
+console.log(
+  "dist path:",
+  path.join(process.cwd(), "dist/features/**/*.js")
+);
+
 const options: swaggerJSDoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -51,7 +65,10 @@ const options: swaggerJSDoc.Options = {
   },
 
   // ✅ important fix
-  apis: [path.join(process.cwd(), "src/features/**/*.ts")],
+ apis: [
+  path.join(process.cwd(), "src/features/**/*.ts"),
+  path.join(process.cwd(), "dist/features/**/*.js"),
+]
 };
 
 export const swaggerSpec = swaggerJSDoc(options);

@@ -28,6 +28,12 @@ app.use(
   })
 );
 
+console.log(
+  "Swagger Paths:",
+  Object.keys((swaggerSpec as any).paths || {})
+);
+
+console.log(swaggerSpec);
 app.get("/api-docs", (req, res) => {
   res.send(`
   <!DOCTYPE html>
