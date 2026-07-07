@@ -30,6 +30,11 @@ app.use(
 const spec = swaggerSpec as any;
 console.log("Swagger paths count:", Object.keys(spec.paths || {}).length);
 console.log("Swagger paths:", Object.keys(spec.paths || {}));
+
+app.get("/swagger-json", (req, res) => {
+  res.json(swaggerSpec);
+});
+
 app.get("/api-docs", (req, res) => {
   res.send(`
   <!DOCTYPE html>
