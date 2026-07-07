@@ -1,6 +1,6 @@
 import swaggerJSDoc from "swagger-jsdoc";
 import path from "path";
-
+import fs from "fs";
 
 console.log("process.cwd():", process.cwd());
 console.log("__dirname:", __dirname);
@@ -13,6 +13,15 @@ console.log(
 console.log(
   "dist path:",
   path.join(process.cwd(), "dist/features/**/*.js")
+);
+console.log(
+  "Features exists:",
+  fs.existsSync(path.join(process.cwd(), "src/features"))
+);
+
+console.log(
+  "Dist exists:",
+  fs.existsSync(path.join(process.cwd(), "dist/features"))
 );
 
 const options: swaggerJSDoc.Options = {

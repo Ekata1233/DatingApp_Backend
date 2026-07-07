@@ -27,13 +27,9 @@ app.use(
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   })
 );
-
-console.log(
-  "Swagger Paths:",
-  Object.keys((swaggerSpec as any).paths || {})
-);
-
-console.log(swaggerSpec);
+const spec = swaggerSpec as any;
+console.log("Swagger paths count:", Object.keys(spec.paths || {}).length);
+console.log("Swagger paths:", Object.keys(spec.paths || {}));
 app.get("/api-docs", (req, res) => {
   res.send(`
   <!DOCTYPE html>
