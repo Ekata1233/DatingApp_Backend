@@ -51,10 +51,7 @@ const options: swaggerJSDoc.Options = {
   },
 
   // ✅ important fix
-  apis: [
-    path.join(process.cwd(), "src/features/**/*.ts"),
-    path.join(process.cwd(), "dist/features/**/*.js"),
-  ],
+  apis: [path.join(process.cwd(), "src/features/**/*.ts")],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);

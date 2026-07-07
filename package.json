@@ -5,11 +5,9 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "npm run swagger && tsc",
+    "build": "tsc",
     "start": "node dist/server.js",
-    "postinstall": "prisma generate",
-    "swagger": "ts-node scripts/generate-swagger.ts",
-    "vercel-build": "npm run swagger && tsc"
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
