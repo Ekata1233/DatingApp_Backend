@@ -32,10 +32,22 @@ const options: swaggerJSDoc.Options = {
         description: "OTP login and phone verification APIs",
       },
     ],
+
+    // ✅ Add this section
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Enter your JWT token",
+        },
+      },
+    },
   },
 
   // ✅ important fix
- apis: [path.join(process.cwd(), "src/features/**/*.ts")],
+  apis: [path.join(process.cwd(), "src/features/**/*.ts")],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
