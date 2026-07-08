@@ -2,29 +2,23 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/server.js",
+      "src": "src/server.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api-docs",
-      "dest": "dist/server.js"
+      "dest": "src/server.ts"
     },
     {
-      "src": "/api-docs-json",
-      "dest": "dist/server.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "dist/server.js"
+      "src": "/api-docs/(.*)",
+      "dest": "src/server.ts"
     },
     {
       "src": "/(.*)",
-      "dest": "dist/server.js"
+      "dest": "src/server.ts"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
+
