@@ -20,7 +20,7 @@ router.delete("/profession/remove/:id", remove);
 // Get
 /**
  * @swagger
- * /api/onboarding/profession/get:
+ * /api/onboarding/professions/get:
  *   get:
  *     summary: Get all profession onboarding options
  *     tags: [Onboarding Dynamic Data]

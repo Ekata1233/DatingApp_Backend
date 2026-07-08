@@ -50,4 +50,4 @@ try {
   spec = swaggerJSDoc(options);
 }
 
-export const swaggerSpec = spec;
+export const swaggerSpec = spec;   
