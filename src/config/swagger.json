@@ -55,7 +55,7 @@
         }
       }
     },
-    "/api/onboarding/employment-types/get": {
+    "/api/onboarding/employment-type/get": {
       "get": {
         "summary": "Get all employment type onboarding options",
         "tags": [
