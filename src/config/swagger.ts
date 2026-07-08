@@ -1,6 +1,7 @@
 import swaggerJSDoc from "swagger-jsdoc";
+import path from "path";
 
-const options: swaggerJSDoc.Options = {
+export const options: swaggerJSDoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
@@ -9,7 +10,6 @@ const options: swaggerJSDoc.Options = {
       description:
         "API documentation for Welvors built with Node.js, Express, and TypeScript",
     },
-
     servers: [
       {
         url: process.env.PRODUCTION_URL || "https://dating-app-backend-plum.vercel.app",
@@ -20,23 +20,11 @@ const options: swaggerJSDoc.Options = {
         description: "Local Server",
       },
     ],
-
     tags: [
-      {
-        name: "Onboarding Dynamic Data",
-        description: "Mobile screen data management APIs",
-      },
-      {
-        name: "User Mobile Authentication",
-        description: "OTP login and phone verification APIs",
-      },
-      {
-        name: "User Profile",
-        description: "All Onboarding Steps APIs",
-      },
+      { name: "Onboarding Dynamic Data", description: "Mobile screen data management APIs" },
+      { name: "User Mobile Authentication", description: "OTP login and phone verification APIs" },
+      { name: "User Profile", description: "All Onboarding Steps APIs" },
     ],
-
-    // ✅ Add this section
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -48,11 +36,18 @@ const options: swaggerJSDoc.Options = {
       },
     },
   },
-
-  // ✅ important fix
-  apis: [
-    "src/features/**/*.ts",
-  ],
+  // Absolute path so it works regardless of cwd during generation
+  apis: [path.join(process.cwd(), "src/features/**/*.ts")],
 };
 
-export const swaggerSpec = swaggerJSDoc(options);
+// Runtime: use the prebuilt JSON (works on Vercel).
+// Fallback to live generation only in local dev if the JSON isn't there yet.
+let spec: object;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  spec = require("./swagger.json");
+} catch {
+  spec = swaggerJSDoc(options);
+}
+
+export const swaggerSpec = spec;
