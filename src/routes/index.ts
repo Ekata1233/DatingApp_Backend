@@ -37,6 +37,7 @@ import promptRoutes from "../features/admin/onboarding/prompt/prompt.routes";
 import familyProfileRoutes from "../features/admin/onboarding/familyProfile/familyProfile.routes";
 import languageRoutes from "../features/admin/onboarding/language/language.routes";
 import waitlistRoutes from "../features/admin/waitlist/waitlist.routes";
+import referralRoutes from "../features/user/referral/referral.routes"
 
 const router = Router();
 
@@ -64,7 +65,7 @@ router.use("/user",waitlistRoutes)
 
 
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

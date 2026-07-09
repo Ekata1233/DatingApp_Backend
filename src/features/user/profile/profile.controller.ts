@@ -341,18 +341,22 @@ export const workController = async (
 
     const {
       professionId,
+      companyName,
       employmentTypeId,
       experienceId,
       ambitionId,
       salaryRangeId,
+      bigDreams,
     } = req.body;
 
     const result = await updateWorkService(userId, {
       professionId,
+      companyName,
       employmentTypeId,
       experienceId,
       ambitionId,
       salaryRangeId,
+      bigDreams,
     });
 
     return res.status(200).json({
@@ -436,10 +440,22 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
       });
     }
 
-    let images = req.files.images;
+    let images: any = req.files.images;
 
     if (!Array.isArray(images)) {
       images = [images];
+    }
+
+    // ✅ File size validation (5 MB per image)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+    for (const image of images) {
+      if (image.size > MAX_FILE_SIZE) {
+        return res.status(413).json({
+          success: false,
+          message: "Each image must be smaller than 5 MB.",
+        });
+      }
     }
 
     const result = await uploadUserPhotosService(userId, images);
@@ -454,11 +470,10 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(400).json({
       success: false,
-      message: error.message,
+      message: error.message || "Something went wrong.",
     });
   }
 };
-
 export const updatePhotoController = async (req: Request<{ photoId: string }>, res: Response) => {
   try {
     const userId = (req as any).user.id;

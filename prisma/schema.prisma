@@ -228,6 +228,7 @@ model UserEduWork {
   // Work
   professionId     Int?
   profession       Profession?     @relation(fields: [professionId], references: [id], onDelete: SetNull)
+  companyName      String?         @db.VarChar(100)
   employmentTypeId Int?
   employmentType   EmploymentType? @relation(fields: [employmentTypeId], references: [id], onDelete: SetNull)
   experienceId     Int?
@@ -236,6 +237,7 @@ model UserEduWork {
   ambition         Ambition?       @relation(fields: [ambitionId], references: [id], onDelete: SetNull)
   salaryRangeId    Int?
   salaryRange      SalaryRange?    @relation(fields: [salaryRangeId], references: [id], onDelete: SetNull)
+  bigDreams        String?         @db.VarChar(100)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
