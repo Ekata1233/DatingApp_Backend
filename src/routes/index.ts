@@ -60,7 +60,7 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 
 
-router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes);
+router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes);
 router.use("/user",waitlistRoutes)
 
 
