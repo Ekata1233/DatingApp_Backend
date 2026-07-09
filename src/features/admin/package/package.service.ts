@@ -1,5 +1,4 @@
 import { prisma } from "../../../prisma/prismaClient";
-import { PackageType } from "@prisma/client";
 import { CreatePackageInput } from "./package.validation";
 
 export const createPackageService = async (

@@ -772,17 +772,17 @@ enum EventType {
 }
 
 model Package {
-  id             String  @id @default(uuid()) @db.Uuid
-  name           String  @db.VarChar(100)
-  slug           String  @unique
+  id             String      @id @default(uuid()) @db.Uuid
+  name           PackageType @unique
+  slug           String      @unique
   tagline        String?
   badgeLabel     String?
   discoveryPool  String?
   visibilityRule String?
   description    String?
-  isPopular      Boolean @default(false)
-  active         Boolean @default(true)
-  sortOrder      Int     @default(0)
+  isPopular      Boolean     @default(false)
+  active         Boolean     @default(true)
+  sortOrder      Int         @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -793,6 +793,12 @@ model Package {
   currentUserPackages UserPackage[]  @relation("currentPackageRelation")
 
   @@map("package")
+}
+
+enum PackageType {
+  PREMIUM
+  VIP
+  VIP_ELITE
 }
 
 model PackagePrice {
