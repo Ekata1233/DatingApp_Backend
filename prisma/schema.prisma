@@ -1580,6 +1580,7 @@ model LaunchConfig {
   appLaunched     Boolean   @default(false)
   launchDate      DateTime?
   waitlistPrice   Decimal   @default(300) @db.Decimal(10, 2)
+  description     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }

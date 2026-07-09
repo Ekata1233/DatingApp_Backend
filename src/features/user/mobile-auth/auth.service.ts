@@ -2,6 +2,7 @@ import { twilioClient, verifyServiceSid } from "../../../config/twilio";
 import { prisma } from "../../../prisma/prismaClient";
 import jwt from "jsonwebtoken";
 import { setUserOnline } from "../../lastActivity/lastActivity.service";
+import { generateReferralCode } from "../../../utils/referral";
 
 export const sendOtp = async (phoneNumber: string) => {
   if (!phoneNumber) throw new Error("Phone number is required");
@@ -20,7 +21,7 @@ export const sendOtp = async (phoneNumber: string) => {
   return verification;
 };
 
-export const verifyOtp = async (phoneNumber: string, otp: string) => {
+export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?: string) => {
   if (!phoneNumber || !otp) throw new Error("Phone & OTP required");
 
   const formattedNumber = phoneNumber.startsWith("+91")
@@ -36,52 +37,87 @@ export const verifyOtp = async (phoneNumber: string, otp: string) => {
       code: otp,
     });
 
-
   if (verificationCheck.status !== "approved") {
     throw new Error("Invalid OTP");
   }
 
   // Transaction starts here
   const user = await prisma.$transaction(async (tx) => {
-    // Create user if doesn't exist
-    const user = await tx.user.upsert({
+
+    // Check if user already exists
+    let existingUser = await tx.user.findUnique({
       where: {
         phone_number: formattedNumber,
-      },
-      update: {
-        is_phone_verified: true,
-      },
-      create: {
-        phone_number: formattedNumber,
-        is_phone_verified: true,
       },
     });
 
-    // Create wallet only if it doesn't exist
+    const isNewUser = !existingUser;
+
+    if (!existingUser) {
+
+      const myReferralCode = await generateReferralCode();
+
+      existingUser = await tx.user.create({
+        data: {
+          phone_number: formattedNumber,
+          is_phone_verified: true,
+          referralCode: myReferralCode,
+        },
+      });
+
+      // Referral processing
+      if (referralCode) {
+        const referrer = await tx.user.findUnique({
+          where: {
+            referralCode,
+          },
+        });
+
+        if (referrer && referrer.id !== existingUser.id) {
+
+          await tx.userReferral.create({
+            data: {
+              referrerId: referrer.id,
+              referredUserId: existingUser.id,
+              status: "SIGNED_UP",
+            },
+          });
+        }
+      }
+    } else {
+      await tx.user.update({
+        where: {
+          id: existingUser.id,
+        },
+        data: {
+          is_phone_verified: true,
+        },
+      });
+    }
+
     await tx.wallet.upsert({
       where: {
-        userId: user.id,
+        userId: existingUser.id,
       },
-      update: {}, // Nothing to update
+      update: {},
       create: {
-        userId: user.id,
+        userId: existingUser.id,
         balance: 0,
       },
     });
 
-    // Create Date Plan Stats only if it doesn't exist
     await tx.datePlanUserStats.upsert({
       where: {
-        userId: user.id,
+        userId: existingUser.id,
       },
       update: {},
       create: {
-        userId: user.id,
-        balance: 0, // Optional since your schema has @default(0)
+        userId: existingUser.id,
       },
     });
 
-    return user;
+    return existingUser;
+
   });
 
   //LAST SEEEN AND ONLINE PRESENCE HANDLING
