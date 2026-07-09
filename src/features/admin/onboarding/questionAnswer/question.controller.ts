@@ -13,6 +13,8 @@ import {
   addQuestionOptionService,
   updateQuestionOptionService,
   deleteQuestionOptionService,
+  clearQuestionService,
+  deleteQuestionWithOptionsService,
 } from "./question.service";
 
 // CREATE QUESTION
@@ -207,6 +209,28 @@ export const deleteQuestionOptionController = async (
     });
   } catch (error: any) {
     res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+export const deleteQuestionWithOptionsController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { questionId } = req.params;
+
+    const result = await deleteQuestionWithOptionsService(questionId);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
       success: false,
       message: error.message,
     });

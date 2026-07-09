@@ -8,6 +8,7 @@ import {
   deleteQuestionOptionController,
   updateQuestionOptionController,
   addQuestionOptionController,
+  deleteQuestionWithOptionsController,
 } from "./question.controller";
 
 
@@ -27,4 +28,9 @@ router.put("/update/:id", updateQuestionController);
 router.post("/:questionId/options", addQuestionOptionController);
 router.put("/options/:optionId", updateQuestionOptionController);
 router.delete("/options/:optionId", deleteQuestionOptionController);
+router.delete(
+  "/delete-question/:questionId",
+  deleteQuestionWithOptionsController
+);
+
 export default router;

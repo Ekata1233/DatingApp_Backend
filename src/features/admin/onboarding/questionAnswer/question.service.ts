@@ -169,24 +169,37 @@ export const updateQuestionOptionService = async (
     },
   });
 };
-export const deleteQuestionOptionService = async (
-  optionId: string
+
+export const deleteQuestionWithOptionsService = async (
+  questionId: string
 ) => {
-  const option = await prisma.questionOption.findUnique({
+  const question = await prisma.question.findUnique({
     where: {
-      id: optionId,
+      id: questionId,
     },
   });
 
-  if (!option) {
-    throw new Error("Option not found");
+  if (!question) {
+    throw new Error("Question not found");
   }
 
-  await prisma.questionOption.delete({
-    where: {
-      id: optionId,
-    },
+  await prisma.$transaction(async (tx) => {
+    // Delete all options of this question
+    await tx.questionOption.deleteMany({
+      where: {
+        question_id: questionId,
+      },
+    });
+
+    // Delete question
+    await tx.question.delete({
+      where: {
+        id: questionId,
+      },
+    });
   });
 
-  return true;
+  return {
+    message: "Question and all related options deleted successfully",
+  };
 };

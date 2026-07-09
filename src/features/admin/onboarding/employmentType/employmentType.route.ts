@@ -18,7 +18,7 @@ router.get("/employment-type/get-all", getAll);
 // Get
 /**
  * @swagger
- * /api/onboarding/employment-types/get:
+ * /api/onboarding/employment-type/get:
  *   get:
  *     summary: Get all employment type onboarding options
  *     tags: [Onboarding Dynamic Data]
