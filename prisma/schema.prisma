@@ -26,6 +26,7 @@ model User {
   onboarding_completed Boolean            @default(false)
   last_active_at       DateTime?
   device_token         String?
+  referralCode         String?            @unique @db.VarChar(20)
   badge_count          Int                @default(0)
   deleted_at           DateTime?
   created_at           DateTime           @default(now())
@@ -59,6 +60,11 @@ model User {
   datePlanStats        DatePlanUserStats?
   intention            Intention?         @relation(fields: [intentionId], references: [id])
   userPrompts          UserPrompt[]
+  UserPlanUsage        UserPlanUsage[]
+  waitlist             Waitlist?
+  referralsMade        UserReferral[]     @relation("Referrer")
+  referralStats        UserReferralStats?
+  receivedReferral     UserReferral?      @relation("ReferredUser")
 
   @@index([phone_number])
   @@index([google_id])
@@ -93,6 +99,48 @@ model UserProfile {
   @@index([country, state, city])
   @@index([latitude, longitude])
   @@map("user_profiles")
+}
+
+model UserReferral {
+  id             String         @id @default(uuid()) @db.Uuid
+  referrerId     String         @db.Uuid
+  referredUserId String         @unique @db.Uuid
+  status         ReferralStatus @default(PENDING)
+  signupReward   Int            @default(0)
+  purchaseReward Int            @default(0)
+  rewardedAt     DateTime?
+  purchaseAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  referrer     User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser User @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@index([createdAt])
+}
+
+model UserReferralStats {
+  userId           String   @id @db.Uuid
+  totalInvites     Int      @default(0)
+  joinedUsers      Int      @default(0)
+  purchasedUsers   Int      @default(0)
+  totalCoinsEarned Int      @default(0)
+  pendingRewards   Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ReferralStatus {
+  PENDING
+  SIGNED_UP
+  PURCHASED
+  REWARDED
+  CANCELLED
 }
 
 model UserLanguage {
@@ -724,90 +772,164 @@ enum EventType {
 }
 
 model Package {
-  id          String      @id @default(uuid())
-  name        PackageType @unique
-  title       String
-  description String?
-  isActive    Boolean     @default(true)
-
-  plans        PackagePlan[]
-  features     PackageFeature[]
-  userPackages UserPackage[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-enum PackageType {
-  PREMIUM
-  VIP
-  VIP_ELITE
-}
-
-model PackagePlan {
-  id              String   @id @default(uuid())
-  packageId       String
-  durationMonths  Int // 1, 3, 6
-  originalPrice   Decimal  @db.Decimal(10, 2)
-  discountedPrice Decimal? @db.Decimal(10, 2)
-  discountPercent Float?
-
-  isPopular   Boolean @default(false)
-  isBestValue Boolean @default(false)
-  isActive    Boolean @default(true)
-
-  package      Package       @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  userPackages UserPackage[]
+  id             String  @id @default(uuid()) @db.Uuid
+  name           String  @db.VarChar(100)
+  slug           String  @unique
+  tagline        String?
+  badgeLabel     String?
+  discoveryPool  String?
+  visibilityRule String?
+  description    String?
+  isPopular      Boolean @default(false)
+  active         Boolean @default(true)
+  sortOrder      Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([packageId, durationMonths])
-  @@index([packageId])
+  prices              PackagePrice[]
+  limits              PlanLimit[]
+  UserPackage         UserPackage[]  @relation("packageRelation")
+  currentUserPackages UserPackage[]  @relation("currentPackageRelation")
+
+  @@map("package")
+}
+
+model PackagePrice {
+  id              String       @id @default(uuid()) @db.Uuid
+  packageId       String       @db.Uuid
+  package         Package      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  billingCycle    BillingCycle
+  months          Int?
+  price           Decimal      @db.Decimal(10, 2)
+  originalPrice   Decimal?     @db.Decimal(10, 2)
+  discountPercent Int?
+  isHighlighted   Boolean      @default(false)
+  active          Boolean      @default(true)
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  UserPackage UserPackage[]
+
+  @@unique([packageId, billingCycle])
+  @@map("plan_prices")
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+  LIFETIME
+}
+
+enum FeatureCategory {
+  MATCH_DISCOVERY
+  CHAT
+  TRUST
+  PRIVACY
+  STATUS
+  EVENTS
+  PERKS
+  FOREVER_LOVE
 }
 
 model PackageFeature {
-  id            String  @id @default(uuid())
-  packageId     String
-  key           String
-  label         String // e.g. "Unlimited Swipes"
-  isHighlighted Boolean @default(false)
+  id            String          @id @default(uuid()) @db.Uuid
+  category      FeatureCategory
+  code          String          @unique
+  title         String
+  description   String?
+  icon          String?
+  sortOrder     Int             @default(0)
+  active        Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  limits        PlanLimit[]
+  UserPlanUsage UserPlanUsage[]
 
-  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  @@map("features")
+}
 
-  createdAt DateTime @default(now())
+model PlanLimit {
+  id        String         @id @default(uuid()) @db.Uuid
+  packageId String         @db.Uuid
+  featureId String         @db.Uuid
+  package   Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  feature   PackageFeature @relation(fields: [featureId], references: [id])
+  enabled   Boolean        @default(false)
+  unlimited Boolean        @default(false)
+  limit     Int?
+  unit      String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([packageId, featureId])
+  @@map("plan_limits")
 }
 
 model UserPackage {
-  id        String @id @default(uuid())
-  user_id   String @db.Uuid
-  packageId String
-  planId    String
-
-  startDate DateTime
-  endDate   DateTime
-  status    PackageStatus @default(ACTIVE)
+  id                    String        @id @default(uuid()) @db.Uuid
+  user_id               String        @db.Uuid
+  packageId             String        @db.Uuid
+  priceId               String        @db.Uuid
+  purchasePrice         Decimal
+  purchaseOriginalPrice Decimal?
+  purchaseDiscount      Int?
+  startDate             DateTime
+  endDate               DateTime?
+  status                PackageStatus @default(ACTIVE)
+  autoRenew             Boolean       @default(false)
+  paymentId             String?       @db.Uuid
+  currentPackageId      String?       @db.Uuid
+  currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user    User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  package Package     @relation(fields: [packageId], references: [id])
-  plan    PackagePlan @relation(fields: [planId], references: [id])
+  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  package Package      @relation("packageRelation", fields: [packageId], references: [id])
+  price   PackagePrice @relation(fields: [priceId], references: [id])
 
   @@index([user_id])
+  @@index([packageId])
+  @@index([status])
+  @@index([endDate])
+  @@map("user_packages")
+}
+
+model UserPlanUsage {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  featureId  String         @db.Uuid
+  used       Int            @default(0)
+  resetAt    DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  user       User           @relation(fields: [userId], references: [id])
+  feature    PackageFeature @relation(fields: [featureId], references: [id])
+
+  @@unique([userId, featureId])
+  @@index([userId])
+  @@index([featureId])
+  @@map("user_plan_usage")
 }
 
 model Payment {
-  id         String   @id @default(uuid())
-  userId     String   @db.Uuid
-  packageId  String?
-  amount     Float
-  currency   String
-  provider   String
-  payment_id String   @db.Uuid
-  status     String
-  created_at DateTime @default(now())
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @db.Uuid
+  packageId       String?
+  amount          Decimal        @db.Decimal(10, 2)
+  currency        String         @default("INR")
+  payment_id      String?
+  transactionId   String?
+  status          PaymentStatus  @default(PENDING)
+  purpose         PaymentPurpose
+  gatewayResponse Json?
+  paidAt          DateTime?
+  created_at      DateTime       @default(now())
+  Waitlist        Waitlist[]
 }
 
 model Notification {
@@ -1267,7 +1389,8 @@ enum TransactionSource {
   DATE_PLAN_BOOKING
   DATE_PLAN_REFUND
   WITHDRAWAL
-  REFERRAL_REWARD
+  REFERRAL_SIGNUP
+  REFERRAL_PURCHASE
 }
 
 enum MessageType {
@@ -1321,6 +1444,9 @@ enum PackageStatus {
   ACTIVE
   EXPIRED
   CANCELLED
+  PENDING
+  FAILED
+  REFUNDED
 }
 
 enum LookingFor {
@@ -1419,4 +1545,66 @@ enum SwipeAction {
   LIKE
   PASS
   SUPERLIKE
+}
+
+model Waitlist {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @unique @db.Uuid
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  waitlistNumber     Int             @unique
+  amountPaid         Decimal         @db.Decimal(10, 2)
+  paymentStatus      PaymentStatus   @default(PENDING)
+  launchBenefit      LaunchBenefit   @default(ONE_MONTH_PREMIUM)
+  premiumActivated   Boolean         @default(false)
+  premiumActivatedAt DateTime?
+  source             WaitlistSource?
+  paymentId          String?         @db.Uuid
+  payment            Payment?        @relation(fields: [paymentId], references: [id])
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([paymentStatus])
+  @@map("waitlists")
+}
+
+model LaunchConfig {
+  id              String    @id @default(uuid()) @db.Uuid
+  waitlistEnabled Boolean   @default(true)
+  appLaunched     Boolean   @default(false)
+  launchDate      DateTime?
+  waitlistPrice   Decimal   @default(300) @db.Decimal(10, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentPurpose {
+  WAITLIST
+  PACKAGE
+  BOOST
+  COINS
+}
+
+enum WaitlistSource {
+  INSTAGRAM
+  FACEBOOK
+  GOOGLE
+  WEBSITE
+  REFERRAL
+  YOUTUBE
+  LINKEDIN
+  OTHER
+}
+
+enum LaunchBenefit {
+  ONE_MONTH_PREMIUM
+  THREE_MONTH_PREMIUM
+  LIFETIME_DISCOUNT
 }
