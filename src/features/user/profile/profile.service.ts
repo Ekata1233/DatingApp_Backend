@@ -482,10 +482,12 @@ export const updateWorkService = async (
   userId: string,
  data: {
     professionId?: number;
+    companyName?: string;
     employmentTypeId?: number;
     experienceId?: number;
     ambitionId?: number;
     salaryRangeId?: number;
+    bigDreams?: string;
   }
 ) => {
   if (!userId) {
@@ -501,18 +503,22 @@ export const updateWorkService = async (
     },
     update: {
       professionId: data.professionId,
+      companyName: data.companyName,
       employmentTypeId: data.employmentTypeId,
       experienceId: data.experienceId,
       ambitionId: data.ambitionId,
       salaryRangeId: data.salaryRangeId,
+      bigDreams: data.bigDreams,
     },
     create: {
       userId,
       professionId: data.professionId,
+      companyName: data.companyName,
       employmentTypeId: data.employmentTypeId,
       experienceId: data.experienceId,
       ambitionId: data.ambitionId,
       salaryRangeId: data.salaryRangeId,
+      bigDreams: data.bigDreams,
     },
   });
 

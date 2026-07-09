@@ -341,18 +341,22 @@ export const workController = async (
 
     const {
       professionId,
+      companyName,
       employmentTypeId,
       experienceId,
       ambitionId,
       salaryRangeId,
+      bigDreams,
     } = req.body;
 
     const result = await updateWorkService(userId, {
       professionId,
+      companyName,
       employmentTypeId,
       experienceId,
       ambitionId,
       salaryRangeId,
+      bigDreams,
     });
 
     return res.status(200).json({
