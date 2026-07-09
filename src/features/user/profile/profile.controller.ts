@@ -18,7 +18,8 @@ import {
   updateWorkService,
   updateFamilyProfileService,
   updateLanguageService,
-  updateUserPromptService
+  updateUserPromptService,
+  completeOnboardingService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -602,6 +603,28 @@ export const UserPromptController = async (
       success: true,
       message: "Prompts saved successfully",
       data,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const completeOnboardingController = async (
+  req: any,
+  res: any
+) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await completeOnboardingService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Onboarding completed successfully.",
+      data: user,
     });
   } catch (error: any) {
     return res.status(400).json({
