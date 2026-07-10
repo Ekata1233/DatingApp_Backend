@@ -2,7 +2,8 @@ import express from "express";
 import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController,
   //  aboutYourselfController, 
    saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController, 
-   UserPromptController} from "./profile.controller";
+   UserPromptController,
+   completeOnboardingController} from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -1320,4 +1321,11 @@ router.patch("/profile/bio",authMiddleware,updateUserBioController);
  *                   example: Unauthorized
  */
 router.patch("/profile/prompts",authMiddleware,UserPromptController);
+
+
+router.patch(
+  "/profile/complete-onboarding",
+  authMiddleware,
+  completeOnboardingController
+);
 export default router;

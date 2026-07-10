@@ -958,3 +958,25 @@ export const updateUserPromptService = async (
     },
   });
 };
+
+// Complete Onboarding Service
+export const completeOnboardingService = async (userId: string) => {
+  if (!userId) throw new Error("User ID is missing");
+
+  // Update profile completion score
+  const score = await calculateProfileScore(userId);
+
+  const user = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      onboarding_completed: true,
+      onboarding_step: "COMPLETED",
+      next_step: null,
+     
+    },
+  });
+
+  return user;
+};

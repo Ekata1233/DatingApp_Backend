@@ -18,7 +18,8 @@ import {
   updateWorkService,
   updateFamilyProfileService,
   updateLanguageService,
-  updateUserPromptService
+  updateUserPromptService,
+  completeOnboardingService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 
@@ -440,10 +441,22 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
       });
     }
 
-    let images = req.files.images;
+    let images: any = req.files.images;
 
     if (!Array.isArray(images)) {
       images = [images];
+    }
+
+    // ✅ File size validation (5 MB per image)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+    for (const image of images) {
+      if (image.size > MAX_FILE_SIZE) {
+        return res.status(413).json({
+          success: false,
+          message: "Each image must be smaller than 5 MB.",
+        });
+      }
     }
 
     const result = await uploadUserPhotosService(userId, images);
@@ -458,11 +471,10 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(400).json({
       success: false,
-      message: error.message,
+      message: error.message || "Something went wrong.",
     });
   }
 };
-
 export const updatePhotoController = async (req: Request<{ photoId: string }>, res: Response) => {
   try {
     const userId = (req as any).user.id;
@@ -591,6 +603,28 @@ export const UserPromptController = async (
       success: true,
       message: "Prompts saved successfully",
       data,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const completeOnboardingController = async (
+  req: any,
+  res: any
+) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await completeOnboardingService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Onboarding completed successfully.",
+      data: user,
     });
   } catch (error: any) {
     return res.status(400).json({
