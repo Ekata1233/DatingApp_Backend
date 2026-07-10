@@ -32,7 +32,6 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
     ? phoneNumber
     : `+91${phoneNumber}`;
 
-  console.log("Verifying OTP for: ", formattedNumber);
 
   // Verify OTP with Twilio
   const verificationCheck = await twilioClient.verify.v2
@@ -41,8 +40,6 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       to: formattedNumber,
       code: otp,
     });
-
-  console.log("Verification check: ", verificationCheck);
 
   if (verificationCheck.status !== "approved") {
     throw new Error("Invalid OTP");
@@ -57,7 +54,6 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       },
     });
 
-    console.log("Existing user: ", existingUser);
     const isNewUser = !existingUser;
 
     // Create user if doesn't exist
@@ -71,8 +67,6 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
           referralCode: myReferralCode,
         },
       });
-
-      console.log("Created new user: ", existingUser);
 
       // Process referral only for new users
       if (referralCode) {
@@ -184,8 +178,6 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       expiresIn: "7d",
     }
   );
-
-  console.log("-----------------End----------------");
 
   return {
     user: result,
