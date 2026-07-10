@@ -22,14 +22,19 @@ export const sendOtp = async (phoneNumber: string) => {
 };
 
 export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?: string) => {
-  if (!phoneNumber || !otp) throw new Error("Phone & OTP required");
+  // Input validation
+  if (!phoneNumber || !otp) {
+    throw new Error("Phone & OTP required");
+  }
 
+  // Format phone number consistently
   const formattedNumber = phoneNumber.startsWith("+91")
     ? phoneNumber
     : `+91${phoneNumber}`;
 
   console.log("Verifying OTP for: ", formattedNumber);
 
+  // Verify OTP with Twilio
   const verificationCheck = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verificationChecks.create({
@@ -37,13 +42,14 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       code: otp,
     });
 
+  console.log("Verification check: ", verificationCheck);
+
   if (verificationCheck.status !== "approved") {
     throw new Error("Invalid OTP");
   }
 
   // Transaction starts here
-  const user = await prisma.$transaction(async (tx) => {
-
+  const result = await prisma.$transaction(async (tx) => {
     // Check if user already exists
     let existingUser = await tx.user.findUnique({
       where: {
@@ -51,11 +57,12 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       },
     });
 
+    console.log("Existing user: ", existingUser);
     const isNewUser = !existingUser;
 
+    // Create user if doesn't exist
     if (!existingUser) {
-
-      const myReferralCode = await generateReferralCode();
+      const myReferralCode = await generateReferralCode(tx);
 
       existingUser = await tx.user.create({
         data: {
@@ -65,27 +72,71 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
         },
       });
 
-      // Referral processing
+      console.log("Created new user: ", existingUser);
+
+      // Process referral only for new users
       if (referralCode) {
-        const referrer = await tx.user.findUnique({
+        const normalizedReferralCode = referralCode.trim().toUpperCase();
+
+        // Find referrer
+        const referrer = await tx.user.findFirst({
           where: {
-            referralCode,
+            referralCode: normalizedReferralCode,
+            deleted_at: null,
+          },
+          select: {
+            id: true,
+            referralCode: true,
           },
         });
 
-        if (referrer && referrer.id !== existingUser.id) {
-
-          await tx.userReferral.create({
-            data: {
-              referrerId: referrer.id,
-              referredUserId: existingUser.id,
-              status: "SIGNED_UP",
-            },
-          });
+        // 1. Referral code does not exist
+        if (!referrer) {
+          throw new Error("Invalid referral code.");
         }
+
+        // 2. Self referral
+        if (referrer.id === existingUser.id) {
+          throw new Error("You cannot use your own referral code.");
+        }
+
+        // 3. Already referred
+        const alreadyReferred = await tx.userReferral.findUnique({
+          where: {
+            referredUserId: existingUser.id,
+          },
+        });
+
+        if (alreadyReferred) {
+          throw new Error("Referral code has already been applied.");
+        }
+
+        // 4. Prevent referral loop
+        const reverseReferral = await tx.userReferral.findFirst({
+          where: {
+            referrerId: existingUser.id,
+            referredUserId: referrer.id,
+          },
+        });
+
+        if (reverseReferral) {
+          throw new Error(
+            "Referral cannot be applied because you have already referred this user."
+          );
+        }
+
+        // 5. Create Referral
+        await tx.userReferral.create({
+          data: {
+            referrerId: referrer.id,
+            referredUserId: existingUser.id,
+            status: "SIGNED_UP",
+          },
+        });
       }
     } else {
-      await tx.user.update({
+      // Update existing user's phone verification
+      existingUser = await tx.user.update({
         where: {
           id: existingUser.id,
         },
@@ -95,6 +146,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       });
     }
 
+    // Create wallet for user (if not exists)
     await tx.wallet.upsert({
       where: {
         userId: existingUser.id,
@@ -106,6 +158,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       },
     });
 
+    // Create date plan user stats (if not exists)
     await tx.datePlanUserStats.upsert({
       where: {
         userId: existingUser.id,
@@ -117,26 +170,195 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
     });
 
     return existingUser;
-
   });
 
-  //LAST SEEEN AND ONLINE PRESENCE HANDLING
-  // await setUserOnline(user.id);
-  //end of presence handling
+  //   //LAST SEEEN AND ONLINE PRESENCE HANDLING
+  //   // await setUserOnline(user.id);
+  //   //end of presence handling
 
+  // Generate JWT token
   const token = jwt.sign(
-    { userId: user.id },
+    { userId: result.id },
     process.env.JWT_SECRET as string,
     {
       expiresIn: "7d",
     }
   );
 
+  console.log("-----------------End----------------");
+
   return {
-    user,
+    user: result,
     token,
   };
 };
+
+// export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?: string) => {
+//   if (!phoneNumber || !otp) throw new Error("Phone & OTP required");
+
+//   const formattedNumber = phoneNumber.startsWith("+91")
+//     ? phoneNumber
+//     : `+91${phoneNumber}`;
+
+//   console.log("Verifying OTP for: ", formattedNumber);
+
+//   const verificationCheck = await twilioClient.verify.v2
+//     .services(verifyServiceSid)
+//     .verificationChecks.create({
+//       to: formattedNumber,
+//       code: otp,
+//     });
+
+//   console.log("verification check : ", verificationCheck)
+//   if (verificationCheck.status !== "approved") {
+//     throw new Error("Invalid OTP");
+//   }
+
+//   // Transaction starts here
+//   const user = await prisma.$transaction(async (tx) => {
+
+//     // Check if user already exists
+//     let existingUser = await tx.user.findUnique({
+//       where: {
+//         phone_number: formattedNumber,
+//       },
+//     });
+
+//     console.log("exsiting user : ", existingUser)
+//     const isNewUser = !existingUser;
+
+//     if (!existingUser) {
+
+//       const myReferralCode = await generateReferralCode(tx);
+
+//       existingUser = await tx.user.create({
+//         data: {
+//           phone_number: formattedNumber,
+//           is_phone_verified: true,
+//           referralCode: myReferralCode,
+//         },
+//       });
+
+//       console.log("exsiting user 2 : ", existingUser)
+
+
+//       // Referral processing
+//       // ================= Referral Processing =================
+//       if (referralCode) {
+
+//         const normalizedReferralCode = referralCode.trim().toUpperCase();
+
+//         // Find referrer
+//         const referrer = await tx.user.findFirst({
+//           where: {
+//             referralCode: normalizedReferralCode,
+//             deleted_at: null,
+//           },
+//           select: {
+//             id: true,
+//             referralCode: true,
+//           },
+//         });
+
+//         // 1. Referral code does not exist
+//         if (!referrer) {
+//           throw new Error("Invalid referral code.");
+//         }
+
+//         // 2. Self referral
+//         if (referrer.id === existingUser.id) {
+//           throw new Error("You cannot use your own referral code.");
+//         }
+
+//         // 3. Already referred
+//         const alreadyReferred = await tx.userReferral.findUnique({
+//           where: {
+//             referredUserId: existingUser.id,
+//           },
+//         });
+
+//         if (alreadyReferred) {
+//           throw new Error("Referral code has already been applied.");
+//         }
+
+//         // 4. Prevent referral loop
+//         const reverseReferral = await tx.userReferral.findFirst({
+//           where: {
+//             referrerId: existingUser.id,
+//             referredUserId: referrer.id,
+//           },
+//         });
+
+//         if (reverseReferral) {
+//           throw new Error(
+//             "Referral cannot be applied because you have already referred this user."
+//           );
+//         }
+
+//         // 5. Create Referral
+//         await tx.userReferral.create({
+//           data: {
+//             referrerId: referrer.id,
+//             referredUserId: existingUser.id,
+//             status: "SIGNED_UP",
+//           },
+//         });
+//       } else {
+
+//         existingUser = await tx.user.update({
+//           where: {
+//             id: existingUser.id,
+//           },
+//           data: {
+//             is_phone_verified: true,
+//           },
+//         });
+
+//       }
+
+//       await tx.wallet.upsert({
+//         where: {
+//           userId: existingUser.id,
+//         },
+//         update: {},
+//         create: {
+//           userId: existingUser.id,
+//           balance: 0,
+//         },
+//       });
+
+//       await tx.datePlanUserStats.upsert({
+//         where: {
+//           userId: existingUser.id,
+//         },
+//         update: {},
+//         create: {
+//           userId: existingUser.id,
+//         },
+//       });
+
+//       return existingUser;
+
+//     });
+
+//   //LAST SEEEN AND ONLINE PRESENCE HANDLING
+//   // await setUserOnline(user.id);
+//   //end of presence handling
+
+//   const token = jwt.sign(
+//     { userId: user.id },
+//     process.env.JWT_SECRET as string,
+//     {
+//       expiresIn: "7d",
+//     }
+//   );
+
+//   console.log("-----------------end----------------")
+//   return {
+//     user,
+//     token,
+//   };
+// };
 
 
 // import axios from "axios";

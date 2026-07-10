@@ -1,4 +1,5 @@
 
+import { PaymentStatus, Prisma, ReferralStatus, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { ValidateReferralResponse } from "./referral.types";
 
@@ -49,6 +50,7 @@ export const validateReferralCode = async (
     };
   }
 
+
   // Find referrer
   const referrer = await prisma.user.findFirst({
     where: {
@@ -69,6 +71,18 @@ export const validateReferralCode = async (
     };
   }
 
+  const reverseReferral = await prisma.userReferral.findFirst({
+    where: {
+      referrerId: currentUser.id,
+      referredUserId: referrer.id,
+    },
+  });
+
+  if (reverseReferral) {
+    throw new Error(
+      "You cannot apply a referral code from a user you have already referred."
+    );
+  }
   // Extra safety
   if (referrer.id === userId) {
     return {
@@ -83,3 +97,544 @@ export const validateReferralCode = async (
     referrerName: referrer.full_name ?? "Welvors User",
   };
 };
+
+export const applyReferral = async (
+    userId:string,
+    referralCode:string
+)=>{
+    return await prisma.$transaction(async(tx)=>{
+
+        referralCode = referralCode.trim().toUpperCase();
+
+        const currentUser = await tx.user.findUnique({
+            where:{
+                id:userId
+            }
+        });
+
+        if(!currentUser){
+            throw new Error("User not found.");
+        }
+
+        const alreadyApplied = await tx.userReferral.findUnique({
+            where:{
+                referredUserId:userId
+            }
+        });
+
+        if(alreadyApplied){
+            throw new Error("Referral already applied.");
+        }
+
+        const referrer = await tx.user.findUnique({
+            where:{
+                referralCode
+            }
+        });
+
+        if(!referrer){
+            throw new Error("Invalid referral code.");
+        }
+
+        if(referrer.deleted_at){
+            throw new Error("Referral code is inactive.");
+        }
+
+        if(referrer.id===currentUser.id){
+            throw new Error(
+                "You cannot use your own referral code."
+            );
+        }
+
+        const reverseReferral = await tx.userReferral.findFirst({
+            where:{
+                referrerId:userId,
+                referredUserId:referrer.id
+            }
+        });
+
+        if(reverseReferral){
+            throw new Error(
+                "Referral loop is not allowed."
+            );
+        }
+
+        await tx.userReferral.create({
+            data:{
+                referrerId:referrer.id,
+                referredUserId:userId,
+                status:"SIGNED_UP"
+            }
+        });
+
+        return{
+            success:true,
+            message:"Referral applied successfully."
+        };
+
+    });
+}
+
+const SIGNUP_REWARD = 100;
+const PURCHASE_REWARD = 500;
+const WAITLIST_SIGNUP_REWARD = 50;
+const WAITLIST_PAYMENT_REWARD = 150;
+
+export class ReferralService {
+  static async onRegistrationCompleted(userId: string) {
+    return prisma.$transaction(async (tx) => {
+
+      // Find referral record
+      const referral = await tx.userReferral.findUnique({
+        where: {
+          referredUserId: userId,
+        },
+      });
+
+      // User was not referred
+      if (!referral) {
+        return;
+      }
+
+      // Reward already given
+      if (
+        referral.status === ReferralStatus.SIGNED_UP ||
+        referral.status === ReferralStatus.PURCHASED ||
+        referral.status === ReferralStatus.REWARDED
+      ) {
+        return;
+      }
+
+      // Referrer's wallet
+      const wallet = await tx.wallet.findUnique({
+        where: {
+          userId: referral.referrerId,
+        },
+      });
+
+      if (!wallet) {
+        throw new Error("Referrer wallet not found.");
+      }
+
+      const balanceBefore = Number(wallet.balance);
+      const balanceAfter = balanceBefore + SIGNUP_REWARD;
+
+      // Update wallet
+      await tx.wallet.update({
+        where: {
+          id: wallet.id,
+        },
+        data: {
+          balance: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Wallet transaction
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: new Prisma.Decimal(SIGNUP_REWARD),
+          balanceBefore: new Prisma.Decimal(balanceBefore),
+          balanceAfter: new Prisma.Decimal(balanceAfter),
+          type: TransactionType.REWARD,
+          status: TransactionStatus.SUCCESS,
+          source: TransactionSource.REFERRAL_SIGNUP,
+          referenceId: referral.id,
+          description: "Referral signup reward",
+        },
+      });
+
+      // Update referral
+      await tx.userReferral.update({
+        where: {
+          id: referral.id,
+        },
+        data: {
+          signupReward: SIGNUP_REWARD,
+          rewardedAt: new Date(),
+          status: ReferralStatus.SIGNED_UP,
+        },
+      });
+
+      // Update referral stats
+      await tx.userReferralStats.upsert({
+        where: {
+          userId: referral.referrerId,
+        },
+        update: {
+          joinedUsers: {
+            increment: 1,
+          },
+          totalCoinsEarned: {
+            increment: SIGNUP_REWARD,
+          },
+        },
+        create: {
+          userId: referral.referrerId,
+          totalInvites: 1,
+          joinedUsers: 1,
+          purchasedUsers: 0,
+          totalCoinsEarned: SIGNUP_REWARD,
+          pendingRewards: 0,
+        },
+      });
+
+      return {
+        success: true,
+      };
+    });
+  }
+
+
+  static async onSubscriptionPurchased(userId: string) {
+    return prisma.$transaction(async (tx) => {
+
+      // Find referral
+      const referral = await tx.userReferral.findUnique({
+        where: {
+          referredUserId: userId,
+        },
+      });
+
+      // User wasn't referred
+      if (!referral) {
+        return;
+      }
+
+      // Signup reward must already be completed
+      if (referral.status === ReferralStatus.PENDING) {
+        return;
+      }
+
+      // Purchase reward already given
+      if (
+        referral.status === ReferralStatus.PURCHASED ||
+        referral.status === ReferralStatus.REWARDED
+      ) {
+        return;
+      }
+
+      // Referrer's wallet
+      const wallet = await tx.wallet.findUnique({
+        where: {
+          userId: referral.referrerId,
+        },
+      });
+
+      if (!wallet) {
+        throw new Error("Referrer's wallet not found.");
+      }
+
+      const balanceBefore = Number(wallet.balance);
+      const balanceAfter = balanceBefore + PURCHASE_REWARD;
+
+      // Update wallet balance
+      await tx.wallet.update({
+        where: {
+          id: wallet.id,
+        },
+        data: {
+          balance: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Create wallet transaction
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: new Prisma.Decimal(PURCHASE_REWARD),
+          type: TransactionType.REWARD,
+          status: TransactionStatus.SUCCESS,
+          source: TransactionSource.REFERRAL_PURCHASE,
+          referenceId: referral.id,
+          description: "Referral subscription purchase reward",
+          balanceBefore: new Prisma.Decimal(balanceBefore),
+          balanceAfter: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Update referral
+      await tx.userReferral.update({
+        where: {
+          id: referral.id,
+        },
+        data: {
+          purchaseReward: PURCHASE_REWARD,
+          purchaseAt: new Date(),
+          status: ReferralStatus.REWARDED,
+        },
+      });
+
+      // Update referral stats
+      await tx.userReferralStats.upsert({
+        where: {
+          userId: referral.referrerId,
+        },
+        update: {
+          purchasedUsers: {
+            increment: 1,
+          },
+          totalCoinsEarned: {
+            increment: PURCHASE_REWARD,
+          },
+        },
+        create: {
+          userId: referral.referrerId,
+          totalInvites: 1,
+          joinedUsers: 1,
+          purchasedUsers: 1,
+          totalCoinsEarned: PURCHASE_REWARD,
+          pendingRewards: 0,
+        },
+      });
+
+      return {
+        success: true,
+        message: "Referral purchase reward credited successfully.",
+      };
+    });
+  }
+
+
+  static async onWaitlistRegistration(userId: string) {
+    return prisma.$transaction(async (tx) => {
+
+      // Check referral
+      const referral = await tx.userReferral.findUnique({
+        where: {
+          referredUserId: userId,
+        },
+      });
+
+      if (!referral) {
+        return;
+      }
+
+      // Already rewarded
+      if (
+        referral.status === ReferralStatus.SIGNED_UP ||
+        referral.status === ReferralStatus.PURCHASED ||
+        referral.status === ReferralStatus.REWARDED
+      ) {
+        return;
+      }
+
+      // Check user is actually on waitlist
+      const waitlist = await tx.waitlist.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+      if (!waitlist) {
+        throw new Error("Waitlist record not found.");
+      }
+
+      // Referrer's wallet
+      const wallet = await tx.wallet.findUnique({
+        where: {
+          userId: referral.referrerId,
+        },
+      });
+
+      if (!wallet) {
+        throw new Error("Referrer's wallet not found.");
+      }
+
+      const balanceBefore = Number(wallet.balance);
+      const balanceAfter = balanceBefore + WAITLIST_SIGNUP_REWARD;
+
+      // Update wallet
+      await tx.wallet.update({
+        where: {
+          id: wallet.id,
+        },
+        data: {
+          balance: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Wallet transaction
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: new Prisma.Decimal(WAITLIST_SIGNUP_REWARD),
+          type: TransactionType.REWARD,
+          status: TransactionStatus.SUCCESS,
+          source: TransactionSource.REFERRAL_SIGNUP,
+          referenceId: referral.id,
+          description: "Waitlist referral signup reward",
+          balanceBefore: new Prisma.Decimal(balanceBefore),
+          balanceAfter: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Update referral
+      await tx.userReferral.update({
+        where: {
+          id: referral.id,
+        },
+        data: {
+          signupReward: WAITLIST_SIGNUP_REWARD,
+          rewardedAt: new Date(),
+          status: ReferralStatus.SIGNED_UP,
+        },
+      });
+
+      // Update stats
+      await tx.userReferralStats.upsert({
+        where: {
+          userId: referral.referrerId,
+        },
+        update: {
+          joinedUsers: {
+            increment: 1,
+          },
+          totalCoinsEarned: {
+            increment: WAITLIST_SIGNUP_REWARD,
+          },
+        },
+
+        create: {
+          userId: referral.referrerId,
+          totalInvites: 1,
+          joinedUsers: 1,
+          purchasedUsers: 0,
+          totalCoinsEarned: WAITLIST_SIGNUP_REWARD,
+          pendingRewards: 0,
+        },
+      });
+
+      return {
+        success: true,
+        message: "Waitlist referral signup reward credited successfully.",
+      };
+    });
+  }
+
+
+  static async onWaitlistPayment(userId: string) {
+    return prisma.$transaction(async (tx) => {
+
+      // Find referral
+      const referral = await tx.userReferral.findUnique({
+        where: {
+          referredUserId: userId,
+        },
+      });
+
+      // User wasn't referred
+      if (!referral) {
+        return;
+      }
+
+      // Signup reward must already be completed
+      if (referral.status === ReferralStatus.PENDING) {
+        return;
+      }
+
+      // Payment reward already given
+      if (
+        referral.status === ReferralStatus.PURCHASED ||
+        referral.status === ReferralStatus.REWARDED
+      ) {
+        return;
+      }
+
+      // Verify waitlist payment
+      const waitlist = await tx.waitlist.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+      if (!waitlist) {
+        throw new Error("Waitlist record not found.");
+      }
+
+      if (waitlist.paymentStatus !== PaymentStatus.PAID) {
+        throw new Error("Waitlist payment is not completed.");
+      }
+
+      // Referrer's wallet
+      const wallet = await tx.wallet.findUnique({
+        where: {
+          userId: referral.referrerId,
+        },
+      });
+
+      if (!wallet) {
+        throw new Error("Referrer's wallet not found.");
+      }
+
+      const balanceBefore = Number(wallet.balance);
+      const balanceAfter = balanceBefore + WAITLIST_PAYMENT_REWARD;
+
+      // Update wallet
+      await tx.wallet.update({
+        where: {
+          id: wallet.id,
+        },
+        data: {
+          balance: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Wallet transaction
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: new Prisma.Decimal(WAITLIST_PAYMENT_REWARD),
+          type: TransactionType.REWARD,
+          status: TransactionStatus.SUCCESS,
+          source: TransactionSource.REFERRAL_PURCHASE,
+          referenceId: referral.id,
+          description: "Waitlist referral payment reward",
+          balanceBefore: new Prisma.Decimal(balanceBefore),
+          balanceAfter: new Prisma.Decimal(balanceAfter),
+        },
+      });
+
+      // Update referral
+      await tx.userReferral.update({
+        where: {
+          id: referral.id,
+        },
+        data: {
+          purchaseReward: WAITLIST_PAYMENT_REWARD,
+          purchaseAt: new Date(),
+          status: ReferralStatus.REWARDED,
+        },
+      });
+
+      // Update referral stats
+      await tx.userReferralStats.upsert({
+        where: {
+          userId: referral.referrerId,
+        },
+        update: {
+          purchasedUsers: {
+            increment: 1,
+          },
+          totalCoinsEarned: {
+            increment: WAITLIST_PAYMENT_REWARD,
+          },
+        },
+
+        create: {
+          userId: referral.referrerId,
+          totalInvites: 1,
+          joinedUsers: 1,
+          purchasedUsers: 1,
+          totalCoinsEarned: WAITLIST_PAYMENT_REWARD,
+          pendingRewards: 0,
+        },
+      });
+
+      return {
+        success: true,
+        message: "Waitlist payment referral reward credited successfully.",
+      };
+    });
+  }
+}

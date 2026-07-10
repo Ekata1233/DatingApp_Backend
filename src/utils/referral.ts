@@ -1,8 +1,10 @@
-import { prisma } from "../prisma/prismaClient";
+import { Prisma } from "@prisma/client";
 
 const CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-export const generateReferralCode = async (): Promise<string> => {
+export const generateReferralCode = async (
+  tx: Prisma.TransactionClient
+): Promise<string> => {
   while (true) {
     let code = "";
 
@@ -12,9 +14,12 @@ export const generateReferralCode = async (): Promise<string> => {
       );
     }
 
-    const exists = await prisma.user.findUnique({
+    const exists = await tx.user.findUnique({
       where: {
         referralCode: code,
+      },
+      select: {
+        id: true,
       },
     });
 

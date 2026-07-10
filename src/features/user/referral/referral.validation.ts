@@ -9,3 +9,16 @@ export const validateReferralSchema = z.object({
     .length(8, "Referral code must be exactly 8 characters"),
   }),
 });
+
+export const applyReferralSchema=z.object({
+
+body:z.object({
+
+referralCode:z
+.string()
+.trim()
+.length(8)
+
+})
+
+});

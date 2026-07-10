@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { validateReferralCode } from "./referral.service";
+import { applyReferral, validateReferralCode } from "./referral.service";
 
 export const validateReferralController = async (
   req: Request,
@@ -33,3 +33,30 @@ export const validateReferralController = async (
 
   }
 };
+
+export const applyReferralController = async(
+req:Request,
+res:Response
+)=>{
+
+try{
+
+const {referralCode}=req.body;
+
+const result=await applyReferral(
+(req as any).user.id,
+referralCode
+);
+
+return res.status(200).json(result);
+
+}catch(error:any){
+
+return res.status(400).json({
+success:false,
+message:error.message
+});
+
+}
+
+}
