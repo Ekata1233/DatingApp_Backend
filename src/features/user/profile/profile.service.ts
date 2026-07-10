@@ -15,6 +15,7 @@ import { getNextStep } from "../../../utils/onboardingFlows";
 import { SaveAnswerDTO } from "./profile.types";
 import imagekit from "../../../utils/imagekit";
 import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
+import { ReferralService } from "../referral/referral.service";
 
 
 //profile update service
@@ -977,6 +978,14 @@ export const completeOnboardingService = async (userId: string) => {
      
     },
   });
+
+   // Credit referral reward if applicable
+  try {
+    await ReferralService.onRegistrationCompleted(userId);
+    console.log("Funtion call ......")
+  } catch (error) {
+    console.error("Referral registration reward failed:", error);
+  }
 
   return user;
 };

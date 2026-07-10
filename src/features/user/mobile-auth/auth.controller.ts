@@ -19,8 +19,8 @@ export const sendOtpController = async (req: Request, res: Response) => {
 export const verifyOtpController = async (req: Request, res: Response) => {
   try {
 
-    const { phoneNumber, otp } = req.body;
-    const user = await verifyOtp(phoneNumber, otp);
+    const { phoneNumber, otp, referralCode } = req.body;
+    const user = await verifyOtp(phoneNumber, otp, referralCode);
 
     res.json({
       success: true,

@@ -39,6 +39,7 @@ import languageRoutes from "../features/admin/onboarding/language/language.route
 import waitlistRoutes from "../features/admin/waitlist/waitlist.routes";
 import referralRoutes from "../features/user/referral/referral.routes"
 import referEarnRoute from "../features/admin/referEarn/referEarn.routes"
+import userWaitlistRoutes from "../features/waitlist/waitlist.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -65,7 +66,7 @@ router.use("/user",waitlistRoutes)
 
 
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes )
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)
