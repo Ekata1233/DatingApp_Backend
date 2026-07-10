@@ -38,7 +38,7 @@ import familyProfileRoutes from "../features/admin/onboarding/familyProfile/fami
 import languageRoutes from "../features/admin/onboarding/language/language.routes";
 import waitlistRoutes from "../features/admin/waitlist/waitlist.routes";
 import referralRoutes from "../features/user/referral/referral.routes"
-
+import referEarnRoute from "../features/admin/referEarn/referEarn.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -56,11 +56,11 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute);
 
 
 
-router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes);
+router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute);
 router.use("/user",waitlistRoutes)
 
 
