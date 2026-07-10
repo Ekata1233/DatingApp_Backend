@@ -2,6 +2,17 @@ import { prisma } from "../../../prisma/prismaClient";
 import { ILaunchConfigPayload } from "./waitlist.types";
 
 /**
+ * discountAmount is a PERCENTAGE (e.g. 50 = 50% off), NOT a rupee amount.
+ * finalPrice = originalPrice - (originalPrice * discountPercent / 100)
+ * Always computed on the server so it can't be faked or sent stale by any client.
+ */
+const calcFinalPrice = (originalPrice: unknown, discountPercent: unknown) => {
+  const original = Number(originalPrice) || 0;
+  const percent = Number(discountPercent) || 0;
+  return Math.max(0, Math.round(original - (original * percent) / 100));
+};
+
+/**
  * Create or Update Launch Config
  */
 export const saveLaunchConfigService = async (
@@ -9,6 +20,10 @@ export const saveLaunchConfigService = async (
 ) => {
   const existing = await prisma.launchConfig.findFirst();
 
+  // Server-computed final price — ignore payload.finalPrice entirely.
+  const finalPrice = calcFinalPrice(payload.originalPrice, payload.discountAmount);
+
+  // First time -> Create
   if (!existing) {
     return prisma.launchConfig.create({
       data: {
@@ -17,8 +32,8 @@ export const saveLaunchConfigService = async (
         launchDate: payload.launchDate,
 
         originalPrice: payload.originalPrice ?? 799,
-        discountAmount: payload.discountAmount ?? 500,
-        finalPrice: payload.finalPrice ?? 299,
+        discountAmount: payload.discountAmount ?? 50, // percentage
+        finalPrice,
 
         welcomeCoins: payload.welcomeCoins ?? 100,
 
@@ -31,6 +46,7 @@ export const saveLaunchConfigService = async (
     });
   }
 
+  // Already exists -> Update same record
   return prisma.launchConfig.update({
     where: {
       id: existing.id,
@@ -42,7 +58,7 @@ export const saveLaunchConfigService = async (
 
       originalPrice: payload.originalPrice,
       discountAmount: payload.discountAmount,
-      finalPrice: payload.finalPrice,
+      finalPrice,
 
       welcomeCoins: payload.welcomeCoins,
 
