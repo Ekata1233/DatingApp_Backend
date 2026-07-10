@@ -1,7 +1,7 @@
 
 import { PaymentStatus, Prisma, ReferralStatus, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
-import { ValidateReferralResponse } from "./referral.types";
+import { ReferralDashboardResponse, ValidateReferralResponse } from "./referral.types";
 
 export const validateReferralCode = async (
   userId: string,
@@ -174,6 +174,101 @@ export const applyReferral = async (
 
   });
 }
+
+export const getReferralDashboard = async (
+  userId: string,
+  page = 1,
+  limit = 20
+): Promise<ReferralDashboardResponse> => {
+  const skip = (page - 1) * limit;
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      referralCode: true,
+      referralStats: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+const [history, total] = await prisma.$transaction([
+  prisma.userReferral.findMany({
+    where: {
+      referrerId: userId,
+    },
+    include: {
+      referredUser: {
+        select: {
+          id: true,
+          full_name: true,
+          photos: {
+            where: {
+              is_primary: true,
+            },
+            take: 1,
+            select: {
+              media_url: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    skip,
+    take: limit,
+  }),
+
+  prisma.userReferral.count({
+    where: {
+      referrerId: userId,
+    },
+  }),
+]);
+
+  return {
+    referralCode: user.referralCode || "",
+
+    shareLink: `ating-app-backend-plum.vercel.app/api-docs`,
+
+    stats: {
+      totalEarned:user.referralStats?.totalCoinsEarned ?? 0,
+      joined:user.referralStats?.joinedUsers ?? 0,
+      rewarded:user.referralStats?.purchasedUsers ?? 0,
+      pending:user.referralStats?.pendingRewards ?? 0,
+    },
+
+    history: history.map((item) => (
+      {
+      id: item.id,
+      userId: item.referredUser.id,
+      name:item.referredUser.full_name || "Unknown User",
+      profileImage: item.referredUser.photos[0]?.media_url ?? null,
+      status: item.status,
+      signupReward: item.signupReward,
+      purchaseReward: item.purchaseReward,
+      totalReward:item.signupReward + item.purchaseReward,
+      joinedAt: item.createdAt,
+      rewardedAt: item.rewardedAt,
+    }
+  )),
+
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    },
+  };
+};
 
 const SIGNUP_REWARD = 100;
 const PURCHASE_REWARD = 500;
