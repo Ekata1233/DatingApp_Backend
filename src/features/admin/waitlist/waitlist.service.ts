@@ -7,23 +7,30 @@ import { ILaunchConfigPayload } from "./waitlist.types";
 export const saveLaunchConfigService = async (
   payload: ILaunchConfigPayload
 ) => {
-  // Check if config already exists
   const existing = await prisma.launchConfig.findFirst();
 
-  // First time -> Create
   if (!existing) {
     return prisma.launchConfig.create({
       data: {
         waitlistEnabled: payload.waitlistEnabled ?? true,
         appLaunched: payload.appLaunched ?? false,
         launchDate: payload.launchDate,
-        waitlistPrice: payload.waitlistPrice ?? 300,
+
+        originalPrice: payload.originalPrice ?? 799,
+        discountAmount: payload.discountAmount ?? 500,
+        finalPrice: payload.finalPrice ?? 299,
+
+        welcomeCoins: payload.welcomeCoins ?? 100,
+
+        perks: payload.perks,
+
+        totalBenefitsValue: payload.totalBenefitsValue,
+
         description: payload.description,
       },
     });
   }
 
-  // Already exists -> Update same record
   return prisma.launchConfig.update({
     where: {
       id: existing.id,
@@ -32,7 +39,17 @@ export const saveLaunchConfigService = async (
       waitlistEnabled: payload.waitlistEnabled,
       appLaunched: payload.appLaunched,
       launchDate: payload.launchDate,
-      waitlistPrice: payload.waitlistPrice,
+
+      originalPrice: payload.originalPrice,
+      discountAmount: payload.discountAmount,
+      finalPrice: payload.finalPrice,
+
+      welcomeCoins: payload.welcomeCoins,
+
+      perks: payload.perks,
+
+      totalBenefitsValue: payload.totalBenefitsValue,
+
       description: payload.description,
     },
   });
