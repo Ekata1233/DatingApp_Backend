@@ -1,13 +1,13 @@
-// import { Router } from "express";
-// import {
-//   saveRewardConfig,
-//   fetchRewardConfig,
-// } from "./referEarn.controller";
+import { Router } from "express";
+import {
+  saveRewardConfig,
+  fetchRewardConfig,
+} from "./referEarn.controller";
 
-// const router = Router();
+const router = Router();
 
-// router.post("/referEarn/create", saveRewardConfig);
+router.post("/referEarn/create", saveRewardConfig);
 
-// router.get("/referEarn/get", fetchRewardConfig);
+router.get("/referEarn/get", fetchRewardConfig);
 
-// export default router;
+export default router;
