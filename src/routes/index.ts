@@ -40,6 +40,7 @@ import waitlistRoutes from "../features/admin/waitlist/waitlist.routes";
 import referralRoutes from "../features/user/referral/referral.routes"
 import referEarnRoute from "../features/admin/referEarn/referEarn.routes"
 import userWaitlistRoutes from "../features/waitlist/waitlist.routes"
+import paymentRoutes from "../features/payment/payment.routes";
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -90,4 +91,6 @@ router.use(
   "/admin/date-now",
   dateNowAdminRoutes
 );
+
+router.use('/payments', paymentRoutes);
 export default router;
