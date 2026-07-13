@@ -517,20 +517,27 @@ model UserBio {
 }
 
 model UserPrompt {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @db.Uuid
-  promptId     String   @db.Uuid
-  answer       String   @db.VarChar(300)
-  displayOrder Int      @default(1)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  promptId     String           @db.Uuid
+  answer       String           @db.VarChar(300)
+  displayOrder Int              @default(1)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt       Prompt           @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@unique([userId, promptId])
   @@index([userId])
   @@index([promptId])
   @@map("user_prompts")
+}
+
+enum PromptVisibility {
+  EVERYONE
+  PREMIUM_AND_ABOVE
+  VIP_AND_ABOVE
+  ELITE_ONLY
 }
 
 model PromptCategory {
@@ -553,6 +560,7 @@ model Prompt {
   active      Boolean        @default(true)
   priority    Int            @default(0)
   maxLength   Int            @default(200)
+  visibility  PromptVisibility @default(EVERYONE)
   category    PromptCategory @relation(fields: [categoryId], references: [id])
   userPrompts UserPrompt[]
   createdAt   DateTime       @default(now())
@@ -1594,11 +1602,26 @@ model LaunchConfig {
   updatedAt          DateTime  @updatedAt
 }
 
+model RewardConfig {
+  id             String   @id @default(uuid()) @db.Uuid
+  signupReward   Decimal  @default(100.00) @db.Decimal(10, 2)
+  packageReward  Decimal  @default(500.00) @db.Decimal(10, 2)
+  waitlistReward Decimal  @default(300.00) @db.Decimal(10, 2)
+  title          String   @default("How Rewards Work") @db.VarChar(100)
+  descriptions   Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("reward_config")
+}
+
 enum PaymentStatus {
   PENDING
-  PAID
+  PROCESSING
+  COMPLETED
   FAILED
   REFUNDED
+  CANCELLED
 }
 
 enum PaymentPurpose {
@@ -1606,6 +1629,7 @@ enum PaymentPurpose {
   PACKAGE
   BOOST
   COINS
+  OTHER
 }
 
 enum WaitlistSource {
@@ -1615,7 +1639,7 @@ enum WaitlistSource {
   WEBSITE
   REFERRAL
   YOUTUBE
-  
+
   LINKEDIN
   OTHER
 }
