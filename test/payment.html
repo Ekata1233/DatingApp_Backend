@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Razorpay Test</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+
+<body>
+
+<button onclick="payNow()">Pay ₹1555</button>
+
+<script>
+
+function payNow(){
+
+var options = {
+
+    key:"rzp_test_TCtmQuGTvgsWU0",
+
+    amount:155500,
+
+    currency:"INR",
+
+    name:"Dating App",
+
+    description:"Package Purchase",
+
+    order_id:"order_TCwWN2VCtACXJp",
+
+    handler:function(response){
+
+        console.log(response);
+
+        alert(JSON.stringify(response));
+
+    },
+
+    theme:{
+        color:"#3399cc"
+    }
+
+};
+
+var rzp=new Razorpay(options);
+
+rzp.open();
+
+}
+
+</script>
+
+</body>
+
+</html>
