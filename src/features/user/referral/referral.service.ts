@@ -235,7 +235,7 @@ export const getReferralDashboard = async (
   return {
     referralCode: user.referralCode || "",
 
-    shareLink: `ating-app-backend-plum.vercel.app/api-docs`,
+    shareLink: `https://play.google.com/store/apps/details?id=com.fetchtrue.bizbooster2x&pcampaignid=web_share`,
 
     stats: {
       totalEarned: user.referralStats?.totalCoinsEarned ?? 0,
@@ -285,11 +285,11 @@ export const getReferralHistory = async (
   if (status) {
     switch (status) {
       case "joined":
-        where.status = ReferralStatus.SIGNED_UP;
+        where.status = ReferralStatus.SIGNUP_REWARDED;
         break;
 
       case "rewarded":
-        where.status = ReferralStatus.REWARDED;
+        where.status = ReferralStatus.PACKAGE_REWARDED;
         break;
 
       case "pending":
@@ -369,13 +369,19 @@ export const getReferralHistory = async (
 
 const SIGNUP_REWARD = 100;
 const PURCHASE_REWARD = 500;
-// const WAITLIST_SIGNUP_REWARD = 50;
 const WAITLIST_PAYMENT_REWARD = 150;
 
 export class ReferralService {
   static async onRegistrationCompleted(userId: string) {
     return prisma.$transaction(async (tx) => {
 
+      const rewardConfig = await tx.rewardConfig.findFirst();
+
+      if (!rewardConfig) {
+        throw new Error("Reward configuration not found.");
+      }
+
+      const signupReward = Number(rewardConfig.signupReward);
       // Find referral record
       const referral = await tx.userReferral.findUnique({
         where: {
@@ -393,8 +399,8 @@ export class ReferralService {
 
       // Reward already given
       if (
-        referral.status === ReferralStatus.PURCHASED ||
-        referral.status === ReferralStatus.REWARDED
+        referral.status === ReferralStatus.SIGNUP_REWARDED ||
+        referral.status === ReferralStatus.PACKAGE_REWARDED 
       ) {
         console.log("already given");
         return;
@@ -414,7 +420,7 @@ export class ReferralService {
       }
 
       const balanceBefore = Number(wallet.balance);
-      const balanceAfter = balanceBefore + SIGNUP_REWARD;
+      const balanceAfter = balanceBefore + signupReward;
 
       console.log("balanceAfter call ......", balanceAfter)
 
@@ -432,7 +438,7 @@ export class ReferralService {
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
-          amount: new Prisma.Decimal(SIGNUP_REWARD),
+          amount: new Prisma.Decimal(signupReward),
           balanceBefore: new Prisma.Decimal(balanceBefore),
           balanceAfter: new Prisma.Decimal(balanceAfter),
           type: TransactionType.REWARD,
@@ -449,9 +455,9 @@ export class ReferralService {
           id: referral.id,
         },
         data: {
-          signupReward: SIGNUP_REWARD,
+          signupReward: new Prisma.Decimal(signupReward),
           rewardedAt: new Date(),
-          status: ReferralStatus.SIGNED_UP,
+          status: ReferralStatus.SIGNUP_REWARDED,
         },
       });
 
@@ -470,7 +476,7 @@ export class ReferralService {
             increment: 1,
           },
           totalCoinsEarned: {
-            increment: SIGNUP_REWARD,
+            increment: signupReward,
           },
           pendingRewards: referralStats && referralStats.pendingRewards > 0
             ? {
@@ -483,7 +489,7 @@ export class ReferralService {
           totalInvites: 1,
           joinedUsers: 1,
           purchasedUsers: 0,
-          totalCoinsEarned: SIGNUP_REWARD,
+          totalCoinsEarned: signupReward,
           pendingRewards: 0,
         },
       });
@@ -498,6 +504,13 @@ export class ReferralService {
   static async onSubscriptionPurchased(userId: string) {
     return prisma.$transaction(async (tx) => {
 
+      const rewardConfig = await tx.rewardConfig.findFirst();
+
+      if (!rewardConfig) {
+        throw new Error("Reward configuration not found.");
+      }
+
+      const packageReward = rewardConfig.packageReward.toNumber();
       // Find referral
       const referral = await tx.userReferral.findUnique({
         where: {
@@ -517,8 +530,7 @@ export class ReferralService {
 
       // Purchase reward already given
       if (
-        referral.status === ReferralStatus.PURCHASED ||
-        referral.status === ReferralStatus.REWARDED
+        referral.status === ReferralStatus.PACKAGE_REWARDED 
       ) {
         return;
       }
@@ -535,7 +547,7 @@ export class ReferralService {
       }
 
       const balanceBefore = Number(wallet.balance);
-      const balanceAfter = balanceBefore + PURCHASE_REWARD;
+      const balanceAfter = balanceBefore + packageReward;
 
       // Update wallet balance
       await tx.wallet.update({
@@ -551,7 +563,7 @@ export class ReferralService {
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
-          amount: new Prisma.Decimal(PURCHASE_REWARD),
+          amount: new Prisma.Decimal(packageReward),
           type: TransactionType.REWARD,
           status: TransactionStatus.SUCCESS,
           source: TransactionSource.REFERRAL_PURCHASE,
@@ -568,9 +580,9 @@ export class ReferralService {
           id: referral.id,
         },
         data: {
-          purchaseReward: PURCHASE_REWARD,
+          purchaseReward: packageReward,
           purchaseAt: new Date(),
-          status: ReferralStatus.REWARDED,
+          status: ReferralStatus.PACKAGE_REWARDED,
         },
       });
 
@@ -584,7 +596,7 @@ export class ReferralService {
             increment: 1,
           },
           totalCoinsEarned: {
-            increment: PURCHASE_REWARD,
+            increment: packageReward,
           },
         },
         create: {
@@ -592,7 +604,7 @@ export class ReferralService {
           totalInvites: 1,
           joinedUsers: 1,
           purchasedUsers: 1,
-          totalCoinsEarned: PURCHASE_REWARD,
+          totalCoinsEarned: packageReward,
           pendingRewards: 0,
         },
       });
@@ -743,8 +755,7 @@ export class ReferralService {
 
       // Payment reward already given
       if (
-        referral.status === ReferralStatus.PURCHASED ||
-        referral.status === ReferralStatus.REWARDED
+        referral.status === ReferralStatus.WAITLIST_REWARDED 
       ) {
         return;
       }
@@ -760,7 +771,7 @@ export class ReferralService {
         throw new Error("Waitlist record not found.");
       }
 
-      if (waitlist.paymentStatus !== PaymentStatus.PAID) {
+      if (waitlist.paymentStatus !== PaymentStatus.COMPLETED) {
         throw new Error("Waitlist payment is not completed.");
       }
 
@@ -811,7 +822,7 @@ export class ReferralService {
         data: {
           purchaseReward: WAITLIST_PAYMENT_REWARD,
           purchaseAt: new Date(),
-          status: ReferralStatus.REWARDED,
+          status: ReferralStatus.WAITLIST_REWARDED,
         },
       });
 
