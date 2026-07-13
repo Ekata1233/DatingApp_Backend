@@ -183,7 +183,7 @@ export const getReferralDashboard = async (
     stats: {
       totalEarned: user.referralStats?.totalCoinsEarned ?? 0,
       joined: user.referralStats?.joinedUsers ?? 0,
-      rewarded: user.referralStats?.purchasedUsers ?? 0,
+      rewarded: user.referralStats?.rewardedUsers ?? 0,
       pending: user.referralStats?.pendingRewards ?? 0,
     },
 
@@ -231,11 +231,22 @@ export const getReferralHistory = async (
   if (status) {
     switch (status) {
       case "joined":
-        where.status = ReferralStatus.SIGNUP_REWARDED;
+        where.status = {
+          in: [
+            ReferralStatus.PENDING,
+            ReferralStatus.SIGNUP_REWARDED,
+            ReferralStatus.PACKAGE_REWARDED,
+          ],
+        };
         break;
 
       case "rewarded":
-        where.status = ReferralStatus.PACKAGE_REWARDED;
+        where.status = {
+          in: [
+            ReferralStatus.SIGNUP_REWARDED,
+            ReferralStatus.PACKAGE_REWARDED,
+          ],
+        };
         break;
 
       case "pending":
@@ -279,26 +290,17 @@ export const getReferralHistory = async (
   return {
     history: history.map((item) => ({
       id: item.id,
-
       userId: item.referredUser.id,
-
       name: item.referredUser.full_name ?? "Unknown User",
-
       profileImage:
         item.referredUser.photos[0]?.media_url ?? null,
-
       status: item.status,
-
       signupReward: item.signupReward,
-
       purchaseReward: item.purchaseReward,
-
       totalReward:
         Number(item.signupReward) +
         Number(item.purchaseReward),
-
       joinedAt: item.createdAt,
-
       rewardedAt: item.rewardedAt,
     })),
 
@@ -313,8 +315,7 @@ export const getReferralHistory = async (
   };
 };
 
-const SIGNUP_REWARD = 100;
-const PURCHASE_REWARD = 500;
+
 const WAITLIST_PAYMENT_REWARD = 150;
 
 export class ReferralService {
@@ -434,7 +435,7 @@ export class ReferralService {
           userId: referral.referrerId,
           totalInvites: 1,
           joinedUsers: 1,
-          purchasedUsers: 0,
+          rewardedUsers: 1,
           totalCoinsEarned: signupReward,
           pendingRewards: 0,
         },
@@ -538,7 +539,7 @@ export class ReferralService {
           userId: referral.referrerId,
         },
         update: {
-          purchasedUsers: {
+          rewardedUsers: {
             increment: 1,
           },
           totalCoinsEarned: {
@@ -549,7 +550,7 @@ export class ReferralService {
           userId: referral.referrerId,
           totalInvites: 1,
           joinedUsers: 1,
-          purchasedUsers: 1,
+          rewardedUsers: 1,
           totalCoinsEarned: packageReward,
           pendingRewards: 0,
         },
@@ -778,7 +779,7 @@ export class ReferralService {
           userId: referral.referrerId,
         },
         update: {
-          purchasedUsers: {
+          rewardedUsers: {
             increment: 1,
           },
           totalCoinsEarned: {
@@ -790,7 +791,7 @@ export class ReferralService {
           userId: referral.referrerId,
           totalInvites: 1,
           joinedUsers: 1,
-          purchasedUsers: 1,
+          rewardedUsers: 1,
           totalCoinsEarned: WAITLIST_PAYMENT_REWARD,
           pendingRewards: 0,
         },
