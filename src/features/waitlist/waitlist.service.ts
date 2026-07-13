@@ -21,7 +21,7 @@ export const joinWaitlistService = async (
             throw new Error("Payment not found");
         }
 
-        if (payment.status !== PaymentStatus.PAID) {
+        if (payment.status !== PaymentStatus.COMPLETED) {
             throw new Error("Payment is not completed");
         }
 
