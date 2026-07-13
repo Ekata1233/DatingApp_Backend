@@ -4,54 +4,18 @@ import { prisma } from "../../../prisma/prismaClient";
 import { ReferralDashboardResponse, ValidateReferralResponse } from "./referral.types";
 
 export const validateReferralCode = async (
-  userId: string,
   referralCode: string
 ): Promise<ValidateReferralResponse> => {
 
   referralCode = referralCode.trim().toUpperCase();
 
-  // Find current user
-  const currentUser = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-    select: {
-      id: true,
-      referralCode: true,
-    },
-  });
-
-  if (!currentUser) {
+  if (!referralCode) {
     return {
       success: false,
-      message: "User not found",
+      message: "Referral code is required.",
     };
   }
 
-  // Self referral
-  if (currentUser.referralCode === referralCode) {
-    return {
-      success: false,
-      message: "You cannot use your own referral code.",
-    };
-  }
-
-  // Already used a referral?
-  const alreadyUsed = await prisma.userReferral.findUnique({
-    where: {
-      referredUserId: userId,
-    },
-  });
-
-  if (alreadyUsed) {
-    return {
-      success: false,
-      message: "Referral code has already been used.",
-    };
-  }
-
-
-  // Find referrer
   const referrer = await prisma.user.findFirst({
     where: {
       referralCode,
@@ -60,7 +24,6 @@ export const validateReferralCode = async (
     select: {
       id: true,
       full_name: true,
-      referralCode: true,
     },
   });
 
@@ -71,29 +34,9 @@ export const validateReferralCode = async (
     };
   }
 
-  const reverseReferral = await prisma.userReferral.findFirst({
-    where: {
-      referrerId: currentUser.id,
-      referredUserId: referrer.id,
-    },
-  });
-
-  if (reverseReferral) {
-    throw new Error(
-      "You cannot apply a referral code from a user you have already referred."
-    );
-  }
-  // Extra safety
-  if (referrer.id === userId) {
-    return {
-      success: false,
-      message: "You cannot use your own referral code.",
-    };
-  }
-
   return {
     success: true,
-    message: "Referral code is validate.",
+    message: "Referral code is valid.",
     referrerName: referrer.full_name ?? "Welvors User",
   };
 };
@@ -244,20 +187,23 @@ export const getReferralDashboard = async (
       pending: user.referralStats?.pendingRewards ?? 0,
     },
 
-    history: history.map((item) => (
-      {
+    history: history.map((item) => {
+      const signupReward = item.signupReward.toNumber();
+      const purchaseReward = item.purchaseReward.toNumber();
+
+      return {
         id: item.id,
         userId: item.referredUser.id,
         name: item.referredUser.full_name || "Unknown User",
         profileImage: item.referredUser.photos[0]?.media_url ?? null,
         status: item.status,
-        signupReward: item.signupReward,
-        purchaseReward: item.purchaseReward,
-        totalReward: item.signupReward + item.purchaseReward,
+        signupReward,
+        purchaseReward,
+        totalReward: signupReward + purchaseReward,
         joinedAt: item.createdAt,
         rewardedAt: item.rewardedAt,
-      }
-    )),
+      };
+    }),
 
     pagination: {
       page,
@@ -400,7 +346,7 @@ export class ReferralService {
       // Reward already given
       if (
         referral.status === ReferralStatus.SIGNUP_REWARDED ||
-        referral.status === ReferralStatus.PACKAGE_REWARDED 
+        referral.status === ReferralStatus.PACKAGE_REWARDED
       ) {
         console.log("already given");
         return;
@@ -530,7 +476,7 @@ export class ReferralService {
 
       // Purchase reward already given
       if (
-        referral.status === ReferralStatus.PACKAGE_REWARDED 
+        referral.status === ReferralStatus.PACKAGE_REWARDED
       ) {
         return;
       }
@@ -755,7 +701,7 @@ export class ReferralService {
 
       // Payment reward already given
       if (
-        referral.status === ReferralStatus.WAITLIST_REWARDED 
+        referral.status === ReferralStatus.WAITLIST_REWARDED
       ) {
         return;
       }

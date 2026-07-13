@@ -6,7 +6,6 @@ const router = Router();
 
 router.post(
   "/referral-validate",
-  authMiddleware,
   validateReferralController
 );
 

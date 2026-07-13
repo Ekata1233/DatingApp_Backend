@@ -6,21 +6,11 @@ export const validateReferralController = async (
   res: Response
 ) => {
   try {
-
-    const userId = (req as any).user.id;
-
     const { referralCode } = req.body;
 
-    const result = await validateReferralCode(
-      userId,
-      referralCode
-    );
+    const result = await validateReferralCode(referralCode);
 
-    if (!result.success) {
-      return res.status(400).json(result);
-    }
-
-    return res.status(200).json(result);
+    return res.status(result.success ? 200 : 400).json(result);
 
   } catch (error) {
 
