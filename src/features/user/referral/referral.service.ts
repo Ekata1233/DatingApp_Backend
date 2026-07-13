@@ -163,7 +163,7 @@ export const applyReferral = async (
       data: {
         referrerId: referrer.id,
         referredUserId: userId,
-        status: "SIGNED_UP"
+        status: "PENDING"
       }
     });
 
