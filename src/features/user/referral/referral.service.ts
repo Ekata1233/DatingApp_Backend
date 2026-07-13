@@ -196,41 +196,41 @@ export const getReferralDashboard = async (
     throw new Error("User not found");
   }
 
-const [history, total] = await prisma.$transaction([
-  prisma.userReferral.findMany({
-    where: {
-      referrerId: userId,
-    },
-    include: {
-      referredUser: {
-        select: {
-          id: true,
-          full_name: true,
-          photos: {
-            where: {
-              is_primary: true,
-            },
-            take: 1,
-            select: {
-              media_url: true,
+  const [history, total] = await prisma.$transaction([
+    prisma.userReferral.findMany({
+      where: {
+        referrerId: userId,
+      },
+      include: {
+        referredUser: {
+          select: {
+            id: true,
+            full_name: true,
+            photos: {
+              where: {
+                is_primary: true,
+              },
+              take: 1,
+              select: {
+                media_url: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    skip,
-    take: limit,
-  }),
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip,
+      take: limit,
+    }),
 
-  prisma.userReferral.count({
-    where: {
-      referrerId: userId,
-    },
-  }),
-]);
+    prisma.userReferral.count({
+      where: {
+        referrerId: userId,
+      },
+    }),
+  ]);
 
   return {
     referralCode: user.referralCode || "",
@@ -238,26 +238,123 @@ const [history, total] = await prisma.$transaction([
     shareLink: `ating-app-backend-plum.vercel.app/api-docs`,
 
     stats: {
-      totalEarned:user.referralStats?.totalCoinsEarned ?? 0,
-      joined:user.referralStats?.joinedUsers ?? 0,
-      rewarded:user.referralStats?.purchasedUsers ?? 0,
-      pending:user.referralStats?.pendingRewards ?? 0,
+      totalEarned: user.referralStats?.totalCoinsEarned ?? 0,
+      joined: user.referralStats?.joinedUsers ?? 0,
+      rewarded: user.referralStats?.purchasedUsers ?? 0,
+      pending: user.referralStats?.pendingRewards ?? 0,
     },
 
     history: history.map((item) => (
       {
-      id: item.id,
-      userId: item.referredUser.id,
-      name:item.referredUser.full_name || "Unknown User",
-      profileImage: item.referredUser.photos[0]?.media_url ?? null,
-      status: item.status,
-      signupReward: item.signupReward,
-      purchaseReward: item.purchaseReward,
-      totalReward:item.signupReward + item.purchaseReward,
-      joinedAt: item.createdAt,
-      rewardedAt: item.rewardedAt,
+        id: item.id,
+        userId: item.referredUser.id,
+        name: item.referredUser.full_name || "Unknown User",
+        profileImage: item.referredUser.photos[0]?.media_url ?? null,
+        status: item.status,
+        signupReward: item.signupReward,
+        purchaseReward: item.purchaseReward,
+        totalReward: item.signupReward + item.purchaseReward,
+        joinedAt: item.createdAt,
+        rewardedAt: item.rewardedAt,
+      }
+    )),
+
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    },
+  };
+};
+
+export const getReferralHistory = async (
+  userId: string,
+  status?: "joined" | "rewarded" | "pending",
+  page = 1,
+  limit = 20
+) => {
+  const skip = (page - 1) * limit;
+
+  const where: any = {
+    referrerId: userId,
+  };
+
+  if (status) {
+    switch (status) {
+      case "joined":
+        where.status = ReferralStatus.SIGNED_UP;
+        break;
+
+      case "rewarded":
+        where.status = ReferralStatus.REWARDED;
+        break;
+
+      case "pending":
+        where.status = ReferralStatus.PENDING;
+        break;
     }
-  )),
+  }
+
+  const [history, total] = await prisma.$transaction([
+    prisma.userReferral.findMany({
+      where,
+      include: {
+        referredUser: {
+          select: {
+            id: true,
+            full_name: true,
+            photos: {
+              where: {
+                is_primary: true,
+              },
+              take: 1,
+              select: {
+                media_url: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip,
+      take: limit,
+    }),
+
+    prisma.userReferral.count({
+      where,
+    }),
+  ]);
+
+  return {
+    history: history.map((item) => ({
+      id: item.id,
+
+      userId: item.referredUser.id,
+
+      name: item.referredUser.full_name ?? "Unknown User",
+
+      profileImage:
+        item.referredUser.photos[0]?.media_url ?? null,
+
+      status: item.status,
+
+      signupReward: item.signupReward,
+
+      purchaseReward: item.purchaseReward,
+
+      totalReward:
+        Number(item.signupReward) +
+        Number(item.purchaseReward),
+
+      joinedAt: item.createdAt,
+
+      rewardedAt: item.rewardedAt,
+    })),
 
     pagination: {
       page,
@@ -358,6 +455,11 @@ export class ReferralService {
         },
       });
 
+      const referralStats = await tx.userReferralStats.findUnique({
+        where: {
+          userId: referral.referrerId,
+        },
+      });
       // Update referral stats
       await tx.userReferralStats.upsert({
         where: {
@@ -370,6 +472,11 @@ export class ReferralService {
           totalCoinsEarned: {
             increment: SIGNUP_REWARD,
           },
+          pendingRewards: referralStats && referralStats.pendingRewards > 0
+            ? {
+              decrement: 1,
+            }
+            : undefined,
         },
         create: {
           userId: referral.referrerId,

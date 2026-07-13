@@ -127,6 +127,25 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
             status: "SIGNED_UP",
           },
         });
+
+        // 6. Increment referrer's total invites
+        await tx.userReferralStats.upsert({
+          where: {
+            userId: referrer.id,
+          },
+          update: {
+            totalInvites: {
+              increment: 1,
+            },
+            pendingRewards: {
+              increment: 1,
+            },
+          },
+          create: {
+            userId: referrer.id,
+            totalInvites: 1,
+          },
+        });
       }
     } else {
       // Update existing user's phone verification
