@@ -106,8 +106,8 @@ model UserReferral {
   referrerId     String         @db.Uuid
   referredUserId String         @unique @db.Uuid
   status         ReferralStatus @default(PENDING)
-  signupReward   Int            @default(0)
-  purchaseReward Int            @default(0)
+  signupReward   Decimal        @default(0) @db.Decimal(10, 2)
+  purchaseReward Decimal        @default(0) @db.Decimal(10, 2)
   rewardedAt     DateTime?
   purchaseAt     DateTime?
 
@@ -137,9 +137,9 @@ model UserReferralStats {
 
 enum ReferralStatus {
   PENDING
-  SIGNED_UP
-  PURCHASED
-  REWARDED
+  SIGNUP_REWARDED
+  PACKAGE_REWARDED
+  WAITLIST_REWARDED
   CANCELLED
 }
 
@@ -517,15 +517,15 @@ model UserBio {
 }
 
 model UserPrompt {
-  id           String           @id @default(uuid()) @db.Uuid
-  userId       String           @db.Uuid
-  promptId     String           @db.Uuid
-  answer       String           @db.VarChar(300)
-  displayOrder Int              @default(1)
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prompt       Prompt           @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  promptId     String   @db.Uuid
+  answer       String   @db.VarChar(300)
+  displayOrder Int      @default(1)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([userId, promptId])
   @@index([userId])
@@ -554,17 +554,17 @@ model PromptCategory {
 }
 
 model Prompt {
-  id          String         @id @default(uuid()) @db.Uuid
-  categoryId  String         @db.Uuid
-  question    String         @db.VarChar(255)
-  active      Boolean        @default(true)
-  priority    Int            @default(0)
-  maxLength   Int            @default(200)
+  id          String           @id @default(uuid()) @db.Uuid
+  categoryId  String           @db.Uuid
+  question    String           @db.VarChar(255)
+  active      Boolean          @default(true)
+  priority    Int              @default(0)
+  maxLength   Int              @default(200)
   visibility  PromptVisibility @default(EVERYONE)
-  category    PromptCategory @relation(fields: [categoryId], references: [id])
+  category    PromptCategory   @relation(fields: [categoryId], references: [id])
   userPrompts UserPrompt[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@index([categoryId])
   @@index([active])
@@ -938,7 +938,7 @@ model Payment {
   packageId       String?
   amount          Decimal        @db.Decimal(10, 2)
   currency        String         @default("INR")
-  payment_id      String?
+  payment_id      String?        @unique
   transactionId   String?
   status          PaymentStatus  @default(PENDING)
   purpose         PaymentPurpose
@@ -1639,7 +1639,6 @@ enum WaitlistSource {
   WEBSITE
   REFERRAL
   YOUTUBE
-
   LINKEDIN
   OTHER
 }

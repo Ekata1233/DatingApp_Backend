@@ -124,7 +124,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
           data: {
             referrerId: referrer.id,
             referredUserId: existingUser.id,
-            status: "SIGNED_UP",
+            status: "PENDING",
           },
         });
 
