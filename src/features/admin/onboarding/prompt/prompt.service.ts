@@ -1,7 +1,19 @@
 import { prisma } from "../../../../prisma/prismaClient";
 import { CreatePromptCategoryDto, CreatePromptDto, UpdatePromptCategoryDto, UpdatePromptDto } from "./prompt.types";
 
-export const createPromptCategoryService = async (data: CreatePromptCategoryDto) => {
+export const createPromptCategoryService = async (
+  data: CreatePromptCategoryDto
+) => {
+  const existingCategory = await prisma.promptCategory.findUnique({
+    where: {
+      name: data.name,
+    },
+  });
+
+  if (existingCategory) {
+    throw new Error("Prompt category already exists.");
+  }
+
   return prisma.promptCategory.create({
     data,
   });
