@@ -12,8 +12,7 @@ import {
   updateQuestionService,
   addQuestionOptionService,
   updateQuestionOptionService,
-  deleteQuestionOptionService,
-  clearQuestionService,
+
   deleteQuestionWithOptionsService,
 } from "./question.service";
 
@@ -76,8 +75,7 @@ export const getQuestionByIdController = async (
   res: Response
 ) => {
   try {
-    const { id } = req.params;
-
+   const id = req.params.id as string;
     const question = await getQuestionByIdService(id);
 
     return res.status(200).json({
@@ -97,7 +95,7 @@ export const deleteQuestionController = async (
   res: Response
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const result = await deleteQuestionService(id);
 
@@ -119,7 +117,7 @@ export const updateQuestionController = async (
   res: Response
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { title, isMulti } = req.body;
 
     const question = await updateQuestionService(
@@ -146,7 +144,7 @@ export const addQuestionOptionController = async (
   res: Response
 ) => {
   try {
-   const { questionId } = req.params;
+   const questionId = req.params.questionId as string;
     const { value, label } = req.body;
 
     const option = await addQuestionOptionService(
@@ -172,7 +170,7 @@ export const updateQuestionOptionController = async (
   res: Response
 ) => {
   try {
-    const { optionId } = req.params;
+    const optionId = req.params.optionId as string;
     const { value, label } = req.body;
 
     const option = await updateQuestionOptionService(
@@ -199,9 +197,9 @@ export const deleteQuestionOptionController = async (
   res: Response
 ) => {
   try {
-    const { optionId } = req.params;
+   const optionId = req.params.optionId as string;
 
-    await deleteQuestionOptionService(optionId);
+    await deleteQuestionWithOptionsService(optionId);
 
     res.status(200).json({
       success: true,
@@ -221,7 +219,7 @@ export const deleteQuestionWithOptionsController = async (
   res: Response
 ) => {
   try {
-    const { questionId } = req.params;
+       const questionId = req.params.questionId as string;
 
     const result = await deleteQuestionWithOptionsService(questionId);
 
