@@ -1,5 +1,6 @@
 import { QuestionCategory,QuestionScreen } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
+import { redis } from "../../../../lib/redis";
 
 // CREATE QUESTION
 export const createQuestionService = async (
@@ -46,6 +47,20 @@ export const getQuestionService = async (
   category?: QuestionCategory,
   screen?: QuestionScreen
 ) => {
+  // Generate unique cache key
+  const cacheKey = `questions:${category ?? "all"}:${screen ?? "all"}`;
+
+  // 1. Check Redis
+  const cachedQuestions = await redis.get(cacheKey);
+
+  if (cachedQuestions) {
+    console.log(`✅ Cache Hit: ${cacheKey}`);
+    return cachedQuestions;
+  }
+
+  console.log(`📦 Cache Miss: ${cacheKey}`);
+
+  // 2. Fetch from Database
   const questions = await prisma.question.findMany({
     where: {
       ...(category && { category }),
@@ -57,6 +72,11 @@ export const getQuestionService = async (
     orderBy: {
       created_at: "asc",
     },
+  });
+
+  // 3. Store in Redis for 10 minutes
+  await redis.set(cacheKey, questions, {
+    ex: 600,
   });
 
   return questions;
