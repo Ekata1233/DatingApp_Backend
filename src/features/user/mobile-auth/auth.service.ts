@@ -144,6 +144,7 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
           create: {
             userId: referrer.id,
             totalInvites: 1,
+            pendingRewards: 1,
           },
         });
       }

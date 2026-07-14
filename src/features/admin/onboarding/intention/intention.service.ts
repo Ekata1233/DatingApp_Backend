@@ -1,3 +1,4 @@
+import { redis } from "../../../../lib/redis";
 import { prisma } from "../../../../prisma/prismaClient";
 import { IIntention } from "./intention.types";
 
@@ -57,12 +58,30 @@ export const createIntention = async (
   });
 };
 
+const CACHE_KEY = "intentions:all";
 export const getAllIntentions = async () => {
-  return prisma.intention.findMany({
+  // 1. Check Redis
+  const cached = await redis.get(CACHE_KEY);
+  if (cached) {
+    console.log("✅ Data from Redis");
+    return cached;
+  }
+
+  console.log("📦 Data from Database");
+
+  // 2. Get from DB
+  const intentions = await prisma.intention.findMany({
     include: {
       options: true,
     },
   });
+
+  // 3. Save in Redis for 10 minutes
+  await redis.set(CACHE_KEY, intentions, {
+    ex: 600,
+  });
+
+  return intentions;
 };
 
 export const deleteIntention = async () => {

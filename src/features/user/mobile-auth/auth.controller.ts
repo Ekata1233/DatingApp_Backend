@@ -11,8 +11,14 @@ export const sendOtpController = async (req: Request, res: Response) => {
       success: true,
       message: "OTP sent successfully",
     });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to send OTP" });
+  } catch (error: any) {
+    console.error("Twilio Error:", error);
+
+    res.status(500).json({
+      message: error.message,
+      code: error.code,
+      moreInfo: error.moreInfo,
+    });
   }
 };
 
@@ -24,7 +30,7 @@ export const verifyOtpController = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-     message: "Phone verified successfully",
+      message: "Phone verified successfully",
       token: user.token
     });
   } catch (error) {

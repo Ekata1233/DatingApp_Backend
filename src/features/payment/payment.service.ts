@@ -20,7 +20,7 @@ export const createOrder = async (
   const order = await razorpay.orders.create({
     amount: amountInPaise,
     currency: "INR",
-    receipt: `receipt_${Date.now()}`,
+    receipt: `USR_${userId}_${Date.now()}`,
     payment_capture: true,
   });
 
