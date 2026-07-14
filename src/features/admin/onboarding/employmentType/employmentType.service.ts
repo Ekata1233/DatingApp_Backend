@@ -1,5 +1,24 @@
+import { redis } from "../../../../lib/redis";
 import { prisma } from "../../../../prisma/prismaClient";
 import { IEmploymentType } from "./employmentType.types";
+
+const ALL_CACHE_KEY = "employmentType:all";
+const ACTIVE_CACHE_KEY = "employmentType:active";
+const SINGLE_CACHE_PREFIX = "employmentType";
+
+const clearEmploymentTypeCache = async () => {
+  await redis.del(ALL_CACHE_KEY);
+  await redis.del(ACTIVE_CACHE_KEY);
+
+  // Remove all single record caches
+  const keys = await redis.keys(`${SINGLE_CACHE_PREFIX}:*`);
+
+  if (keys.length > 0) {
+    await redis.del(...keys);
+  }
+
+  console.log("🗑️ Employment Type cache cleared");
+};
 
 /**
  * Create Employment Type
@@ -7,12 +26,16 @@ import { IEmploymentType } from "./employmentType.types";
 export const createEmploymentType = async (
   payload: IEmploymentType
 ) => {
-  return prisma.employmentType.create({
+  const employmentType = await prisma.employmentType.create({
     data: {
       name: payload.name,
       isActive: payload.isActive,
     },
   });
+
+  await clearEmploymentTypeCache();
+
+  return employmentType;
 };
 
 /**
@@ -22,7 +45,7 @@ export const updateEmploymentType = async (
   id: number,
   payload: IEmploymentType
 ) => {
-  return prisma.employmentType.update({
+  const employmentType = await prisma.employmentType.update({
     where: {
       id,
     },
@@ -31,17 +54,32 @@ export const updateEmploymentType = async (
       isActive: payload.isActive,
     },
   });
+
+  await clearEmploymentTypeCache();
+
+  return employmentType;
 };
 
 /**
  * Get All Employment Types
  */
 export const getAllEmploymentType = async () => {
-  return prisma.employmentType.findMany({
+  const cached = await redis.get(ALL_CACHE_KEY);
+  if (cached) {
+    console.log("✅ Cache Hit: employmentType:all");
+    return cached;
+  }
+  console.log("📦 Cache Miss: employmentType:all");
+
+  const employmentTypes = await prisma.employmentType.findMany({
     orderBy: {
       id: "asc",
     },
   });
+  await redis.set(ALL_CACHE_KEY, employmentTypes, {
+    ex: 600,
+  });
+  return employmentTypes;
 };
 
 /**
@@ -50,11 +88,25 @@ export const getAllEmploymentType = async () => {
 export const getEmploymentTypeById = async (
   id: number
 ) => {
-  return prisma.employmentType.findUnique({
+  const cacheKey = `${SINGLE_CACHE_PREFIX}:${id}`;
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    console.log(`✅ Cache Hit: ${cacheKey}`);
+    return cached;
+  }
+  console.log(`📦 Cache Miss: ${cacheKey}`);
+
+  const employmentType = await prisma.employmentType.findUnique({
     where: {
       id,
     },
   });
+  if (employmentType) {
+    await redis.set(cacheKey, employmentType, {
+      ex: 600,
+    });
+  }
+  return employmentType;
 };
 
 /**
@@ -63,15 +115,29 @@ export const getEmploymentTypeById = async (
 export const removeEmploymentType = async (
   id: number
 ) => {
-  return prisma.employmentType.delete({
+  const employmentType = await prisma.employmentType.delete({
     where: {
       id,
     },
   });
+
+  await clearEmploymentTypeCache();
+
+  return employmentType;
 };
 
+/**
+ * Active Employment Type
+ */
 export const getActiveEmploymentType = async () => {
-  return prisma.employmentType.findMany({
+  const cached = await redis.get(ACTIVE_CACHE_KEY);
+  if (cached) {
+    console.log("✅ Cache Hit: employmentType:active");
+    return cached;
+  }
+  console.log("📦 Cache Miss: employmentType:active");
+
+  const employmentTypes = await prisma.employmentType.findMany({
     where: {
       isActive: true,
     },
@@ -79,4 +145,8 @@ export const getActiveEmploymentType = async () => {
       id: "asc",
     },
   });
+  await redis.set(ACTIVE_CACHE_KEY, employmentTypes, {
+    ex: 600,
+  });
+  return employmentTypes;
 };

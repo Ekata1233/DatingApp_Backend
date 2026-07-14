@@ -1,7 +1,15 @@
-import { QuestionCategory,QuestionScreen } from "@prisma/client";
+import { QuestionCategory, QuestionScreen } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import { redis } from "../../../../lib/redis";
 
+export const clearQuestionCache = async () => {
+  const keys = await redis.keys("questions:*");
+
+  if (keys.length > 0) {
+    await redis.del(...keys);
+    console.log("🗑️ Question cache cleared");
+  }
+};
 // CREATE QUESTION
 export const createQuestionService = async (
   key: string,
@@ -38,6 +46,8 @@ export const createQuestionService = async (
       options: true,
     },
   });
+
+  await clearQuestionCache();
 
   return question;
 };
@@ -113,6 +123,7 @@ export const deleteQuestionService = async (id: string) => {
   await prisma.question.delete({
     where: { id },
   });
+  await clearQuestionCache();
 
   return { message: "Question deleted successfully" };
 };
@@ -130,7 +141,7 @@ export const updateQuestionService = async (
     throw new Error("Question not found");
   }
 
-  return prisma.question.update({
+  const question = await prisma.question.update({
     where: { id },
     data: {
       title,
@@ -140,7 +151,12 @@ export const updateQuestionService = async (
       options: true,
     },
   });
+
+  await clearQuestionCache();
+
+  return question;
 };
+
 export const addQuestionOptionService = async (
   question_id: string,
   value: string,
@@ -156,14 +172,19 @@ export const addQuestionOptionService = async (
     throw new Error("Question not found");
   }
 
-  return prisma.questionOption.create({
-    data: {
-      question_id,
-      value,
-      label,
-    },
-  });
+  const option = await prisma.questionOption.create({
+  data: {
+    question_id,
+    value,
+    label,
+  },
+});
+
+await clearQuestionCache();
+
+return option;
 };
+
 export const updateQuestionOptionService = async (
   optionId: string,
   value: string,
@@ -179,15 +200,19 @@ export const updateQuestionOptionService = async (
     throw new Error("Option not found");
   }
 
-  return prisma.questionOption.update({
-    where: {
-      id: optionId,
-    },
-    data: {
-      value,
-      label,
-    },
-  });
+  const options = await prisma.questionOption.update({
+  where: {
+    id: optionId,
+  },
+  data: {
+    value,
+    label,
+  },
+});
+
+await clearQuestionCache();
+
+return options;
 };
 
 export const deleteQuestionWithOptionsService = async (
@@ -218,6 +243,8 @@ export const deleteQuestionWithOptionsService = async (
       },
     });
   });
+  
+  await clearQuestionCache();
 
   return {
     message: "Question and all related options deleted successfully",
