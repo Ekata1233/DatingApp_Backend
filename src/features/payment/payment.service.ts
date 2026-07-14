@@ -1,288 +1,212 @@
-// // src/modules/payment/payment.service.ts
+import { PaymentStatus, Prisma } from "@prisma/client";
+import { CreateOrderDto, VerifyPaymentDto } from "./payment.dto";
+import razorpay from "../../config/razorpay";
+import { prisma } from "../../prisma/prismaClient";
+import crypto from "crypto";
 
-// import { PrismaClient, PaymentStatus } from '@prisma/client';
-// import Razorpay from 'razorpay';
-// import crypto from 'crypto';
-// import { CreateOrderDto, RazorpayOrderResponse, WebhookPayload } from './payment.types';
+export const createOrder = async (
+  userId: string,
+  payload: CreateOrderDto
+) => {
+  const { amount, purpose } = payload;
 
-// const prisma = new PrismaClient();
+  // Bare-minimum guard now that there's no package to derive price from.
+  if (!amount || amount <= 0) {
+    throw new Error("Invalid amount.");
+  }
 
-// export class PaymentService {
-//   private razorpay: Razorpay;
+  const amountInPaise = Math.round(amount * 100);
 
-//   constructor() {
-//     this.razorpay = new Razorpay({
-//       key_id: process.env.RAZORPAY_KEY_ID!,
-//       key_secret: process.env.RAZORPAY_KEY_SECRET!,
-//     });
-//   }
+  const order = await razorpay.orders.create({
+    amount: amountInPaise,
+    currency: "INR",
+    receipt: `USR_${userId}_${Date.now()}`,
+    payment_capture: true,
+  });
 
-//   // Create Razorpay Order
-//   async createOrder(paymentData: CreateOrderDto): Promise<{ order: RazorpayOrderResponse; paymentId: string }> {
-//     try {
-//       const { userId, packageId, amount, currency = 'INR', purpose, receipt, notes } = paymentData;
+  const payment = await prisma.payment.create({
+    data: {
+      userId,
+      amount, // rupees. See note at bottom re: storing paise instead.
+      currency: "INR",
+      payment_id: order.id,
+      transactionId: order.receipt,
+      status: PaymentStatus.PENDING,
+      purpose,
+      gatewayResponse: {
+        id: order.id,
+        entity: order.entity,
+        amount: order.amount,
+        amount_paid: order.amount_paid,
+        amount_due: order.amount_due,
+        currency: order.currency,
+        receipt: order.receipt,
+        status: order.status,
+        attempts: order.attempts,
+        created_at: order.created_at,
+      } as Prisma.InputJsonValue,
+    },
+  });
 
-//       // Create payment record in database
-//       const payment = await prisma.payment.create({
-//         data: {
-//           userId,
-//           packageId: packageId || null,
-//           amount: amount,
-//           currency,
-//           status: PaymentStatus.PENDING,
-//           purpose: purpose,
-//         },
-//       });
+  return {
+    paymentId: payment.id,
+    razorpayOrderId: order.id,
+    amount: order.amount,
+    currency: order.currency,
+    key: process.env.RAZORPAY_KEY_ID,
+  };
+};
 
-//       // Create Razorpay order
-//       const orderOptions = {
-//         amount: Math.round(amount * 100), // Convert to paise and ensure integer
-//         currency: currency,
-//         receipt: receipt || `receipt_${payment.id}`,
-//         notes: {
-//           ...notes,
-//           paymentId: payment.id,
-//           userId: userId,
-//         },
-//       };
+export const verifyPayment = async (
+  userId: string,
+  payload: VerifyPaymentDto
+) => {
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = payload;
 
-//       const order = await this.razorpay.orders.create(orderOptions);
+  // 1. Signature check — constant-time compare
+  const generatedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
 
-//       // Update payment with order ID
-//       await prisma.payment.update({
-//         where: { id: payment.id },
-//         data: {
-//           transactionId: order.id,
-//           gatewayResponse: order as any,
-//         },
-//       });
+  const signatureValid =
+    generatedSignature.length === razorpay_signature.length &&
+    crypto.timingSafeEqual(
+      Buffer.from(generatedSignature),
+      Buffer.from(razorpay_signature)
+    );
 
-//       return {
-//         order: order as RazorpayOrderResponse,
-//         paymentId: payment.id,
-//       };
-//     } catch (error) {
-//       console.error('Error creating order:', error);
-//       throw new Error('Failed to create payment order');
-//     }
-//   }
+  if (!signatureValid) {
+    throw new Error("Payment verification failed.");
+  }
 
-//   // Verify Payment Signature
-//   verifyPaymentSignature(paymentResponse: {
-//     razorpay_payment_id: string;
-//     razorpay_order_id: string;
-//     razorpay_signature: string;
-//   }): boolean {
-//     try {
-//       const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = paymentResponse;
-      
-//       const body = razorpay_order_id + '|' + razorpay_payment_id;
-//       const expectedSignature = crypto
-//         .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
-//         .update(body)
-//         .digest('hex');
+  // 2. Load our order + ownership check (fixes IDOR — userId was unused before)
+  const existing = await prisma.payment.findUnique({
+    where: { payment_id: razorpay_order_id },
+  });
 
-//       return expectedSignature === razorpay_signature;
-//     } catch (error) {
-//       console.error('Error verifying signature:', error);
-//       return false;
-//     }
-//   }
+  if (!existing || existing.userId !== userId) {
+    throw new Error("Payment not found or not authorized.");
+  }
 
-//   // Process Successful Payment
-//   async processSuccessfulPayment(paymentId: string, razorpayPaymentId: string) {
-//     try {
-//       // Update payment status
-//       const payment = await prisma.payment.update({
-//         where: { id: paymentId },
-//         data: {
-//           status: PaymentStatus.COMPLETED,
-//           payment_id: razorpayPaymentId,
-//           paidAt: new Date(),
-//         },
-//         include: {
-//           Waitlist: true,
-//         },
-//       });
+  // 3. Idempotency — don't re-process a completed payment
+  if (existing.status === PaymentStatus.COMPLETED) {
+    return existing;
+  }
 
-//       // Handle business logic based on purpose
-//       await this.handlePaymentSuccess(payment);
+  // 4. Confirm money was actually captured for the right order + amount
+  const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
+const expectedPaise = existing.amount.mul(100).toNumber();
+  if (
+    paymentDetails.status !== "captured" ||
+    paymentDetails.order_id !== razorpay_order_id ||
+    Number(paymentDetails.amount) !== expectedPaise
+  ) {
+    await prisma.payment.update({
+      where: { payment_id: razorpay_order_id },
+      data: {
+        status: PaymentStatus.FAILED,
+        gatewayResponse: paymentDetails as unknown as Prisma.InputJsonValue,
+      },
+    });
+    throw new Error("Payment not captured or amount mismatch.");
+  }
 
-//       return payment;
-//     } catch (error) {
-//       console.error('Error processing successful payment:', error);
-//       throw error;
-//     }
-//   }
+  // 5. Mark completed
+  const payment = await prisma.payment.update({
+    where: { payment_id: razorpay_order_id },
+    data: {
+      status: PaymentStatus.COMPLETED,
+      transactionId: razorpay_payment_id,
+      gatewayResponse: paymentDetails as unknown as Prisma.InputJsonValue,
+      paidAt: new Date(),
+    },
+  });
 
-//   // Handle Payment Success Business Logic
-//   private async handlePaymentSuccess(payment: any) {
-//     try {
-//       switch (payment.purpose) {
-//         case 'PACKAGE_PURCHASE':
-//           await this.handlePackagePurchase(payment);
-//           break;
-//         case 'WAITLIST':
-//           await this.handleWaitlistPayment(payment);
-//           break;
-//         case 'SUBSCRIPTION':
-//           await this.handleSubscriptionPayment(payment);
-//           break;
-//         default:
-//           console.log('No specific handling for this payment purpose');
-//       }
-//     } catch (error) {
-//       console.error('Error in payment success handler:', error);
-//       throw error;
-//     }
-//   }
+  return payment;
+};
 
-//   private async handlePackagePurchase(payment: any) {
-//     // Implement package purchase logic
-//     console.log(`Processing package purchase for payment ${payment.id}`);
-//     // Example: Update user's subscription, assign package, etc.
-//   }
+export const handleWebhookEvent = async (
+  rawBody: Buffer,
+  signature: string
+) => {
+  // 1. Verify signature over the RAW body
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
+    .update(rawBody)
+    .digest("hex");
 
-//   private async handleWaitlistPayment(payment: any) {
-//     // Implement waitlist payment logic
-//     console.log(`Processing waitlist payment for payment ${payment.id}`);
-//   }
+  const valid =
+    expectedSignature.length === signature.length &&
+    crypto.timingSafeEqual(
+      Buffer.from(expectedSignature),
+      Buffer.from(signature)
+    );
 
-//   private async handleSubscriptionPayment(payment: any) {
-//     // Implement subscription payment logic
-//     console.log(`Processing subscription payment for payment ${payment.id}`);
-//   }
+  if (!valid) {
+    throw new Error("Invalid webhook signature.");
+  }
 
-//   // Process Failed Payment
-//   async processFailedPayment(paymentId: string, errorDetails?: any) {
-//     try {
-//       const payment = await prisma.payment.findUnique({
-//         where: { id: paymentId },
-//       });
+  const event = JSON.parse(rawBody.toString());
+  const type: string = event.event;
 
-//       if (!payment) {
-//         throw new Error('Payment not found');
-//       }
+  // We only act on payment lifecycle events tied to an order
+  const paymentEntity = event.payload?.payment?.entity;
+  if (!paymentEntity?.order_id) {
+    return; // nothing to reconcile
+  }
 
-//       const updatedPayment = await prisma.payment.update({
-//         where: { id: paymentId },
-//         data: {
-//           status: PaymentStatus.FAILED,
-//           gatewayResponse: errorDetails ? { ...(payment.gatewayResponse as any), error: errorDetails } : undefined,
-//         },
-//       });
+  const orderId = paymentEntity.order_id;
 
-//       return updatedPayment;
-//     } catch (error) {
-//       console.error('Error processing failed payment:', error);
-//       throw error;
-//     }
-//   }
+  const existing = await prisma.payment.findUnique({
+    where: { payment_id: orderId },
+  });
 
-//   // Get Payment Status
-//   async getPaymentStatus(paymentId: string) {
-//     try {
-//       const payment = await prisma.payment.findUnique({
-//         where: { id: paymentId },
-//         include: {
-//           Waitlist: true,
-//         },
-//       });
+  if (!existing) {
+    // Order we never created / already deleted — ignore, don't error.
+    return;
+  }
 
-//       if (!payment) {
-//         throw new Error('Payment not found');
-//       }
+  // 2. Idempotency: if already in a terminal state matching the event, skip.
+  if (type === "payment.captured") {
+    if (existing.status === PaymentStatus.COMPLETED) return;
 
-//       return payment;
-//     } catch (error) {
-//       console.error('Error getting payment status:', error);
-//       throw error;
-//     }
-//   }
+    // Amount safety check — same guard as verifyPayment
+ const expectedPaise = existing.amount.mul(100).toNumber();
+    if (Number(paymentEntity.amount) !== expectedPaise) {
+      await prisma.payment.update({
+        where: { payment_id: orderId },
+        data: {
+          status: PaymentStatus.FAILED,
+          gatewayResponse: paymentEntity as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return;
+    }
 
-//   // Get User Payments
-//   async getUserPayments(userId: string) {
-//     try {
-//       const payments = await prisma.payment.findMany({
-//         where: { userId },
-//         orderBy: { created_at: 'desc' },
-//       });
+    await prisma.payment.update({
+      where: { payment_id: orderId },
+      data: {
+        status: PaymentStatus.COMPLETED,
+        transactionId: paymentEntity.id,
+        gatewayResponse: paymentEntity as unknown as Prisma.InputJsonValue,
+        paidAt: new Date(),
+      },
+    });
+    return;
+  }
 
-//       return payments;
-//     } catch (error) {
-//       console.error('Error getting user payments:', error);
-//       throw error;
-//     }
-//   }
+  if (type === "payment.failed") {
+    if (existing.status === PaymentStatus.COMPLETED) return; // already paid, ignore
+    await prisma.payment.update({
+      where: { payment_id: orderId },
+      data: {
+        status: PaymentStatus.FAILED,
+        gatewayResponse: paymentEntity as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return;
+  }
 
-//   // Refund Payment
-//   async refundPayment(paymentId: string, amount?: number) {
-//     try {
-//       const payment = await prisma.payment.findUnique({
-//         where: { id: paymentId },
-//       });
-
-//       if (!payment || !payment.payment_id) {
-//         throw new Error('Payment not found or no payment ID available');
-//       }
-
-//       if (payment.status !== PaymentStatus.COMPLETED) {
-//         throw new Error('Only completed payments can be refunded');
-//       }
-
-//       // Process refund with Razorpay
-//       const refundOptions: any = {
-//         payment_id: payment.payment_id,
-//         notes: {
-//           paymentId: payment.id,
-//           userId: payment.userId,
-//         },
-//       };
-
-//       if (amount) {
-//         refundOptions.amount = Math.round(amount * 100); // Convert to paise
-//       }
-
-//       const refund = await this.razorpay.payments.refund(payment.payment_id, refundOptions);
-
-//       // Update payment status
-//       const updatedPayment = await prisma.payment.update({
-//         where: { id: paymentId },
-//         data: {
-//           status: PaymentStatus.REFUNDED,
-//           gatewayResponse: {
-//             ...(payment.gatewayResponse as any),
-//             refund: refund,
-//           },
-//         },
-//       });
-
-//       return updatedPayment;
-//     } catch (error) {
-//       console.error('Error processing refund:', error);
-//       throw error;
-//     }
-//   }
-
-//   // Fetch order details from Razorpay
-//   async fetchOrder(orderId: string) {
-//     try {
-//       const order = await this.razorpay.orders.fetch(orderId);
-//       return order;
-//     } catch (error) {
-//       console.error('Error fetching order:', error);
-//       throw error;
-//     }
-//   }
-
-//   // Fetch payment details from Razorpay
-//   async fetchPayment(paymentId: string) {
-//     try {
-//       const payment = await this.razorpay.payments.fetch(paymentId);
-//       return payment;
-//     } catch (error) {
-//       console.error('Error fetching payment:', error);
-//       throw error;
-//     }
-//   }
-// }
+  // Other events (order.paid, refund.*) — ignore for now.
+};

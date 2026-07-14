@@ -30,6 +30,26 @@ export const updateProfileService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
+
+  // Normalize email
+  email = email.trim().toLowerCase();
+
+  // Check if email already exists for another user
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      email,
+      NOT: {
+        id: userId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existingUser) {
+    throw new Error("Email is already registered. Please use another email.");
+  }
   // 👉 Calculate next step
   const currentStep = "BASIC_INFO";
   const nextStep = getNextStep(currentStep);

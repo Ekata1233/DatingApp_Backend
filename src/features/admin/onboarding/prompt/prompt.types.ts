@@ -1,3 +1,5 @@
+import { PromptVisibility } from "@prisma/client";
+
 export interface CreatePromptCategoryDto {
   name: string;
   description?: string;
@@ -18,6 +20,7 @@ export interface CreatePromptDto {
   priority?: number;
   active?: boolean;
   maxLength?: number;
+  visibility?: PromptVisibility;
 }
 
 export interface UpdatePromptDto {
@@ -26,4 +29,5 @@ export interface UpdatePromptDto {
   priority?: number;
   active?: boolean;
   maxLength?: number;
+  visibility?: PromptVisibility;
 }
