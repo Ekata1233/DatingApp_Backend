@@ -2,63 +2,63 @@ import { redis } from "../../../../lib/redis";
 import { prisma } from "../../../../prisma/prismaClient";
 import { IIntention } from "./intention.types";
 
-export const createIntention = async (
-  payload: IIntention
-) => {
+const CACHE_KEY = "intentions:all";
 
+export const createIntention = async (payload: IIntention) => {
   const existing = await prisma.intention.findFirst({
     include: {
       options: true,
     },
   });
 
+  let result;
+
   // UPDATE
   if (existing) {
-    return prisma.intention.update({
+    result = await prisma.intention.update({
       where: {
         id: existing.id,
       },
-
       data: {
         title: payload.title,
         description: payload.description,
         sortOrder: payload.sortOrder,
         isActive: payload.isActive,
-
         options: {
           deleteMany: {},
-
           create: payload.options,
         },
       },
-
+      include: {
+        options: true,
+      },
+    });
+  } else {
+    // CREATE
+    result = await prisma.intention.create({
+      data: {
+        title: payload.title,
+        description: payload.description,
+        sortOrder: payload.sortOrder,
+        isActive: payload.isActive,
+        options: {
+          create: payload.options,
+        },
+      },
       include: {
         options: true,
       },
     });
   }
 
-  // CREATE
+  // ✅ Clear cache after successful DB operation
+  await redis.del(CACHE_KEY);
 
-  return prisma.intention.create({
-    data: {
-      title: payload.title,
-      description: payload.description,
-      sortOrder: payload.sortOrder,
-      isActive: payload.isActive,
+  console.log("🗑️ Intention cache cleared");
 
-      options: {
-        create: payload.options,
-      },
-    },
-
-    include: {
-      options: true,
-    },
-  });
+  return result;
 };
 
-const CACHE_KEY = "intentions:all";
 export const getAllIntentions = async () => {
   // 1. Check Redis
   const cached = await redis.get(CACHE_KEY);
@@ -86,12 +86,18 @@ export const getAllIntentions = async () => {
 
 export const deleteIntention = async () => {
   const existing = await prisma.intention.findFirst();
-
   if (!existing) return null;
 
-  return prisma.intention.delete({
+  const result = await prisma.intention.delete({
     where: {
       id: existing.id,
     },
   });
+
+  // ✅ Clear cache
+  await redis.del(CACHE_KEY);
+
+  console.log("🗑️ Intention cache cleared");
+
+  return result;
 };
