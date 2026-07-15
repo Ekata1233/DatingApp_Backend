@@ -10,6 +10,7 @@ import {
   getDatePlanDetailsService,
 } from "./dateNow.service";
 import { upsertDatePlanOptionsSchema } from "./dateNow.Validation";
+import imagekit from "../../../utils/imagekit";
 
 interface OptionItem {
   label: string;
