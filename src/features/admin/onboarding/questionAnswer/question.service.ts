@@ -85,9 +85,7 @@ export const getQuestionService = async (
   });
 
   // 3. Store in Redis for 10 minutes
-  await redis.set(cacheKey, questions, {
-    ex: 600,
-  });
+  await redis.set(cacheKey, questions);
 
   return questions;
 };

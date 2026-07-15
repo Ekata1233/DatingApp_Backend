@@ -76,9 +76,7 @@ export const getAllEmploymentType = async () => {
       id: "asc",
     },
   });
-  await redis.set(ALL_CACHE_KEY, employmentTypes, {
-    ex: 600,
-  });
+  await redis.set(ALL_CACHE_KEY, employmentTypes);
   return employmentTypes;
 };
 
@@ -102,9 +100,7 @@ export const getEmploymentTypeById = async (
     },
   });
   if (employmentType) {
-    await redis.set(cacheKey, employmentType, {
-      ex: 600,
-    });
+    await redis.set(cacheKey, employmentType);
   }
   return employmentType;
 };
@@ -145,8 +141,6 @@ export const getActiveEmploymentType = async () => {
       id: "asc",
     },
   });
-  await redis.set(ACTIVE_CACHE_KEY, employmentTypes, {
-    ex: 600,
-  });
+  await redis.set(ACTIVE_CACHE_KEY, employmentTypes);
   return employmentTypes;
 };

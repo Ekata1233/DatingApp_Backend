@@ -65,9 +65,7 @@ export const getAllAmbition = async () => {
     },
   });
   // 3. Save to Redis
-  await redis.set(ALL_CACHE_KEY, ambitions, {
-    ex: 600,
-  });
+  await redis.set(ALL_CACHE_KEY, ambitions);
   return ambitions;
 };
 
@@ -92,9 +90,7 @@ export const getActiveAmbition = async () => {
     },
   });
   // 3. Save to Redis
-  await redis.set(ACTIVE_CACHE_KEY, ambitions, {
-    ex: 600,
-  });
+  await redis.set(ACTIVE_CACHE_KEY, ambitions);
   return ambitions;
 };
 
@@ -121,9 +117,7 @@ export const getAmbitionById = async (
     return null;
   }
   // 2. Save to Redis
-  await redis.set(CACHE_KEY, ambition, {
-    ex: 600,
-  });
+  await redis.set(CACHE_KEY, ambition);
   return ambition;
 };
 

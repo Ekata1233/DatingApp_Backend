@@ -11,12 +11,22 @@ export const sendOtp = async (phoneNumber: string) => {
     ? phoneNumber
     : `+91${phoneNumber}`;
 
+     const account = await twilioClient.api
+    .accounts(process.env.TWILIO_ACCOUNT_SID!)
+    .fetch();
+
+  console.log("✅ Authentication Success");
+  console.log(account.friendlyName);
+  console.log(account.status);
+
   const verification = await twilioClient.verify.v2
     .services(verifyServiceSid)
     .verifications.create({
       to: formattedNumber,
       channel: "sms",
     });
+
+    console.log("veirfication ", verification)
 
   return verification;
 };

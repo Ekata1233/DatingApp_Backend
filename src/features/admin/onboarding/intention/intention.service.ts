@@ -77,9 +77,7 @@ export const getAllIntentions = async () => {
   });
 
   // 3. Save in Redis for 10 minutes
-  await redis.set(CACHE_KEY, intentions, {
-    ex: 600,
-  });
+  await redis.set(CACHE_KEY, intentions);
 
   return intentions;
 };

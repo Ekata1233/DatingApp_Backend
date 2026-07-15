@@ -2,29 +2,33 @@ import { redis } from "../../lib/redis";
 
 const ONLINE_KEY = (id: string) => `online:${id}`;
 const LAST_ACTIVE_KEY = (id: string) => `lastActive:${id}`;
+const ONLINE_TTL = 120;
 
 // ======================
 // SET ONLINE
 // ======================
 export const setUserOnline = async (userId: string) => {
-  await redis.set(ONLINE_KEY(userId), "1", { ex: 120 });
-  await redis.set(LAST_ACTIVE_KEY(userId), new Date().toISOString());
+  await redis.set(ONLINE_KEY(userId), "1", {
+    ex: ONLINE_TTL,
+  });
 };
 
 // ======================
 // SET OFFLINE
 // ======================
 export const setUserOffline = async (userId: string) => {
-  await redis.del(ONLINE_KEY(userId));
-  await redis.set(LAST_ACTIVE_KEY(userId), new Date().toISOString());
-};
+  await redis
+    .pipeline()
+    .del(ONLINE_KEY(userId))
+    .set(LAST_ACTIVE_KEY(userId), new Date().toISOString())
+    .exec();
+}
 
 // ======================
 // HEARTBEAT
 // ======================
 export const updateHeartbeat = async (userId: string) => {
-  await redis.set(ONLINE_KEY(userId), "1", { ex: 120 });
-  await redis.set(LAST_ACTIVE_KEY(userId), new Date().toISOString());
+  await redis.expire(ONLINE_KEY(userId), ONLINE_TTL);
 };
 
 // ======================

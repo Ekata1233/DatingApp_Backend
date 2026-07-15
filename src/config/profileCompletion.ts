@@ -1,4 +1,5 @@
-export const PROFILE_WEIGHTS = {
+export const 
+PROFILE_WEIGHTS = {
   marriage: {
     basic_details: 15, // Screen 1
     religion: 5, // Screen 2

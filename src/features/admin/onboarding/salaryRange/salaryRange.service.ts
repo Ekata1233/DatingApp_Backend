@@ -65,9 +65,7 @@ export const getAllSalaryRange = async () => {
     },
   });
   // 3. Save to Redis for 10 minutes
-  await redis.set(ALL_CACHE_KEY, salaryRanges, {
-    ex: 600,
-  });
+  await redis.set(ALL_CACHE_KEY, salaryRanges);
   return salaryRanges;
 };
 
@@ -93,9 +91,7 @@ export const getActiveSalaryRange = async () => {
     },
   });
   // 3. Save to Redis for 10 minutes
-  await redis.set(ACTIVE_CACHE_KEY, salaryRanges, {
-    ex: 600, // 10 minutes
-  });
+  await redis.set(ACTIVE_CACHE_KEY, salaryRanges);
 
   return salaryRanges;
 };
@@ -123,9 +119,7 @@ export const getSalaryRangeById = async (id: number) => {
     return null;
   }
   // 3. Store in Redis for 10 minutes
-  await redis.set(CACHE_KEY, salaryRange, {
-    ex: 600,
-  });
+  await redis.set(CACHE_KEY, salaryRange);
   return salaryRange;
 };
 

@@ -39,9 +39,7 @@ export const getAllExperience = async () => {
       sortOrder: "asc",
     },
   });
-  await redis.set(ALL_CACHE_KEY, experiences, {
-    ex: 600, // 10 minutes
-  });
+  await redis.set(ALL_CACHE_KEY, experiences);
   return experiences;
 }
 
@@ -93,8 +91,6 @@ export const getActiveExperience = async () => {
       sortOrder: "asc",
     },
   });
-  await redis.set(ACTIVE_CACHE_KEY, experiences, {
-    ex: 600, // 10 minutes
-  });
+  await redis.set(ACTIVE_CACHE_KEY, experiences);
   return experiences;
 }

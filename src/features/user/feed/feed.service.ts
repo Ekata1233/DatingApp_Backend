@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
@@ -9,23 +10,66 @@ import { FeedParams } from "./feed.types";
 // HELPERS
 // =========================
 
-export const getGenderFromInterest = (lookingFor: string) => {
-  const value = lookingFor?.toUpperCase();
-
-  if (value === "MEN") return ["MEN"];
-  if (value === "WOMEN") return ["WOMEN"];
-  return ["MEN", "WOMEN"];
+export const getGenderFromInterest = (myInterest?: string): string[] => {
+  const value = myInterest?.toUpperCase();
+  const allGenders = [
+    "MEN",
+    "WOMEN",
+    "NON_BINARY",
+    "PREFER_NOT_TO_SAY",
+  ];
+  if (!value || value === "EVERYONE") {
+    return allGenders;
+  }
+  return allGenders.includes(value) ? [value] : allGenders;
 };
 
-export const getOrientationCompatibility = (orientation: string) => {
+export const getOrientationCompatibility = (orientation?: string | null): string[] => {
   const map: Record<string, string[]> = {
-    STRAIGHT: ["STRAIGHT", "BISEXUAL"],
-    GAY: ["GAY", "BISEXUAL"],
-    LESBIAN: ["LESBIAN", "BISEXUAL"],
-    BISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL"],
+    STRAIGHT: ["STRAIGHT", "BISEXUAL", "PANSEXUAL", "QUEER"],
+    GAY: ["GAY", "BISEXUAL", "PANSEXUAL", "QUEER"],
+    LESBIAN: ["LESBIAN", "BISEXUAL", "PANSEXUAL", "QUEER"],
+    BISEXUAL: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "QUEER",
+    ],
+    PANSEXUAL: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+    ],
+    DEMISEXUAL: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+    ],
+    QUEER: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+    ],
+    ASEXUAL: ["ASEXUAL"],
+    AROMATIC: ["AROMATIC"],
+    NOT_LISTED: [],
   };
 
-  return map[orientation?.toUpperCase()] || [];
+  return map[orientation?.toUpperCase() ?? ""] ?? [];
 };
 
 const NEW_USER_BOOST_HOURS = 48; // you can change: 24 / 48 / 72
@@ -45,13 +89,9 @@ export const getFeedService = async ({
     where: { id: userId },
     include: {
       profile: true,
-
       eduWork: true,
-
       bio: true,
-
       photos: true,
-
       answer: {
         include: {
           question: true,
@@ -68,6 +108,10 @@ export const getFeedService = async ({
   const { interested_in, sexual_orientation } = currentUser.profile;
   const { gender, gender_option } = currentUser;
 
+  const myLatitude = Number(currentUser.profile.latitude);
+  const myLongitude = Number(currentUser.profile.longitude);
+  const maxDistance = currentUser.profile.max_distance_km ?? 50;
+
   if (!gender || !gender_option || !interested_in) {
     throw new Error("Required fields missing");
   }
@@ -77,7 +121,7 @@ export const getFeedService = async ({
   // -------------------------
 
   const filterQuery = filters
-    ? buildFilterQuery(filters, currentUser)
+    ? buildFilterQuery(filters)
     : { where: {} };
 
   const userFilters = Object.fromEntries(
@@ -128,30 +172,59 @@ export const getFeedService = async ({
   // 4. FETCH BASE USERS
   // =========================
 
+  const nearbyUsers = await prisma.$queryRaw<
+    { id: string; distance: number }[]
+  >`
+SELECT
+    u.id,
+    ROUND(
+    (
+        ST_Distance(
+            p.location,
+            ST_SetSRID(
+                ST_MakePoint(${myLongitude}, ${myLatitude}),
+                4326
+            )::geography
+        ) / 1000
+    )::numeric,
+    2
+) AS distance
+FROM users u
+JOIN user_profiles p
+    ON p.user_id = u.id
+WHERE
+    u.deleted_at IS NULL
+    AND u.id <> ${userId}::uuid
+    AND u.id NOT IN (${Prisma.join(excludedArray.map(id => Prisma.sql`${id}::uuid`))})
+    AND ST_DWithin(
+        p.location,
+        ST_SetSRID(
+            ST_MakePoint(${myLongitude}, ${myLatitude}),
+            4326
+        )::geography,
+        ${maxDistance * 1000}
+    );
+`;
+  console.log("near by users : ", nearbyUsers)
+
   const allUsers = await prisma.user.findMany({
     where: {
-      id: { notIn: excludedArray },
-      deleted_at: null,
+      id: {
+        in: nearbyUsers.map((u) => u.id),
+      },
+       ...userFilters,
+    ...(Object.keys(profileFilters).length > 0 && {
+      profile: {
+        is: profileFilters,
+      },
+    }),
 
-      // ✅ APPLY USER FILTERS
-      ...userFilters,
-
-      // ✅ APPLY PROFILE FILTERS (THIS WAS MISSING)
-      ...(Object.keys(profileFilters).length > 0 && {
-        profile: {
-          is: profileFilters,
-        },
-      }),
     },
     include: {
       profile: true,
-
       eduWork: true,
-
       bio: true,
-
       photos: true,
-
       answer: {
         include: {
           question: true,
@@ -160,6 +233,9 @@ export const getFeedService = async ({
       },
     },
   });
+  const distanceMap = new Map(
+  nearbyUsers.map((u) => [u.id, Number(u.distance)])
+);
 
   // =========================
   // 5. APPLY FILTERS (STEPWISE)
@@ -167,7 +243,7 @@ export const getFeedService = async ({
 
   // STEP 1 → Gender match (my preference)
   const genderMatched = allUsers.filter((user) =>
-    genderFilter.includes(user.gender?.toUpperCase()),
+    genderFilter.includes(user.gender!.toUpperCase()),
   );
 
   // STEP 2 → Mutual interest
@@ -178,7 +254,7 @@ export const getFeedService = async ({
 
   // STEP 3 → Orientation (they match me)
   const orientationMatched = mutualInterest.filter((user) =>
-    orientationFilter.includes(user.gender_option?.toUpperCase()),
+    orientationFilter.includes(user.gender_option?.toUpperCase() ?? ""),
   );
 
   // STEP 4 → Reverse orientation (I match them)
@@ -187,7 +263,7 @@ export const getFeedService = async ({
       user.profile?.sexual_orientation,
     );
 
-    return theirCompatible.includes(sexual_orientation?.toUpperCase());
+    return theirCompatible.includes(sexual_orientation?.toUpperCase() ?? "");
   });
 
   // =========================
@@ -218,7 +294,6 @@ export const getFeedService = async ({
   // =========================
   // 7. PRESENCE (REDIS)
   // =========================
-
   const userIds = users.map((u) => u.id);
 
   // 🔥 Fetch from Redis
@@ -244,6 +319,7 @@ export const getFeedService = async ({
       lastSeen: formatLastSeen(presence?.lastActiveAt),
       createdAt: user.created_at,
       isBoosted: boostedUserIds.has(user.id),
+      distanceKm: distanceMap.get(user.id) ?? null,
     };
   });
 

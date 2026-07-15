@@ -1648,3 +1648,31 @@ enum LaunchBenefit {
   THREE_MONTH_PREMIUM
   LIFETIME_DISCOUNT
 }
+
+model GiftCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  gifts     Gift[]
+
+  @@map("gift_categories")
+}
+
+model Gift {
+  id           Int          @id @default(autoincrement())
+  categoryId   Int
+  category     GiftCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  image        String
+  name         String
+  coinCost     Int
+  triggerLine  String?      @db.VarChar(90)
+  receiverLine String?      @db.VarChar(90)
+  isLive       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@index([name])
+  @@map("gifts")
+}

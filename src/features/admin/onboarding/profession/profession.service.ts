@@ -66,9 +66,7 @@ export const getAllProfession = async () => {
     },
   });
 
-  await redis.set(cacheKey, professions, {
-    ex: 600,
-  });
+  await redis.set(cacheKey, professions);
   return professions;
 };
 
@@ -90,9 +88,7 @@ export const getProfessionById = async (id: number) => {
     },
   });
   if (profession) {
-    await redis.set(cacheKey, profession, {
-      ex: 600,
-    });
+    await redis.set(cacheKey, profession);
   }
   return profession;
 };
@@ -129,9 +125,7 @@ export const getActiveProfession = async () => {
       id: "asc",
     },
   });
-  await redis.set(cacheKey, professions, {
-    ex: 600,
-  });
+  await redis.set(cacheKey, professions);
 
   return professions;
 };

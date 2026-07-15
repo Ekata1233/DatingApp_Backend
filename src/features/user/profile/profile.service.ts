@@ -89,7 +89,7 @@ export const updateInterestedInService = async (
 
   // 👉 Calculate next step
   const currentStep = "INTRESTED_IN";
-  const nextStep = getNextStep( currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -116,7 +116,7 @@ export const updateInterestedInService = async (
     },
   });
 
-    // 👉 UPDATE SCORE
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -251,10 +251,10 @@ export const updateAddressService = async (
     select: { looking_for: true },
   });
 
- 
+
 
   const currentStep = "ADDRESS";
-  const nextStep = getNextStep( currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const profile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -273,7 +273,7 @@ export const updateAddressService = async (
     },
   });
 
-    // 👉 UPDATE SCORE
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -305,7 +305,7 @@ export const updateAddressService = async (
 //     select: { looking_for: true },
 //   });
 
- 
+
 
 //   // ✅ Business Validation (IMPORTANT)
 //   if (data.childStatus === "NO") {
@@ -377,11 +377,21 @@ export const updateLocationService = async (
     create: {
       user_id: userId,
       latitude,
-      longitude, 
+      longitude,
     },
   });
 
-    // 👉 UPDATE SCORE
+  // ✅ Update PostGIS location
+  await prisma.$executeRaw`
+  UPDATE user_profiles
+  SET location = ST_SetSRID(
+    ST_MakePoint(${longitude}, ${latitude}),
+    4326
+  )::geography
+  WHERE user_id = ${userId}::uuid;
+`;
+
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -436,7 +446,7 @@ export const updateUserAnswerService = async (
     skipDuplicates: true,
   });
 
-    // 👉 UPDATE SCORE
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -454,7 +464,7 @@ export const updateUserAnswerService = async (
 export const updateEducationService = async (
   userId: string,
   data: {
-     highestEdu?: EducationLevel;
+    highestEdu?: EducationLevel;
     degree?: string;
     collegeName?: string;
     graduationYear?: number;
@@ -463,7 +473,7 @@ export const updateEducationService = async (
   if (!userId) throw new Error("User ID is missing");
 
   const currentStep = "EDUCATION";
-  const nextStep = getNextStep( currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const eduWork = await prisma.userEduWork.upsert({
     where: { userId },
@@ -501,7 +511,7 @@ export const updateEducationService = async (
 //work
 export const updateWorkService = async (
   userId: string,
- data: {
+  data: {
     professionId?: number;
     companyName?: string;
     employmentTypeId?: number;
@@ -748,7 +758,7 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
 
   // Onboarding step update
   const currentStep = "LATEST_PHOTOS";
-  const nextStep = getNextStep( currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -762,7 +772,7 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
     },
   });
 
-    // 👉 UPDATE SCORE
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -806,7 +816,7 @@ export const updateUserPhotoService = async (
     },
   });
 
-    // 👉 UPDATE SCORE
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -871,7 +881,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
 
   // ✅ Onboarding Step
   const currentStep = "USER_BIO";
-  const nextStep = getNextStep( currentStep);
+  const nextStep = getNextStep(currentStep);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -885,7 +895,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
     },
   });
 
-    // 👉 UPDATE SCORE
+  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
@@ -995,11 +1005,11 @@ export const completeOnboardingService = async (userId: string) => {
       onboarding_completed: true,
       onboarding_step: "COMPLETED",
       next_step: null,
-     
+
     },
   });
 
-   // Credit referral reward if applicable
+  // Credit referral reward if applicable
   try {
     await ReferralService.onRegistrationCompleted(userId);
     console.log("Funtion call ......")
