@@ -1,5 +1,6 @@
 import { OptionType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
+import { GetPlansQuery } from "./dateNow.types";
 
 export const upsertDatePlanOptionsService = async (
   type: OptionType,
