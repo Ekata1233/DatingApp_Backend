@@ -1,10 +1,12 @@
 // Date Now Service
 import { prisma } from "../../prisma/prismaClient";
 import {
+  
   PlanStatus,
   TransactionType,
   TransactionStatus,
   TransactionSource,
+  Prisma,
 } from "@prisma/client";
 import { UpdateDatePlanInput } from "./dateNow.types";
 import { calculateMatchScore } from "../../utils/matchScore.constants";
@@ -57,8 +59,13 @@ export const updateDraftDatePlan = async (
     throw new Error("Plan not found");
   }
 
-  const { vibeIds, eventDate, eventTime, ...planData } = payload;
-
+  const {
+  vibeIds,
+  eventDate,
+  eventTime,
+  activityId,
+  ...planData
+} = payload;
   let eventDateTime: Date | undefined;
 
   if (eventDate && eventTime) {
@@ -66,15 +73,15 @@ export const updateDraftDatePlan = async (
   }
 
   const updatedPlan = await prisma.$transaction(async (tx) => {
-    await tx.datePlan.update({
-      where: {
-        id: planId,
-      },
-      data: {
-        ...planData,
-        ...(eventDateTime && { eventDateTime }),
-      },
-    });
+   await tx.datePlan.update({
+  where: {
+    id: planId,
+  },
+  data: {
+    ...planData,
+    ...(eventDateTime && { eventDateTime }),
+  } as Prisma.DatePlanUncheckedUpdateInput,
+});
 
     if (vibeIds) {
       await tx.datePlanVibe.deleteMany({
@@ -496,6 +503,7 @@ export const getDatePlanRequests = async (
     },
     include: {
       activity: true,
+      quickTitle: true,
       requests: {
         where: {
           status: "PENDING",
@@ -567,7 +575,7 @@ export const getDatePlanRequests = async (
           : null,
 
         photo:
-          request.requester.photos?.[0]?.photo_url ??
+          request.requester.photos?.[0]?.media_url ??
           null,
       },
     })),

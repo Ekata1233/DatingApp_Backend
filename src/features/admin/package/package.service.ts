@@ -1,3 +1,4 @@
+import { PackageType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { CreatePackageInput } from "./package.validation";
 

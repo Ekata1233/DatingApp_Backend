@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { getFeedService } from "./feed.service";
+import { FeedMode } from "./feed.types";
 
 export const getFeedController = async (req: Request, res: Response) => {
   try {
@@ -22,7 +23,7 @@ export const getFeedController = async (req: Request, res: Response) => {
       userId,
       cursor: cursor as string,
       limit: Number(limit),
-      mode: mode as string,
+      mode: mode as FeedMode,
       filters,
     });
 

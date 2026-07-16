@@ -42,6 +42,7 @@ import referEarnRoute from "../features/admin/revenue/referEarn/referEarn.routes
 import userWaitlistRoutes from "../features/waitlist/waitlist.routes"
 import paymentRoutes from "../features/payment/payment.routes";
 import giftsRoutes from "../features/admin/revenue/gifts/gifts.routes"
+import complimentRoutes from "../features/admin/revenue/compliment/compliment.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -59,7 +60,7 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes);
 
 
 
@@ -94,6 +95,6 @@ router.use(
 );
 
 router.use('/payments', paymentRoutes);
-router.use('/revenue', giftsRoutes);
+router.use('/revenue', giftsRoutes,complimentRoutes);
 
 export default router;
