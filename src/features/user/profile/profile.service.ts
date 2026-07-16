@@ -177,6 +177,9 @@ export const updateReligionService = async (
     },
   });
 
+  const score = await calculateProfileScore(userId);
+
+
   await prisma.user.update({
     where: {
       id: userId,
@@ -184,6 +187,7 @@ export const updateReligionService = async (
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
+      profile_completion: score
     },
   });
 
@@ -223,13 +227,16 @@ export const updateLookingForService = async (
   if (!userId) throw new Error("User ID is required");
 
   const currentStep = "LOOKING_FOR";
-  const nextStep = getNextStep(currentStep);
+
+    const score = await calculateProfileScore(userId);
+
 
   return prisma.user.update({
     where: { id: userId },
     data: {
       intentionId,
       onboarding_step: currentStep,
+      profile_completion: score
     },
     include: {
       intention: true,
@@ -491,11 +498,15 @@ export const updateEducationService = async (
       graduationYear: data.graduationYear,
     },
   });
+
+    const score = await calculateProfileScore(userId);
+
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
+      profile_completion: score
     },
     select: {
       onboarding_step: true,
@@ -553,6 +564,9 @@ export const updateWorkService = async (
     },
   });
 
+    const score = await calculateProfileScore(userId);
+
+
   const onboarding = await prisma.user.update({
     where: {
       id: userId,
@@ -560,6 +574,7 @@ export const updateWorkService = async (
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
+      profile_completion: score
     },
     select: {
       onboarding_step: true,
@@ -687,6 +702,8 @@ export const updateLanguageService = async (
       })),
     });
 
+      const score = await calculateProfileScore(userId);
+
     await tx.user.update({
       where: {
         id: userId,
@@ -694,6 +711,7 @@ export const updateLanguageService = async (
       data: {
         onboarding_step: currentStep,
         next_step: nextStep,
+        profile_completion: score
       },
     });
   });

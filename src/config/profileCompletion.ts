@@ -1,44 +1,117 @@
-export const 
-PROFILE_WEIGHTS = {
-  marriage: {
-    basic_details: 15, // Screen 1
-    religion: 5, // Screen 2
-    location: 10, // Screen 3
-    about: 10, // Screen 4
-    education: 10, // Screen 5
-    work: 10, // Screen 6
-    lifestyle: 10, // Screen 7
-    real_you: 5, // Screen 8
-    interests: 10, // Screen 9
-    photos: 10, // Screen 10
-    bio: 5, // Screen 11
+// profile-completion.constants.ts
+
+export const PROFILE_WEIGHTS = {
+  TOTAL_SCORE: 100,
+
+  PHONE_VERIFICATION: 5,
+
+  BASIC_INFO: {
+    TOTAL: 13,
+
+    FULL_NAME: 3,
+    EMAIL: 2,
+    BIRTH_DATE: 2,
+    HEIGHT: 2,
+    GENDER: 2,
+    GENDER_OPTION: 2,
   },
 
-  dating: {
-    basic_details: 12,
-    location: 8,
-    address: 6,
-    interested_in: 8,
-    lifestyle: 8,
-    real_you: 10,
-    things_you_love: 13,
-    photos: 25,
-    bio: 10,
+/////////////////////------------------18----------------------///////////////////////////
+  
+  PROFILE: {
+    TOTAL: 15,
+
+    INTENTION: 2,
+    RELIGION: 1,
+    COMMUNITY: 2,
+    INTERESTED_IN: 2,
+    SEXUAL_ORIENTATION: 2,
+    COUNTRY: 1,
+    STATE: 1,
+    CITY: 1,
+    LOCATION_COORDINATES: 2,
+    LANGUAGES: 1,
   },
 
-  mature: {
-    basic_details: 15, // Step 1
-    interested_in: 5, // Step 2
-    religion: 5, // Step 3
-    location: 10, // Step 4
-    about: 10, // Step 5
-    education: 10, // Step 6
-    financial: 10, // Step 7
-    lifestyle: 5, // Step 8
-    health: 10, // Step 9
-    interests: 5, // Step 10
-    future_plans: 5, // Step 11
-    photos: 5, // Step 12
-    bio: 5, // Step 13
+  EDUCATION_WORK: {
+    TOTAL: 12,
+
+    HIGHEST_EDUCATION: 1,
+    DEGREE: 1,
+    COLLEGE: 1,
+    YEAR_OF_PASSING: 1,
+    PROFESSION: 2,
+    COMPANY: 1,
+    EMPLOYMENT_TYPE: 1,
+    EXPERIENCE: 1,
+    AMBITION: 1,
+    SALARY_RANGE: 1,
+    BIG_DREAMS: 1,
   },
-};
+
+  FAMILY: {
+    TOTAL: 10,
+
+    FAMILY_STATUS: 1,
+    FAMILY_TYPE: 1,
+    FATHER_OCCUPATION: 1,
+    FATHER_ORGANIZATION: 1,
+    MOTHER_OCCUPATION: 1,
+    MOTHER_ORGANIZATION: 1,
+    SIBLING_RELATION: 1,
+    SIBLING_OCCUPATION: 1,
+    FAMILY_CITY: 1,
+    FAMILY_INCOME: 1,
+  },
+
+  INTERESTS: {
+    TOTAL: 10,
+
+    QUESTIONS_COUNT: 6,
+
+    ONE: 2,
+    TWO: 4,
+    THREE: 6,
+    FOUR: 8,
+    FIVE: 9,
+    SIX: 10,
+  },
+
+  LIFESTYLE: {
+    TOTAL: 5,
+
+    QUESTIONS_COUNT: 5,
+
+    ONE: 1,
+    TWO: 2,
+    THREE: 3,
+    FOUR: 4,
+    FIVE: 5,
+  },
+
+  PROMPTS: {
+    TOTAL: 5,
+
+    ONE: 2,
+    TWO: 4,
+    THREE: 5,
+  },
+
+  PHOTOS: {
+    TOTAL: 15,
+
+    ONE_PHOTO: 3,
+    TWO_PHOTOS: 3,
+    THREE_PHOTOS: 3,
+    FOUR_PHOTOS: 3,
+    FIVE_OR_MORE: 3,
+  },
+
+  BIO: {
+    TOTAL: 10,
+
+    MIN_20_CHARS: 3,
+    MIN_50_CHARS: 6,
+    MIN_100_CHARS: 10,
+  },
+} as const;

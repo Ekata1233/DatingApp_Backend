@@ -74,23 +74,24 @@ model User {
 }
 
 model UserProfile {
-  user_id            String         @id @db.Uuid
+  user_id            String                                @id @db.Uuid
   religionId         Int?
-  religion           Religion?      @relation(fields: [religionId], references: [id])
+  religion           Religion?                             @relation(fields: [religionId], references: [id])
   communityId        Int?
-  community          Community?     @relation(fields: [communityId], references: [id])
+  community          Community?                            @relation(fields: [communityId], references: [id])
   languages          UserLanguage[]
   interested_in      Gender?
   sexual_orientation GenderOption?
-  country            String?        @db.VarChar(30)
-  state              String?        @db.VarChar(30)
-  city               String?        @db.VarChar(30)
+  country            String?                               @db.VarChar(30)
+  state              String?                               @db.VarChar(30)
+  city               String?                               @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal?       @db.Decimal(10, 8)
-  longitude          Decimal?       @db.Decimal(11, 8)
-  created_at         DateTime       @default(now())
-  updated_at         DateTime       @updatedAt
-  user               User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  latitude           Decimal?                              @db.Decimal(10, 8)
+  longitude          Decimal?                              @db.Decimal(11, 8)
+  location           Unsupported("geography(Point,4326)")?
+  created_at         DateTime                              @default(now())
+  updated_at         DateTime                              @updatedAt
+  user               User                                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religionId])
   @@index([communityId])
@@ -1675,4 +1676,26 @@ model Gift {
   @@index([categoryId])
   @@index([name])
   @@map("gifts")
+}
+
+model ComplimentCategory {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  sortOrder Int              @default(0)
+  ideas     ComplimentIdea[]
+
+  @@map("compliment_categories")
+}
+
+model ComplimentIdea {
+  id         String             @id @default(cuid())
+  categoryId String
+  category   ComplimentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  text       String
+  sortOrder  Int                @default(0)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([categoryId, sortOrder])
+  @@map("compliment_ideas")
 }
