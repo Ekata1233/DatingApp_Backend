@@ -9,6 +9,23 @@ import { FeedParams } from "./feed.types";
 // =========================
 // HELPERS
 // =========================
+export const calculateAge = (birthDate: Date | null) => {
+  if (!birthDate) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+
+  const month = today.getMonth() - birthDate.getMonth();
+
+  if (
+    month < 0 ||
+    (month === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+
+  return age;
+};
 
 export const getGenderFromInterest = (myInterest?: string): string[] => {
   const value = myInterest?.toUpperCase();
@@ -84,14 +101,45 @@ export const getFeedService = async ({
   limit,
   filters,
 }: FeedParams) => {
+
+  console.log("filter : ", filters)
   // 1. Current User
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       profile: true,
-      eduWork: true,
+      eduWork: {
+        include: {
+          profession: true,
+          employmentType: true,
+          experience: true,
+          ambition: true,
+          salaryRange: true,
+        }
+      },
       bio: true,
       photos: true,
+      familyProfile: {
+        include: {
+          familyStatus: true,
+          familyType: true,
+          fatherOccupation: true,
+          fatherOrganisation: true,
+          motherOccupation: true,
+          motherOrganisation: true,
+          siblingRelation: true,
+          siblingOccupation: true,
+          siblingMarital: true,
+          familyHome: true,
+          nativePlace: true,
+          familyIncome: true,
+        }
+      },
+      userPrompts: {
+        include: {
+          prompt: true
+        }
+      },
       answer: {
         include: {
           question: true,
@@ -120,16 +168,32 @@ export const getFeedService = async ({
   // FILTER BUILD
   // -------------------------
 
+  console.log(JSON.stringify(filters, null, 2));
+
   const filterQuery = filters
     ? buildFilterQuery(filters)
     : { where: {} };
+
+  console.log("filterQuery filter : ", filterQuery)
+
 
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
   );
 
+
+  console.log("userFilters filter : ", userFilters)
+
+
   const profileFilters = filterQuery.where?.profile?.is || {};
 
+  console.log("profile filter : ", profileFilters)
+  // If user manually selected city/state/country,
+  // don't use PostGIS nearby search.
+  const hasManualLocationFilter =
+    !!filters?.location?.city ||
+    !!filters?.location?.state ||
+    !!filters?.location?.country;
   // =========================
   // 2. EXCLUSIONS
   // =========================
@@ -178,53 +242,94 @@ export const getFeedService = async ({
 SELECT
     u.id,
     ROUND(
-    (
+      (
         ST_Distance(
-            p.location,
-            ST_SetSRID(
-                ST_MakePoint(${myLongitude}, ${myLatitude}),
-                4326
-            )::geography
+          p.location,
+          ST_SetSRID(
+            ST_MakePoint(${myLongitude}, ${myLatitude}),
+            4326
+          )::geography
         ) / 1000
-    )::numeric,
-    2
-) AS distance
+      )::numeric,
+      2
+    ) AS distance
 FROM users u
 JOIN user_profiles p
     ON p.user_id = u.id
 WHERE
     u.deleted_at IS NULL
     AND u.id <> ${userId}::uuid
-    AND u.id NOT IN (${Prisma.join(excludedArray.map(id => Prisma.sql`${id}::uuid`))})
-    AND ST_DWithin(
-        p.location,
-        ST_SetSRID(
-            ST_MakePoint(${myLongitude}, ${myLatitude}),
-            4326
-        )::geography,
-        ${maxDistance * 1000}
-    );
+    AND u.id NOT IN (
+      ${Prisma.join(excludedArray.map(id => Prisma.sql`${id}::uuid`))}
+    )
+
+    ${hasManualLocationFilter
+      ? Prisma.empty
+      : Prisma.sql`
+          AND ST_DWithin(
+            p.location,
+            ST_SetSRID(
+              ST_MakePoint(${myLongitude}, ${myLatitude}),
+              4326
+            )::geography,
+            ${maxDistance * 1000}
+          )
+        `
+    };
 `;
   console.log("near by users : ", nearbyUsers)
 
   const allUsers = await prisma.user.findMany({
     where: {
-      id: {
-        in: nearbyUsers.map((u) => u.id),
-      },
-       ...userFilters,
-    ...(Object.keys(profileFilters).length > 0 && {
-      profile: {
-        is: profileFilters,
-      },
-    }),
+      ...(hasManualLocationFilter
+        ? {}
+        : {
+          id: {
+            in: nearbyUsers.map((u) => u.id),
+          },
+        }),
+      ...userFilters,
+      ...(Object.keys(profileFilters).length > 0 && {
+        profile: {
+          is: profileFilters,
+        },
+      }),
 
     },
     include: {
       profile: true,
-      eduWork: true,
+      eduWork: {
+        include: {
+          profession: true,
+          employmentType: true,
+          experience: true,
+          ambition: true,
+          salaryRange: true,
+        }
+      },
       bio: true,
       photos: true,
+      familyProfile: {
+        include: {
+          familyStatus: true,
+          familyType: true,
+          fatherOccupation: true,
+          fatherOrganisation: true,
+          motherOccupation: true,
+          motherOrganisation: true,
+          siblingRelation: true,
+          siblingOccupation: true,
+          siblingMarital: true,
+          familyHome: true,
+          nativePlace: true,
+          familyIncome: true,
+        }
+      },
+      userPrompts: {
+        include: {
+          prompt: true
+        }
+      },
       answer: {
         include: {
           question: true,
@@ -233,9 +338,10 @@ WHERE
       },
     },
   });
+
   const distanceMap = new Map(
-  nearbyUsers.map((u) => [u.id, Number(u.distance)])
-);
+    nearbyUsers.map((u) => [u.id, Number(u.distance)])
+  );
 
   // =========================
   // 5. APPLY FILTERS (STEPWISE)
@@ -314,6 +420,7 @@ WHERE
     return {
       ...user,
       matchScore,
+      age: calculateAge(user.birth_date),
       isOnline: presence?.isOnline || false,
       lastActiveAt: presence?.lastActiveAt || null, // 👈 important
       lastSeen: formatLastSeen(presence?.lastActiveAt),

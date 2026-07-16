@@ -87,30 +87,236 @@ export function scoreByDistance(
 // =======================
 // EDUCATION
 // =======================
-export function educationScore(my?: string, other?: string) {
+export function educationScore(
+  my?: string,
+  other?: string
+): number {
 
-  return scoreByDistance(
-    EDUCATION_LEVEL[my ?? ""],
-    EDUCATION_LEVEL[other ?? ""],
-    5
-  );
+  if (!my || !other) {
+    return 0;
+  }
+
+  const myLevel = EDUCATION_LEVEL[my];
+  const otherLevel = EDUCATION_LEVEL[other];
+
+  if (myLevel == null || otherLevel == null) {
+    return 0;
+  }
+
+  const diff = Math.abs(myLevel - otherLevel);
+
+  switch (diff) {
+    case 0:
+      return 5;
+
+    case 1:
+      return 4;
+
+    case 2:
+      return 3;
+
+    case 3:
+      return 2;
+
+    default:
+      return 1;
+  }
 }
 
 // =======================
 // DEGREE
 // =======================
+function normalizeDegree(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ");
+}
+
 export function degreeScore(
   my?: string,
   other?: string
-) {
-  if (!my || !other) return 0;
-  if (my.trim().toLowerCase() === other.trim().toLowerCase()) {
+): number {
+
+  if (!my || !other) {
+    return 0;
+  }
+
+  const myDegree = normalizeDegree(my);
+  const otherDegree = normalizeDegree(other);
+
+  if (myDegree === otherDegree) {
+    return 3;
+  }
+
+  if (
+    myDegree.includes(otherDegree) ||
+    otherDegree.includes(myDegree)
+  ) {
     return 2;
   }
 
   return 1;
 }
 
+
+// =======================
+// PROFESSION
+// =======================
+export function professionScore(
+  myProfessionId?: number | null,
+  otherProfessionId?: number | null
+): number {
+
+  if (
+    myProfessionId == null ||
+    otherProfessionId == null
+  ) {
+    return 0;
+  }
+
+  if (myProfessionId === otherProfessionId) {
+    return 5;
+  }
+
+  return 1;
+}
+
+export function employmentTypeScore(
+  myEmploymentTypeId?: number | null,
+  otherEmploymentTypeId?: number | null
+): number {
+
+  if (
+    myEmploymentTypeId == null ||
+    otherEmploymentTypeId == null
+  ) {
+    return 0;
+  }
+
+  if (myEmploymentTypeId === otherEmploymentTypeId) {
+    return 3;
+  }
+
+  return 1;
+}
+
+const EXPERIENCE_LEVEL: Record<number, number> = {
+  1: 1, // Fresher
+  2: 2, // 1-3 Years
+  3: 3, // 3-5 Years
+  4: 4, // 5-8 Years
+  5: 5, // 8-12 Years
+  6: 6, // 12+ Years
+};
+
+export function experienceScore(
+  myExperienceId?: number | null,
+  otherExperienceId?: number | null
+): number {
+
+  if (
+    myExperienceId == null ||
+    otherExperienceId == null
+  ) {
+    return 0;
+  }
+
+  const myLevel = EXPERIENCE_LEVEL[myExperienceId];
+  const otherLevel = EXPERIENCE_LEVEL[otherExperienceId];
+
+  if (
+    myLevel == null ||
+    otherLevel == null
+  ) {
+    return 0;
+  }
+
+  const diff = Math.abs(myLevel - otherLevel);
+
+  switch (diff) {
+    case 0:
+      return 4;
+
+    case 1:
+      return 3;
+
+    case 2:
+      return 2;
+
+    default:
+      return 1;
+  }
+}
+
+export function ambitionScore(
+  myAmbitionId?: number | null,
+  otherAmbitionId?: number | null
+): number {
+
+  if (
+    myAmbitionId == null ||
+    otherAmbitionId == null
+  ) {
+    return 0;
+  }
+
+  if (myAmbitionId === otherAmbitionId) {
+    return 4;
+  }
+
+  return 1;
+}
+
+const SALARY_LEVEL: Record<number, number> = {
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  6: 6,
+  7: 7,
+};
+
+export function salaryScore(
+  mySalaryRangeId?: number | null,
+  otherSalaryRangeId?: number | null
+): number {
+
+  if (
+    mySalaryRangeId == null ||
+    otherSalaryRangeId == null
+  ) {
+    return 0;
+  }
+
+  const myLevel = SALARY_LEVEL[mySalaryRangeId];
+  const otherLevel = SALARY_LEVEL[otherSalaryRangeId];
+
+  if (
+    myLevel == null ||
+    otherLevel == null
+  ) {
+    return 0;
+  }
+
+  const diff = Math.abs(myLevel - otherLevel);
+
+  switch (diff) {
+    case 0:
+      return 4;
+
+    case 1:
+      return 3;
+
+    case 2:
+      return 2;
+
+    default:
+      return 1;
+  }
+}
 // =======================
 // GRADUATION YEAR
 // =======================
@@ -133,12 +339,26 @@ export function graduationYearScore(
 //=======================
 // GENDER PREFERENCE
 //=======================
+function isInterestedIn(
+  interestedIn?: Gender,
+  targetGender?: Gender
+): boolean {
+  if (!interestedIn || !targetGender) return false;
+
+  // EVERYONE means interested in all genders
+  if (interestedIn === Gender.EVERYONE) {
+    return true;
+  }
+
+  return interestedIn === targetGender;
+}
+
 export function genderPreferenceScore(
   myGender?: Gender,
   myInterestedIn?: Gender,
   otherGender?: Gender,
   otherInterestedIn?: Gender
-) {
+): number {
   if (
     !myGender ||
     !myInterestedIn ||
@@ -148,29 +368,41 @@ export function genderPreferenceScore(
     return 0;
   }
 
-  const bothInterested =
-    myInterestedIn === otherGender &&
-    otherInterestedIn === myGender;
+  const iLikeThem = isInterestedIn(myInterestedIn, otherGender);
+  const theyLikeMe = isInterestedIn(otherInterestedIn, myGender);
 
-  return bothInterested ? 15 : 0;
+  // Perfect mutual match
+  if (iLikeThem && theyLikeMe) {
+    return 15;
+  }
+
+  // One-sided interest (normally won't happen in feed,
+  // but safe if function is reused elsewhere)
+  if (iLikeThem || theyLikeMe) {
+    return 5;
+  }
+
+  // Not compatible
+  return 0;
 }
-
 // =======================
 // SEXUAL ORIENTATION COMPATIBILITY
 // =======================
 export function orientationScore(
   myOrientation?: GenderOption,
   otherOrientation?: GenderOption
-) {
+): number {
+
   if (!myOrientation || !otherOrientation) {
     return 0;
   }
 
+  // Exactly same orientation
   if (myOrientation === otherOrientation) {
-    return 10;
+    return 3;
   }
 
-  const compatible = [
+  const compatiblePairs: [GenderOption, GenderOption][] = [
     [GenderOption.STRAIGHT, GenderOption.BISEXUAL],
     [GenderOption.STRAIGHT, GenderOption.PANSEXUAL],
 
@@ -181,51 +413,72 @@ export function orientationScore(
     [GenderOption.LESBIAN, GenderOption.PANSEXUAL],
 
     [GenderOption.BISEXUAL, GenderOption.PANSEXUAL],
+    [GenderOption.BISEXUAL, GenderOption.QUEER],
+
+    [GenderOption.PANSEXUAL, GenderOption.QUEER],
+    [GenderOption.DEMISEXUAL, GenderOption.PANSEXUAL],
+    [GenderOption.DEMISEXUAL, GenderOption.QUEER],
   ];
 
-  const match = compatible.some(
+  const isCompatible = compatiblePairs.some(
     ([a, b]) =>
       (a === myOrientation && b === otherOrientation) ||
       (a === otherOrientation && b === myOrientation)
   );
 
-  return match ? 7 : 2;
+  if (isCompatible) {
+    return 2;
+  }
+
+  return 1;
 }
 
 // =======================
 // AGE SCORE
 // =======================
+function calculateAge(dob: Date): number {
+
+  const today = new Date();
+
+  let age = today.getFullYear() - dob.getFullYear();
+
+  const monthDiff = today.getMonth() - dob.getMonth();
+
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < dob.getDate())
+  ) {
+    age--;
+  }
+
+  return age;
+}
+
 export function ageScore(
   myDob?: Date,
   otherDob?: Date
-) {
+): number {
 
-  if (!myDob || !otherDob) return 0;
-
-  const age = (dob: Date) =>
-    new Date().getFullYear() - dob.getFullYear();
-
-  const diff = Math.abs(age(myDob) - age(otherDob));
-
-  switch (true) {
-    case diff === 0:
-      return 10;
-
-    case diff <= 2:
-      return 9;
-
-    case diff <= 4:
-      return 7;
-
-    case diff <= 6:
-      return 5;
-
-    case diff <= 10:
-      return 3;
-
-    default:
-      return 1;
+  if (!myDob || !otherDob) {
+    return 0;
   }
+
+  const myAge = calculateAge(myDob);
+  const otherAge = calculateAge(otherDob);
+
+  const diff = Math.abs(myAge - otherAge);
+
+  if (diff === 0) return 10;
+
+  if (diff <= 2) return 9;
+
+  if (diff <= 4) return 7;
+
+  if (diff <= 6) return 5;
+
+  if (diff <= 8) return 3;
+
+  return 1;
 }
 
 // =======================
@@ -234,28 +487,132 @@ export function ageScore(
 export function heightScore(
   myHeight?: number,
   otherHeight?: number
-) {
+): number {
 
   if (
     myHeight == null ||
     otherHeight == null
-  )
+  ) {
     return 0;
+  }
 
   const diff = Math.abs(myHeight - otherHeight);
 
-  if (diff <= 5) return 5;
+  if (diff <= 5) return 3;
 
-  if (diff <= 10) return 4;
+  if (diff <= 10) return 2;
 
-  if (diff <= 15) return 3;
+  if (diff <= 20) return 1;
 
-  if (diff <= 20) return 2;
+  return 0;
+}
+
+export function religionScore(
+  myReligionId?: number | null,
+  otherReligionId?: number | null
+): number {
+
+  if (
+    myReligionId == null ||
+    otherReligionId == null
+  ) {
+    return 0;
+  }
+
+  return myReligionId === otherReligionId ? 5 : 0;
+}
+
+export function communityScore(
+  myCommunityId?: number | null,
+  otherCommunityId?: number | null
+): number {
+
+  if (
+    myCommunityId == null ||
+    otherCommunityId == null
+  ) {
+    return 0;
+  }
+
+  return myCommunityId === otherCommunityId ? 3 : 0;
+}
+
+export function familyProfileScore(
+  me?: any,
+  other?: any
+): number {
+
+  if (!me || !other) {
+    return 0;
+  }
+
+  let score = 0;
+
+  if (me.familyStatusId && me.familyStatusId === other.familyStatusId) {
+    score += 2;
+  }
+
+  if (me.familyTypeId && me.familyTypeId === other.familyTypeId) {
+    score += 2;
+  }
+
+  if (me.familyIncomeId && me.familyIncomeId === other.familyIncomeId) {
+    score += 2;
+  }
+
+  if (me.familyHomeId && me.familyHomeId === other.familyHomeId) {
+    score += 1;
+  }
+
+  if (me.nativePlaceId && me.nativePlaceId === other.nativePlaceId) {
+    score += 1;
+  }
+
+  if (me.siblingRelationId && me.siblingRelationId === other.siblingRelationId) {
+    score += 1;
+  }
+
+  if (me.siblingMaritalId && me.siblingMaritalId === other.siblingMaritalId) {
+    score += 1;
+  }
+
+  return score;
+}
+
+export function distanceScore(
+  distanceKm?: number | null
+): number {
+
+  if (distanceKm == null) {
+    return 0;
+  }
+
+  if (distanceKm <= 5) {
+    return 10;
+  }
+
+  if (distanceKm <= 10) {
+    return 9;
+  }
+
+  if (distanceKm <= 20) {
+    return 8;
+  }
+
+  if (distanceKm <= 30) {
+    return 6;
+  }
+
+  if (distanceKm <= 50) {
+    return 4;
+  }
+
+  if (distanceKm <= 100) {
+    return 2;
+  }
 
   return 1;
 }
-
-
 // =======================
 // DRINK
 // =======================  
@@ -499,16 +856,35 @@ export function dietScore(my?: string, other?: string) {
 export function languageScore(
   myLanguages: string[] = [],
   otherLanguages: string[] = []
-) {
+): number {
 
-  if (!myLanguages.length || !otherLanguages.length)
+  if (
+    !myLanguages.length ||
+    !otherLanguages.length
+  ) {
     return 0;
+  }
 
-  const common = myLanguages.filter(l =>
-    otherLanguages.includes(l)
+  const mySet = new Set(
+    myLanguages.map(l => l.toLowerCase())
   );
 
-  return Math.min((common.length / myLanguages.length) * 5, 5);
+  const otherSet = new Set(
+    otherLanguages.map(l => l.toLowerCase())
+  );
+
+  const common = [...mySet].filter(
+    l => otherSet.has(l)
+  ).length;
+
+  const union = new Set([
+    ...mySet,
+    ...otherSet,
+  ]).size;
+
+  const similarity = common / union;
+
+  return Math.round(similarity * 5);
 }
 
 // =======================

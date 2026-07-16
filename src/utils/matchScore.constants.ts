@@ -1,18 +1,8 @@
-import { ageScore, bioScore, buildAnswerMap, communicationScore, degreeScore, dietScore, drinkScore, educationScore, genderPreferenceScore, getAnswerValues, graduationYearScore, heightScore, languageScore, loveLanguageScore, multiSelectScore, occupationScore, orientationScore, petScore, photoScore, profileCompletenessScore, smokeScore, workoutScore, zodiacScore } from "./matchScore";
+import { ageScore, ambitionScore, bioScore, buildAnswerMap, communicationScore, communityScore, degreeScore, dietScore, distanceScore, drinkScore, educationScore, employmentTypeScore, experienceScore, familyProfileScore, genderPreferenceScore, getAnswerValues, graduationYearScore, heightScore, languageScore, loveLanguageScore, multiSelectScore, occupationScore, orientationScore, petScore, photoScore, profileCompletenessScore, religionScore, salaryScore, smokeScore, workoutScore, zodiacScore } from "./matchScore";
 
 export function calculateMatchScore(me: any, user: any) {
 
     let score = 0;
-
-    score += educationScore(
-        me.eduWork?.highestEdu,
-        user.eduWork?.highestEdu
-    );
-
-    score += degreeScore(
-        me.eduWork?.degree,
-        user.eduWork?.degree
-    );
 
     score += graduationYearScore(
         me.eduWork?.graduationYear,
@@ -48,6 +38,53 @@ export function calculateMatchScore(me: any, user: any) {
     //     me.profile.drinking,
     //     user.profile.drinking
     // );
+
+    score += educationScore(
+        me.eduWork?.highestEdu,
+        user.eduWork?.highestEdu
+    );
+
+    score += degreeScore(
+        me.eduWork?.degree,
+        user.eduWork?.degree
+    );
+
+    score += employmentTypeScore(
+        me.eduWork?.employmentTypeId,
+        user.eduWork?.employmentTypeId
+    );
+
+    score += experienceScore(
+        me.eduWork?.experienceId,
+        user.eduWork?.experienceId
+    );
+
+    score += ambitionScore(
+        me.eduWork?.ambitionId,
+        user.eduWork?.ambitionId
+    );
+
+    score += salaryScore(
+        me.eduWork?.salaryRangeId,
+        user.eduWork?.salaryRangeId
+    );
+
+    score += religionScore(
+        me.profile?.religionId,
+        user.profile?.religionId
+    );
+
+    score += communityScore(
+        me.profile?.communityId,
+        user.profile?.communityId
+    );
+
+    score += familyProfileScore(
+        me.familyProfile,
+        user.familyProfile
+    );
+
+    // score += distanceScore(distanceKm);
 
     const myAnswers = buildAnswerMap(me.answer);
     const otherAnswers = buildAnswerMap(user.answer);
@@ -168,8 +205,8 @@ export function calculateMatchScore(me: any, user: any) {
     );
 
     score += languageScore(
-        me.profile.languages,
-        user.profile.languages
+        me.profile?.languages?.map((l: any) => l.language?.name) ?? [],
+        user.profile?.languages?.map((l: any) => l.language?.name) ?? []
     );
 
     // Bio
@@ -190,7 +227,7 @@ export function calculateMatchScore(me: any, user: any) {
         profileCompletenessScore(user)
     );
 
-    const MAX_SCORE = 170;
+    const MAX_SCORE = 150;
 
     return {
         score,
