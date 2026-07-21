@@ -573,7 +573,7 @@ model Prompt {
 }
 
 model UserBlock {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid())  @db.Uuid
   blockerId String
   blockedId String
   createdAt DateTime @default(now())
@@ -582,7 +582,7 @@ model UserBlock {
 }
 
 model UserReport {
-  id         String   @id @default(uuid())
+  id         String   @id @default(uuid())  @db.Uuid
   reporterId String
   reportedId String
   createdAt  DateTime @default(now())

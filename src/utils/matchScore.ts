@@ -436,17 +436,28 @@ export function orientationScore(
 // =======================
 // AGE SCORE
 // =======================
-function calculateAge(dob: Date): number {
+function calculateAge(
+  dob: Date | string | null | undefined
+): number {
+  if (!dob) return 0;
+
+  const birthDate =
+    dob instanceof Date ? dob : new Date(dob);
+
+  if (isNaN(birthDate.getTime())) {
+    return 0;
+  }
 
   const today = new Date();
 
-  let age = today.getFullYear() - dob.getFullYear();
+  let age = today.getFullYear() - birthDate.getFullYear();
 
-  const monthDiff = today.getMonth() - dob.getMonth();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
 
   if (
     monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < dob.getDate())
+    (monthDiff === 0 &&
+      today.getDate() < birthDate.getDate())
   ) {
     age--;
   }
@@ -455,10 +466,9 @@ function calculateAge(dob: Date): number {
 }
 
 export function ageScore(
-  myDob?: Date,
-  otherDob?: Date
+  myDob?: Date | string | null,
+  otherDob?: Date | string | null
 ): number {
-
   if (!myDob || !otherDob) {
     return 0;
   }
@@ -466,16 +476,16 @@ export function ageScore(
   const myAge = calculateAge(myDob);
   const otherAge = calculateAge(otherDob);
 
+  if (myAge === null || otherAge === null) {
+    return 0;
+  }
+
   const diff = Math.abs(myAge - otherAge);
 
   if (diff === 0) return 10;
-
   if (diff <= 2) return 9;
-
   if (diff <= 4) return 7;
-
   if (diff <= 6) return 5;
-
   if (diff <= 8) return 3;
 
   return 1;
