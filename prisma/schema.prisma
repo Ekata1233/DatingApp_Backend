@@ -936,17 +936,17 @@ model UserPlanUsage {
 model Payment {
   id              String         @id @default(uuid()) @db.Uuid
   userId          String         @db.Uuid
-  packageId       String?
   amount          Decimal        @db.Decimal(10, 2)
   currency        String         @default("INR")
   payment_id      String?        @unique
   transactionId   String?
   status          PaymentStatus  @default(PENDING)
   purpose         PaymentPurpose
+  referenceId     String?        @db.Uuid
   gatewayResponse Json?
   paidAt          DateTime?
   created_at      DateTime       @default(now())
-  Waitlist        Waitlist[]
+  waitlist        Waitlist?
 }
 
 model Notification {
