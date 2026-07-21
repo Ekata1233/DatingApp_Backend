@@ -77,6 +77,7 @@ if (!pgCached) {
 // export default connectPostgres;
 
 export function connectPostgres(): Pool {
+  
   if (pgCached.pool) {
     return pgCached.pool;
   }
