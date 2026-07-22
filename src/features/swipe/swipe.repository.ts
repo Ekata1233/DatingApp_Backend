@@ -1,3 +1,4 @@
+import { redis } from "../../lib/redis";
 import { prisma } from "../../prisma/prismaClient";
 
 export const createSwipe = async (data: {
@@ -19,6 +20,25 @@ export const createSwipe = async (data: {
       swiperId: data.swiperId,
       targetUserId: data.targetUserId,
       action: data.action, // ✅ FIXED
+    },
+  });
+};
+
+export const checkExistingSwipe = async (
+  swiperId: string,
+  targetUserId: string
+) => {
+  return prisma.userSwipe.findUnique({
+    where: {
+      swiperId_targetUserId: {
+        swiperId: swiperId,
+        targetUserId: targetUserId,
+      },
+    },
+    select: {
+      id: true,
+      action: true,
+      createdAt: true,
     },
   });
 };
@@ -68,4 +88,23 @@ export const checkMatchExists = async (
       },
     },
   });
+};
+
+export const cacheSwipe = async (
+  swiperId: string,
+  targetUserId: string
+) => {
+  await redis.sadd(`swipes:${swiperId}`, targetUserId);
+};
+
+export const checkReverseLikeRedis = async (
+  swiperId: string,
+  targetUserId: string
+): Promise<boolean> => {
+  const exists = await redis.sismember(
+    `swipes:${targetUserId}`,
+    swiperId
+  );
+
+  return exists === 1;
 };

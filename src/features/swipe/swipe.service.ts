@@ -97,6 +97,9 @@ import {
   checkReverseLike,
   createMatch,
   checkMatchExists,
+  cacheSwipe,
+  checkReverseLikeRedis,
+  checkExistingSwipe,
 } from "./swipe.repository";
 
 export const handleSwipe = async (data: {
@@ -110,54 +113,59 @@ export const handleSwipe = async (data: {
     throw new Error("Cannot swipe yourself");
   }
 
-  // 1. Save swipe
-  await createSwipe({ swiperId, targetUserId, action });
+    // 1. Check for duplicate swipe (idempotency)
+  const existingSwipe = await checkExistingSwipe(swiperId, targetUserId);
+  if (existingSwipe) {
+    throw new Error("Already swiped on this user");
+  }
 
   // Only LIKE / SUPERLIKE can create match
   if (action === "PASS") {
+    // Save PASS swipe (no match possible)
+    await createSwipe({ swiperId, targetUserId, action });
+    await cacheSwipe(swiperId, targetUserId);
     return { matched: false };
   }
-  /**
-   * ----------------------------------------
-   * 2. Send LIKE/SUPERLIKE notification
-   * ----------------------------------------
-   */
-  await createNotification({
-    sender_id: swiperId,
-    receiver_id: targetUserId,
-    type: "LIKE",
-    message:
-      action === "SUPERLIKE"
-        ? "Someone super liked your profile ⭐"
-        : "Someone liked your profile ❤️",
-  });
 
-  // 2. Check reverse like
-  const reverse = await checkReverseLike(swiperId, targetUserId);
+    let reverse = await checkReverseLikeRedis(swiperId, targetUserId);
 
   if (!reverse) {
+    const dbReverse = await checkReverseLike(swiperId, targetUserId);
+    if (dbReverse) {
+      // Cache the reverse like for future lookups
+      await cacheSwipe(targetUserId, swiperId);
+      reverse = true;
+    }
+  }
+
+  // 3. Save the swipe (after checking reverse to avoid race conditions)
+  // Consider using a transaction here
+  await createSwipe({ swiperId, targetUserId, action });
+  await cacheSwipe(swiperId, targetUserId);
+  // 4. If no reverse like, just send LIKE notification and return
+  if (!reverse) {
+    await createNotification({
+      sender_id: swiperId,
+      receiver_id: targetUserId,
+      type: "LIKE",
+      message:
+        action === "SUPERLIKE"
+          ? "Someone super liked your profile ⭐"
+          : "Someone liked your profile ❤️",
+    });
     return { matched: false };
   }
 
-  // 3. Prevent duplicate match
-  const existingMatch = await checkMatchExists(
-    swiperId,
-    targetUserId
-  );
-
+    // 5. Prevent duplicate match (race condition safe)
+  const existingMatch = await checkMatchExists(swiperId, targetUserId);
   if (existingMatch) {
     return { matched: true, matchId: existingMatch.id };
   }
 
-  // 4. Create match
+  // 6. Create match (consider using database transaction)
   const match = await createMatch(swiperId, targetUserId);
 
-  /**
-   * ----------------------------------------
-   * 6. Send MATCH notification to both users
-   * ----------------------------------------
-   */
-
+  // 7. Send notifications in parallel
   await Promise.all([
     createNotification({
       sender_id: swiperId,
@@ -165,7 +173,6 @@ export const handleSwipe = async (data: {
       type: "MATCH",
       message: "It's a match 🎉",
     }),
-
     createNotification({
       sender_id: targetUserId,
       receiver_id: swiperId,
