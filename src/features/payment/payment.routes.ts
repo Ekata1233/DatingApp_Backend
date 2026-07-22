@@ -28,6 +28,10 @@ import authMiddleware from "../../middleware/auth.middleware";
 
 const router = Router();
 
+//CREATE PAYMENT LINK
 router.post("/create-order",authMiddleware, controller.createPayment);
+
+//SUCCESS WEBHOOK
+router.post("/payments/webhook", controller.payuWebhookController);
 
 export default router;

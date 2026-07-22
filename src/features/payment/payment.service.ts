@@ -217,6 +217,7 @@ import { PaymentPurpose, PaymentStatus } from "@prisma/client";
 import { getAccessToken } from "./payment.utils";
 import { randomUUID } from "node:crypto";
 
+//CREATE PAYMENT LINK
 export async function createPaymentLink(userId: string, body: any) {
   const accessToken = await getAccessToken();
 
@@ -335,4 +336,65 @@ export async function createPaymentLink(userId: string, body: any) {
   });
 
   return data;
+}
+
+
+//WEBHOOK
+export async function paymentWebhookService(payload: any) {
+  const payment_id = payload.txnid;
+  const status = payload.status;
+
+  const payment = await prisma.payment.findUnique({
+    where: {
+      payment_id,
+    },
+  });
+
+  if (!payment) {
+    throw new Error("Payment not found");
+  }
+
+  // Prevent duplicate webhook processing
+  if (payment.status === PaymentStatus.COMPLETED) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const updatedPayment = await tx.payment.update({
+      where: {
+        id: payment.id,
+      },
+      data: {
+        status:
+          status === "success"
+            ? PaymentStatus.COMPLETED
+            : PaymentStatus.FAILED,
+        paidAt: new Date(),
+        gatewayResponse: payload,
+      },
+    });
+
+    console.log("payment response : ", updatedPayment);
+    if (updatedPayment.status !== PaymentStatus.COMPLETED) {
+      return;
+    }
+
+    switch (updatedPayment.purpose) {
+      case PaymentPurpose.WAITLIST:
+        await createWaitlist(tx, updatedPayment);
+        break;
+
+      case PaymentPurpose.PACKAGE:
+        await activateSubscription(tx, updatedPayment);
+        break;
+
+      case PaymentPurpose.BOOST:
+        await creditBoost(tx, updatedPayment);
+        break;
+
+      case PaymentPurpose.WALLET:
+        await creditWallet(tx, updatedPayment);
+        break;
+    }
+  });
 }

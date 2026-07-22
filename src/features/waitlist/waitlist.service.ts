@@ -1,72 +1,41 @@
 import { prisma } from "../../prisma/prismaClient";
 import { JoinWaitlistDto } from "./waitlist.validation";
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, WaitlistPlan } from "@prisma/client";
 
-export const joinWaitlistService = async (
-    userId: string,
-    payload: JoinWaitlistDto
+export const joinFreeWaitlistService = async (
+  userId: string,
+  payload: JoinWaitlistDto
 ) => {
-    const { paymentId, source } = payload;
-    
-    return await prisma.$transaction(async (tx) => {
-        // Verify payment belongs to user
-        const payment = await tx.payment.findFirst({
-            where: {
-                id: paymentId,
-                userId,
-            },
-        });
-
-        if (!payment) {
-            throw new Error("Payment not found");
-        }
-
-        if (payment.status !== PaymentStatus.COMPLETED) {
-            throw new Error("Payment is not completed");
-        }
-
-        // Already joined
-        const existingUser = await tx.waitlist.findUnique({
-            where: {
-                userId,
-            },
-        });
-
-        if (existingUser) {
-            throw new Error("User already joined the waitlist");
-        }
-
-        // Payment already used
-        const existingPayment = await tx.waitlist.findFirst({
-            where: {
-                paymentId,
-            },
-        });
-
-        if (existingPayment) {
-            throw new Error("Payment already used");
-        }
-
-        // Get next waitlist number from PostgreSQL sequence
-        const result =
-            await tx.$queryRaw<{ nextval: bigint }[]>`
-        SELECT nextval('waitlist_number_seq')
-      `;
-
-        const waitlistNumber = Number(result[0].nextval);
-
-        return await tx.waitlist.create({
-            data: {
-                userId,
-                waitlistNumber,
-                amountPaid: payment.amount,
-                paymentStatus: payment.status,
-                paymentId,
-                source,
-            },
-            include: {
-                payment: true,
-            },
-        });
+  return prisma.$transaction(async (tx) => {
+    // Already joined?
+    const existing = await tx.waitlist.findUnique({
+      where: { userId },
     });
+
+    if (existing) {
+      throw new Error("User already joined the waitlist");
+    }
+
+    // Generate next waitlist number
+    const result = await tx.$queryRaw<{ nextval: bigint }[]>`
+      SELECT nextval('waitlist_number_seq')
+    `;
+
+    const waitlistNumber = Number(result[0].nextval);
+
+    // Create waitlist
+    const waitlist = await tx.waitlist.create({
+      data: {
+        userId,
+        waitlistNumber,
+        plan: WaitlistPlan.FREE,
+        amountPaid: 0,
+        paymentStatus: PaymentStatus.COMPLETED,
+        source: payload.source,
+        notes: payload.notes,
+      },
+    });
+
+    return waitlist;
+  });
 };

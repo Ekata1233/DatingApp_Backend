@@ -69,6 +69,7 @@
 import { Request, Response } from "express";
 import * as paymentService from "./payment.service";
 
+//CREATE PAYMENT LINK
 export async function createPayment(req: Request, res: Response) {
   try {
     const result = await paymentService.createPaymentLink((req as any).user.id, req.body);
@@ -84,3 +85,24 @@ export async function createPayment(req: Request, res: Response) {
     });
   }
 }
+
+//WEBHOOK
+export const payuWebhookController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    await paymentService.paymentWebhookService(req.body);
+
+    return res.status(200).json({
+      success: true,
+    });
+  } catch (error: any) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
