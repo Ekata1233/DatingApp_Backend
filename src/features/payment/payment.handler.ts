@@ -1,5 +1,7 @@
+import { PaymentStatus, WaitlistPlan } from "@prisma/client";
+
 //PIAD WAITLIST JOINING
-async function createWaitlist(tx: any, payment: any) {
+export async function createWaitlist(tx: any, payment: any) {
   const exists = await tx.waitlist.findUnique({
     where: {
       userId: payment.userId,
@@ -25,14 +27,14 @@ async function createWaitlist(tx: any, payment: any) {
 }
 
 
-async function activateSubscription(tx: any, payment: any) {
+export async function activateSubscription(tx: any, payment: any) {
   // Activate package/subscription
 }
 
-async function creditBoost(tx: any, payment: any) {
+export async function creditBoost(tx: any, payment: any) {
   // Credit boost package
 }
 
-async function creditWallet(tx: any, payment: any) {
+export async function creditWallet(tx: any, payment: any) {
   // Add wallet balance
 }

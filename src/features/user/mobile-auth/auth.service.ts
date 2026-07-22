@@ -11,7 +11,7 @@ export const sendOtp = async (phoneNumber: string) => {
     ? phoneNumber
     : `+91${phoneNumber}`;
 
-     const account = await twilioClient.api
+  const account = await twilioClient.api
     .accounts(process.env.TWILIO_ACCOUNT_SID!)
     .fetch();
 
@@ -22,7 +22,7 @@ export const sendOtp = async (phoneNumber: string) => {
       channel: "sms",
     });
 
-    console.log("veirfication ", verification)
+  console.log("veirfication ", verification)
 
   return verification;
 };
@@ -189,32 +189,32 @@ export const verifyOtp = async (phoneNumber: string, otp: string, referralCode?:
       },
     });
 
-     const userData = await tx.user.findUnique({
-    where: {
-      id: existingUser.id,
-    },
-    select: {
-      id: true,
-      full_name: true,
-      phone_number: true,
-      email: true,
-      birth_date: true,
-      gender: true,
-      gender_option: true,
-      onboarding_completed: true,
-      onboarding_step: true,
-      profile_completion: true,
-      referralCode: true,
-      created_at: true,
-      profile: {
-        select: {
-          country: true,
-          state: true,
-          city: true,
+    const userData = await tx.user.findUnique({
+      where: {
+        id: existingUser.id,
+      },
+      select: {
+        id: true,
+        full_name: true,
+        phone_number: true,
+        email: true,
+        birth_date: true,
+        gender: true,
+        gender_option: true,
+        onboarding_completed: true,
+        onboarding_step: true,
+        profile_completion: true,
+        referralCode: true,
+        created_at: true,
+        profile: {
+          select: {
+            country: true,
+            state: true,
+            city: true,
+          },
         },
       },
-    },
-  });
+    });
     return userData;
   });
 

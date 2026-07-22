@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-import { joinWaitlistService } from "./waitlist.service";
+import { joinFreeWaitlistService } from "./waitlist.service";
 
 export const joinWaitlistController = async (
   req: Request,
   res: Response
 ) => {
   try {
-    const waitlist = await joinWaitlistService(
+    const waitlist = await joinFreeWaitlistService(
       (req as any).user.id,
       req.body
     );

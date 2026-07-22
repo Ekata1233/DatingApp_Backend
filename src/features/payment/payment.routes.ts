@@ -32,6 +32,6 @@ const router = Router();
 router.post("/create-order",authMiddleware, controller.createPayment);
 
 //SUCCESS WEBHOOK
-router.post("/payments/webhook", controller.payuWebhookController);
+router.post("/webhook", controller.payuWebhookController);
 
 export default router;

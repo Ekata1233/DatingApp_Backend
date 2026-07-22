@@ -216,6 +216,7 @@ import { prisma } from "../../prisma/prismaClient";
 import { PaymentPurpose, PaymentStatus } from "@prisma/client";
 import { getAccessToken } from "./payment.utils";
 import { randomUUID } from "node:crypto";
+import { activateSubscription, createWaitlist, creditBoost, creditWallet } from "./payment.handler";
 
 //CREATE PAYMENT LINK
 export async function createPaymentLink(userId: string, body: any) {
@@ -341,6 +342,7 @@ export async function createPaymentLink(userId: string, body: any) {
 
 //WEBHOOK
 export async function paymentWebhookService(payload: any) {
+  console.log("payload : ", payload)
   const payment_id = payload.txnid;
   const status = payload.status;
 

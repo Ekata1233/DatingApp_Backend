@@ -4,7 +4,7 @@ import { PaymentStatus, WaitlistPlan } from "@prisma/client";
 
 export const joinFreeWaitlistService = async (
   userId: string,
-  payload: JoinWaitlistDto
+  payload?: JoinWaitlistDto
 ) => {
   return prisma.$transaction(async (tx) => {
     // Already joined?
@@ -31,8 +31,8 @@ export const joinFreeWaitlistService = async (
         plan: WaitlistPlan.FREE,
         amountPaid: 0,
         paymentStatus: PaymentStatus.COMPLETED,
-        source: payload.source,
-        notes: payload.notes,
+        source: payload?.source,
+        notes: payload?.notes,
       },
     });
 
