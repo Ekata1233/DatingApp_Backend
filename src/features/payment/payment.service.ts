@@ -273,7 +273,7 @@ export async function createPaymentLink(userId: string, body: any) {
       throw new Error("Invalid payment purpose");
   }
 
-   // Fetch authenticated user details
+  // Fetch authenticated user details
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -297,7 +297,9 @@ export async function createPaymentLink(userId: string, body: any) {
     source: "API",
     order_id: orderId,
 
-    redirectUrl: process.env.PAYMENT_SUCCESS_URL,
+    successURL: "https://www.welvors.com/",
+    failureURL: "https://www.welvors.com/",
+
 
     customer: {
       customerId: userId,
@@ -312,6 +314,7 @@ export async function createPaymentLink(userId: string, body: any) {
     },
   };
 
+  console.log("payload : ", payload)
   const { data } = await axios.post(
     "https://uatoneapi.payu.in/payment-links/",
     payload,
