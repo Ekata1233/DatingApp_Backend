@@ -3,7 +3,7 @@ import cors, { CorsOptions } from "cors";
 const allowedOrigins = [
   "http://localhost:3000",
   "https://dating-landing-page-two.vercel.app",
-  "https://www.welvors.com",
+  "https://www.welvors.com/",
   "https://welvors.com/"
 ];
 
