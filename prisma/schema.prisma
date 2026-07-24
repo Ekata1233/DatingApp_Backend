@@ -65,6 +65,20 @@ model User {
   referralsMade        UserReferral[]     @relation("Referrer")
   referralStats        UserReferralStats?
   receivedReferral     UserReferral?      @relation("ReferredUser")
+  // Roses
+  rosesSent            UserRose[]         @relation("RoseSender")
+  rosesReceived        UserRose[]         @relation("RoseReceiver")
+
+  // Compliments
+  complimentsSent     UserCompliment[] @relation("ComplimentSender")
+  complimentsReceived UserCompliment[] @relation("ComplimentReceiver")
+
+  // Gifts
+  giftsSent     UserGift[] @relation("GiftSender")
+  giftsReceived UserGift[] @relation("GiftReceiver")
+
+  // Rose Balance
+  roseBalance UserRoseBalance?
 
   @@index([phone_number])
   @@index([google_id])
@@ -74,23 +88,23 @@ model User {
 }
 
 model UserProfile {
-  user_id            String                                @id @db.Uuid
+  user_id            String         @id @db.Uuid
   religionId         Int?
-  religion           Religion?                             @relation(fields: [religionId], references: [id])
+  religion           Religion?      @relation(fields: [religionId], references: [id])
   communityId        Int?
-  community          Community?                            @relation(fields: [communityId], references: [id])
+  community          Community?     @relation(fields: [communityId], references: [id])
   languages          UserLanguage[]
   interested_in      Gender?
   sexual_orientation GenderOption?
-  country            String?                               @db.VarChar(30)
-  state              String?                               @db.VarChar(30)
-  city               String?                               @db.VarChar(30)
+  country            String?        @db.VarChar(30)
+  state              String?        @db.VarChar(30)
+  city               String?        @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal?                              @db.Decimal(10, 8)
-  longitude          Decimal?                              @db.Decimal(11, 8)
-  created_at         DateTime                              @default(now())
-  updated_at         DateTime                              @updatedAt
-  user               User                                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  latitude           Decimal?       @db.Decimal(10, 8)
+  longitude          Decimal?       @db.Decimal(11, 8)
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+  user               User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religionId])
   @@index([communityId])
@@ -932,6 +946,78 @@ model UserPlanUsage {
   @@map("user_plan_usage")
 }
 
+model UserRose {
+  id         String   @id @default(uuid()) @db.Uuid
+  senderId   String   @db.Uuid
+  receiverId String   @db.Uuid
+  type       RoseType
+  createdAt  DateTime @default(now())
+  sender     User     @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([senderId, receiverId])
+}
+
+model UserRoseBalance {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @db.Uuid
+  purchasedRoses Int      @default(0)
+  lastResetAt    DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserCompliment {
+  id         String           @id @default(uuid()) @db.Uuid
+  senderId   String           @db.Uuid
+  receiverId String           @db.Uuid
+  ideaId     String?
+  idea       ComplimentIdea?  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  message    String?          @db.VarChar(250)
+  status     ComplimentStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  sender     User             @relation("ComplimentSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User             @relation("ComplimentReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId, status])
+}
+
+model UserGift {
+  id                  String             @id @default(uuid()) @db.Uuid
+  senderId            String             @db.Uuid
+  receiverId          String             @db.Uuid
+  giftId              Int
+  giftName            String
+  pricePaid           Int
+  message             String?            @db.VarChar(150)
+  walletTransactionId String?            @unique @db.Uuid
+  walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
+  createdAt           DateTime           @default(now())
+  sender              User               @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver            User               @relation("GiftReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  gift                Gift               @relation(fields: [giftId], references: [id])
+
+  @@index([receiverId])
+  @@index([senderId])
+  @@index([giftId])
+}
+
+enum RoseType {
+  PURCHASED
+}
+
+enum ComplimentStatus {
+  PENDING
+  READ
+  ACCEPTED
+  DECLINED
+}
+
 model Payment {
   id              String         @id @default(uuid()) @db.Uuid
   userId          String         @db.Uuid
@@ -1376,7 +1462,8 @@ model WalletTransaction {
   balanceAfter  Decimal
   createdAt     DateTime           @default(now())
 
-  wallet Wallet @relation(fields: [walletId], references: [id])
+  wallet Wallet    @relation(fields: [walletId], references: [id])
+  gift   UserGift?
 
   @@index([walletId])
   @@index([type])
@@ -1678,6 +1765,7 @@ model Gift {
   isLive       Boolean      @default(true)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  UserGift     UserGift[]
 
   @@index([categoryId])
   @@index([name])
@@ -1694,13 +1782,14 @@ model ComplimentCategory {
 }
 
 model ComplimentIdea {
-  id         String             @id @default(cuid())
-  categoryId String
-  category   ComplimentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  text       String
-  sortOrder  Int                @default(0)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id             String             @id @default(cuid())
+  categoryId     String
+  category       ComplimentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  text           String
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  UserCompliment UserCompliment[]
 
   @@index([categoryId, sortOrder])
   @@map("compliment_ideas")
