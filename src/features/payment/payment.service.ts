@@ -297,8 +297,8 @@ export async function createPaymentLink(userId: string, body: any) {
     source: "API",
     order_id: orderId,
 
-    successURL: "https://www.welvors.com/stepdone",
-    failureURL: "https://www.welvors.com/stepdone",
+    successURL: "/api/payments/return",
+    failureURL: "https://www.fetchtrue.com/",
 
 
     customer: {

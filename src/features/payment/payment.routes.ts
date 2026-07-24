@@ -34,4 +34,7 @@ router.post("/create-order",authMiddleware, controller.createPayment);
 //SUCCESS WEBHOOK
 router.post("/webhook", controller.payuWebhookController);
 
+//RETURN URL
+router.post("/return", controller.paymentReturnController);
+
 export default router;

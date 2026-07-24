@@ -106,3 +106,15 @@ export const payuWebhookController = async (
     });
   }
 };
+
+//RETURN URL 
+export const paymentReturnController = async (req: Request, res:Response) => {
+  console.log(req.body);
+
+  // Verify/update payment if needed
+
+  return res.redirect(
+    302,
+    "https://www.fetchtrue.com/stepdone"
+  );
+};
