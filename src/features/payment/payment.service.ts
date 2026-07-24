@@ -297,7 +297,7 @@ export async function createPaymentLink(userId: string, body: any) {
     source: "API",
     order_id: orderId,
 
-    successURL: "/api/payments/return",
+    successURL: "https://dating-app-backend-plum.vercel.app/api/payments/return",
     failureURL: "https://www.fetchtrue.com/",
 
 

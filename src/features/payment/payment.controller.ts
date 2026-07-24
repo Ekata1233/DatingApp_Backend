@@ -108,13 +108,26 @@ export const payuWebhookController = async (
 };
 
 //RETURN URL 
-export const paymentReturnController = async (req: Request, res:Response) => {
-  console.log(req.body);
+export const paymentReturnController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+    console.log("Query:", req.query);
 
-  // Verify/update payment if needed
+    return res.redirect(
+      302,
+      "https://www.fetchtrue.com/stepdone"
+    );
+  } catch (error) {
+    console.error(error);
 
-  return res.redirect(
-    302,
-    "https://www.fetchtrue.com/stepdone"
-  );
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error,
+    });
+  }
 };
