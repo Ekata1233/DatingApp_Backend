@@ -22,3 +22,9 @@ export interface RegisterEmployeeInput
   extends RegisterEmployeeBody {
   image?: string;
 }
+
+export interface LoginEmployeeInput {
+  email?: string;
+  phone?: string;
+  password: string;
+}

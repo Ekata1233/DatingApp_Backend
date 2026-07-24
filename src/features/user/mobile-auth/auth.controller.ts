@@ -24,16 +24,23 @@ export const sendOtpController = async (req: Request, res: Response) => {
 
 export const verifyOtpController = async (req: Request, res: Response) => {
   try {
-
     const { phoneNumber, otp, referralCode } = req.body;
+
     const user = await verifyOtp(phoneNumber, otp, referralCode);
 
-    res.json({
+    return res.json({
       success: true,
       message: "Phone verified successfully",
-      token: user.token
+      token: user.token,
+      user: user.user, // optional: return user data too
     });
-  } catch (error) {
-    res.status(400).json({ error: "Invalid OTP" });
+  } catch (error: any) {
+    console.error("VERIFY OTP ERROR:");
+    console.error(error);
+
+    return res.status(400).json({
+      success: false,
+      error: error.message,
+    });
   }
 };

@@ -13,6 +13,8 @@
 
 import { Router } from "express";
 import { sendOtpController, verifyOtpController } from "./auth.controller";
+import { prisma } from "../../../prisma/prismaClient";
+import jwt from "jsonwebtoken";
 
 const router = Router();
 
@@ -69,5 +71,54 @@ router.post("/send-otp", sendOtpController);
  *         description: Phone verified successfully
  */
 router.post("/verify-otp", verifyOtpController);
+
+router.post("/token/:userId", async (req, res) => {
+
+  if (process.env.NODE_ENV !== "development") {
+    return res.status(403).json({
+      success: false,
+      message: "Not allowed",
+    });
+  }
+
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+      },
+      process.env.JWT_SECRET!,
+      {
+        expiresIn: "30d",
+      }
+    );
+
+    return res.json({
+      success: true,
+      token,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+});
 
 export default router;

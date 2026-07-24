@@ -1,4 +1,4 @@
-import swaggerUi from "swagger-ui-express";
+import corsMiddleware from "./config/cors";
 import { swaggerSpec } from "./config/swagger";
 import express from "express";
 import cors from "cors";
@@ -15,7 +15,7 @@ const app = express();
 //     credentials: true
 //   })
 // );
-app.use(cors());
+app.use(corsMiddleware);
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

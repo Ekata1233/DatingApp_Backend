@@ -6,14 +6,14 @@ const router = Router();
 
 router.post("/employee-role/create", createEmployeeRoleController);
 router.get("/employee-role/get", getEmployeeRolesController);
-router.get("/employee-role/update/:id", updateEmployeeRoleController);
-router.get("/employee-role/delete/:id", deleteEmployeeRoleController);
+router.patch("/employee-role/update/:id", updateEmployeeRoleController);
+router.delete("/employee-role/delete/:id", deleteEmployeeRoleController);
 router.post(
   "/employee-role/:roleId/permissions",
   createRolePermissionController
 );
 router.get(
-  "/employee-role/:roleId/get/permissions",
+  "/employee-role/:roleId/permissions/get",
   getRolePermissionController
 );
 router.patch(

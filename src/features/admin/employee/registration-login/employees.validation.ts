@@ -56,3 +56,28 @@ export const registerEmployeeSchema = z.object({
     .string()
     .optional(),
 });
+
+
+
+
+export const loginEmployeeSchema = z
+  .object({
+    email: z.string().email().optional(),
+
+    phone: z
+      .string()
+      .min(10)
+      .max(15)
+      .optional(),
+
+    password: z
+      .string()
+      .min(8),
+  })
+  .refine(
+    (data) => data.email || data.phone,
+    {
+      message: "Email or phone is required.",
+      path: ["email"],
+    }
+  );

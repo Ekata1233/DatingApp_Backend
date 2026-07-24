@@ -1,6 +1,7 @@
 
 import { CreateEmployeeRoleInput, CreateRolePermissionInput, GetEmployeeRolesQuery, UpdateEmployeeRoleInput } from "./employee.types";
 import { prisma } from "../../../../prisma/prismaClient";
+import { PermissionModule } from "@prisma/client";
 
 
 
@@ -200,28 +201,29 @@ export const createRolePermissionService = async (
     );
   }
 
-  // Replace old permissions with new ones
   await prisma.$transaction(async (tx) => {
-    await tx.rolePermission.deleteMany({
-      where: {
-        roleId,
-      },
-    });
-
-    await tx.rolePermission.createMany({
-      data: data.permissions.map((permission) => ({
-        roleId,
-        module: permission.module.trim().toUpperCase(),
-
-        all: permission.all ?? false,
-        add: permission.add ?? false,
-        view: permission.view ?? false,
-        update: permission.update ?? false,
-        delete: permission.delete ?? false,
-        export: permission.export ?? false,
-      })),
-    });
+  await tx.rolePermission.deleteMany({
+    where: {
+      roleId,
+    },
   });
+
+  await tx.rolePermission.createMany({
+    data: data.permissions.map((permission) => ({
+      roleId,
+      module: permission.module
+        .trim()
+        .toUpperCase() as PermissionModule,
+
+      all: permission.all ?? false,
+      add: permission.add ?? false,
+      view: permission.view ?? false,
+      update: permission.update ?? false,
+      delete: permission.delete ?? false,
+      export: permission.export ?? false,
+    })),
+  });
+});
 
   return prisma.rolePermission.findMany({
     where: {
@@ -283,26 +285,27 @@ export const updateRolePermissionService = async (
     throw new Error(`Duplicate module: ${duplicateModules[0]}`);
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.rolePermission.deleteMany({
-      where: {
-        roleId,
-      },
-    });
-
-    await tx.rolePermission.createMany({
-      data: data.permissions.map((item) => ({
-        roleId,
-        module: item.module.trim().toUpperCase(),
-        all: item.all ?? false,
-        add: item.add ?? false,
-        view: item.view ?? false,
-        update: item.update ?? false,
-        delete: item.delete ?? false,
-        export: item.export ?? false,
-      })),
-    });
+ await prisma.$transaction(async (tx) => {
+  await tx.rolePermission.deleteMany({
+    where: {
+      roleId,
+    },
   });
+
+  await tx.rolePermission.createMany({
+    data: data.permissions.map((item) => ({
+      roleId,
+      module: item.module.trim().toUpperCase() as PermissionModule,
+
+      all: item.all ?? false,
+      add: item.add ?? false,
+      view: item.view ??false,
+      update: item.update ?? false,
+      delete: item.delete ?? false,
+      export: item.export ?? false,
+    })),
+  });
+});
 
   return await prisma.rolePermission.findMany({
     where: {

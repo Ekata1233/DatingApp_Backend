@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import { registerEmployeeSchema } from "./employee.validation";
-import { registerEmployeeService } from "./employee.service";
-import { RegisterEmployeeBody } from "./employee.types";
+import { loginEmployeeSchema, registerEmployeeSchema } from "./employees.validation";
+import { loginEmployeeService, registerEmployeeService } from "./employees.service";
+import { RegisterEmployeeBody } from "./employees.types";
 import imagekit from "../../../../utils/imagekit";
 
 export const registerEmployeeController = async (
@@ -72,6 +72,31 @@ export const registerEmployeeController = async (
         error?.errors?.[0]?.message ||
         error.message ||
         "Something went wrong",
+    });
+  }
+};
+
+
+export const loginEmployeeController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const body =
+      loginEmployeeSchema.parse(req.body);
+
+    const result =
+      await loginEmployeeService(body);
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful.",
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 };
