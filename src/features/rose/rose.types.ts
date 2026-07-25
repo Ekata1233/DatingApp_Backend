@@ -4,7 +4,6 @@ import { RoseType } from '@prisma/client';
 export interface SendRoseDTO {
   receiverId: string;
   roseType: RoseType;
-  message?: string;
 }
 
 export interface RoseResponse {

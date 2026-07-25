@@ -47,6 +47,9 @@ import eventRoutes from "../features/admin/event/event.routes"
 import employeeRoutes from "../features/admin/employee/roles-permissions/employee.routes"
 import employeesRoutes from "../features/admin/employee/registration-login/employees.routes"
 import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
+import roseRoutes from "../features/rose/rose.routes"
+
+
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -73,7 +76,7 @@ router.use("/user",waitlistRoutes,eventPartnerRoutes)
 
 
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes )
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes )
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)
