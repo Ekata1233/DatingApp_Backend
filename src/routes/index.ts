@@ -46,7 +46,7 @@ import complimentRoutes from "../features/admin/revenue/compliment/compliment.ro
 import eventRoutes from "../features/admin/event/event.routes"
 import employeeRoutes from "../features/admin/employee/roles-permissions/employee.routes"
 import employeesRoutes from "../features/admin/employee/registration-login/employees.routes"
-
+import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -69,7 +69,7 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 
 router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute);
-router.use("/user",waitlistRoutes)
+router.use("/user",waitlistRoutes,eventPartnerRoutes)
 
 
 // router.use("/users",usersRoutes)
