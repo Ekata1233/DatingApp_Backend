@@ -1,76 +1,132 @@
-// rose.controller.ts
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from "express";
 import {
   sendRoseService,
   getRoseBalanceService,
   getRoseHistoryService,
   addPurchasedRosesService,
-} from './rose.service';
-import { 
-  sendRoseSchema, 
-  getHistoryQuerySchema, 
-  addPurchasedRosesSchema,
-  validate 
-} from './rose.validation';
-import { AppError } from './AppError';
+} from "./rose.service";
 
-// Custom async handler wrapper
-const asyncHandler = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
+import {
+  sendRoseSchema,
+  getHistoryQuerySchema,
+  addPurchasedRosesSchema,
+  validate,
+} from "./rose.validation";
+
+export const sendRoseController = async (req: Request, res: Response) => {
+  try {
+    const senderId = (req as any).user.id;
+    const validatedData = validate(sendRoseSchema, req.body);
+
+    const data = await sendRoseService(senderId, {
+      ...validatedData,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Rose sent successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error("Send Rose Error:", error.message);
+
+    const errorMap: Record<string, string> = {
+      USER_NOT_FOUND: "User not found",
+      RECEIVER_NOT_FOUND: "Receiver not found",
+      CANNOT_SEND_TO_SELF: "You cannot send a rose to yourself",
+      INSUFFICIENT_ROSES: "You don't have enough roses",
+      ALREADY_SENT: "Rose already sent",
+      MATCH_NOT_FOUND: "You can only send roses to matched users",
+    };
+
+    return res.status(400).json({
+      success: false,
+      message: errorMap[error.message] || "Something went wrong",
+    });
+  }
 };
 
-export const sendRose = asyncHandler(async (req: Request, res: Response) => {
-  const senderId = req.user!.id; // Assuming auth middleware sets user
-  
-  // Validate request body using Zod schema
-  const validatedData = validate(sendRoseSchema, req.body);
+export const getRoseBalanceController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const data = await getRoseBalanceService(userId);
 
-  const result = await sendRoseService(senderId, validatedData);
+    return res.status(200).json({
+      success: true,
+      message: "Rose balance fetched successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error("Get Rose Balance Error:", error.message);
 
-  res.status(201).json({
-    status: 'success',
-    ...result,
-  });
-});
+    return res.status(400).json({
+      success: false,
+      message: "Something went wrong",
+    });
+  }
+};
 
-export const getBalance = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user!.id;
+export const getRoseHistoryController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const validatedQuery = validate(getHistoryQuerySchema, req.query);
 
-  const balance = await getRoseBalanceService(userId);
+    const data = await getRoseHistoryService(userId, validatedQuery);
 
-  res.status(200).json({
-    status: 'success',
-    data: balance,
-  });
-});
+    return res.status(200).json({
+      success: true,
+      message: "Rose history fetched successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error("Get Rose History Error:", error.message);
 
-export const getHistory = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  
-  // Validate query parameters using Zod schema
-  const validatedQuery = validate(getHistoryQuerySchema, req.query);
+    const errorMap: Record<string, string> = {
+      INVALID_PAGINATION: "Invalid pagination parameters",
+    };
 
-  const history = await getRoseHistoryService(userId, validatedQuery);
+    return res.status(400).json({
+      success: false,
+      message: errorMap[error.message] || "Something went wrong",
+    });
+  }
+};
 
-  res.status(200).json({
-    status: 'success',
-    data: history,
-  });
-});
+export const addPurchasedRosesController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const validatedData = validate(addPurchasedRosesSchema, req.body);
 
-export const addPurchasedRoses = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  
-  // Validate request body using Zod schema
-  const validatedData = validate(addPurchasedRosesSchema, req.body);
+    const data = await addPurchasedRosesService(
+      userId,
+      validatedData.amount
+    );
 
-  const result = await addPurchasedRosesService(userId, validatedData.amount);
+    return res.status(200).json({
+      success: true,
+      message: "Purchased roses added successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error("Add Purchased Roses Error:", error.message);
 
-  res.status(200).json({
-    status: 'success',
-    message: 'Purchased roses added successfully',
-    data: result,
-  });
-});
+    const errorMap: Record<string, string> = {
+      INVALID_AMOUNT: "Invalid amount",
+      USER_NOT_FOUND: "User not found",
+    };
+
+    return res.status(400).json({
+      success: false,
+      message: errorMap[error.message] || "Something went wrong",
+    });
+  }
+};

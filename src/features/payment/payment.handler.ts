@@ -1,4 +1,5 @@
 import { PaymentStatus, WaitlistPlan } from "@prisma/client";
+import { processPackageActivation } from "../package/package.service";
 
 //PIAD WAITLIST JOINING
 export async function createWaitlist(tx: any, payment: any) {
@@ -27,8 +28,8 @@ export async function createWaitlist(tx: any, payment: any) {
 }
 
 
-export async function activateSubscription(tx: any, payment: any) {
-  // Activate package/subscription
+export async function activatePackage(tx: any, payment: any) {
+   return await processPackageActivation(tx, payment);
 }
 
 export async function creditBoost(tx: any, payment: any) {

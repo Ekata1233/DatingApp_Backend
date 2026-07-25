@@ -43,6 +43,7 @@ import userWaitlistRoutes from "../features/waitlist/waitlist.routes"
 import paymentRoutes from "../features/payment/payment.routes";
 import giftsRoutes from "../features/admin/revenue/gifts/gifts.routes"
 import complimentRoutes from "../features/admin/revenue/compliment/compliment.routes"
+import roseRoutes from "../features/rose/rose.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -69,7 +70,7 @@ router.use("/user",waitlistRoutes)
 
 
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes )
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes )
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

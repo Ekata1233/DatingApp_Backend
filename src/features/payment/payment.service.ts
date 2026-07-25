@@ -216,13 +216,14 @@ import { prisma } from "../../prisma/prismaClient";
 import { PaymentPurpose, PaymentStatus } from "@prisma/client";
 import { getAccessToken } from "./payment.utils";
 import { randomUUID } from "node:crypto";
-import { activateSubscription, createWaitlist, creditBoost, creditWallet } from "./payment.handler";
+import { activatePackage, createWaitlist, creditBoost, creditWallet } from "./payment.handler";
 
 //CREATE PAYMENT LINK
 export async function createPaymentLink(userId: string, body: any) {
   const accessToken = await getAccessToken();
 
   let amount = 0;
+  let priceId = null;
 
   switch (body.purpose) {
     case PaymentPurpose.WAITLIST: {
@@ -246,14 +247,31 @@ export async function createPaymentLink(userId: string, body: any) {
     }
 
     case PaymentPurpose.PACKAGE: {
+            // ✅ FIXED: Find package by slug and billing cycle
       const pkg = await prisma.package.findUnique({
-        where: { id: body.packageId },
-        select: { prices: true },
+        where: { slug: body.packageSlug },  // User sends slug like "premium"
       });
 
-      if (!pkg) throw new Error("Package not found");
+      if (!pkg || !pkg.active) {
+        throw new Error("Package not found or inactive");
+      }
 
-      amount = Number(pkg.prices);
+      // Find specific price for the billing cycle
+      const package_price = await prisma.packagePrice.findUnique({
+        where: {
+          packageId_billingCycle: {
+            packageId: pkg.id,
+            billingCycle: body.billingCycle,  // User sends billing cycle
+          },
+        },
+      });
+
+      if (!package_price || !package_price.active) {
+        throw new Error("Price not available for this billing cycle");
+      }
+
+      amount = Number(package_price.price);
+      priceId = package_price.id;  // Store priceId for payment creation
       break;
     }
 
@@ -390,7 +408,7 @@ export async function paymentWebhookService(payload: any) {
         break;
 
       case PaymentPurpose.PACKAGE:
-        await activateSubscription(tx, updatedPayment);
+        await activatePackage(tx, updatedPayment);
         break;
 
       case PaymentPurpose.BOOST:

@@ -878,24 +878,34 @@ model PackageFeature {
   limits        PlanLimit[]
   UserPlanUsage UserPlanUsage[]
 
-  @@map("features")
+  @@map("package_feature")
 }
 
 model PlanLimit {
-  id        String         @id @default(uuid()) @db.Uuid
-  packageId String         @db.Uuid
-  featureId String         @db.Uuid
-  package   Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  feature   PackageFeature @relation(fields: [featureId], references: [id])
-  enabled   Boolean        @default(false)
-  unlimited Boolean        @default(false)
-  limit     Int?
-  unit      String?
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id          String         @id @default(uuid()) @db.Uuid
+  packageId   String         @db.Uuid
+  featureId   String         @db.Uuid
+  package     Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  feature     PackageFeature @relation(fields: [featureId], references: [id])
+  enabled     Boolean        @default(false)
+  unlimited   Boolean        @default(false)
+  limit       Int?
+  resetPeriod ResetPeriod    @default(NONE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   @@unique([packageId, featureId])
+  @@index([packageId])
+  @@index([featureId])
   @@map("plan_limits")
+}
+
+enum ResetPeriod {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
 }
 
 model UserPackage {
@@ -911,6 +921,7 @@ model UserPackage {
   status                PackageStatus @default(ACTIVE)
   autoRenew             Boolean       @default(false)
   paymentId             String?       @db.Uuid
+  payment               Payment?      @relation(fields: [paymentId], references: [id])
   currentPackageId      String?       @db.Uuid
   currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
 
@@ -1032,6 +1043,7 @@ model Payment {
   paidAt          DateTime?
   created_at      DateTime       @default(now())
   waitlist        Waitlist?
+  UserPackage     UserPackage[]
 }
 
 model Notification {
@@ -1863,4 +1875,63 @@ enum PermissionModule {
   PAYMENT
   REPORT
   SETTINGS
+}
+
+enum PartnerStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum BusinessType {
+  INDIVIDUAL
+  LLP
+  PRIVATE_LIMITED
+  PARTNERSHIP
+  OPC
+  NGO
+  OTHER
+}
+
+model EventPartner {
+  id               String        @id @default(uuid())
+  businessName     String
+  legalEntity      String
+  businessType     BusinessType
+  contactPerson    String
+  email            String        @unique
+  phone            String
+  gstNumber        String?       @unique
+  panNumber        String?
+  experienceYears  Int?
+  description      String?       @db.Text
+  monthlyEventsMin Int?
+  monthlyEventsMax Int?
+  teamSize         Int?
+  venueNames       String[]      @default([])
+  address          String?
+  areaName         String?
+  city             String?
+  state            String?
+  country          String?
+  pincode          String?
+  coverageAreas    String[]      @default([])
+  references       String[]      @default([])
+  website          String?
+  logo             String?
+  gstCertificate   String?
+  businessProof    String?
+  status           PartnerStatus @default(PENDING)
+  isActive         Boolean       @default(true)
+  isDeleted        Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([businessName])
+  @@index([city])
+  @@index([state])
+  @@index([status])
+  @@map("event_partners")
 }

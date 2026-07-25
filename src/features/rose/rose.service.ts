@@ -26,7 +26,7 @@ export const sendRoseService = async (
   senderId: string,
   data: SendRoseDTO
 ): Promise<SendRoseResponse> => {
-  const { receiverId, roseType, message } = data;
+  const { receiverId, roseType } = data;
 
   // Validate not sending to self
   if (senderId === receiverId) {

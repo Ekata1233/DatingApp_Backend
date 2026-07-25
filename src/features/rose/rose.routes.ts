@@ -1,42 +1,46 @@
-// rose.routes.ts
-import { Router } from 'express';
-import { RoseController } from './rose.controller';
-import { RoseService } from './rose.service';
-import { RoseValidation } from './rose.validation';
-import { PrismaClient } from '@prisma/client';
-import authMiddleware from '../../middleware/auth.middleware';
-import { rateLimiter } from './rose.middleware';
+import { Router } from "express";
+import authMiddleware from "../../middleware/auth.middleware";
 
-export function createRoseRoutes(prisma: PrismaClient): Router {
-  const router = Router();
-  const roseService = new RoseService(prisma);
-  const roseController = new RoseController(roseService);
+import {
+  sendRoseController,
+  getRoseBalanceController,
+  getRoseHistoryController,
+  addPurchasedRosesController,
+} from "./rose.controller";
 
-  // All routes require authentication
-  router.use(authMiddleware);
+import { rateLimiter } from "./rose.middleware";
 
-  // Send a rose
-  router.post(
-    '/send',
-    rateLimiter({ windowMs: 60000, max: 10 }), // 10 requests per minute
-    RoseValidation.sendRose,
-    roseController.sendRose
-  );
+const router = Router();
 
-  // Get rose balance
-  router.get(
-    '/balance',
-    rateLimiter({ windowMs: 60000, max: 30 }),
-    roseController.getBalance
-  );
+// All routes require authentication
+router.use(authMiddleware);
 
-  // Get rose history
-  router.get(
-    '/history',
-    rateLimiter({ windowMs: 60000, max: 30 }),
-    RoseValidation.getHistory,
-    roseController.getHistory
-  );
+// Send Rose
+router.post(
+  "/rose/send",
+  rateLimiter({ windowMs: 60 * 1000, max: 10 }),
+  sendRoseController
+);
 
-  return router;
-}
+// Get Rose Balance
+router.get(
+  "/rose/balance",
+  rateLimiter({ windowMs: 60 * 1000, max: 30 }),
+  getRoseBalanceController
+);
+
+// Get Rose History
+router.get(
+  "/rose/history",
+  rateLimiter({ windowMs: 60 * 1000, max: 30 }),
+  getRoseHistoryController
+);
+
+// Add Purchased Roses (Testing/Admin)
+router.post(
+  "/rose/purchase",
+  rateLimiter({ windowMs: 60 * 1000, max: 10 }),
+  addPurchasedRosesController
+);
+
+export default router;
