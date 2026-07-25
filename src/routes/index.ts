@@ -43,7 +43,12 @@ import userWaitlistRoutes from "../features/waitlist/waitlist.routes"
 import paymentRoutes from "../features/payment/payment.routes";
 import giftsRoutes from "../features/admin/revenue/gifts/gifts.routes"
 import complimentRoutes from "../features/admin/revenue/compliment/compliment.routes"
+import eventRoutes from "../features/admin/event/event.routes"
+import employeeRoutes from "../features/admin/employee/roles-permissions/employee.routes"
+import employeesRoutes from "../features/admin/employee/registration-login/employees.routes"
 import roseRoutes from "../features/rose/rose.routes"
+
+
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -61,7 +66,7 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes);
 
 
 

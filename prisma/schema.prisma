@@ -20,7 +20,7 @@ model User {
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  intentionId          String?            @db.Uuid
+  intentionId          String?            @db.Uuid 
   onboarding_step      String?            @db.VarChar(20)
   next_step            String?            @db.VarChar(20)
   onboarding_completed Boolean            @default(false)

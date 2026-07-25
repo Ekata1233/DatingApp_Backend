@@ -37,7 +37,7 @@ export const createComplimentCategoryService = async (
  * Get All Compliment Categories
  */
 export const getAllComplimentCategoryService = async () => {
-  const cache = await redis.get(ALL_CACHE_KEY);
+  const cache = await redis.get(ALL_CACHE_KEY) as string | null;
 
   if (cache) {
     return JSON.parse(cache);
@@ -57,8 +57,9 @@ export const getAllComplimentCategoryService = async () => {
   await redis.set(
     ALL_CACHE_KEY,
     JSON.stringify(categories),
-    "EX",
-    60 * 60 // 1 hour
+     {
+    ex: 60 * 60,
+  }
   );
 
   return categories;
@@ -199,9 +200,7 @@ export const createComplimentIdeaService = async (
 // =====================================
 
 export const getAllComplimentIdeaService = async () => {
-
-  const cache = await redis.get(ALL_IDEA_CACHE_KEY);
-
+  const cache = (await redis.get(ALL_IDEA_CACHE_KEY)) as string | null;
 
   if (cache) {
     return JSON.parse(cache);
@@ -223,13 +222,13 @@ export const getAllComplimentIdeaService = async () => {
   });
 
 
-  await redis.set(
-    ALL_IDEA_CACHE_KEY,
-    JSON.stringify(ideas),
-    "EX",
-    3600
-  );
-
+await redis.set(
+  ALL_IDEA_CACHE_KEY,
+  JSON.stringify(ideas),
+  {
+    ex: 60 * 60,
+  }
+);
 
   return ideas;
 };
