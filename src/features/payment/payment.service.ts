@@ -425,5 +425,9 @@ export async function paymentWebhookService(payload: any) {
         await creditWallet(tx, updatedPayment);
         break;
     }
+  },
+  {
+    maxWait: 10000,   // wait up to 10 sec for DB connection
+    timeout: 30000,   // transaction can run for 30 sec
   });
 }
