@@ -29,7 +29,12 @@ export async function createWaitlist(tx: any, payment: any) {
 
 
 export async function activatePackage(tx: any, payment: any) {
-   return await processPackageActivation(tx, payment);
+  if (!tx || typeof tx.packagePrice?.findUnique !== 'function') {
+    console.error("Invalid transaction object:", tx);
+    throw new Error("Invalid transaction object provided. Transaction client missing required methods.");
+  }
+  
+  return await processPackageActivation(tx, payment);
 }
 
 export async function creditBoost(tx: any, payment: any) {

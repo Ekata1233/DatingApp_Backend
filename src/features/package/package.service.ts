@@ -378,12 +378,21 @@ export async function processPackageActivation(
   payment: any
 ) {
   // 1. Get package price with package info from payment
+  console.log("in activat package function : ", payment)
+  if (!payment.packagePriceId) {
+    throw new Error("Package price not found in payment");
+  }
+
   const price = await tx.packagePrice.findUnique({
-    where: { id: payment.priceId },
+    where: {
+      id: payment.packagePriceId,
+    },
     include: {
       package: true,
     },
   });
+
+  console.log("price", price)
 
   if (!price) {
     throw new Error("Package price not found");
@@ -395,16 +404,26 @@ export async function processPackageActivation(
 
   const pkg = price.package;
 
+  console.log("pkg ", pkg)
+
+
   if (!pkg.active) {
     throw new Error("This package is no longer available");
   }
 
   // 2. Expire existing active package
+  console.log("expire preivos function call")
   await expirePreviousPackage(payment.userId, tx);
+  console.log("expire preivos function end")
+
 
   // 3. Calculate dates
+  console.log("calculate end date function call")
+
   const startDate = new Date();
   const endDate = calculateEndDate(price.billingCycle, startDate);
+  console.log("expire preivos function end")
+
 
   // 4. Create UserPackage
   const userPackage = await tx.userPackage.create({

@@ -326,21 +326,15 @@ model UserFamilyProfile {
   motherOccupation     MasterValue?  @relation("MotherOccupation", fields: [motherOccupationId], references: [id])
   motherOrganisationId Int?
   motherOrganisation   MasterValue?  @relation("MotherOrganisation", fields: [motherOrganisationId], references: [id])
-  siblingRelationId    Int?
-  siblingRelation      MasterValue?  @relation("SiblingRelation", fields: [siblingRelationId], references: [id])
-  siblingOccupationId  Int?
-  siblingOccupation    MasterValue?  @relation("SiblingOccupation", fields: [siblingOccupationId], references: [id])
-  siblingMaritalId     Int?
-  siblingMarital       MasterValue?  @relation("SiblingMarital", fields: [siblingMaritalId], references: [id])
   familyHomeId         Int?
   familyHome           MasterValue?  @relation("FamilyHome", fields: [familyHomeId], references: [id])
   nativePlaceId        Int?
   nativePlace          MasterValue?  @relation("NativePlace", fields: [nativePlaceId], references: [id])
   familyIncomeId       Int?
   familyIncome         FamilyIncome? @relation(fields: [familyIncomeId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  siblings             UserSibling[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   @@index([familyStatusId])
   @@index([familyTypeId])
@@ -350,6 +344,23 @@ model UserFamilyProfile {
   @@index([nativePlaceId])
   @@index([familyIncomeId])
   @@map("user_family_profiles")
+}
+
+model UserSibling {
+  id              String            @id @default(uuid()) @db.Uuid
+  familyProfileId String            @db.Uuid
+  familyProfile   UserFamilyProfile @relation(fields: [familyProfileId], references: [id], onDelete: Cascade)
+  relationId      Int?
+  relation        MasterValue?      @relation("SiblingRelation", fields: [relationId], references: [id])
+  occupationId    Int?
+  occupation      MasterValue?      @relation("SiblingOccupation", fields: [occupationId], references: [id])
+  maritalId       Int?
+  marital         MasterValue?      @relation("SiblingMarital", fields: [maritalId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_siblings")
 }
 
 model MasterCategory {
@@ -379,9 +390,9 @@ model MasterValue {
   fatherOrganisations UserFamilyProfile[] @relation("FatherOrganisation")
   motherOccupations   UserFamilyProfile[] @relation("MotherOccupation")
   motherOrganisations UserFamilyProfile[] @relation("MotherOrganisation")
-  siblingRelations    UserFamilyProfile[] @relation("SiblingRelation")
-  siblingOccupations  UserFamilyProfile[] @relation("SiblingOccupation")
-  siblingMaritals     UserFamilyProfile[] @relation("SiblingMarital")
+  siblingRelations    UserSibling[]       @relation("SiblingRelation")
+  siblingOccupations  UserSibling[]       @relation("SiblingOccupation")
+  siblingMaritals     UserSibling[]       @relation("SiblingMarital")
   familyHomes         UserFamilyProfile[] @relation("FamilyHome")
   nativePlaces        UserFamilyProfile[] @relation("NativePlace")
 
@@ -548,17 +559,22 @@ model UserAnswer {
 }
 
 model UserPhoto {
-  id         String   @id @default(uuid()) @db.Uuid
-  user_id    String   @db.Uuid
-  is_primary Boolean  @default(false)
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  is_primary Boolean   @default(false)
   order      Int?
-  created_at DateTime @default(now())
-  media_type String   @default("image")
+  created_at DateTime  @default(now())
+  media_type MediaType @default(IMAGE)
   media_url  String
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@map("user_photos")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
 }
 
 model UserBio {
@@ -748,6 +764,7 @@ model UserBoost {
   id String @id @default(uuid()) @db.Uuid
 
   user_id          String    @db.Uuid
+  boostId          String?   @db.Uuid
   boost_option_id  String    @db.Uuid
   total_boosts     Int       @default(0)
   remaining_boosts Int
@@ -761,11 +778,10 @@ model UserBoost {
   updated_at       DateTime  @updatedAt
 
   user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Boost       Boost?      @relation(fields: [boostId], references: [id])
   boostOption BoostOption @relation(fields: [boost_option_id], references: [id])
 
-  usages  BoostUsage[]
-  Boost   Boost?       @relation(fields: [boostId], references: [id])
-  boostId String?      @db.Uuid
+  usages BoostUsage[]
 
   @@index([user_id])
   @@index([boost_option_id])
@@ -863,6 +879,7 @@ model BoostTransaction {
 }
 
 enum BoostTransactionType {
+  PACKAGE_CREDIT
   PURCHASE
   USE
   REFUND
@@ -1227,6 +1244,7 @@ model Payment {
   status          PaymentStatus  @default(PENDING)
   purpose         PaymentPurpose
   referenceId     String?        @db.Uuid
+  packagePriceId  String?        @db.Uuid
   gatewayResponse Json?
   paidAt          DateTime?
   created_at      DateTime       @default(now())

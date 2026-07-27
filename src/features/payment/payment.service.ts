@@ -247,10 +247,12 @@ export async function createPaymentLink(userId: string, body: any) {
     }
 
     case PaymentPurpose.PACKAGE: {
-            // ✅ FIXED: Find package by slug and billing cycle
+      // ✅ FIXED: Find package by slug and billing cycle
       const pkg = await prisma.package.findUnique({
         where: { slug: body.packageSlug },  // User sends slug like "premium"
       });
+
+      console.log("pkg : ", pkg)
 
       if (!pkg || !pkg.active) {
         throw new Error("Package not found or inactive");
@@ -265,6 +267,9 @@ export async function createPaymentLink(userId: string, body: any) {
           },
         },
       });
+
+      console.log("package_price : ", package_price)
+
 
       if (!package_price || !package_price.active) {
         throw new Error("Price not available for this billing cycle");
@@ -333,6 +338,7 @@ export async function createPaymentLink(userId: string, body: any) {
   };
 
   console.log("payload : ", payload)
+
   const { data } = await axios.post(
     "https://uatoneapi.payu.in/payment-links/",
     payload,
@@ -344,7 +350,6 @@ export async function createPaymentLink(userId: string, body: any) {
     }
   );
 
-
   await prisma.payment.create({
     data: {
       userId,
@@ -353,6 +358,7 @@ export async function createPaymentLink(userId: string, body: any) {
       transactionId: orderId,
       status: PaymentStatus.PENDING,
       purpose: body.purpose,
+      packagePriceId: priceId,
       gatewayResponse: data,
     },
   });
@@ -362,3 +368,62 @@ export async function createPaymentLink(userId: string, body: any) {
 
 
 //WEBHOOK
+export async function paymentWebhookService(payload: any) {
+  console.log("payload : ", payload)
+  const payment_id = payload.txnid;
+  const status = payload.status;
+
+  const payment = await prisma.payment.findUnique({
+    where: {
+      payment_id,
+    },
+  });
+
+  if (!payment) {
+    throw new Error("Payment not found");
+  }
+
+  // Prevent duplicate webhook processing
+  if (payment.status === PaymentStatus.COMPLETED) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const updatedPayment = await tx.payment.update({
+      where: {
+        id: payment.id,
+      },
+      data: {
+        status:
+          status === "success"
+            ? PaymentStatus.COMPLETED
+            : PaymentStatus.FAILED,
+        paidAt: new Date(),
+        gatewayResponse: payload,
+      },
+    });
+
+    console.log("payment response : ", updatedPayment);
+    if (updatedPayment.status !== PaymentStatus.COMPLETED) {
+      return;
+    }
+
+    switch (updatedPayment.purpose) {
+      case PaymentPurpose.WAITLIST:
+        await createWaitlist(tx, updatedPayment);
+        break;
+
+      case PaymentPurpose.PACKAGE:
+        await activatePackage(tx, updatedPayment);
+        break;
+
+      case PaymentPurpose.BOOST:
+        await creditBoost(tx, updatedPayment);
+        break;
+
+      case PaymentPurpose.WALLET:
+        await creditWallet(tx, updatedPayment);
+        break;
+    }
+  });
+}
