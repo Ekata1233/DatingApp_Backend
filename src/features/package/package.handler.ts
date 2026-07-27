@@ -267,20 +267,62 @@ export async function initializePlanUsage(
         }
 
         // 7. Initialize Welcome Coins (one-time, if applicable)
-        // if (welcomeCoins > 0) {
-        //     // Assuming you have a coins/wallet system
-        //     await tx.userWallet.upsert({
-        //         where: { userId },
-        //         create: {
-        //             userId,
-        //             balance: welcomeCoins,
-        //         },
-        //         update: {
-        //             balance: { increment: welcomeCoins }
-        //         }
-        //     });
-        //     console.log(`🪙 Welcome coins added: ${welcomeCoins}`);
-        // }
+        // 7. Initialize Welcome Coins (one-time, if applicable)
+        if (welcomeCoins > 0) {
+            try {
+                console.log(`🪙 Initializing welcome coins: ${welcomeCoins}`);
+
+                // Get or create user's wallet
+                let wallet = await tx.wallet.findUnique({
+                    where: { userId }
+                });
+
+                const balanceBefore = wallet?.balance || 0;
+                const balanceAfter = balanceBefore + welcomeCoins;
+
+                if (!wallet) {
+                    // Create wallet if it doesn't exist
+                    wallet = await tx.wallet.create({
+                        data: {
+                            userId,
+                            balance: welcomeCoins,
+                        }
+                    });
+                    console.log(`✅ New wallet created for user: ${userId}`);
+                } else {
+                    // Update existing wallet
+                    wallet = await tx.wallet.update({
+                        where: { userId },
+                        data: {
+                            balance: {
+                                increment: welcomeCoins
+                            }
+                        }
+                    });
+                    console.log(`✅ Wallet updated for user: ${userId}`);
+                }
+
+                // Create wallet transaction record
+                await tx.walletTransaction.create({
+                    data: {
+                        walletId: wallet.id,
+                        amount: welcomeCoins,
+                        type: 'DEPOSIT', // or 'PACKAGE_BONUS' depending on your TransactionType enum
+                        status: 'SUCCESS',
+                        source: 'PACKAGE_ACTIVATION', // or 'WELCOME_BONUS'
+                        referenceId: `PACKAGE_${packageId}_${Date.now()}`,
+                        description: `Welcome coins from package activation`,
+                        balanceBefore,
+                        balanceAfter,
+                    }
+                });
+
+                console.log(`🪙 Welcome coins added: ${welcomeCoins} (Total wallet balance: ${balanceAfter})`);
+            } catch (walletError) {
+                console.error("❌ Error initializing welcome coins:", walletError);
+                throw walletError; // You can decide whether to throw or continue
+            }
+        }
 
 
         return featuresInitialized;

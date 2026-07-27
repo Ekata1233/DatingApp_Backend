@@ -1694,6 +1694,7 @@ enum TransactionType {
   REFUND
   PURCHASE
   REWARD
+  PACKAGE_BONUS
 }
 
 enum TransactionStatus {
@@ -1703,6 +1704,7 @@ enum TransactionStatus {
 }
 
 enum TransactionSource {
+  PACKAGE_ACTIVATION
   WALLET_TOPUP
   PREMIUM_PLAN
   BOOST_PURCHASE
