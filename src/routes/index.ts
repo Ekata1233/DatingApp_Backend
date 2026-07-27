@@ -48,7 +48,7 @@ import employeeRoutes from "../features/admin/employee/roles-permissions/employe
 import employeesRoutes from "../features/admin/employee/registration-login/employees.routes"
 import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
 import roseRoutes from "../features/rose/rose.routes"
-
+import editProfileRoutes from "../features/user/profile/edit-profile/editProfile.routes"
 
 const router = Router();
 
@@ -71,12 +71,12 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 
 
-router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute);
-router.use("/user",waitlistRoutes,eventPartnerRoutes)
+router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute,eventPartnerRoutes);
+router.use("/user",waitlistRoutes,)
 
 
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes )
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

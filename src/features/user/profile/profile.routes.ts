@@ -1,9 +1,13 @@
 import express from "express";
 import { profileController, InterestedInController,ReligionController, updateLookingForController, addressController,
   //  aboutYourselfController, 
-   saveUserAnswerController, updateLocationController, educatioController, uploadPhotosController, updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController, 
+   saveUserAnswerController, updateLocationController, educatioController,  updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController, 
    UserPromptController,
-   completeOnboardingController} from "./profile.controller";
+   completeOnboardingController,
+   uploadVideoController,
+   updateVideoController,
+   deleteVideoController,
+   uploadPhotoController} from "./profile.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -1155,7 +1159,7 @@ router.patch("/profile/languages",authMiddleware,LanguageController);
  *                   type: string
  *                   example: Unauthorized
  */
-router.post("/profile/photos", authMiddleware, uploadPhotosController);
+router.post("/profile/photos", authMiddleware, uploadPhotoController);
 
 router.patch("/profile/photos/:photoId", authMiddleware, updatePhotoController);
 
@@ -1163,6 +1167,14 @@ router.patch("/profile/photos/:photoId/primary", authMiddleware, setPrimaryPhoto
 
 router.delete("/profile/photos/:photoId", authMiddleware, deletePhotoController);
 
+
+
+router.post("/profile/video", authMiddleware, uploadVideoController);
+
+router.patch("/profile/video/:videoId", authMiddleware, updateVideoController);
+
+
+router.delete("/profile/video/:videoId", authMiddleware, deleteVideoController);
 /**
  * @swagger
  * /api/user/profile/bio:

@@ -1,5 +1,5 @@
 import express from "express";
-import { updateBasicInfo, updateBio, updateQuestionAnswers, updateUserEduWork } from "./editProfile.controller";
+import { updateBasicInfo, updateBio, updateEduWork, updateLocation, updateQuestionAnswers, updateUserPrompt} from "./editProfile.controller";
 import authMiddleware from "../../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -7,19 +7,33 @@ const router = express.Router();
 router.patch("/edit-basic-info", authMiddleware, updateBasicInfo);
 
 router.patch(
-  "/edit-bio",
+  "/edit-profile/basic-info",
   authMiddleware,
   updateBio
 );
 
+
 router.patch(
-  "/education-work",
-  authMiddleware,
-  updateUserEduWork
-);
-router.patch(
-  "/questions",
+  "/edit-profile/answers",
   authMiddleware,
   updateQuestionAnswers
+);
+
+router.patch(
+  "/edit-profile/education-work",
+  authMiddleware,
+  updateEduWork
+);
+
+router.patch(
+  "/edit-profile/prompts",
+  authMiddleware,
+  updateUserPrompt
+);
+
+router.patch(
+  "/edit-profile/location",
+  authMiddleware,
+  updateLocation
 );
 export default router;

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { answerValidation, familyProfileValidation, locationValidation, profileValidation, promptValidation } from "./profile.validation";
+import { answerValidation, bioValidation, familyProfileValidation, locationValidation, profileValidation, promptValidation } from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -19,9 +19,14 @@ import {
   updateFamilyProfileService,
   updateLanguageService,
   updateUserPromptService,
-  completeOnboardingService
+  completeOnboardingService,
+  deleteUserMediaService,
+  updateUserMediaService,
+  uploadUserMediaService
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
+import { ZodError } from "zod";
+import { prisma } from "../../../prisma/prismaClient";
 
 //Basic Info
 export const profileController = async (req: Request, res: Response) => {
@@ -430,7 +435,10 @@ export const LanguageController = async (
 };
 
 //Photos
-export const uploadPhotosController = async (req: Request, res: Response) => {
+export const uploadPhotoController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
@@ -447,10 +455,16 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
       images = [images];
     }
 
-    // ✅ File size validation (5 MB per image)
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
     for (const image of images) {
+      if (!image.mimetype.startsWith("image")) {
+        return res.status(400).json({
+          success: false,
+          message: "Only image files are allowed.",
+        });
+      }
+
       if (image.size > MAX_FILE_SIZE) {
         return res.status(413).json({
           success: false,
@@ -459,23 +473,88 @@ export const uploadPhotosController = async (req: Request, res: Response) => {
       }
     }
 
-    const result = await uploadUserPhotosService(userId, images);
+    const result = await uploadUserMediaService(
+      userId,
+      images,
+      "IMAGE",
+    );
 
     return res.status(200).json({
       success: true,
       message: "Photos uploaded successfully",
       onboarding_step: result.onboarding.onboarding_step,
       next_step: result.onboarding.next_step,
-      data: result.photos,
+      data: result.media,
     });
   } catch (error: any) {
     return res.status(400).json({
       success: false,
-      message: error.message || "Something went wrong.",
+      message: error.message,
     });
   }
 };
-export const updatePhotoController = async (req: Request<{ photoId: string }>, res: Response) => {
+export const uploadVideoController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    if (!req.files || !req.files.video) {
+      return res.status(400).json({
+        success: false,
+        message: "Video is required",
+      });
+    }
+
+    let videos: any = req.files.video;
+
+    if (!Array.isArray(videos)) {
+      videos = [videos];
+    }
+
+    const MAX_FILE_SIZE = 30 * 1024 * 1024;
+
+    for (const video of videos) {
+      if (!video.mimetype.startsWith("video")) {
+        return res.status(400).json({
+          success: false,
+          message: "Only video files are allowed.",
+        });
+      }
+
+      if (video.size > MAX_FILE_SIZE) {
+        return res.status(413).json({
+          success: false,
+          message: "Each video must be smaller than 30 MB.",
+        });
+      }
+    }
+
+    const result = await uploadUserMediaService(
+      userId,
+      videos,
+      "VIDEO",
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Video uploaded successfully",
+      onboarding_step: result.onboarding.onboarding_step,
+      next_step: result.onboarding.next_step,
+      data: result.media,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+export const updatePhotoController = async (
+  req: Request<{ photoId: string }>,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
     const { photoId } = req.params;
@@ -489,7 +568,19 @@ export const updatePhotoController = async (req: Request<{ photoId: string }>, r
 
     const image = req.files.image;
 
-    const photo = await updateUserPhotoService(userId, photoId, image);
+    if (!image.mimetype.startsWith("image")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only image files are allowed.",
+      });
+    }
+
+    const photo = await updateUserMediaService(
+      userId,
+      photoId,
+      image,
+      "IMAGE",
+    );
 
     return res.status(200).json({
       success: true,
@@ -503,10 +594,52 @@ export const updatePhotoController = async (req: Request<{ photoId: string }>, r
     });
   }
 };
+export const updateVideoController = async (
+  req: Request<{ videoId: string }>,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { videoId } = req.params;
 
+    if (!req.files || !req.files.video) {
+      return res.status(400).json({
+        success: false,
+        message: "Video is required",
+      });
+    }
+
+    const video = req.files.video;
+
+    if (!video.mimetype.startsWith("video")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only video files are allowed.",
+      });
+    }
+
+    const updatedVideo = await updateUserMediaService(
+      userId,
+      videoId,
+      video,
+      "VIDEO",
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Video updated successfully",
+      data: updatedVideo,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 export const setPrimaryPhotoController = async (
   req: Request<{ photoId: string }>,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user.id;
@@ -529,13 +662,42 @@ export const setPrimaryPhotoController = async (
 
 export const deletePhotoController = async (
   req: Request<{ photoId: string }>,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user.id;
     const { photoId } = req.params;
 
-    const result = await deleteUserPhotoService(userId, photoId);
+    const result = await deleteUserMediaService(
+      userId,
+      photoId,
+      "IMAGE",
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+export const deleteVideoController = async (
+  req: Request<{ videoId: string }>,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { videoId } = req.params;
+
+    const result = await deleteUserMediaService(
+      userId,
+      videoId,
+      "VIDEO",
+    );
 
     return res.status(200).json({
       success: true,
@@ -549,10 +711,6 @@ export const deletePhotoController = async (
   }
 };
 
-//Bio
-import { bioValidation } from "./profile.validation";
-import { ZodError } from "zod";
-import { prisma } from "../../../prisma/prismaClient";
 
 export const updateUserBioController = async (
   req: Request,

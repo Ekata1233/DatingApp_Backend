@@ -17,7 +17,6 @@ import imagekit from "../../../utils/imagekit";
 import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
 import { ReferralService } from "../referral/referral.service";
 
-
 //profile update service
 export const updateProfileService = async (
   userId: string,
@@ -29,7 +28,6 @@ export const updateProfileService = async (
   gender_option?: GenderOption | null,
 ) => {
   if (!userId) throw new Error("User ID is missing");
-
 
   // Normalize email
   email = email.trim().toLowerCase();
@@ -134,7 +132,7 @@ export const updateInterestedInService = async (
 export const updateReligionService = async (
   userId: string,
   religionId: number,
-  communityId: number
+  communityId: number,
 ) => {
   if (!userId) {
     throw new Error("User ID is missing");
@@ -179,7 +177,6 @@ export const updateReligionService = async (
 
   const score = await calculateProfileScore(userId);
 
-
   await prisma.user.update({
     where: {
       id: userId,
@@ -187,7 +184,7 @@ export const updateReligionService = async (
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
-      profile_completion: score
+      profile_completion: score,
     },
   });
 
@@ -219,7 +216,7 @@ export const updateReligionService = async (
 //   return updatedUser;
 // };
 
-//LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION 
+//LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION
 export const updateLookingForService = async (
   userId: string,
   intentionId: string,
@@ -228,15 +225,14 @@ export const updateLookingForService = async (
 
   const currentStep = "LOOKING_FOR";
 
-    const score = await calculateProfileScore(userId);
-
+  const score = await calculateProfileScore(userId);
 
   return prisma.user.update({
     where: { id: userId },
     data: {
       intentionId,
       onboarding_step: currentStep,
-      profile_completion: score
+      profile_completion: score,
     },
     include: {
       intention: true,
@@ -257,8 +253,6 @@ export const updateAddressService = async (
     where: { id: userId },
     select: { looking_for: true },
   });
-
-
 
   const currentStep = "ADDRESS";
   const nextStep = getNextStep(currentStep);
@@ -311,8 +305,6 @@ export const updateAddressService = async (
 //     where: { id: userId },
 //     select: { looking_for: true },
 //   });
-
-
 
 //   // ✅ Business Validation (IMPORTANT)
 //   if (data.childStatus === "NO") {
@@ -499,14 +491,14 @@ export const updateEducationService = async (
     },
   });
 
-    const score = await calculateProfileScore(userId);
+  const score = await calculateProfileScore(userId);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
-      profile_completion: score
+      profile_completion: score,
     },
     select: {
       onboarding_step: true,
@@ -530,7 +522,7 @@ export const updateWorkService = async (
     ambitionId?: number;
     salaryRangeId?: number;
     bigDreams?: string;
-  }
+  },
 ) => {
   if (!userId) {
     throw new Error("User ID is missing");
@@ -564,8 +556,7 @@ export const updateWorkService = async (
     },
   });
 
-    const score = await calculateProfileScore(userId);
-
+  const score = await calculateProfileScore(userId);
 
   const onboarding = await prisma.user.update({
     where: {
@@ -574,7 +565,7 @@ export const updateWorkService = async (
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
-      profile_completion: score
+      profile_completion: score,
     },
     select: {
       onboarding_step: true,
@@ -600,34 +591,53 @@ export const updateFamilyProfileService = async (
     motherOccupationId?: number;
     motherOrganisationId?: number;
 
-    siblingRelationId?: number;
-    siblingOccupationId?: number;
-    siblingMaritalId?: number;
-
+    siblings?: {
+      relationId: number;
+      occupationId: number;
+      maritalId: number;
+    }[];
     familyHomeId?: number;
     nativePlaceId?: number;
 
     familyIncomeId?: number;
-  }
+  },
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
   const currentStep = "FAMILY_DETAILS";
   const nextStep = getNextStep(currentStep);
 
+  const { siblings, ...familyData } = data;
+
   const updatedProfile = await prisma.userFamilyProfile.upsert({
     where: {
       userId,
     },
-    update: {
-      ...data,
-    },
+    update: familyData,
     create: {
       userId,
-      ...data,
+      ...familyData,
     },
   });
 
+  if (siblings) {
+    await prisma.userSibling.deleteMany({
+      where: {
+        familyProfileId: updatedProfile.id,
+      },
+    });
+
+    if (siblings.length) {
+      await prisma.userSibling.createMany({
+        data: siblings.map((item: any) => ({
+          familyProfileId: updatedProfile.id,
+          relationId: item.relationId,
+          occupationId: item.occupationId,
+          maritalId: item.maritalId,
+        })),
+      });
+    }
+  }
   const updatedUser = await prisma.user.update({
     where: {
       id: userId,
@@ -662,7 +672,7 @@ export const updateFamilyProfileService = async (
 //language
 export const updateLanguageService = async (
   userId: string,
-  languageIds: number[]
+  languageIds: number[],
 ) => {
   if (!userId) {
     throw new Error("User ID is missing");
@@ -702,7 +712,7 @@ export const updateLanguageService = async (
       })),
     });
 
-      const score = await calculateProfileScore(userId);
+    const score = await calculateProfileScore(userId);
 
     await tx.user.update({
       where: {
@@ -711,7 +721,7 @@ export const updateLanguageService = async (
       data: {
         onboarding_step: currentStep,
         next_step: nextStep,
-        profile_completion: score
+        profile_completion: score,
       },
     });
   });
@@ -732,54 +742,65 @@ export const updateLanguageService = async (
 };
 
 // Upload Photos
-export const uploadUserPhotosService = async (userId: string, files: any[]) => {
+export const uploadUserMediaService = async (
+  userId: string,
+  files: any[],
+  mediaType: "IMAGE" | "VIDEO",
+) => {
   if (!userId) throw new Error("User ID is required");
 
   if (!files || files.length === 0) {
-    throw new Error("No images provided");
+    throw new Error(
+      mediaType === "IMAGE"
+        ? "No images provided"
+        : "No videos provided",
+    );
   }
 
-
-  // Upload all images
-  const uploadedPhotos = await Promise.all(
+  const uploadedMedia = await Promise.all(
     files.map(async (file: any, index: number) => {
-      const base64File = file.data.toString("base64"); // ✅ added
+      const base64File = file.data.toString("base64");
 
       const uploadResponse = await imagekit.upload({
-        file: base64File, // ✅ changed
+        file: base64File,
         fileName: file.name,
-        folder: "/user-photos",
+        folder:
+          mediaType === "IMAGE"
+            ? "/user-photos"
+            : "/user-videos",
       });
-
-      const isVideo = file.mimetype?.startsWith("video");
 
       return {
         user_id: userId,
         media_url: uploadResponse.url,
         order: index + 1,
         is_primary: index === 0,
-        media_type: isVideo ? "video" : "image",
+        media_type: mediaType,
       };
     }),
   );
 
-  // Save in DB
   await prisma.userPhoto.createMany({
-    data: uploadedPhotos,
+    data: uploadedMedia,
   });
 
-  // ✅ Fetch saved photos with IDs
-  const savedPhotos = await prisma.userPhoto.findMany({
-    where: { user_id: userId },
-    orderBy: { created_at: "asc" },
+  const savedMedia = await prisma.userPhoto.findMany({
+    where: {
+      user_id: userId,
+      media_type: mediaType,
+    },
+    orderBy: {
+      created_at: "asc",
+    },
   });
 
-  // Onboarding step update
   const currentStep = "LATEST_PHOTOS";
   const nextStep = getNextStep(currentStep);
 
   const updatedUser = await prisma.user.update({
-    where: { id: userId },
+    where: {
+      id: userId,
+    },
     data: {
       onboarding_step: currentStep,
       next_step: nextStep,
@@ -790,59 +811,76 @@ export const uploadUserPhotosService = async (userId: string, files: any[]) => {
     },
   });
 
-  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
-    where: { id: userId },
-    data: { profile_completion: score },
+    where: {
+      id: userId,
+    },
+    data: {
+      profile_completion: score,
+    },
   });
 
   return {
-    photos: savedPhotos,
+    media: savedMedia,
     onboarding: updatedUser,
   };
 };
 
 // Update Photo
-export const updateUserPhotoService = async (
+export const updateUserMediaService = async (
   userId: string,
-  photoId: string,
+  mediaId: string,
   file: any,
+  mediaType: "IMAGE" | "VIDEO",
 ) => {
   if (!userId) throw new Error("User ID is required");
-  const isVideo = file.mimetype?.startsWith("video");
-  const existingPhoto = await prisma.userPhoto.findUnique({
-    where: { id: photoId },
-  });
 
-  if (!existingPhoto) {
-    throw new Error("Photo not found");
-  }
-
-  const uploadResponse = await imagekit.upload({
-    file: file.data,
-    fileName: file.name,
-    folder: "/user-photos",
-  });
-
-  const updatedPhoto = await prisma.userPhoto.update({
-    where: { id: photoId },
-    data: {
-      media_url: uploadResponse.url,
-      media_type: isVideo ? "video" : "image", // ✅ ADDED
+  const existingMedia = await prisma.userPhoto.findFirst({
+    where: {
+      id: mediaId,
+      user_id: userId,
     },
   });
 
-  // 👉 UPDATE SCORE
+  if (!existingMedia) {
+    throw new Error("Media not found");
+  }
+
+  const base64File = file.data.toString("base64");
+
+  const uploadResponse = await imagekit.upload({
+    file: base64File,
+    fileName: file.name,
+    folder:
+      mediaType === "IMAGE"
+        ? "/user-photos"
+        : "/user-videos",
+  });
+
+  const updatedMedia = await prisma.userPhoto.update({
+    where: {
+      id: mediaId,
+    },
+    data: {
+      media_url: uploadResponse.url,
+      media_type: mediaType,
+    },
+  });
+
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
-    where: { id: userId },
-    data: { profile_completion: score },
+    where: {
+      id: userId,
+    },
+    data: {
+      profile_completion: score,
+    },
   });
 
-  return updatedPhoto;
+  return updatedMedia;
 };
 
 //primary photo
@@ -855,30 +893,50 @@ export const setPrimaryPhotoService = async (
     data: { is_primary: false },
   });
 
-  const photo = await prisma.userPhoto.update({
-    where: { id: photoId },
-    data: { is_primary: true },
-  });
+  const photo = await prisma.userPhoto.updateMany({
+  where: {
+    id: photoId,
+    user_id: userId,
+    media_type: "IMAGE",
+  },
+  data: {
+    is_primary: true,
+  },
+});
 
   return photo;
 };
 
 //Delete Photo
-export const deleteUserPhotoService = async (
+export const deleteUserMediaService = async (
   userId: string,
-  photoId: string,
+  mediaId: string,
+  mediaType: "IMAGE" | "VIDEO",
 ) => {
-  const photo = await prisma.userPhoto.findUnique({
-    where: { id: photoId },
+  const media = await prisma.userPhoto.findFirst({
+    where: {
+      id: mediaId,
+      user_id: userId,
+      media_type: mediaType,
+    },
   });
 
-  if (!photo) throw new Error("Photo not found");
+  if (!media) {
+    throw new Error("Media not found");
+  }
 
   await prisma.userPhoto.delete({
-    where: { id: photoId },
+    where: {
+      id: mediaId,
+    },
   });
 
-  return { message: "Photo deleted" };
+  return {
+    message:
+      mediaType === "IMAGE"
+        ? "Photo deleted"
+        : "Video deleted",
+  };
 };
 
 //Bio
@@ -933,7 +991,7 @@ export const updateUserPromptService = async (
   prompts: {
     promptId: string;
     answer: string;
-  }[]
+  }[],
 ) => {
   if (!userId) {
     throw new Error("User ID is missing");
@@ -1023,14 +1081,13 @@ export const completeOnboardingService = async (userId: string) => {
       onboarding_completed: true,
       onboarding_step: "COMPLETED",
       next_step: null,
-
     },
   });
 
   // Credit referral reward if applicable
   try {
     await ReferralService.onRegistrationCompleted(userId);
-    console.log("Funtion call ......")
+    console.log("Funtion call ......");
   } catch (error) {
     console.error("Referral registration reward failed:", error);
   }
