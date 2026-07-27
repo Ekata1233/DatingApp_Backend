@@ -7,6 +7,7 @@ import {
   PaymentStatus,
 } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
+import { initializePlanUsage } from "./package.handler";
 
 // Helper: Calculate end date based on billing cycle
 function calculateEndDate(
@@ -95,54 +96,6 @@ async function expirePreviousPackage(
       },
     });
   }
-}
-
-// Helper: Initialize plan usage records
-async function initializePlanUsage(
-  userId: string,
-  packageId: string,
-  tx: Prisma.TransactionClient
-): Promise<number> {
-  const planLimits = await tx.planLimit.findMany({
-    where: {
-      packageId,
-      enabled: true,
-    },
-    include: {
-      feature: true,
-    },
-  });
-
-  let featuresInitialized = 0;
-
-  for (const limit of planLimits) {
-    if (!limit.enabled) continue;
-
-    const resetAt = calculateResetDate(limit.resetPeriod);
-
-    await tx.userPlanUsage.upsert({
-      where: {
-        userId_featureId: {
-          userId,
-          featureId: limit.featureId,
-        },
-      },
-      create: {
-        userId,
-        featureId: limit.featureId,
-        used: 0,
-        resetAt,
-      },
-      update: {
-        used: 0,
-        resetAt,
-      },
-    });
-
-    featuresInitialized++;
-  }
-
-  return featuresInitialized;
 }
 
 // Main service: Activate package after successful payment

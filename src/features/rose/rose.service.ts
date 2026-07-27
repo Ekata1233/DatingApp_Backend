@@ -74,7 +74,7 @@ export const sendRoseService = async (
   // Get user balance
   const balance = await getOrCreateBalance(senderId, prisma);
 
-  if (balance.purchasedRoses <= 0) {
+  if (balance.totalRoses <= 0) {
     throw new AppError(
       400,
       ROSE_CONSTANTS.ERRORS.PURCHASED_ROSES_UNAVAILABLE
@@ -144,8 +144,7 @@ export const sendRoseService = async (
     };
 
     const balanceResponse: RoseBalanceResponse = {
-      purchasedRoses: updatedBalance.purchasedRoses,
-      totalRoses: updatedBalance.purchasedRoses,
+      totalRoses: updatedBalance.totalRoses,
       lastResetAt: updatedBalance.lastResetAt,
     };
 
@@ -166,8 +165,7 @@ export const getRoseBalanceService = async (
   const balance = await getOrCreateBalance(userId, prisma);
 
   return {
-    purchasedRoses: balance.purchasedRoses,
-    totalRoses: balance.purchasedRoses,
+    totalRoses: balance.totalRoses,
     lastResetAt: balance.lastResetAt,
   };
 };
@@ -192,8 +190,7 @@ export const addPurchasedRosesService = async (
   console.log('Purchased roses added', { userId, amount });
 
   return {
-    purchasedRoses: updatedBalance.purchasedRoses,
-    totalRoses: updatedBalance.purchasedRoses,
+    totalRoses: updatedBalance.totalRoses,
     lastResetAt: updatedBalance.lastResetAt,
   };
 };

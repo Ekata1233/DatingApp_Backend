@@ -20,7 +20,7 @@ model User {
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  intentionId          String?            @db.Uuid 
+  intentionId          String?            @db.Uuid
   onboarding_step      String?            @db.VarChar(20)
   next_step            String?            @db.VarChar(20)
   onboarding_completed Boolean            @default(false)
@@ -51,6 +51,8 @@ model User {
   boostEvents          BoostEvent[]       @relation("BoostedUser")
   actorEvents          BoostEvent[]       @relation("ActorUser")
   boostStats           UserBoostStats?
+  boostPurchases       BoostPurchase[]
+  boostTransactions    BoostTransaction[]
   datePlan             DatePlan[]
   datePlanRequests     DatePlanRequest[]
   datePlanSkips        DatePlanSkip[]
@@ -68,17 +70,20 @@ model User {
   // Roses
   rosesSent            UserRose[]         @relation("RoseSender")
   rosesReceived        UserRose[]         @relation("RoseReceiver")
+  roseBalance          UserRoseBalance?
+  rosePurchases        RosePurchase[]
+  roseTransactions     RoseTransaction[]
 
   // Compliments
-  complimentsSent     UserCompliment[] @relation("ComplimentSender")
-  complimentsReceived UserCompliment[] @relation("ComplimentReceiver")
+  complimentsSent        UserCompliment[]        @relation("ComplimentSender")
+  complimentsReceived    UserCompliment[]        @relation("ComplimentReceiver")
+  complimentBalance      UserComplimentBalance?
+  complimentPurchases    ComplimentPurchase[]
+  complimentTransactions ComplimentTransaction[]
 
   // Gifts
   giftsSent     UserGift[] @relation("GiftSender")
   giftsReceived UserGift[] @relation("GiftReceiver")
-
-  // Rose Balance
-  roseBalance UserRoseBalance?
 
   @@index([phone_number])
   @@index([google_id])
@@ -99,6 +104,7 @@ model UserProfile {
   country            String?        @db.VarChar(30)
   state              String?        @db.VarChar(30)
   city               String?        @db.VarChar(30)
+  area               String?        @db.VarChar(30)
   max_distance_km    Int?
   latitude           Decimal?       @db.Decimal(10, 8)
   longitude          Decimal?       @db.Decimal(11, 8)
@@ -221,6 +227,9 @@ model UserAbout {
   numberOfChildren       NumberOfChildren?
   childLivingArrangement ChildLivingArrangement?
   livingSituation        LivingSituation?
+  zodiac                 Zodiac?
+  loveLanguage           LoveLanguage?
+  communicationStyle     CommunicationStyle?
   created_at             DateTime                @default(now())
   updated_at             DateTime                @updatedAt
   user                   User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -228,6 +237,38 @@ model UserAbout {
   @@index([maritalStatus])
   @@index([childStatus])
   @@map("user_about")
+}
+
+enum Zodiac {
+  ARIES
+  TAURUS
+  GEMINI
+  CANCER
+  LEO
+  VIRGO
+  LIBRA
+  SCORPIO
+  SAGITTARIUS
+  CAPRICORN
+  AQUARIUS
+  PISCES
+}
+
+enum LoveLanguage {
+  WORDS_OF_AFFIRMATION
+  QUALITY_TIME
+  ACTS_OF_SERVICE
+  PHYSICAL_TOUCH
+  RECEIVING_GIFTS
+}
+
+enum CommunicationStyle {
+  PHONE_CALLS_OVER_TEXTS
+  TEXTS_OVER_CALLS
+  VIDEO_CALLS
+  VOICE_NOTES
+  IN_PERSON_ALWAYS
+  A_BIT_OF_EVERYTHING
 }
 
 model UserEduWork {
@@ -681,22 +722,23 @@ model Boost {
 }
 
 model BoostOption {
-  id               String      @id @default(uuid()) @db.Uuid
-  boost_id         String      @db.Uuid
+  id               String          @id @default(uuid()) @db.Uuid
+  boost_id         String          @db.Uuid
   label            String
   boostCount       Int
   timePerBoost     Int
-  pricePerBoost    Decimal     @db.Decimal(10, 2)
-  discounted_price Decimal     @db.Decimal(10, 2)
+  pricePerBoost    Decimal         @db.Decimal(10, 2)
+  discounted_price Decimal         @db.Decimal(10, 2)
   discount_percent Int?
-  totalPrice       Decimal     @db.Decimal(10, 2)
-  is_best_value    Boolean     @default(false)
-  is_popular       Boolean     @default(false)
-  is_active        Boolean     @default(true)
-  created_at       DateTime    @default(now())
-  updated_at       DateTime    @updatedAt
-  boost            Boost       @relation(fields: [boost_id], references: [id], onDelete: Cascade)
+  totalPrice       Decimal         @db.Decimal(10, 2)
+  is_best_value    Boolean         @default(false)
+  is_popular       Boolean         @default(false)
+  is_active        Boolean         @default(true)
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  boost            Boost           @relation(fields: [boost_id], references: [id], onDelete: Cascade)
   userBoosts       UserBoost[]
+  BoostPurchase    BoostPurchase[]
 
   @@index([boost_id])
   @@map("boost_options")
@@ -706,10 +748,12 @@ model UserBoost {
   id String @id @default(uuid()) @db.Uuid
 
   user_id          String    @db.Uuid
-  boost_id         String    @db.Uuid
   boost_option_id  String    @db.Uuid
-  total_boosts     Int
+  total_boosts     Int       @default(0)
   remaining_boosts Int
+  weeklyLimit      Int       @default(0)
+  last_reset_at    DateTime
+  next_reset_at    DateTime
   start_at         DateTime  @default(now())
   expires_at       DateTime?
   is_active        Boolean   @default(true)
@@ -717,13 +761,14 @@ model UserBoost {
   updated_at       DateTime  @updatedAt
 
   user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  boost       Boost       @relation(fields: [boost_id], references: [id])
   boostOption BoostOption @relation(fields: [boost_option_id], references: [id])
 
-  usages BoostUsage[]
+  usages  BoostUsage[]
+  Boost   Boost?       @relation(fields: [boostId], references: [id])
+  boostId String?      @db.Uuid
 
   @@index([user_id])
-  @@index([boost_id])
+  @@index([boost_option_id])
   @@map("user_boosts")
 }
 
@@ -754,13 +799,12 @@ model BoostUsage {
 }
 
 model UserBoostStats {
-  id      String @id @default(uuid()) @db.Uuid
-  user_id String @unique @db.Uuid
-
-  total_views     Int @default(0)
-  total_likes     Int @default(0)
-  total_interests Int @default(0)
-  total_reach     Int @default(0)
+  id              String @id @default(uuid()) @db.Uuid
+  user_id         String @unique @db.Uuid
+  total_views     Int    @default(0)
+  total_likes     Int    @default(0)
+  total_interests Int    @default(0)
+  total_reach     Int    @default(0)
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
@@ -768,24 +812,63 @@ model UserBoostStats {
 }
 
 model BoostEvent {
-  id String @id @default(uuid()) @db.Uuid
-
-  boost_usage_id String @db.Uuid
-  user_id        String @db.Uuid // boosted user
-  actor_id       String @db.Uuid // who performed action
-
-  event_type EventType
-  created_at DateTime  @default(now())
-
-  boostUsage BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
-
-  user  User @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
-  actor User @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
+  id             String     @id @default(uuid()) @db.Uuid
+  boost_usage_id String     @db.Uuid
+  user_id        String     @db.Uuid // boosted user
+  actor_id       String     @db.Uuid // who performed action
+  event_type     EventType
+  created_at     DateTime   @default(now())
+  boostUsage     BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+  user           User       @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
+  actor          User       @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
 
   @@index([boost_usage_id])
   @@index([user_id])
   @@index([actor_id])
+  @@index([created_at])
   @@map("boost_events")
+}
+
+model BoostPurchase {
+  id               String             @id @default(uuid()) @db.Uuid
+  userId           String             @db.Uuid
+  boostOptionId    String             @db.Uuid
+  quantity         Int
+  amount           Decimal
+  paymentId        String
+  status           PaymentStatus
+  createdAt        DateTime           @default(now())
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boostOption      BoostOption        @relation(fields: [boostOptionId], references: [id])
+  BoostTransaction BoostTransaction[]
+
+  @@index([userId])
+  @@index([paymentId])
+  @@index([status])
+}
+
+model BoostTransaction {
+  id                String               @id @default(uuid()) @db.Uuid
+  userId            String               @db.Uuid
+  type              BoostTransactionType
+  quantity          Int
+  boostBalanceAfter Int
+  purchaseId        String?              @db.Uuid
+  createdAt         DateTime             @default(now())
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purchase          BoostPurchase?       @relation(fields: [purchaseId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+}
+
+enum BoostTransactionType {
+  PURCHASE
+  USE
+  REFUND
+  EXPIRE
+  ADMIN_ADD
+  ADMIN_REMOVE
 }
 
 enum EventType {
@@ -969,16 +1052,62 @@ model UserRose {
   @@index([senderId])
   @@index([receiverId])
   @@index([senderId, receiverId])
+  @@index([createdAt])
 }
 
 model UserRoseBalance {
   id             String   @id @default(uuid()) @db.Uuid
   userId         String   @unique @db.Uuid
+  totalRoses     Int      @default(0)
+  freeRoses      Int      @default(0)
   purchasedRoses Int      @default(0)
+  weeklyLimit    Int      @default(0)
+  totalRosesSent Int      @default(0)
   lastResetAt    DateTime
+  nextResetAt    DateTime
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RosePurchase {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @db.Uuid
+  quantity        Int
+  amount          Decimal           @db.Decimal(10, 2)
+  paymentId       String
+  status          PaymentStatus
+  createdAt       DateTime          @default(now())
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  RoseTransaction RoseTransaction[]
+
+  @@index([userId])
+  @@index([paymentId])
+  @@index([status])
+}
+
+model RoseTransaction {
+  id               String              @id @default(uuid()) @db.Uuid
+  userId           String              @db.Uuid
+  type             RoseTransactionType
+  quantity         Int
+  roseBalanceAfter Int
+  purchaseId       String?             @db.Uuid
+  createdAt        DateTime            @default(now())
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purchase         RosePurchase?       @relation(fields: [purchaseId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+}
+
+enum RoseTransactionType {
+  PACKAGE_CREDIT
+  PURCHASE
+  SEND
+  REFUND
+  ADMIN_CREDIT
+  ADMIN_DEBIT
 }
 
 model UserCompliment {
@@ -987,7 +1116,7 @@ model UserCompliment {
   receiverId String           @db.Uuid
   ideaId     String?
   idea       ComplimentIdea?  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
-  message    String?          @db.VarChar(250)
+  message    String?          @db.VarChar(140)
   status     ComplimentStatus @default(PENDING)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
@@ -996,6 +1125,65 @@ model UserCompliment {
 
   @@index([senderId])
   @@index([receiverId, status])
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+}
+
+model UserComplimentBalance {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @db.Uuid
+  totalCompliments     Int      @default(0)
+  freeCompliments      Int      @default(0)
+  purchasedCompliments Int      @default(0)
+  weeklyLimit          Int      @default(0)
+  totalComplimentsSent Int      @default(0)
+  lastResetAt          DateTime
+  nextResetAt          DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_compliment_balance")
+}
+
+model ComplimentPurchase {
+  id           String                  @id @default(uuid()) @db.Uuid
+  userId       String                  @db.Uuid
+  quantity     Int
+  amount       Decimal                 @db.Decimal(10, 2)
+  paymentId    String
+  status       PaymentStatus
+  createdAt    DateTime                @default(now())
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions ComplimentTransaction[]
+
+  @@index([userId])
+  @@index([paymentId])
+}
+
+model ComplimentTransaction {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  userId                 String                    @db.Uuid
+  type                   ComplimentTransactionType
+  quantity               Int
+  complimentBalanceAfter Int
+  purchaseId             String?                   @db.Uuid
+  createdAt              DateTime                  @default(now())
+  user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purchase               ComplimentPurchase?       @relation(fields: [purchaseId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([userId, createdAt])
+}
+
+enum ComplimentTransactionType {
+  PACKAGE_CREDIT
+  PURCHASE
+  SEND
+  REFUND
+  ADMIN_CREDIT
+  ADMIN_DEBIT
 }
 
 model UserGift {

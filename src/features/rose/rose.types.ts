@@ -21,7 +21,6 @@ export interface RoseResponse {
 }
 
 export interface RoseBalanceResponse {
-  purchasedRoses: number;
   totalRoses: number;
   lastResetAt: Date;
 }

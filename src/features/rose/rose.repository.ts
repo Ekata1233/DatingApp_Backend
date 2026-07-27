@@ -13,7 +13,7 @@ export const createBalance = async (userId: string, prisma: PrismaClient) => {
   return prisma.userRoseBalance.create({
     data: {
       userId,
-      purchasedRoses: 0,
+      totalRoses: 0,
       lastResetAt: new Date(),
     },
   });
@@ -51,7 +51,7 @@ export const deductRose = async (
   return prisma.userRoseBalance.update({
     where: { userId },
     data: {
-      purchasedRoses: { decrement: 1 },
+      totalRoses: { decrement: 1 },
     },
   });
 };
@@ -283,7 +283,7 @@ export const addPurchasedRoses = async (
   return prisma.userRoseBalance.update({
     where: { userId },
     data: {
-      purchasedRoses: { increment: amount },
+      totalRoses: { increment: amount },
     },
   });
 };
