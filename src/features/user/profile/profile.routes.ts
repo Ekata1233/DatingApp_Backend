@@ -4,7 +4,7 @@ import { profileController, InterestedInController,ReligionController, updateLoo
    saveUserAnswerController, updateLocationController, educatioController,  updatePhotoController, setPrimaryPhotoController, deletePhotoController, updateUserBioController, workController, FamilyProfileController, LanguageController, 
    UserPromptController,
    completeOnboardingController,
-   uploadVideoController,
+  
    updateVideoController,
    deleteVideoController,
    uploadPhotoController} from "./profile.controller";
@@ -1169,9 +1169,8 @@ router.delete("/profile/photos/:photoId", authMiddleware, deletePhotoController)
 
 
 
-router.post("/profile/video", authMiddleware, uploadVideoController);
+router.patch("/profile/video", authMiddleware, updateVideoController);
 
-router.patch("/profile/video/:videoId", authMiddleware, updateVideoController);
 
 
 router.delete("/profile/video/:videoId", authMiddleware, deleteVideoController);

@@ -34,6 +34,7 @@ export async function initializePlanUsage(
         const complimentsLimit = getFeatureLimit(packageFeatures, 'COMPLIMENTS');
         const boostsLimit = getFeatureLimit(packageFeatures, 'BOOSTS');
         const welcomeCoins = getFeatureLimit(packageFeatures, 'WELCOME_COINS');
+        const datePlan = getFeatureLimit(packageFeatures, 'DATE_PLANS');
 
         const now = new Date();
         const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -165,14 +166,20 @@ export async function initializePlanUsage(
         if (boostsLimit > 0) {
             // Get default boost option (or create a package-specific one)
             console.log("in boost feature function")
-            const boost = await tx.boost.findFirst({
+            const boostOption = await tx.boostOption.findFirst({
                 where: {
-                    name: BoostType.BOOST
-                }
+                    boost: {
+                        name: BoostType.BOOST,
+                    },
+                    is_active: true,
+                },
+                orderBy: {
+                    created_at: "asc",
+                },
             });
 
-            console.log("boost : ", boost)
-            if (!boost) {
+            console.log("boostOption : ", boostOption)
+            if (!boostOption) {
                 throw new Error("Default boost type not found");
             }
 
@@ -180,13 +187,15 @@ export async function initializePlanUsage(
             const existingBoost = await tx.userBoost.findFirst({
                 where: {
                     user_id: userId,
-                    boostId: boost.id, // ✅ CORRECT - use boost_option_id
+                    boostId: boostOption.boost_id, // Boost table ID
                     is_active: true,
                 },
                 orderBy: {
-                    created_at: 'desc' // Get the most recent one
-                }
+                    created_at: "desc",
+                },
             });
+
+            console.log("existing boost : ", existingBoost)
 
             const currentTotalBoosts = existingBoost?.total_boosts || 0;
             const currentRemainingBoosts = existingBoost?.remaining_boosts || 0;
@@ -197,7 +206,7 @@ export async function initializePlanUsage(
             const boostPurchase = await tx.boostPurchase.create({
                 data: {
                     userId,
-                    boostOptionId: boost.id,
+                    boostOptionId: boostOption.id,
                     quantity: boostsLimit,
                     amount: 0.00, // Free with package
                     paymentId: `PACKAGE_${packageId}_${Date.now()}`,
@@ -205,6 +214,8 @@ export async function initializePlanUsage(
                     createdAt: now,
                 }
             });
+
+            console.log("boost purchase : ", boostPurchase)
 
             // Create transaction record
             await tx.boostTransaction.create({
@@ -239,7 +250,8 @@ export async function initializePlanUsage(
                 await tx.userBoost.create({
                     data: {
                         user_id: userId,
-                        boost_id: boost.id,
+                        boostId: boostOption.boost_id,        // ✅ Boost ID
+                        boost_option_id: boostOption.id,
                         total_boosts: newTotalBoosts,
                         remaining_boosts: newRemainingBoosts,
                         weeklyLimit: boostsLimit,
@@ -257,35 +269,109 @@ export async function initializePlanUsage(
 
         // 7. Initialize Welcome Coins (one-time, if applicable)
         if (welcomeCoins > 0) {
-            // Assuming you have a coins/wallet system
-            await tx.userWallet.upsert({
+            try {
+                console.log(`🪙 Initializing welcome coins: ${welcomeCoins}`);
+
+                // Get or create user's wallet
+                let wallet = await tx.wallet.findUnique({
+                    where: { userId }
+                });
+
+                const balanceBefore = wallet?.balance || 0;
+                const balanceAfter = balanceBefore + welcomeCoins;
+
+                if (!wallet) {
+                    // Create wallet if it doesn't exist
+                    wallet = await tx.wallet.create({
+                        data: {
+                            userId,
+                            balance: welcomeCoins,
+                        }
+                    });
+                    console.log(`✅ New wallet created for user: ${userId}`);
+                } else {
+                    // Update existing wallet
+                    wallet = await tx.wallet.update({
+                        where: { userId },
+                        data: {
+                            balance: {
+                                increment: welcomeCoins
+                            }
+                        }
+                    });
+                    console.log(`✅ Wallet updated for user: ${userId}`);
+                }
+
+                // Create wallet transaction record
+                await tx.walletTransaction.create({
+                    data: {
+                        walletId: wallet.id,
+                        amount: welcomeCoins,
+                        type: 'DEPOSIT', // or 'PACKAGE_BONUS' depending on your TransactionType enum
+                        status: 'SUCCESS',
+                        source: 'PACKAGE_ACTIVATION', // or 'WELCOME_BONUS'
+                        referenceId: `PACKAGE_${packageId}_${Date.now()}`,
+                        description: `Welcome coins from package activation`,
+                        balanceBefore,
+                        balanceAfter,
+                    }
+                });
+
+                console.log(`🪙 Welcome coins added: ${welcomeCoins} (Total wallet balance: ${balanceAfter})`);
+            } catch (walletError) {
+                console.error("❌ Error initializing welcome coins:", walletError);
+                throw walletError; // You can decide whether to throw or continue
+            }
+        }
+
+        // 6.5 Initialize Date Plan Balance
+        if (datePlan > 0) {
+            const existingBalance = await tx.datePlanUserStats.findUnique({
+                where: { userId }
+            });
+
+            const currentBalance = existingBalance?.balance || 0;
+            const newBalance = currentBalance + datePlan;
+
+            // Create a system purchase record for tracking
+            const datePlanPurchase = await tx.datePlanPurchase.create({
+                data: {
+                    userId,
+                    quantity: datePlan,
+                    amount: 0.00, // Free with package
+                    paymentId: `PACKAGE_${packageId}_${Date.now()}`,
+                    status: 'COMPLETED',
+                    createdAt: now,
+                }
+            });
+
+            // Create transaction record
+            await tx.datePlanTransaction.create({
+                data: {
+                    userId,
+                    type: 'PACKAGE_CREDIT',
+                    quantity: datePlan,
+                    balanceAfter: newBalance,
+                    purchaseId: datePlanPurchase.id,
+                    createdAt: now,
+                }
+            });
+
+            // Upsert the balance
+            await tx.datePlanUserStats.upsert({
                 where: { userId },
                 create: {
                     userId,
-                    balance: welcomeCoins,
+                    balance: newBalance,
                 },
                 update: {
-                    balance: { increment: welcomeCoins }
+                    balance: newBalance,
                 }
             });
-            console.log(`🪙 Welcome coins added: ${welcomeCoins}`);
-        }
 
-        // 8. Create subscription record for tracking
-        await tx.userSubscription.create({
-            data: {
-                userId,
-                packageId,
-                tier,
-                status: 'ACTIVE',
-                activatedAt: now,
-                lastResetAt: now,
-                expiresAt: calculateEndDate(
-                    packageFeatures[0]?.package?.billingCycle || 'MONTHLY',
-                    now
-                ),
-            }
-        });
+            featuresInitialized++;
+            console.log(`📅 Date Plans initialized: ${datePlan} (Total: ${newBalance})`);
+        }
 
         return featuresInitialized;
     } catch (error) {

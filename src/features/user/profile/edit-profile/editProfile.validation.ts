@@ -66,7 +66,8 @@ export const updateBioSchema = z.object({
 export const updateQuestionAnswerSchema =
   z.object({
     questionKey: z.string(),
-    optionIds: z.array(z.string().uuid())
+    optionIds: z.array(z.string().uuid()),
+     description: z.string().optional()
   });
 
 

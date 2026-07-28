@@ -201,9 +201,10 @@ export const updateQuestionAnswersService = async (
   payload: {
     questionKey: string;
     optionIds: string[];
+    description?: string;
   },
 ) => {
-  const { questionKey, optionIds } = payload;
+  const { questionKey, optionIds, description } = payload;
 
   return await prisma.$transaction(async (tx) => {
     //-----------------------------------
@@ -258,6 +259,7 @@ export const updateQuestionAnswersService = async (
           user_id: userId,
           question_id: question.id,
           option_id: optionId,
+          description, // Added only this line
         })),
       });
     }

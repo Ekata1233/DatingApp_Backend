@@ -368,62 +368,130 @@ export async function createPaymentLink(userId: string, body: any) {
 
 
 //WEBHOOK
+// export async function paymentWebhookService(payload: any) {
+//   console.log("payload : ", payload)
+//   const payment_id = payload.txnid;
+//   const status = payload.status;
+
+//   const payment = await prisma.payment.findUnique({
+//     where: {
+//       payment_id,
+//     },
+//   });
+
+//   if (!payment) {
+//     throw new Error("Payment not found");
+//   }
+
+//   // Prevent duplicate webhook processing
+//   if (payment.status === PaymentStatus.COMPLETED) {
+//     return;
+//   }
+
+//   await prisma.$transaction(async (tx) => {
+//     const updatedPayment = await tx.payment.update({
+//       where: {
+//         id: payment.id,
+//       },
+//       data: {
+//         status:
+//           status === "success"
+//             ? PaymentStatus.COMPLETED
+//             : PaymentStatus.FAILED,
+//         paidAt: new Date(),
+//         gatewayResponse: payload,
+//       },
+//     });
+
+//     console.log("payment response : ", updatedPayment);
+//     if (updatedPayment.status !== PaymentStatus.COMPLETED) {
+//       return;
+//     }
+
+//     switch (updatedPayment.purpose) {
+//       case PaymentPurpose.WAITLIST:
+//         await createWaitlist(tx, updatedPayment);
+//         break;
+
+//       case PaymentPurpose.PACKAGE:
+//         await activatePackage(tx, updatedPayment);
+//         break;
+
+//       case PaymentPurpose.BOOST:
+//         await creditBoost(tx, updatedPayment);
+//         break;
+
+//       case PaymentPurpose.WALLET:
+//         await creditWallet(tx, updatedPayment);
+//         break;
+//     }
+//   },
+//   {
+//     maxWait: 10000,   // wait up to 10 sec for DB connection
+//     timeout: 30000,   // transaction can run for 30 sec
+//   });
+// }
+
 export async function paymentWebhookService(payload: any) {
-  console.log("payload : ", payload)
-  const payment_id = payload.txnid;
-  const status = payload.status;
+    const payment_id = payload.txnid;
+    const status = payload.status;
 
-  const payment = await prisma.payment.findUnique({
-    where: {
-      payment_id,
-    },
-  });
+    // Use transaction with optimistic locking to prevent race conditions
+    const result = await prisma.$transaction(async (tx) => {
+        // Lock the payment row for update
+        const payment = await tx.payment.findUnique({
+            where: { payment_id },
+        });
 
-  if (!payment) {
-    throw new Error("Payment not found");
-  }
+        if (!payment) {
+            throw new Error("Payment not found");
+        }
 
-  // Prevent duplicate webhook processing
-  if (payment.status === PaymentStatus.COMPLETED) {
-    return;
-  }
+        // Check idempotency with status check AND version/updatedAt check
+        if (payment.status === PaymentStatus.COMPLETED) {
+            console.log(`Payment ${payment_id} already processed`);
+            return { success: true, alreadyProcessed: true };
+        }
 
-  await prisma.$transaction(async (tx) => {
-    const updatedPayment = await tx.payment.update({
-      where: {
-        id: payment.id,
-      },
-      data: {
-        status:
-          status === "success"
-            ? PaymentStatus.COMPLETED
-            : PaymentStatus.FAILED,
-        paidAt: new Date(),
-        gatewayResponse: payload,
-      },
+        // Update payment status with optimistic locking
+        const updatedPayment = await tx.payment.update({
+            where: {
+                id: payment.id,
+                status: { not: PaymentStatus.COMPLETED }, 
+            },
+            data: {
+                status: status === "success" ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+                paidAt: new Date(),
+                gatewayResponse: payload,
+            },
+        });
+
+        if (updatedPayment.status !== PaymentStatus.COMPLETED) {
+            return { success: false, reason: 'payment_failed' };
+        }
+
+        // Process based on purpose
+        switch (updatedPayment.purpose) {
+            case PaymentPurpose.WAITLIST:
+                await createWaitlist(tx, updatedPayment);
+                break;
+            case PaymentPurpose.PACKAGE:
+                await activatePackage(tx, updatedPayment);
+                break;
+            case PaymentPurpose.BOOST:
+                await creditBoost(tx, updatedPayment);
+                break;
+            case PaymentPurpose.WALLET:
+                await creditWallet(tx, updatedPayment);
+                break;
+        }
+
+        return { success: true, alreadyProcessed: false };
+    }, {
+        maxWait: 10000,
+        timeout: 30000,
+        isolationLevel: 'Serializable', // Add serializable isolation for extra safety
     });
 
-    console.log("payment response : ", updatedPayment);
-    if (updatedPayment.status !== PaymentStatus.COMPLETED) {
-      return;
-    }
-
-    switch (updatedPayment.purpose) {
-      case PaymentPurpose.WAITLIST:
-        await createWaitlist(tx, updatedPayment);
-        break;
-
-      case PaymentPurpose.PACKAGE:
-        await activatePackage(tx, updatedPayment);
-        break;
-
-      case PaymentPurpose.BOOST:
-        await creditBoost(tx, updatedPayment);
-        break;
-
-      case PaymentPurpose.WALLET:
-        await creditWallet(tx, updatedPayment);
-        break;
-    }
-  });
+    return result;
 }

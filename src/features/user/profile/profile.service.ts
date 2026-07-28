@@ -663,10 +663,34 @@ export const updateFamilyProfileService = async (
     },
   });
 
-  return {
-    updatedProfile,
-    updatedUser,
-  };
+  const familyProfile = await prisma.userFamilyProfile.findUnique({
+  where: {
+    userId,
+  },
+  include: {
+    siblings: {
+      include: {
+        relation: true,
+        occupation: true,
+        marital: true,
+      },
+    },
+    familyStatus: true,
+    familyType: true,
+    fatherOccupation: true,
+    fatherOrganisation: true,
+    motherOccupation: true,
+    motherOrganisation: true,
+    familyHome: true,
+    nativePlace: true,
+    familyIncome: true,
+  },
+});
+
+return {
+  updatedProfile: familyProfile,
+  updatedUser,
+};
 };
 
 //language
@@ -828,6 +852,8 @@ export const uploadUserMediaService = async (
   };
 };
 
+
+
 // Update Photo
 export const updateUserMediaService = async (
   userId: string,
@@ -937,6 +963,55 @@ export const deleteUserMediaService = async (
         ? "Photo deleted"
         : "Video deleted",
   };
+};
+
+export const updateUserVideoService = async (
+  userId: string,
+  file: any,
+) => {
+  if (!userId) throw new Error("User ID is required");
+
+  // Find existing user video
+  const existingVideo = await prisma.userPhoto.findFirst({
+    where: {
+      user_id: userId,
+      media_type: "VIDEO",
+    },
+  });
+
+  if (!existingVideo) {
+    throw new Error("Video not found");
+  }
+
+  const base64File = file.data.toString("base64");
+
+  const uploadResponse = await imagekit.upload({
+    file: base64File,
+    fileName: file.name,
+    folder: "/user-videos",
+  });
+
+  const updatedVideo = await prisma.userPhoto.update({
+    where: {
+      id: existingVideo.id,
+    },
+    data: {
+      media_url: uploadResponse.url,
+    },
+  });
+
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      profile_completion: score,
+    },
+  });
+
+  return updatedVideo;
 };
 
 //Bio
