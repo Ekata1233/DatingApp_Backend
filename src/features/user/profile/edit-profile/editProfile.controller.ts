@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { updateBasicInfoService, updateBioService } from "./editProfile.service";
-import { updateBasicInfoSchema, updateBioSchema } from "./editProfile.validation";
+import { updateBasicInfoSchema, updateBioSchema, updateEduWorkSchema, updateLocationSchema, updateUserPromptSchema } from "./editProfile.validation";
 import * as userEduWorkService from "./editProfile.service";
 import {
   updateQuestionAnswerSchema
@@ -14,33 +14,37 @@ export const updateBasicInfo = async (
   res: Response
 ) => {
   try {
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized"
+        message: "Unauthorized",
       });
     }
 
-    
-    const userId = (req as any).user.id;
+    const userId = req.user.id;
 
-    const validatedData = updateBasicInfoSchema.parse(req.body);
+    const validatedData =
+      updateBasicInfoSchema.parse(req.body);
 
-    const result = await updateBasicInfoService(
-      userId,
-      validatedData
-    );
+    const result =
+      await updateBasicInfoService(
+        userId,
+        validatedData
+      );
 
     return res.status(200).json({
       success: true,
-      data: result
+      message: result.message,
     });
 
   } catch (error: any) {
+
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
+
   }
 };
 
@@ -50,15 +54,15 @@ export const updateBio = async (
   res: Response
 ) => {
   try {
-    if (!req.user) {
+
+     if (!req.user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized"
       });
     }
-
+  const userId = req.user.id;
    
-    const userId = (req as any).user.id;
 
     const validatedData =
       updateBioSchema.parse(req.body);
@@ -83,87 +87,160 @@ export const updateBio = async (
 };
 
 //-------------------------------USER EDUCATION AND WORK UPDATE-------------------------------
-export const updateUserEduWork = async (
+// export const updateUserEduWork = async (
+//   req: Request,
+//   res: Response
+// ) => {
+//   try {
+//    const userId = (req as any).user.id;
+
+//     const result = await userEduWorkService.updateUserEduWork(
+//       userId,
+//       req.body
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "User education and work updated successfully",
+//       data: result,
+//     });
+//   } catch (error: any) {
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message || "Internal server error",
+//     });
+//   }
+// };
+
+export const updateQuestionAnswers = async (
   req: Request,
   res: Response
 ) => {
   try {
-   const userId = (req as any).user.id;
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
 
-    const result = await userEduWorkService.updateUserEduWork(
+    const userId = req.user.id;
+
+    const body = updateQuestionAnswerSchema.parse(req.body);
+
+    const result = await updateQuestionAnswersService(
       userId,
-      req.body
+      body
     );
 
     return res.status(200).json({
       success: true,
-      message: "User education and work updated successfully",
-      data: result,
+      message: result.message,
     });
   } catch (error: any) {
     return res.status(500).json({
       success: false,
-      message: error.message || "Internal server error",
+      message: error.message,
     });
   }
 };
 
-export const updateQuestionAnswers =
-  async (
-    req: Request,
-    res: Response
-  ) => {
 
-    try {
-
-      const userId = req.user?.id;
-
-      if (!userId) {
-
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized"
-        });
-
-      }
-
-      //-----------------------------------
-      // VALIDATION
-      //-----------------------------------
-
-      const validatedData =
-        updateQuestionAnswerSchema.parse(
-          req.body
-        );
-
-      //-----------------------------------
-      // SERVICE
-      //-----------------------------------
-
-      const result =
-        await updateQuestionAnswersService(
-          userId,
-          validatedData
-        );
-
-      //-----------------------------------
-      // RESPONSE
-      //-----------------------------------
-
-      return res.status(200).json({
-        success: true,
-        data: result
-      });
-
-    } catch (error: any) {
-
-      return res.status(500).json({
+export const updateEduWork = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message:
-          error.message ||
-          "Internal server error"
+        message: "Unauthorized",
       });
-
     }
 
+    const userId = req.user.id;
+
+    const body = updateEduWorkSchema.parse(req.body);
+
+    const result = await userEduWorkService.updateEduWorkService(
+      userId,
+      body
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+
+  } catch (error: any) {
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+};
+
+
+
+export const updateUserPrompt = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = req.user!.id;
+
+    const body = updateUserPromptSchema.parse(req.body);
+
+    const result = await userEduWorkService.updateUserPromptService(
+      userId,
+      body
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result.data,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const updateLocation = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const userId = req.user.id;
+
+    const body = updateLocationSchema.parse(req.body);
+
+    const result = await userEduWorkService.updateLocationService(
+      userId,
+      body
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };

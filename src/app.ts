@@ -20,12 +20,13 @@ app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// File upload middleware
 app.use(
   fileUpload({
     useTempFiles: false,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 5MB
-  })
+    limits: {
+      fileSize: 30 * 1024 * 1024, // 30 MB
+    },
+  }),
 );
 
 app.get("/api-docs", (req, res) => {
@@ -82,7 +83,5 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api", routes);
-app.use(fileUpload({
-  useTempFiles: false,
-}));
+
 export default app;

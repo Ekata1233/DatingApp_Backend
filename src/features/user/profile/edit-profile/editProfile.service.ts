@@ -7,261 +7,456 @@ import {
   createUserAnswers,
   upsertUserBio,
   validateQuestionOptions,
-  replaceUserAnswers
+  replaceUserAnswers,
 } from "./editProfile.repository";
 import * as userEduWorkRepository from "./editProfile.service";
 
-
-
 //--------------------------------BASIC INFO UPDATE--------------------------------
-export const updateBasicInfoService = async (
-  userId: string,
-  payload: any
-) => {
+
+export const updateBasicInfoService = async (userId: string, payload: any) => {
   const {
     full_name,
+    email,
     birth_date,
     height,
-    city,
-    religion,
-    community,
-    interested_in,
-    love_language
+    gender,
+
+    religionId,
+    communityId,
+    languageIds,
+
+    zodiac,
+    loveLanguage,
+    communicationStyle,
   } = payload;
 
-  //-----------------------------------
-  // USER TABLE UPDATE
-  //-----------------------------------
-  const userData: any = {};
+  return await prisma.$transaction(async (tx) => {
+    //--------------------------------------------------
+    // USER
+    //--------------------------------------------------
 
-  if (full_name) userData.full_name = full_name;
-  if (birth_date) userData.birth_date = new Date(birth_date);
-  if (height) userData.height = height;
+    const userData: any = {};
 
-  if (Object.keys(userData).length > 0) {
-    await updateUserData(userId, userData);
-  }
+    if (full_name !== undefined) userData.full_name = full_name;
 
-  //-----------------------------------
-  // USER PROFILE UPSERT
-  //-----------------------------------
-  const profileData: any = {};
+    if (email !== undefined) userData.email = email;
 
-  if (city) profileData.city = city;
-  if (religion) profileData.religion = religion;
-  if (community) profileData.community = community;
-  if (interested_in)
-    profileData.interested_in = interested_in;
+    if (birth_date !== undefined) userData.birth_date = new Date(birth_date);
 
-  if (Object.keys(profileData).length > 0) {
-    await upsertUserProfile(userId, profileData);
-  }
+    if (height !== undefined) userData.height = height;
 
-  //-----------------------------------
-  // LOVE LANGUAGE UPDATE
-  //-----------------------------------
-  if (love_language?.length) {
-    const question = await findQuestionByKey(
-      "love_language"
-    );
+    if (gender !== undefined) userData.gender = gender;
 
-    if (!question) {
-      throw new Error(
-        "Love language question not found"
-      );
+    if (Object.keys(userData).length) {
+      await tx.user.update({
+        where: {
+          id: userId,
+        },
+        data: userData,
+      });
     }
 
-    const optionIds = question.options
-      .filter((option) =>
-        love_language.includes(option.value)
-      )
-      .map((option) => option.id);
+    //--------------------------------------------------
+    // USER PROFILE
+    //--------------------------------------------------
 
-    await deleteExistingAnswers(
-      userId,
-      question.id
-    );
-
-    await createUserAnswers(
-      optionIds.map((optionId) => ({
+    await tx.userProfile.upsert({
+      where: {
         user_id: userId,
-        question_id: question.id,
-        option_id: optionId
-      }))
-    );
-  }
+      },
+      create: {
+        user_id: userId,
+        religionId,
+        communityId,
+      },
+      update: {
+        religionId,
+        communityId,
+      },
+    });
 
-  //-----------------------------------
-  // RETURN UPDATED DATA
-  //-----------------------------------
-  return {
-    message: "Basic info updated successfully"
-  };
+    //--------------------------------------------------
+    // LANGUAGES
+    //--------------------------------------------------
+
+    if (Array.isArray(languageIds)) {
+      await tx.userLanguage.deleteMany({
+        where: {
+          userId,
+        },
+      });
+
+      if (languageIds.length) {
+        await tx.userLanguage.createMany({
+          data: languageIds.map((id: number) => ({
+            userId,
+            languageId: id,
+          })),
+        });
+      }
+    }
+
+    //--------------------------------------------------
+    // USER ABOUT
+    //--------------------------------------------------
+
+    await tx.userAbout.upsert({
+      where: {
+        user_id: userId,
+      },
+      create: {
+        user_id: userId,
+        zodiac,
+        loveLanguage,
+        communicationStyle,
+      },
+      update: {
+        zodiac,
+        loveLanguage,
+        communicationStyle,
+      },
+    });
+
+    //--------------------------------------------------
+
+    return {
+      message: "Basic information updated successfully.",
+    };
+  });
 };
 
-
-//aboutme 
-export const updateBioService = async (
-  userId: string,
-  bio: string
-) => {
-  const updatedBio = await upsertUserBio(
-    userId,
-    bio
-  );
+//aboutme
+export const updateBioService = async (userId: string, bio: string) => {
+  const updatedBio = await upsertUserBio(userId, bio);
 
   return updatedBio;
 };
 
 // --------------------------------USER EDUCATION AND WORK UPDATE-------------------------------
-export const updateUserEduWork = async (
+// export const updateUserEduWork = async (
+//   userId: string,
+//   body: any
+// ) => {
+//   const existingUser = await prisma.user.findUnique({
+//     where: {
+//       id: userId,
+//     },
+//   });
+
+//   if (!existingUser) {
+//     throw new Error("User not found");
+//   }
+
+//   const {
+//     highestEdu,
+//     degree,
+//     collegeName,
+//     graduationYear,
+//     workingWith,
+//     workingAs,
+//     companyName,
+//     workStyle,
+//     incomeRange,
+//     minIncome,
+//     maxIncome,
+//     skills,
+//   } = body;
+
+//   // update edu/work
+//   const updatedEduWork =
+//     await userEduWorkRepository.updateUserEduWork(userId, {
+//       highestEdu,
+//       degree,
+//       collegeName,
+//       graduationYear,
+//       workingWith,
+//       workingAs,
+//       companyName,
+//       workStyle,
+//       incomeRange,
+//       minIncome,
+//       maxIncome,
+//     });
+
+//   // update skills
+//   if (Array.isArray(skills)) {
+//     await userEduWorkRepository.deleteUserSkills(userId);
+
+//     for (const skillId of skills) {
+//       await userEduWorkRepository.createUserSkill({
+//         userId,
+//         skillId,
+//       });
+//     }
+//   }
+
+//   const finalData =
+//     await userEduWorkRepository.getUserEduWorkByUserId(userId);
+
+//   return finalData;
+// };
+
+export const updateQuestionAnswersService = async (
   userId: string,
-  body: any
+  payload: {
+    questionKey: string;
+    optionIds: string[];
+    description?: string;
+  },
 ) => {
-  const existingUser = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-  });
+  const { questionKey, optionIds, description } = payload;
 
-  if (!existingUser) {
-    throw new Error("User not found");
-  }
+  return await prisma.$transaction(async (tx) => {
+    //-----------------------------------
+    // Find Question
+    //-----------------------------------
 
-  const {
-    highestEdu,
-    degree,
-    collegeName,
-    graduationYear,
-    workingWith,
-    workingAs,
-    companyName,
-    workStyle,
-    incomeRange,
-    minIncome,
-    maxIncome,
-    skills,
-  } = body;
-
-  // update edu/work
-  const updatedEduWork =
-    await userEduWorkRepository.updateUserEduWork(userId, {
-      highestEdu,
-      degree,
-      collegeName,
-      graduationYear,
-      workingWith,
-      workingAs,
-      companyName,
-      workStyle,
-      incomeRange,
-      minIncome,
-      maxIncome,
+    const question = await tx.question.findUnique({
+      where: {
+        key: questionKey,
+      },
+      include: {
+        options: true,
+      },
     });
 
-  // update skills
-  if (Array.isArray(skills)) {
-    await userEduWorkRepository.deleteUserSkills(userId);
-
-    for (const skillId of skills) {
-      await userEduWorkRepository.createUserSkill({
-        userId,
-        skillId,
-      });
-    }
-  }
-
-  const finalData =
-    await userEduWorkRepository.getUserEduWorkByUserId(userId);
-
-  return finalData;
-};
-
-
-
-export const updateQuestionAnswersService =
-  async (
-    userId: string,
-    body: {
-      questionKey: string;
-      optionIds: string[];
-    }
-  ) => {
-
-    const {
-      questionKey,
-      optionIds
-    } = body;
-
-    //-----------------------------------
-    // FIND QUESTION
-    //-----------------------------------
-
-    const question =
-      await findQuestionByKey(
-        questionKey
-      );
-
     if (!question) {
-      throw new Error(
-        "Question not found"
-      );
+      throw new Error("Question not found.");
     }
 
     //-----------------------------------
-    // VALIDATE OPTIONS
+    // Validate Options
     //-----------------------------------
 
-    const validOptions =
-      await validateQuestionOptions(
-        question.id,
-        optionIds
-      );
+    const validOptionIds = question.options.map((o) => o.id);
 
-    if (
-      validOptions.length !==
-      optionIds.length
-    ) {
-
-      throw new Error(
-        "Invalid option selected"
-      );
-
-    }
-
-    //-----------------------------------
-    // SINGLE SELECT VALIDATION
-    //-----------------------------------
-
-    if (
-      !question.isMulti &&
-      optionIds.length > 1
-    ) {
-
-      throw new Error(
-        "Only one option allowed"
-      );
-
-    }
-
-    //-----------------------------------
-    // UPDATE ANSWERS
-    //-----------------------------------
-
-    await replaceUserAnswers(
-      userId,
-      question.id,
-      optionIds
+    const invalidOptions = optionIds.filter(
+      (id) => !validOptionIds.includes(id),
     );
 
+    if (invalidOptions.length) {
+      throw new Error("Invalid option selected.");
+    }
+
     //-----------------------------------
-    // RETURN RESPONSE
+    // Delete Old Answers
+    //-----------------------------------
+
+    await tx.userAnswer.deleteMany({
+      where: {
+        user_id: userId,
+        question_id: question.id,
+      },
+    });
+
+    //-----------------------------------
+    // Insert New Answers
+    //-----------------------------------
+
+    if (optionIds.length) {
+      await tx.userAnswer.createMany({
+        data: optionIds.map((optionId) => ({
+          user_id: userId,
+          question_id: question.id,
+          option_id: optionId,
+          description, // Added only this line
+        })),
+      });
+    }
+
     //-----------------------------------
 
     return {
-      success: true,
-      message:
-        "Answers updated successfully"
+      message: "Question updated successfully.",
     };
+  });
+};
 
+export const updateEduWorkService = async (userId: string, payload: any) => {
+  return await prisma.$transaction(async (tx) => {
+    // Optional FK validation
+
+    if (payload.professionId) {
+      const profession = await tx.profession.findUnique({
+        where: { id: payload.professionId },
+      });
+
+      if (!profession) {
+        throw new Error("Invalid profession.");
+      }
+    }
+
+    if (payload.employmentTypeId) {
+      const employment = await tx.employmentType.findUnique({
+        where: { id: payload.employmentTypeId },
+      });
+
+      if (!employment) {
+        throw new Error("Invalid employment type.");
+      }
+    }
+
+    if (payload.experienceId) {
+      const experience = await tx.experience.findUnique({
+        where: { id: payload.experienceId },
+      });
+
+      if (!experience) {
+        throw new Error("Invalid experience.");
+      }
+    }
+
+    if (payload.ambitionId) {
+      const ambition = await tx.ambition.findUnique({
+        where: { id: payload.ambitionId },
+      });
+
+      if (!ambition) {
+        throw new Error("Invalid ambition.");
+      }
+    }
+
+    if (payload.salaryRangeId) {
+      const salary = await tx.salaryRange.findUnique({
+        where: { id: payload.salaryRangeId },
+      });
+
+      if (!salary) {
+        throw new Error("Invalid salary range.");
+      }
+    }
+
+    const data: any = {};
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] !== undefined) {
+        data[key] = payload[key];
+      }
+    });
+
+    await tx.userEduWork.upsert({
+      where: {
+        userId,
+      },
+      create: {
+        userId,
+        ...data,
+      },
+      update: data,
+    });
+
+    return {
+      message: "Education & Work updated successfully.",
+    };
+  });
+};
+
+export const updateUserPromptService = async (userId: string, payload: any) => {
+  const { categoryId, promptId, answer, displayOrder } = payload;
+
+  return await prisma.$transaction(async (tx) => {
+    // Validate Category
+    const category = await tx.promptCategory.findUnique({
+      where: {
+        id: categoryId,
+      },
+    });
+
+    if (!category) {
+      throw new Error("Category not found.");
+    }
+
+    // Validate Prompt belongs to Category
+    const prompt = await tx.prompt.findFirst({
+      where: {
+        id: promptId,
+        categoryId: categoryId,
+        active: true,
+      },
+    });
+
+    if (!prompt) {
+      throw new Error("Selected prompt does not belong to this category.");
+    }
+
+    // Create or Update User Prompt
+    const userPrompt = await tx.userPrompt.upsert({
+      where: {
+        userId_promptId: {
+          userId,
+          promptId,
+        },
+      },
+      create: {
+        userId,
+        promptId,
+        answer,
+        displayOrder: displayOrder ?? 1,
+      },
+      update: {
+        answer,
+        ...(displayOrder !== undefined && {
+          displayOrder,
+        }),
+      },
+      include: {
+        prompt: {
+          include: {
+            category: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: "Prompt updated successfully.",
+      data: userPrompt,
+    };
+  });
+};
+
+export const updateLocationService = async (
+  userId: string,
+  payload: any
+) => {
+  return await prisma.$transaction(async (tx) => {
+
+    const profileData: any = {};
+
+    if (payload.country !== undefined)
+      profileData.country = payload.country;
+
+    if (payload.state !== undefined)
+      profileData.state = payload.state;
+
+    if (payload.city !== undefined)
+      profileData.city = payload.city;
+
+    if (payload.area !== undefined)
+      profileData.area = payload.area;
+
+    if (payload.latitude !== undefined)
+      profileData.latitude = payload.latitude;
+
+    if (payload.longitude !== undefined)
+      profileData.longitude = payload.longitude;
+
+    if (payload.max_distance_km !== undefined)
+      profileData.max_distance_km = payload.max_distance_km;
+
+    await tx.userProfile.upsert({
+      where: {
+        user_id: userId,
+      },
+      create: {
+        user_id: userId,
+        ...profileData,
+      },
+      update: profileData,
+    });
+
+    return {
+      message: "Location updated successfully.",
+    };
+  });
 };

@@ -32,16 +32,16 @@ export const upsertUserProfile = async (
   });
 };
 
-export const findQuestionByKey = async (
-  key: string
-) => {
-  return prisma.question.findUnique({
-    where: { key },
-    include: {
-      options: true
-    }
-  });
-};
+// export const findQuestionByKey = async (
+//   key: string
+// ) => {
+//   return prisma.question.findUnique({
+//     where: { key },
+//     include: {
+//       options: true
+//     }
+//   });
+// };
 
 export const deleteExistingAnswers = async (
   userId: string,
