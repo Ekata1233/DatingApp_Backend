@@ -241,6 +241,11 @@ export class PackageRepository {
           },
         },
       });
-    });
+    },
+     {
+    maxWait: 10000,
+    timeout: 60000,
+  }
+  );
   }
 }
