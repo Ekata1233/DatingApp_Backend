@@ -22,8 +22,6 @@ export const sendOtp = async (phoneNumber: string) => {
       channel: "sms",
     });
 
-  console.log("veirfication ", verification)
-
   return verification;
 };
 
