@@ -77,3 +77,5 @@ export interface PlanLimitResponse {
   limit: number | null;
   resetPeriod: ResetPeriod;
 }
+
+export interface UpdatePackageDTO extends Partial<CreatePackageDTO> {}

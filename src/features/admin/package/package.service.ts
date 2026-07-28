@@ -1,126 +1,8 @@
-// import { PackageType } from "@prisma/client";
-// import { prisma } from "../../../prisma/prismaClient";
-// import { CreatePackageInput } from "./package.validation";
 
-// export const createPackageService = async (
-//   data: CreatePackageInput
-// ) => {
-//   const { plans, features, ...packageData } = data;
-
-//   // enum validation
-//   if (
-//     !Object.values(PackageType).includes(
-//       packageData.name as PackageType
-//     )
-//   ) {
-//     throw new Error("Invalid package type");
-//   }
-
-//   const packageName = packageData.name as PackageType;
-
-//   // check existing package
-//   const existingPackage = await prisma.package.findFirst({
-//     where: {
-//       name: packageName,
-//     },
-//     include: {
-//       plans: true,
-//       features: true,
-//     },
-//   });
-
-//   // ---------------- UPDATE FLOW ----------------
-//   if (existingPackage) {
-//     // delete old plans
-//     await prisma.packagePrice.deleteMany({
-//       where: {
-//         packageId: existingPackage.id,
-//       },
-//     });
-
-//     // delete old features
-//     await prisma.packageFeature.deleteMany({
-//       where: {
-//         packageId: existingPackage.id,
-//       },
-//     });
-
-//     const updatedPackage = await prisma.package.update({
-//       where: {
-//         id: existingPackage.id,
-//       },
-//       data: {
-//         title: packageData.title,
-//         description: packageData.description,
-
-//         plans: {
-//           create: plans.map((plan) => ({
-//             durationMonths: plan.durationMonths,
-//             originalPrice: plan.originalPrice,
-//             discountedPrice: plan.discountedPrice,
-//             discountPercent: plan.discountPercent,
-//             isPopular: plan.isPopular ?? false,
-//             isBestValue: plan.isBestValue ?? false,
-//           })),
-//         },
-
-//         features: {
-//           create: features.map((feature) => ({
-//             key: feature.key,
-//             label: feature.label,
-//             isHighlighted:
-//               feature.isHighlighted ?? false,
-//           })),
-//         },
-//       },
-//       include: {
-//         plans: true,
-//         features: true,
-//       },
-//     });
-
-//     return updatedPackage;
-//   }
-
-//   // ---------------- CREATE FLOW ----------------
-//   const createdPackage = await prisma.package.create({
-//     data: {
-//       name: packageName,
-//       title: packageData.title,
-//       description: packageData.description,
-
-//       plans: {
-//         create: plans.map((plan) => ({
-//           durationMonths: plan.durationMonths,
-//           originalPrice: plan.originalPrice,
-//           discountedPrice: plan.discountedPrice,
-//           discountPercent: plan.discountPercent,
-//           isPopular: plan.isPopular ?? false,
-//           isBestValue: plan.isBestValue ?? false,
-//         })),
-//       },
-
-//       features: {
-//         create: features.map((feature) => ({
-//           key: feature.key,
-//           label: feature.label,
-//           isHighlighted:
-//             feature.isHighlighted ?? false,
-//         })),
-//       },
-//     },
-//     include: {
-//       plans: true,
-//       features: true,
-//     },
-//   });
-
-//   return createdPackage;
-// };
 
 import { prisma } from "../../../prisma/prismaClient";
 import { PackageRepository } from "./package.repository";
-import { CreatePackageInput } from "./package.validation";
+import { CreatePackageInput, UpdatePackageInput } from "./package.validation";
 
 const packageRepository = new PackageRepository(prisma);
 
@@ -201,4 +83,75 @@ function getDefaultMonths(billingCycle: string): number {
     default:
       return 1;
   }
+}
+
+
+
+export const updatePackageService = async (
+    input: UpdatePackageInput
+) => {
+
+    const existing = await packageRepository.findPackageById(input.id);
+
+    if (!existing) {
+        throw new Error("Package not found");
+    }
+
+    // slug validation
+    if (input.slug) {
+
+        const slug = await packageRepository.findPackageBySlug(input.slug);
+
+        if (slug && slug.id !== input.id) {
+            throw new Error("Slug already exists");
+        }
+    }
+
+    let featureMap = new Map<string, string>();
+
+    if (input.limits?.length) {
+
+        const codes = input.limits.map(x => x.featureCode);
+
+        const features =
+            await packageRepository.findFeaturesByCodes(codes);
+
+        const found = new Set(features.map(x => x.code));
+
+        const invalid = codes.filter(x => !found.has(x));
+
+        if (invalid.length) {
+            throw new Error(
+                `Invalid feature codes : ${invalid.join(",")}`
+            );
+        }
+
+        features.forEach(f => {
+            featureMap.set(f.code, f.id);
+        });
+
+    }
+
+    const prices =
+        input.prices?.map(p => ({
+            ...p,
+            months:
+                p.months ??
+                getDefaultMonths(p.billingCycle)
+        })) ?? [];
+
+    const limits =
+        input.limits?.map(l => ({
+            ...l,
+            limit: l.unlimited ? null : l.limit
+        })) ?? [];
+
+    return await packageRepository.updatePackage(
+        input.id,
+        input,
+        prices,
+        limits,
+        featureMap
+    );
+
 }
