@@ -115,14 +115,15 @@ export class PackageRepository {
     });
   }
 
-  async updatePackage(
-    packageId: string,
-    data: UpdatePackageDTO,
-    priceData: PriceInput[],
-    limitsData: PlanLimitInput[],
-    featureMap: Map<string, string>
-  ) {
-    return this.prisma.$transaction(async (tx) => {
+ async updatePackage(
+  packageId: string,
+  data: UpdatePackageDTO,
+  priceData: PriceInput[],
+  limitsData: PlanLimitInput[],
+  featureMap: Map<string, string>
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
       const updateData: Prisma.PackageUpdateInput = {};
 
       if (data.name !== undefined) updateData.name = data.name;
@@ -150,82 +151,86 @@ export class PackageRepository {
         data: updateData,
       });
 
+      // ==========================
+      // Update Prices (Optimized)
+      // ==========================
       if (priceData.length > 0) {
-        for (const price of priceData) {
-          await tx.packagePrice.upsert({
-            where: {
-              packageId_billingCycle: {
+        await Promise.all(
+          priceData.map((price) =>
+            tx.packagePrice.upsert({
+              where: {
+                packageId_billingCycle: {
+                  packageId,
+                  billingCycle: price.billingCycle,
+                },
+              },
+              create: {
                 packageId,
                 billingCycle: price.billingCycle,
+                months: price.months,
+                price: price.price,
+                originalPrice: price.originalPrice,
+                discountPercent: price.discountPercent,
+                isHighlighted: price.isHighlighted ?? false,
+                active: price.active ?? true,
               },
-            },
-
-            create: {
-              packageId,
-              billingCycle: price.billingCycle,
-              months: price.months,
-              price: price.price,
-              originalPrice: price.originalPrice,
-              discountPercent: price.discountPercent,
-              isHighlighted: price.isHighlighted ?? false,
-              active: price.active ?? true,
-            },
-
-            update: {
-              months: price.months,
-              price: price.price,
-              originalPrice: price.originalPrice,
-              discountPercent: price.discountPercent,
-              isHighlighted: price.isHighlighted ?? false,
-              active: price.active ?? true,
-            },
-          });
-        }
+              update: {
+                months: price.months,
+                price: price.price,
+                originalPrice: price.originalPrice,
+                discountPercent: price.discountPercent,
+                isHighlighted: price.isHighlighted ?? false,
+                active: price.active ?? true,
+              },
+            })
+          )
+        );
       }
 
+      // ==========================
+      // Update Limits (Optimized)
+      // ==========================
       if (limitsData.length > 0) {
-        for (const limit of limitsData) {
-          const featureId = featureMap.get(limit.featureCode)!;
+        await Promise.all(
+          limitsData.map((limit) => {
+            const featureId = featureMap.get(limit.featureCode)!;
 
-          await tx.planLimit.upsert({
-            where: {
-              packageId_featureId: {
+            return tx.planLimit.upsert({
+              where: {
+                packageId_featureId: {
+                  packageId,
+                  featureId,
+                },
+              },
+              create: {
                 packageId,
                 featureId,
+                enabled: limit.enabled,
+                unlimited: limit.unlimited,
+                limit: limit.limit,
+                resetPeriod: limit.resetPeriod,
               },
-            },
-
-            create: {
-              packageId,
-              featureId,
-              enabled: limit.enabled,
-              unlimited: limit.unlimited,
-              limit: limit.limit,
-              resetPeriod: limit.resetPeriod,
-            },
-
-            update: {
-              enabled: limit.enabled,
-              unlimited: limit.unlimited,
-              limit: limit.limit,
-              resetPeriod: limit.resetPeriod,
-            },
-          });
-        }
+              update: {
+                enabled: limit.enabled,
+                unlimited: limit.unlimited,
+                limit: limit.limit,
+                resetPeriod: limit.resetPeriod,
+              },
+            });
+          })
+        );
       }
 
       return tx.package.findUnique({
         where: {
           id: packageId,
         },
-
         include: {
           prices: {
             orderBy: {
               createdAt: "asc",
             },
           },
-
           limits: {
             include: {
               feature: {
@@ -241,11 +246,8 @@ export class PackageRepository {
           },
         },
       });
-    },
-     {
-    maxWait: 10000,
-    timeout: 60000,
-  }
+    }
+    
   );
-  }
+}
 }
