@@ -1,6 +1,10 @@
 import { prisma } from "../../prisma/prismaClient";
 
 export const upgradeBoostService = async (userId: string, boost_option_id: string) => {
+  const now = new Date();
+
+  const nextReset = new Date(now);
+  nextReset.setDate(nextReset.getDate() + 7);
   // 1. Validate BoostOption
   const boostOption = await prisma.boostOption.findUnique({
     where: { id: boost_option_id },
@@ -17,10 +21,13 @@ export const upgradeBoostService = async (userId: string, boost_option_id: strin
   const userBoost = await prisma.userBoost.create({
     data: {
       user_id: userId,
-      boost_id: boostOption.boost_id,
+      boostId: boostOption.boost_id,
       boost_option_id: boostOption.id,
       total_boosts: boostOption.boostCount,
       remaining_boosts: boostOption.boostCount,
+      weeklyLimit: boostOption.boostCount,
+      last_reset_at: now,
+      next_reset_at: nextReset,
       is_active: true,
       start_at: new Date(),
       // optional expiry (example: 7 days)
@@ -69,6 +76,9 @@ export const activateBoostService = async (userId: string, user_boost_id: string
   }
 
   // 6. Get duration
+  if (!userBoost.boost_option_id) {
+    throw new Error("BOOST_OPTION_NOT_FOUND");
+  }
   const boostOption = await prisma.boostOption.findUnique({
     where: { id: userBoost.boost_option_id },
   });

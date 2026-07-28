@@ -9,67 +9,69 @@ datasource db {
 }
 
 model User {
-  id                   String             @id @default(uuid()) @db.Uuid
-  full_name            String?            @db.VarChar(100)
-  email                String?            @unique @db.VarChar(255)
-  phone_number         String?            @unique @db.VarChar(20)
-  is_phone_verified    Boolean            @default(false)
-  google_id            String?            @unique @db.VarChar(255)
-  birth_date           DateTime?          @db.Date
+  id                   String                @id @default(uuid()) @db.Uuid
+  full_name            String?               @db.VarChar(100)
+  email                String?               @unique @db.VarChar(255)
+  phone_number         String?               @unique @db.VarChar(20)
+  is_phone_verified    Boolean               @default(false)
+  google_id            String?               @unique @db.VarChar(255)
+  birth_date           DateTime?             @db.Date
   height               Int?
   gender               Gender?
   gender_option        GenderOption?
   looking_for          LookingFor?
-  intentionId          String?            @db.Uuid
-  onboarding_step      String?            @db.VarChar(20)
-  next_step            String?            @db.VarChar(20)
-  onboarding_completed Boolean            @default(false)
+  intentionId          String?               @db.Uuid
+  onboarding_step      String?               @db.VarChar(20)
+  next_step            String?               @db.VarChar(20)
+  onboarding_completed Boolean               @default(false)
   last_active_at       DateTime?
   device_token         String?
-  referralCode         String?            @unique @db.VarChar(20)
-  badge_count          Int                @default(0)
+  referralCode         String?               @unique @db.VarChar(20)
+  badge_count          Int                   @default(0)
   deleted_at           DateTime?
-  created_at           DateTime           @default(now())
-  updated_at           DateTime           @updatedAt
-  profile_completion   Int                @default(0)
+  created_at           DateTime              @default(now())
+  updated_at           DateTime              @updatedAt
+  profile_completion   Int                   @default(0)
   looking_for_option   LookingForOption?
   answer               UserAnswer[]
-  matchesAsUser1       UserMatch[]        @relation("MatchUser1")
-  matchesAsUser2       UserMatch[]        @relation("MatchUser2")
-  swipesGiven          UserSwipe[]        @relation("Swiper")
-  swipesReceived       UserSwipe[]        @relation("TargetUser")
+  matchesAsUser1       UserMatch[]           @relation("MatchUser1")
+  matchesAsUser2       UserMatch[]           @relation("MatchUser2")
+  swipesGiven          UserSwipe[]           @relation("Swiper")
+  swipesReceived       UserSwipe[]           @relation("TargetUser")
   about                UserAbout?
   bio                  UserBio?
-  eduWork              UserEduWork?       @relation("UserEduWork")
-  familyProfile        UserFamilyProfile? @relation("UserFamilyProfile")
+  eduWork              UserEduWork?          @relation("UserEduWork")
+  familyProfile        UserFamilyProfile?    @relation("UserFamilyProfile")
   skills               UserSkill[]
   photos               UserPhoto[]
   profile              UserProfile?
   userBoosts           UserBoost[]
   boostUsages          BoostUsage[]
   userPackages         UserPackage[]
-  boostEvents          BoostEvent[]       @relation("BoostedUser")
-  actorEvents          BoostEvent[]       @relation("ActorUser")
+  boostEvents          BoostEvent[]          @relation("BoostedUser")
+  actorEvents          BoostEvent[]          @relation("ActorUser")
   boostStats           UserBoostStats?
   boostPurchases       BoostPurchase[]
   boostTransactions    BoostTransaction[]
   datePlan             DatePlan[]
   datePlanRequests     DatePlanRequest[]
   datePlanSkips        DatePlanSkip[]
-  hostedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateHost")
-  joinedConfirmedDates DateConfirmed[]    @relation("ConfirmedDateParticipant")
+  hostedConfirmedDates DateConfirmed[]       @relation("ConfirmedDateHost")
+  joinedConfirmedDates DateConfirmed[]       @relation("ConfirmedDateParticipant")
   wallet               Wallet?
   datePlanStats        DatePlanUserStats?
-  intention            Intention?         @relation(fields: [intentionId], references: [id])
+  datePlanPurchases    DatePlanPurchase[]
+  datePlanTransactions DatePlanTransaction[]
+  intention            Intention?            @relation(fields: [intentionId], references: [id])
   userPrompts          UserPrompt[]
   UserPlanUsage        UserPlanUsage[]
   waitlist             Waitlist?
-  referralsMade        UserReferral[]     @relation("Referrer")
+  referralsMade        UserReferral[]        @relation("Referrer")
   referralStats        UserReferralStats?
-  receivedReferral     UserReferral?      @relation("ReferredUser")
+  receivedReferral     UserReferral?         @relation("ReferredUser")
   // Roses
-  rosesSent            UserRose[]         @relation("RoseSender")
-  rosesReceived        UserRose[]         @relation("RoseReceiver")
+  rosesSent            UserRose[]            @relation("RoseSender")
+  rosesReceived        UserRose[]            @relation("RoseReceiver")
   roseBalance          UserRoseBalance?
   rosePurchases        RosePurchase[]
   roseTransactions     RoseTransaction[]
@@ -547,6 +549,7 @@ model UserAnswer {
   user_id     String         @db.Uuid
   question_id String         @db.Uuid
   option_id   String
+  description String?        @db.Text
   created_at  DateTime       @default(now())
   option      QuestionOption @relation(fields: [option_id], references: [id], onDelete: Cascade)
   question    Question       @relation(fields: [question_id], references: [id], onDelete: Cascade)
@@ -765,7 +768,7 @@ model UserBoost {
 
   user_id          String    @db.Uuid
   boostId          String?   @db.Uuid
-  boost_option_id  String    @db.Uuid
+  boost_option_id  String?   @db.Uuid
   total_boosts     Int       @default(0)
   remaining_boosts Int
   weeklyLimit      Int       @default(0)
@@ -777,9 +780,9 @@ model UserBoost {
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
 
-  user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  Boost       Boost?      @relation(fields: [boostId], references: [id])
-  boostOption BoostOption @relation(fields: [boost_option_id], references: [id])
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Boost       Boost?       @relation(fields: [boostId], references: [id])
+  boostOption BoostOption? @relation(fields: [boost_option_id], references: [id])
 
   usages BoostUsage[]
 
@@ -1470,6 +1473,47 @@ model DatePlanUserStats {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model DatePlanPurchase {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  quantity  Int
+  amount    Float    @default(0.00)
+  paymentId String
+  status    String   @default("COMPLETED") // COMPLETED, PENDING, FAILED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                  @relation(fields: [userId], references: [id])
+  transactions DatePlanTransaction[]
+
+  @@map("date_plan_purchases")
+}
+
+model DatePlanTransaction {
+  id           String                  @id @default(uuid()) @db.Uuid
+  userId       String                  @db.Uuid
+  type         DatePlanTransactionType
+  quantity     Int // Positive for credits, negative for debits
+  balanceAfter Int
+  purchaseId   String?                 @db.Uuid // Optional for non-purchase transactions
+  referenceId  String? // For linking to date plan usage
+  description  String?
+  createdAt    DateTime                @default(now())
+
+  user     User              @relation(fields: [userId], references: [id])
+  purchase DatePlanPurchase? @relation(fields: [purchaseId], references: [id])
+
+  @@map("date_plan_transactions")
+}
+
+enum DatePlanTransactionType {
+  PACKAGE_CREDIT
+  USAGE
+  EXPIRED
+  ADMIN_ADJUSTMENT
+  REFUND
 }
 
 model Conversation {

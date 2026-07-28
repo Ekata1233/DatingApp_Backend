@@ -34,6 +34,7 @@ export async function initializePlanUsage(
         const complimentsLimit = getFeatureLimit(packageFeatures, 'COMPLIMENTS');
         const boostsLimit = getFeatureLimit(packageFeatures, 'BOOSTS');
         const welcomeCoins = getFeatureLimit(packageFeatures, 'WELCOME_COINS');
+        const datePlan = getFeatureLimit(packageFeatures, 'DATE_PLANS');
 
         const now = new Date();
         const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -267,7 +268,6 @@ export async function initializePlanUsage(
         }
 
         // 7. Initialize Welcome Coins (one-time, if applicable)
-        // 7. Initialize Welcome Coins (one-time, if applicable)
         if (welcomeCoins > 0) {
             try {
                 console.log(`🪙 Initializing welcome coins: ${welcomeCoins}`);
@@ -324,6 +324,54 @@ export async function initializePlanUsage(
             }
         }
 
+        // 6.5 Initialize Date Plan Balance
+        if (datePlan > 0) {
+            const existingBalance = await tx.datePlanUserStats.findUnique({
+                where: { userId }
+            });
+
+            const currentBalance = existingBalance?.balance || 0;
+            const newBalance = currentBalance + datePlan;
+
+            // Create a system purchase record for tracking
+            const datePlanPurchase = await tx.datePlanPurchase.create({
+                data: {
+                    userId,
+                    quantity: datePlan,
+                    amount: 0.00, // Free with package
+                    paymentId: `PACKAGE_${packageId}_${Date.now()}`,
+                    status: 'COMPLETED',
+                    createdAt: now,
+                }
+            });
+
+            // Create transaction record
+            await tx.datePlanTransaction.create({
+                data: {
+                    userId,
+                    type: 'PACKAGE_CREDIT',
+                    quantity: datePlan,
+                    balanceAfter: newBalance,
+                    purchaseId: datePlanPurchase.id,
+                    createdAt: now,
+                }
+            });
+
+            // Upsert the balance
+            await tx.datePlanUserStats.upsert({
+                where: { userId },
+                create: {
+                    userId,
+                    balance: newBalance,
+                },
+                update: {
+                    balance: newBalance,
+                }
+            });
+
+            featuresInitialized++;
+            console.log(`📅 Date Plans initialized: ${datePlan} (Total: ${newBalance})`);
+        }
 
         return featuresInitialized;
     } catch (error) {
