@@ -945,7 +945,7 @@ model PackagePrice {
   UserPackage UserPackage[]
 
   @@unique([packageId, billingCycle])
-   @@index([packageId])
+  @@index([packageId])
   @@map("plan_prices")
 }
 
