@@ -1,48 +1,8 @@
-// import { Request, Response } from "express";
-// import { createPackageSchema } from "./package.validation";
-// import { createPackageService } from "./package.service";
 
-// export const createPackageController = async (
-//   req: Request,
-//   res: Response
-// ) => {
-//   try {
-//     const parsed = createPackageSchema.safeParse(
-//       req.body
-//     );
-
-//     if (!parsed.success) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           parsed.error.issues[0].message,
-//       });
-//     }
-
-//     const result = await createPackageService(
-//       parsed.data
-//     );
-
-//     return res.status(201).json({
-//       success: true,
-//       message:
-//         "Package created successfully",
-//       data: result,
-//     });
-//   } catch (error) {
-//     console.error(error);
-
-//     return res.status(500).json({
-//       success: false,
-//       message:
-//         "Internal server error",
-//     });
-//   }
-// };
 
 import { Request, Response } from "express";
-import { createPackageSchema } from "./package.validation";
-import { createOrUpdatePackageService } from "./package.service";
+import { createPackageSchema, updatePackageSchema } from "./package.validation";
+import { createOrUpdatePackageService, updatePackageService } from "./package.service";
 
 export const createPackageController = async (req: Request, res: Response) => {
   try {
@@ -73,3 +33,56 @@ export const createPackageController = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+export const updatePackageController = async (
+    req: Request,
+    res: Response
+) => {
+
+    try {
+
+        const data =
+            updatePackageSchema.parse({
+                id: req.params.id,
+                ...req.body
+            });
+
+        const result =
+            await updatePackageService(data);
+
+        return res.status(200).json({
+
+            success: true,
+
+            message: "Package updated successfully",
+
+            data: result
+
+        });
+
+    } catch (error: any) {
+
+        if (error.name === "ZodError") {
+
+            return res.status(400).json({
+
+                success: false,
+
+                errors: error.errors
+
+            });
+
+        }
+
+        return res.status(400).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
+
+}

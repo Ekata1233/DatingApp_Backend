@@ -1,5 +1,10 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { CreatePackageDTO, PriceInput, PlanLimitInput } from "./package.types";
+import {
+  CreatePackageDTO,
+  UpdatePackageDTO,
+  PriceInput,
+  PlanLimitInput,
+} from "./package.types";
 
 export class PackageRepository {
   constructor(private prisma: PrismaClient) {}
@@ -25,6 +30,20 @@ export class PackageRepository {
     });
   }
 
+  async findPackageById(id: string) {
+    return this.prisma.package.findUnique({
+      where: { id },
+      include: {
+        prices: true,
+        limits: {
+          include: {
+            feature: true,
+          },
+        },
+      },
+    });
+  }
+
   async createPackage(
     data: CreatePackageDTO,
     priceData: PriceInput[],
@@ -32,7 +51,7 @@ export class PackageRepository {
     featureMap: Map<string, string>
   ) {
     return this.prisma.$transaction(async (tx) => {
-      const pkg = await tx.package.create({
+      return tx.package.create({
         data: {
           name: data.name,
           slug: data.slug,
@@ -44,6 +63,7 @@ export class PackageRepository {
           isPopular: data.isPopular ?? false,
           active: data.active ?? true,
           sortOrder: data.sortOrder ?? 0,
+
           prices: {
             create: priceData.map((price) => ({
               billingCycle: price.billingCycle,
@@ -55,6 +75,7 @@ export class PackageRepository {
               active: price.active ?? true,
             })),
           },
+
           limits: {
             create: limitsData.map((limit) => ({
               featureId: featureMap.get(limit.featureCode)!,
@@ -65,11 +86,17 @@ export class PackageRepository {
             })),
           },
         },
+
         include: {
           prices: {
-            where: { active: true },
-            orderBy: { createdAt: "asc" },
+            where: {
+              active: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
           },
+
           limits: {
             include: {
               feature: {
@@ -85,94 +112,124 @@ export class PackageRepository {
           },
         },
       });
-
-      return pkg;
     });
   }
 
-  async updatePackage(
-    packageId: string,
-    data: CreatePackageDTO,
-    priceData: PriceInput[],
-    limitsData: PlanLimitInput[],
-    featureMap: Map<string, string>
-  ) {
-    return this.prisma.$transaction(async (tx) => {
+ async updatePackage(
+  packageId: string,
+  data: UpdatePackageDTO,
+  priceData: PriceInput[],
+  limitsData: PlanLimitInput[],
+  featureMap: Map<string, string>
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
+      const updateData: Prisma.PackageUpdateInput = {};
+
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.slug !== undefined) updateData.slug = data.slug;
+      if (data.tagline !== undefined) updateData.tagline = data.tagline;
+      if (data.badgeLabel !== undefined)
+        updateData.badgeLabel = data.badgeLabel;
+      if (data.discoveryPool !== undefined)
+        updateData.discoveryPool = data.discoveryPool;
+      if (data.visibilityRule !== undefined)
+        updateData.visibilityRule = data.visibilityRule;
+      if (data.description !== undefined)
+        updateData.description = data.description;
+      if (data.isPopular !== undefined)
+        updateData.isPopular = data.isPopular;
+      if (data.active !== undefined)
+        updateData.active = data.active;
+      if (data.sortOrder !== undefined)
+        updateData.sortOrder = data.sortOrder;
+
       await tx.package.update({
-        where: { id: packageId },
-        data: {
-          slug: data.slug,
-          tagline: data.tagline,
-          badgeLabel: data.badgeLabel,
-          discoveryPool: data.discoveryPool,
-          visibilityRule: data.visibilityRule,
-          description: data.description,
-          isPopular: data.isPopular ?? false,
-          active: data.active ?? true,
-          sortOrder: data.sortOrder ?? 0,
+        where: {
+          id: packageId,
         },
+        data: updateData,
       });
 
-      for (const price of priceData) {
-        await tx.packagePrice.upsert({
-          where: {
-            packageId_billingCycle: {
-              packageId,
-              billingCycle: price.billingCycle,
-            },
-          },
-          create: {
-            packageId,
-            billingCycle: price.billingCycle,
-            months: price.months,
-            price: price.price,
-            originalPrice: price.originalPrice,
-            discountPercent: price.discountPercent,
-            isHighlighted: price.isHighlighted ?? false,
-            active: price.active ?? true,
-          },
-          update: {
-            months: price.months,
-            price: price.price,
-            originalPrice: price.originalPrice,
-            discountPercent: price.discountPercent,
-            isHighlighted: price.isHighlighted ?? false,
-            active: price.active ?? true,
-          },
-        });
+      // ==========================
+      // Update Prices (Optimized)
+      // ==========================
+      if (priceData.length > 0) {
+        await Promise.all(
+          priceData.map((price) =>
+            tx.packagePrice.upsert({
+              where: {
+                packageId_billingCycle: {
+                  packageId,
+                  billingCycle: price.billingCycle,
+                },
+              },
+              create: {
+                packageId,
+                billingCycle: price.billingCycle,
+                months: price.months,
+                price: price.price,
+                originalPrice: price.originalPrice,
+                discountPercent: price.discountPercent,
+                isHighlighted: price.isHighlighted ?? false,
+                active: price.active ?? true,
+              },
+              update: {
+                months: price.months,
+                price: price.price,
+                originalPrice: price.originalPrice,
+                discountPercent: price.discountPercent,
+                isHighlighted: price.isHighlighted ?? false,
+                active: price.active ?? true,
+              },
+            })
+          )
+        );
       }
 
-      for (const limit of limitsData) {
-        const featureId = featureMap.get(limit.featureCode)!;
-        await tx.planLimit.upsert({
-          where: {
-            packageId_featureId: {
-              packageId,
-              featureId,
-            },
-          },
-          create: {
-            packageId,
-            featureId,
-            enabled: limit.enabled,
-            unlimited: limit.unlimited,
-            limit: limit.limit,
-            resetPeriod: limit.resetPeriod,
-          },
-          update: {
-            enabled: limit.enabled,
-            unlimited: limit.unlimited,
-            limit: limit.limit,
-            resetPeriod: limit.resetPeriod,
-          },
-        });
+      // ==========================
+      // Update Limits (Optimized)
+      // ==========================
+      if (limitsData.length > 0) {
+        await Promise.all(
+          limitsData.map((limit) => {
+            const featureId = featureMap.get(limit.featureCode)!;
+
+            return tx.planLimit.upsert({
+              where: {
+                packageId_featureId: {
+                  packageId,
+                  featureId,
+                },
+              },
+              create: {
+                packageId,
+                featureId,
+                enabled: limit.enabled,
+                unlimited: limit.unlimited,
+                limit: limit.limit,
+                resetPeriod: limit.resetPeriod,
+              },
+              update: {
+                enabled: limit.enabled,
+                unlimited: limit.unlimited,
+                limit: limit.limit,
+                resetPeriod: limit.resetPeriod,
+              },
+            });
+          })
+        );
       }
 
       return tx.package.findUnique({
-        where: { id: packageId },
+        where: {
+          id: packageId,
+        },
         include: {
           prices: {
-            orderBy: { createdAt: "asc" },
+            orderBy: {
+              createdAt: "asc",
+            },
           },
           limits: {
             include: {
@@ -189,6 +246,8 @@ export class PackageRepository {
           },
         },
       });
-    });
-  }
+    }
+    
+  );
+}
 }

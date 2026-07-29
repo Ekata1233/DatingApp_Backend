@@ -1,32 +1,4 @@
-// import { z } from "zod";
-// import { PackageType } from "@prisma/client";
 
-// export const createPackageSchema = z.object({
-//   name: z.nativeEnum(PackageType),
-//   title: z.string(),
-//   description: z.string().optional(),
-
-//   plans: z.array(
-//     z.object({
-//       durationMonths: z.number(),
-//       originalPrice: z.number(),
-//       discountedPrice: z.number().optional(),
-//       discountPercent: z.number().optional(),
-//       isPopular: z.boolean().optional(),
-//       isBestValue: z.boolean().optional(),
-//     })
-//   ),
-
-//   features: z.array(
-//     z.object({
-//       key: z.string(),
-//       label: z.string(),
-//       isHighlighted: z.boolean().optional(),
-//     })
-//   ),
-// });
-
-// export type CreatePackageInput = z.infer<typeof createPackageSchema>;
 
 
 import { z } from "zod";
@@ -102,4 +74,13 @@ export const createPackageSchema = z.object({
     ),
 });
 
+
 export type CreatePackageInput = z.infer<typeof createPackageSchema>;
+
+// package.validation.ts
+
+export const updatePackageSchema = createPackageSchema.partial().extend({
+  id: z.string().uuid("Invalid package id"),
+});
+
+export type UpdatePackageInput = z.infer<typeof updatePackageSchema>;
