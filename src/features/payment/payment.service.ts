@@ -216,7 +216,10 @@ import { prisma } from "../../prisma/prismaClient";
 import { PaymentPurpose, PaymentStatus } from "@prisma/client";
 import { getAccessToken } from "./payment.utils";
 import { randomUUID } from "node:crypto";
-import { activatePackage, createWaitlist, creditBoost, creditWallet } from "./payment.handler";
+import { activatePackage } from "./handlers/package.handler";
+import { creditWallet } from "./handlers/wallet.handler";
+import { creditBoost } from "./handlers/boost.handler";
+import { createWaitlist } from "./handlers/waitlist.handler";
 
 //CREATE PAYMENT LINK
 export async function createPaymentLink(userId: string, body: any) {

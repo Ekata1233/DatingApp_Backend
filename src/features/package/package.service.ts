@@ -2,12 +2,189 @@
 import {
   BillingCycle,
   Prisma,
-  ResetPeriod,
-  PackageStatus,
-  PaymentStatus,
 } from "@prisma/client";
-import { prisma } from "../../prisma/prismaClient";
 import { initializePlanUsage } from "./package.handler";
+
+type PackageAction =
+  | 'NEW_PURCHASE'
+  | 'RENEW'
+  | 'UPGRADE'
+  | 'DOWNGRADE'
+  | 'ACTIVATE_PENDING'
+  | 'LIFETIME_OWNED'
+  | 'DUPLICATE_PENDING';
+
+interface PackagePriority {
+  [key: string]: number;
+}
+
+interface SubscriptionAction {
+  type: PackageAction;
+  currentPackage?: any;
+  reason?: string;
+}
+
+// constants.ts - Package priorities configuration
+const PACKAGE_PRIORITY: PackagePriority = {
+  'VIP_ELITE': 3,
+  'VIP': 2,
+  'PREMIUM': 1,
+};
+
+// helpers.ts - All helper functions
+
+/**
+ * Get the priority of a package by its slug or ID
+ */
+function getPackagePriority(packageSlug: string): number {
+  return PACKAGE_PRIORITY[packageSlug] || 0;
+}
+
+// Main function to activate package (called from payment.handler.ts)
+export async function processPackageActivation(
+  tx: any,
+  payment: any
+) {
+  // 1. Get package price with package info from payment
+  if (!payment.packagePriceId) {
+    throw new Error("Package price not found in payment");
+  }
+
+  const price = await tx.packagePrice.findUnique({
+    where: {
+      id: payment.packagePriceId,
+    },
+    include: {
+      package: true,
+    },
+  });
+
+  console.log("price", price)
+
+  if (!price) {
+    throw new Error("Package price not found");
+  }
+  if (!price.active) {
+    throw new Error("This package price is no longer active");
+  }
+  const pkg = price.package;
+
+  if (!pkg.active) {
+    throw new Error("This package is no longer available");
+  }
+
+  // 2. Determine what action to take based on current subscription state
+  const action = await determineSubscriptionAction(
+    payment.userId,
+    pkg,
+    { ...price, paymentId: payment.id },
+    tx
+  );
+
+  console.log(`📋 Subscription action determined: ${action.type}`);
+
+  let result;
+
+  switch (action.type) {
+    case 'DUPLICATE_PENDING':
+      // CASE 7 & 8: Return existing package for idempotency
+      console.log(`⚠️ Duplicate request detected: ${action.reason}`);
+      return {
+        success: true,
+        package: {
+          id: action.currentPackage.package.id,
+          name: action.currentPackage.package.name,
+          slug: action.currentPackage.package.slug,
+          billingCycle: price.billingCycle,
+        },
+        userPackageId: action.currentPackage.id,
+        startDate: action.currentPackage.startDate,
+        endDate: action.currentPackage.endDate,
+        featuresInitialized: 0,
+        message: action.reason,
+      };
+
+    case 'LIFETIME_OWNED':
+      // CASE 6: User already owns lifetime package
+      console.log(`🚫 Lifetime package already owned`);
+      throw new Error("You already own this package.");
+
+    case 'NEW_PURCHASE':
+      // CASE 1 & 5: New purchase or expired package
+      console.log(`🆕 Processing new purchase`);
+      result = await activateNewSubscription(
+        payment.userId,
+        pkg,
+        price,
+        payment,
+        tx
+      );
+      break;
+
+    case 'RENEW':
+      // CASE 2: Renew existing package
+      console.log(`🔄 Renewing existing package`);
+      result = await renewSubscription(
+        action.currentPackage,
+        price,
+        tx
+      );
+      break;
+
+    case 'UPGRADE':
+      // CASE 3: Upgrade to higher tier
+      console.log(`⬆️ Upgrading from ${action.currentPackage.package.slug} to ${pkg.slug}`);
+      result = await upgradeSubscription(
+        payment.userId,
+        action.currentPackage,
+        pkg,
+        price,
+        payment,
+        tx
+      );
+      break;
+
+    case 'DOWNGRADE':
+      // CASE 4: Schedule downgrade
+      console.log(`⬇️ Scheduling downgrade from ${action.currentPackage.package.slug} to ${pkg.slug}`);
+      result = await scheduleDowngrade(
+        payment.userId,
+        action.currentPackage,
+        pkg,
+        price,
+        payment,
+        tx
+      );
+      break;
+
+    default:
+      throw new Error(`Unknown subscription action: ${action.type}`);
+  }
+
+  // 4. Log the result
+  console.log(`✅ Package ${action.type === 'DOWNGRADE' ? 'scheduled' : 'activated'}: ${pkg.name} for user ${payment.userId}`);
+  console.log(`📅 ${action.type === 'DOWNGRADE' ? 'Will start' : 'Expires'}: ${result.endDate}`);
+
+  if (result.featuresInitialized > 0) {
+    console.log(`🎯 Features initialized: ${result.featuresInitialized}`);
+  }
+
+  // 5. Return consistent response format
+  return {
+    success: true,
+    package: {
+      id: pkg.id,
+      name: pkg.name,
+      slug: pkg.slug,
+      billingCycle: price.billingCycle,
+    },
+    userPackageId: result.userPackage.id,
+    startDate: result.startDate,
+    endDate: result.endDate,
+    featuresInitialized: result.featuresInitialized,
+    action: action.type, // Include action type for monitoring/logging
+  };
+}
 
 // Helper: Calculate end date based on billing cycle
 function calculateEndDate(
@@ -39,42 +216,6 @@ function calculateEndDate(
   return endDate;
 }
 
-// Helper: Calculate reset date based on reset period
-function calculateResetDate(resetPeriod: ResetPeriod): Date {
-  const now = new Date();
-
-  switch (resetPeriod) {
-    case "NONE":
-      // 100 years later (effectively never resets)
-      return new Date(now.getFullYear() + 100, now.getMonth(), now.getDate());
-    case "DAILY":
-      // Tomorrow at midnight
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      return tomorrow;
-    case "WEEKLY":
-      // 7 days from now
-      const weekly = new Date(now);
-      weekly.setDate(weekly.getDate() + 7);
-      return weekly;
-    case "MONTHLY":
-      // 1 month from now
-      const monthly = new Date(now);
-      monthly.setMonth(monthly.getMonth() + 1);
-      return monthly;
-    case "YEARLY":
-      // 1 year from now
-      const yearly = new Date(now);
-      yearly.setFullYear(yearly.getFullYear() + 1);
-      return yearly;
-    default:
-      throw new Error(
-        `Invalid reset period '${resetPeriod}'. Valid values: NONE, DAILY, WEEKLY, MONTHLY, YEARLY.`
-      );
-  }
-}
-
 // Helper: Expire previous active package
 async function expirePreviousPackage(
   userId: string,
@@ -98,337 +239,178 @@ async function expirePreviousPackage(
   }
 }
 
-// Main service: Activate package after successful payment
-export const activatePackageService = async (
+/**
+ * Determine what subscription action to take based on current and new package
+ */
+async function determineSubscriptionAction(
   userId: string,
-  paymentId: string
-) => {
-  if (!userId) throw new Error("User ID is required");
-  if (!paymentId) throw new Error("Payment ID is required");
+  newPackage: any,
+  newPrice: any,
+  tx: any
+): Promise<SubscriptionAction> {
+  // Check for idempotency - if this payment was already processed
+  // This handles CASE 8: PAYMENT WEBHOOK RETRY
+  const existingPackage = await getPackageByPaymentId(newPrice.paymentId, tx);
+  if (existingPackage) {
+    return {
+      type: 'DUPLICATE_PENDING',
+      currentPackage: existingPackage,
+      reason: 'Payment already processed',
+    };
+  }
 
-  return await prisma.$transaction(async (tx: any) => {
-    // 1. Verify Payment
-    const payment = await tx.payment.findUnique({
-      where: { id: paymentId },
-    });
+  // Check for lifetime package ownership
+  // This handles CASE 6: LIFETIME PACKAGE
+  const lifetimePackage = await getLifetimePackage(userId, tx);
+  if (lifetimePackage && lifetimePackage.package.slug !== newPackage.slug) {
+    return {
+      type: 'LIFETIME_OWNED',
+      currentPackage: lifetimePackage,
+      reason: 'User already owns a lifetime package',
+    };
+  }
 
-    if (!payment) {
-      throw new Error("Payment not found");
+  const activePackage = await getActivePackage(userId, tx);
+
+  // CASE 1 & CASE 5: No active package or expired package
+  if (!activePackage) {
+    return {
+      type: 'NEW_PURCHASE',
+    };
+  }
+
+  // CASE 2: Same package renewal
+  if (activePackage.package.slug === newPackage.slug) {
+    return {
+      type: 'RENEW',
+      currentPackage: activePackage,
+    };
+  }
+
+  // Compare priorities for upgrade/downgrade decisions
+  const currentPriority = getPackagePriority(activePackage.package.slug);
+  const newPriority = getPackagePriority(newPackage.slug);
+
+  // CASE 3: Upgrade (higher priority package)
+  if (newPriority > currentPriority) {
+    return {
+      type: 'UPGRADE',
+      currentPackage: activePackage,
+    };
+  }
+
+  // CASE 4: Downgrade (lower priority package)
+  if (newPriority < currentPriority) {
+    // CASE 7: Check for existing pending downgrade
+    const pendingPackage = await getPendingPackage(userId, tx);
+    if (pendingPackage) {
+      return {
+        type: 'DUPLICATE_PENDING',
+        currentPackage: pendingPackage,
+        reason: 'User already has a pending downgrade',
+      };
     }
-
-    if (payment.status !== PaymentStatus.COMPLETED) {
-      throw new Error("Payment is not successful. Cannot activate package.");
-    }
-
-    // 2. Get PackagePrice and verify
-    const price = await tx.packagePrice.findUnique({
-      where: { id: payment.priceId || undefined },
-      include: {
-        package: true,
-      },
-    });
-
-    if (!price) {
-      throw new Error("Package price not found for this payment");
-    }
-
-    if (!price.active) {
-      throw new Error("This package price is no longer active");
-    }
-
-    const pkg = price.package;
-
-    if (!pkg.active) {
-      throw new Error("This package is no longer available");
-    }
-
-    // 3. Expire existing active package
-    await expirePreviousPackage(userId, tx);
-
-    // 4. Calculate dates
-    const startDate = new Date();
-    const endDate = calculateEndDate(price.billingCycle, startDate);
-
-    // 5. Create UserPackage
-    const userPackage = await tx.userPackage.create({
-      data: {
-        user_id: userId,
-        packageId: pkg.id,
-        priceId: price.id,
-        purchasePrice: price.price,
-        purchaseOriginalPrice: price.originalPrice,
-        purchaseDiscount: price.discountPercent,
-        startDate,
-        endDate,
-        status: "ACTIVE",
-        paymentId,
-        currentPackageId: pkg.id,
-        autoRenew: false,
-      },
-      include: {
-        package: {
-          include: {
-            limits: {
-              where: { enabled: true },
-              include: {
-                feature: true,
-              },
-            },
-          },
-        },
-        price: true,
-      },
-    });
-
-    // 6. Initialize UserPlanUsage
-    const featuresInitialized = await initializePlanUsage(
-      userId,
-      pkg.id,
-      tx
-    );
 
     return {
-      package: {
-        id: pkg.id,
-        name: pkg.name,
-        slug: pkg.slug,
-        tagline: pkg.tagline,
-        badgeLabel: pkg.badgeLabel,
-        discoveryPool: pkg.discoveryPool,
-      },
-      userPackage: {
-        id: userPackage.id,
-        startDate: userPackage.startDate,
-        endDate: userPackage.endDate,
-        status: userPackage.status,
-        autoRenew: userPackage.autoRenew,
-      },
-      billingCycle: price.billingCycle,
-      purchasePrice: price.price,
-      expiresAt: endDate,
-      featuresInitialized,
+      type: 'DOWNGRADE',
+      currentPackage: activePackage,
     };
-  });
-};
+  }
 
-// Helper: Check user feature access
-export const checkUserFeatureAccessService = async (
-  userId: string,
-  featureCode: string
-) => {
-  // Get user's active package
-  const activePackage = await prisma.userPackage.findFirst({
+  // Same priority but different packages (edge case)
+  return {
+    type: 'NEW_PURCHASE',
+    currentPackage: activePackage,
+  };
+}
+
+/**
+ * Get user's currently active package
+ */
+async function getActivePackage(userId: string, tx: any) {
+  return tx.userPackage.findFirst({
     where: {
       user_id: userId,
-      status: "ACTIVE",
+      status: 'ACTIVE',
       endDate: {
-        gte: new Date(),
+        gt: new Date(), // Only return non-expired packages
       },
     },
     include: {
-      package: {
-        include: {
-          limits: {
-            where: { enabled: true },
-            include: {
-              feature: true,
-            },
-          },
-        },
-      },
+      package: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
     },
   });
+}
 
-  if (!activePackage) {
-    // No active package - check if feature is available for free users
-    const feature = await prisma.packageFeature.findUnique({
-      where: { code: featureCode },
-    });
-
-    if (!feature) {
-      throw new Error(`Feature not found: ${featureCode}`);
-    }
-
-    return {
-      enabled: false,
-      unlimited: false,
-      remaining: 0,
-      resetAt: null,
-      message: "No active subscription",
-    };
-  }
-
-  // Find the feature limit in the package
-  const featureLimit = activePackage.package.limits.find(
-    (limit) => limit.feature.code === featureCode
-  );
-
-  if (!featureLimit || !featureLimit.enabled) {
-    return {
-      enabled: false,
-      unlimited: false,
-      remaining: 0,
-      resetAt: null,
-      message: "Feature not included in your package",
-    };
-  }
-
-  // Get user's usage for this feature
-  const usage = await prisma.userPlanUsage.findUnique({
+/**
+ * Get user's pending downgrade package
+ */
+async function getPendingPackage(userId: string, tx: any) {
+  return tx.userPackage.findFirst({
     where: {
-      userId_featureId: {
-        userId,
-        featureId: featureLimit.featureId,
-      },
-    },
-  });
-
-  if (featureLimit.unlimited) {
-    return {
-      enabled: true,
-      unlimited: true,
-      remaining: null,
-      resetAt: usage?.resetAt || null,
-      message: "Unlimited access",
-    };
-  }
-
-  const used = usage?.used || 0;
-  const remaining = featureLimit.limit ? featureLimit.limit - used : 0;
-
-  // Check if reset is needed
-  if (usage && new Date() > usage.resetAt) {
-    // Reset the usage
-    const newResetAt = calculateResetDate(featureLimit.resetPeriod);
-
-    await prisma.userPlanUsage.update({
-      where: { id: usage.id },
-      data: {
-        used: 0,
-        resetAt: newResetAt,
-      },
-    });
-
-    return {
-      enabled: true,
-      unlimited: false,
-      remaining: featureLimit.limit || 0,
-      resetAt: newResetAt,
-      message: "Usage reset",
-    };
-  }
-
-  return {
-    enabled: remaining > 0,
-    unlimited: false,
-    remaining: Math.max(0, remaining),
-    resetAt: usage?.resetAt || null,
-    message: remaining > 0 ? "Access granted" : "Limit reached",
-  };
-};
-
-// Helper: Record feature usage
-export const recordFeatureUsageService = async (
-  userId: string,
-  featureCode: string
-) => {
-  const access = await checkUserFeatureAccessService(userId, featureCode);
-
-  if (!access.enabled) {
-    throw new Error(access.message || "Feature not available");
-  }
-
-  if (access.unlimited) {
-    return { success: true, message: "Usage recorded (unlimited)" };
-  }
-
-  // Get feature ID
-  const feature = await prisma.packageFeature.findUnique({
-    where: { code: featureCode },
-  });
-
-  if (!feature) {
-    throw new Error(`Feature not found: ${featureCode}`);
-  }
-
-  // Increment usage
-  await prisma.userPlanUsage.update({
-    where: {
-      userId_featureId: {
-        userId,
-        featureId: feature.id,
-      },
-    },
-    data: {
-      used: { increment: 1 },
-      lastUsedAt: new Date(),
-    },
-  });
-
-  return {
-    success: true,
-    remaining: access.remaining! - 1,
-    message: "Usage recorded successfully",
-  };
-};
-
-// Main function to activate package (called from payment.handler.ts)
-export async function processPackageActivation(
-  tx: any,
-  payment: any
-) {
-  // 1. Get package price with package info from payment
-  console.log("in activat package function : ", payment)
-  if (!payment.packagePriceId) {
-    throw new Error("Package price not found in payment");
-  }
-
-  const price = await tx.packagePrice.findUnique({
-    where: {
-      id: payment.packagePriceId,
+      user_id: userId,
+      status: 'PENDING',
     },
     include: {
       package: true,
     },
   });
+}
 
-  console.log("price", price)
+/**
+ * Get user's lifetime package if exists
+ */
+async function getLifetimePackage(userId: string, tx: any) {
+  return tx.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: 'ACTIVE',
+      package: {
+        slug: {
+          contains: 'LIFETIME',
+          mode: 'insensitive',
+        },
+      },
+    },
+    include: {
+      package: true,
+    },
+  });
+}
 
-  if (!price) {
-    throw new Error("Package price not found");
-  }
+/**
+ * Check if payment has already been processed (idempotency)
+ */
+async function getPackageByPaymentId(paymentId: string, tx: any) {
+  return tx.userPackage.findFirst({
+    where: {
+      paymentId: paymentId,
+    },
+    include: {
+      package: true,
+    },
+  });
+}
 
-  if (!price.active) {
-    throw new Error("This package price is no longer active");
-  }
-
-  const pkg = price.package;
-
-  console.log("pkg ", pkg)
-
-
-  if (!pkg.active) {
-    throw new Error("This package is no longer available");
-  }
-
-  // 2. Expire existing active package
-  console.log("expire preivos function call")
-  await expirePreviousPackage(payment.userId, tx);
-  console.log("expire preivos function end")
-
-
-  // 3. Calculate dates
-  console.log("calculate end date function call")
-
+/**
+ * CASE 1 & CASE 5: Activate new subscription
+ */
+async function activateNewSubscription(
+  userId: string,
+  pkg: any,
+  price: any,
+  payment: any,
+  tx: any
+) {
   const startDate = new Date();
   const endDate = calculateEndDate(price.billingCycle, startDate);
-  console.log("expire preivos function end")
 
-
-  // 4. Create UserPackage
   const userPackage = await tx.userPackage.create({
     data: {
-      user_id: payment.userId,
+      user_id: userId,
       packageId: pkg.id,
       priceId: price.id,
       purchasePrice: price.price,
@@ -436,35 +418,118 @@ export async function processPackageActivation(
       purchaseDiscount: price.discountPercent,
       startDate,
       endDate,
-      status: "ACTIVE",
+      status: 'ACTIVE',
       paymentId: payment.id,
       currentPackageId: pkg.id,
       autoRenew: false,
     },
   });
 
-  // 5. Initialize feature usage
-  const featuresInitialized = await initializePlanUsage(
-    payment.userId,
-    pkg.id,
-    tx
-  );
-
-  console.log(`✅ Package activated: ${pkg.name} for user ${payment.userId}`);
-  console.log(`📅 Expires: ${endDate}`);
-  console.log(`🎯 Features initialized: ${featuresInitialized}`);
+  // Initialize feature usage for new active packages
+  const featuresInitialized = await initializePlanUsage(userId, pkg.id, tx);
 
   return {
-    success: true,
-    package: {
-      id: pkg.id,
-      name: pkg.name,
-      slug: pkg.slug,
-      billingCycle: price.billingCycle,
-    },
-    userPackageId: userPackage.id,
+    userPackage,
     startDate,
     endDate,
     featuresInitialized,
+  };
+}
+
+/**
+ * CASE 2: Renew existing subscription by extending end date
+ */
+async function renewSubscription(
+  currentPackage: any,
+  price: any,
+  tx: any
+) {
+  // Calculate new end date by extending from current end date
+  // This prevents overlapping subscriptions
+  const newEndDate = calculateEndDate(
+    price.billingCycle,
+    new Date(currentPackage.endDate)
+  );
+
+  // Update the existing active package instead of creating new one
+  const updatedPackage = await tx.userPackage.update({
+    where: {
+      id: currentPackage.id,
+    },
+    data: {
+      endDate: newEndDate,
+      purchasePrice: price.price,
+      purchaseOriginalPrice: price.originalPrice,
+      purchaseDiscount: price.discountPercent,
+    },
+  });
+
+  return {
+    userPackage: updatedPackage,
+    startDate: currentPackage.startDate,
+    endDate: newEndDate,
+    featuresInitialized: 0, // No new features to initialize for renewal
+  };
+}
+
+/**
+ * CASE 3: Upgrade subscription immediately
+ */
+async function upgradeSubscription(
+  userId: string,
+  currentPackage: any,
+  pkg: any,
+  price: any,
+  payment: any,
+  tx: any
+) {
+  // Expire the current package immediately
+  await expirePreviousPackage(userId, tx);
+
+  // Activate the new upgraded package immediately
+  return activateNewSubscription(userId, pkg, price, payment, tx);
+}
+
+/**
+ * CASE 4: Schedule downgrade for when current package expires
+ */
+async function scheduleDowngrade(
+  userId: string,
+  currentPackage: any,
+  pkg: any,
+  price: any,
+  payment: any,
+  tx: any
+) {
+  // Schedule start date after current package expires
+  const startDate = new Date(currentPackage.endDate);
+  const endDate = calculateEndDate(price.billingCycle, startDate);
+
+  // Create pending package - don't initialize features yet
+  const userPackage = await tx.userPackage.create({
+    data: {
+      user_id: userId,
+      packageId: pkg.id,
+      priceId: price.id,
+      purchasePrice: price.price,
+      purchaseOriginalPrice: price.originalPrice,
+      purchaseDiscount: price.discountPercent,
+      startDate,
+      endDate,
+      status: 'PENDING',
+      paymentId: payment.id,
+      currentPackageId: pkg.id,
+      autoRenew: false,
+    },
+  });
+
+  // Don't initialize features for pending packages
+  // They will be initialized when the package becomes active
+
+  return {
+    userPackage,
+    startDate,
+    endDate,
+    featuresInitialized: 0,
   };
 }
