@@ -11,9 +11,10 @@ router.patch(
 );
 router.get("/get/list", getAllPackagesController);
 
-router.get("/get/slug/:slug", getPackageBySlugController);
 
 router.get("/get/cards", getPackageCardsController);
 router.get("/get/:id", getPackageByIdController);
+router.get("/get/slug/:slug", getPackageBySlugController);
+
 
 export default router;

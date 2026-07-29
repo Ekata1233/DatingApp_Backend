@@ -211,6 +211,7 @@ export const getPackageCardsService = async () => {
     return {
       id: pkg.id,
       name: pkg.name,
+      slug:pkg.slug,
       badgeLabel: pkg.badgeLabel,
       discoveryPool: pkg.discoveryPool,
       active: pkg.active,

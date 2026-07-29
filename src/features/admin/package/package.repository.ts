@@ -348,6 +348,7 @@ async findPackageCards() {
     select: {
       id: true,
       name: true,
+      slug:true,
       badgeLabel: true,
       discoveryPool: true,
       active: true,
