@@ -228,6 +228,7 @@ export const getPackageCardsService = async () => {
       features: pkg.limits.map((limit) => ({
         title: limit.feature.title,
         description: limit.feature.description,
+        limit: limit.limit,
       })),
 
       categoryCount,

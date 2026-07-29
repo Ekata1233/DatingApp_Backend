@@ -367,12 +367,16 @@ async findPackageCards() {
       limits: {
         where: {
           enabled: true,
+          
         },
+
         select: {
+           limit: true,
           feature: {
             select: {
               title: true,
               description: true,
+              
               category: true,
             },
           },
