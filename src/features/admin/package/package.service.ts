@@ -88,70 +88,79 @@ function getDefaultMonths(billingCycle: string): number {
 
 
 export const updatePackageService = async (
-    input: UpdatePackageInput
+  input: UpdatePackageInput
 ) => {
+  console.time("Total Update Package API");
 
-    const existing = await packageRepository.findPackageById(input.id);
+  console.time("findPackageById");
+  const existing = await packageRepository.findPackageById(input.id);
+  console.timeEnd("findPackageById");
 
-    if (!existing) {
-        throw new Error("Package not found");
+  if (!existing) {
+    throw new Error("Package not found");
+  }
+
+  // slug validation
+  if (input.slug) {
+    console.time("findPackageBySlug");
+
+    const slug = await packageRepository.findPackageBySlug(input.slug);
+
+    console.timeEnd("findPackageBySlug");
+
+    if (slug && slug.id !== input.id) {
+      throw new Error("Slug already exists");
+    }
+  }
+
+  let featureMap = new Map<string, string>();
+
+  if (input.limits?.length) {
+    const codes = input.limits.map((x) => x.featureCode);
+
+    console.time("findFeaturesByCodes");
+
+    const features = await packageRepository.findFeaturesByCodes(codes);
+
+    console.timeEnd("findFeaturesByCodes");
+
+    const found = new Set(features.map((x) => x.code));
+
+    const invalid = codes.filter((x) => !found.has(x));
+
+    if (invalid.length) {
+      throw new Error(`Invalid feature codes : ${invalid.join(",")}`);
     }
 
-    // slug validation
-    if (input.slug) {
+    features.forEach((f) => {
+      featureMap.set(f.code, f.id);
+    });
+  }
 
-        const slug = await packageRepository.findPackageBySlug(input.slug);
+  const prices =
+    input.prices?.map((p) => ({
+      ...p,
+      months: p.months ?? getDefaultMonths(p.billingCycle),
+    })) ?? [];
 
-        if (slug && slug.id !== input.id) {
-            throw new Error("Slug already exists");
-        }
-    }
+  const limits =
+    input.limits?.map((l) => ({
+      ...l,
+      limit: l.unlimited ? null : l.limit,
+    })) ?? [];
 
-    let featureMap = new Map<string, string>();
+  console.time("updatePackage");
 
-    if (input.limits?.length) {
+  const result = await packageRepository.updatePackage(
+    input.id,
+    input,
+    prices,
+    limits,
+    featureMap
+  );
 
-        const codes = input.limits.map(x => x.featureCode);
+  console.timeEnd("updatePackage");
+  console.timeEnd("Total Update Package API");
 
-        const features =
-            await packageRepository.findFeaturesByCodes(codes);
-
-        const found = new Set(features.map(x => x.code));
-
-        const invalid = codes.filter(x => !found.has(x));
-
-        if (invalid.length) {
-            throw new Error(
-                `Invalid feature codes : ${invalid.join(",")}`
-            );
-        }
-
-        features.forEach(f => {
-            featureMap.set(f.code, f.id);
-        });
-
-    }
-
-    const prices =
-        input.prices?.map(p => ({
-            ...p,
-            months:
-                p.months ??
-                getDefaultMonths(p.billingCycle)
-        })) ?? [];
-
-    const limits =
-        input.limits?.map(l => ({
-            ...l,
-            limit: l.unlimited ? null : l.limit
-        })) ?? [];
-
-    return await packageRepository.updatePackage(
-        input.id,
-        input,
-        prices,
-        limits,
-        featureMap
-    );
-
-}
+  return result;
+};14

@@ -30,19 +30,14 @@ export class PackageRepository {
     });
   }
 
-  async findPackageById(id: string) {
-    return this.prisma.package.findUnique({
-      where: { id },
-      include: {
-        prices: true,
-        limits: {
-          include: {
-            feature: true,
-          },
-        },
-      },
-    });
-  }
+ async findPackageById(id: string) {
+  return this.prisma.package.findUnique({
+    where: { id },
+    select: {
+      id: true,
+    },
+  });
+}
 
   async createPackage(
     data: CreatePackageDTO,
@@ -115,139 +110,153 @@ export class PackageRepository {
     });
   }
 
- async updatePackage(
+async updatePackage(
   packageId: string,
   data: UpdatePackageDTO,
   priceData: PriceInput[],
   limitsData: PlanLimitInput[],
   featureMap: Map<string, string>
 ) {
-  return this.prisma.$transaction(
-    async (tx) => {
-      const updateData: Prisma.PackageUpdateInput = {};
+  return this.prisma.$transaction(async (tx) => {
+    const updateData: Prisma.PackageUpdateInput = {};
 
-      if (data.name !== undefined) updateData.name = data.name;
-      if (data.slug !== undefined) updateData.slug = data.slug;
-      if (data.tagline !== undefined) updateData.tagline = data.tagline;
-      if (data.badgeLabel !== undefined)
-        updateData.badgeLabel = data.badgeLabel;
-      if (data.discoveryPool !== undefined)
-        updateData.discoveryPool = data.discoveryPool;
-      if (data.visibilityRule !== undefined)
-        updateData.visibilityRule = data.visibilityRule;
-      if (data.description !== undefined)
-        updateData.description = data.description;
-      if (data.isPopular !== undefined)
-        updateData.isPopular = data.isPopular;
-      if (data.active !== undefined)
-        updateData.active = data.active;
-      if (data.sortOrder !== undefined)
-        updateData.sortOrder = data.sortOrder;
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.slug !== undefined) updateData.slug = data.slug;
+    if (data.tagline !== undefined) updateData.tagline = data.tagline;
+    if (data.badgeLabel !== undefined)
+      updateData.badgeLabel = data.badgeLabel;
+    if (data.discoveryPool !== undefined)
+      updateData.discoveryPool = data.discoveryPool;
+    if (data.visibilityRule !== undefined)
+      updateData.visibilityRule = data.visibilityRule;
+    if (data.description !== undefined)
+      updateData.description = data.description;
+    if (data.isPopular !== undefined)
+      updateData.isPopular = data.isPopular;
+    if (data.active !== undefined)
+      updateData.active = data.active;
+    if (data.sortOrder !== undefined)
+      updateData.sortOrder = data.sortOrder;
 
-      await tx.package.update({
-        where: {
-          id: packageId,
-        },
-        data: updateData,
-      });
+    console.time("package.update");
 
-      // ==========================
-      // Update Prices (Optimized)
-      // ==========================
-      if (priceData.length > 0) {
-        await Promise.all(
-          priceData.map((price) =>
-            tx.packagePrice.upsert({
-              where: {
-                packageId_billingCycle: {
-                  packageId,
-                  billingCycle: price.billingCycle,
-                },
-              },
-              create: {
+    await tx.package.update({
+      where: {
+        id: packageId,
+      },
+      data: updateData,
+    });
+
+    console.timeEnd("package.update");
+
+    // ==========================
+    // Update Prices
+    // ==========================
+
+    console.time("price.upsert");
+
+    if (priceData.length > 0) {
+      await Promise.all(
+        priceData.map((price) =>
+          tx.packagePrice.upsert({
+            where: {
+              packageId_billingCycle: {
                 packageId,
                 billingCycle: price.billingCycle,
-                months: price.months,
-                price: price.price,
-                originalPrice: price.originalPrice,
-                discountPercent: price.discountPercent,
-                isHighlighted: price.isHighlighted ?? false,
-                active: price.active ?? true,
               },
-              update: {
-                months: price.months,
-                price: price.price,
-                originalPrice: price.originalPrice,
-                discountPercent: price.discountPercent,
-                isHighlighted: price.isHighlighted ?? false,
-                active: price.active ?? true,
-              },
-            })
-          )
-        );
-      }
+            },
 
-      // ==========================
-      // Update Limits (Optimized)
-      // ==========================
-      if (limitsData.length > 0) {
-        await Promise.all(
-          limitsData.map((limit) => {
-            const featureId = featureMap.get(limit.featureCode)!;
+            create: {
+              packageId,
+              billingCycle: price.billingCycle,
+              months: price.months,
+              price: price.price,
+              originalPrice: price.originalPrice,
+              discountPercent: price.discountPercent,
+              isHighlighted: price.isHighlighted ?? false,
+              active: price.active ?? true,
+            },
 
-            return tx.planLimit.upsert({
-              where: {
-                packageId_featureId: {
-                  packageId,
-                  featureId,
-                },
-              },
-              create: {
-                packageId,
-                featureId,
-                enabled: limit.enabled,
-                unlimited: limit.unlimited,
-                limit: limit.limit,
-                resetPeriod: limit.resetPeriod,
-              },
-              update: {
-                enabled: limit.enabled,
-                unlimited: limit.unlimited,
-                limit: limit.limit,
-                resetPeriod: limit.resetPeriod,
-              },
-            });
+            update: {
+              months: price.months,
+              price: price.price,
+              originalPrice: price.originalPrice,
+              discountPercent: price.discountPercent,
+              isHighlighted: price.isHighlighted ?? false,
+              active: price.active ?? true,
+            },
           })
-        );
-      }
-
-      return tx.package.findUnique({
-        where: {
-          id: packageId,
-        },
-        include: {
-          prices: {
-            orderBy: {
-              createdAt: "asc",
-            },
-          },
-          limits: {
-            include: {
-              feature: {
-                select: {
-                  id: true,
-                  code: true,
-                  title: true,
-                  category: true,
-                  description: true,
-                },
-              },
-            },
-          },
-        },
-      });
+        )
+      );
     }
-    
-  );
+
+    console.timeEnd("price.upsert");
+
+    // ==========================
+    // Update Limits
+    // ==========================
+
+    console.time("limit.upsert");
+
+if (limitsData.length > 0) {
+
+  await tx.planLimit.deleteMany({
+    where: {
+      packageId,
+    },
+  });
+
+
+  await tx.planLimit.createMany({
+    data: limitsData.map((limit) => ({
+      packageId,
+      featureId: featureMap.get(limit.featureCode)!,
+      enabled: limit.enabled,
+      unlimited: limit.unlimited,
+      limit: limit.limit,
+      resetPeriod: limit.resetPeriod,
+    })),
+  });
+
+}
+
+
+    console.timeEnd("limit.upsert");
+
+    // ==========================
+    // Final Response
+    // ==========================
+
+   console.time("package.findUnique");
+
+const result = await tx.package.findUnique({
+  where: {
+    id: packageId,
+  },
+  include: {
+    prices: {
+      orderBy: {
+        createdAt: "asc",
+      },
+    },
+    limits: {
+      include: {
+        feature: {
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            category: true,
+            description: true,
+          },
+        },
+      },
+    },
+  },
+});
+console.timeEnd("package.findUnique");
+
+return result;
+  });
 }
 }
