@@ -2,7 +2,7 @@
 
 import { Request, Response } from "express";
 import { createPackageSchema, updatePackageSchema } from "./package.validation";
-import { createOrUpdatePackageService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, updatePackageService } from "./package.service";
+import { createOrUpdatePackageService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, getPackageCardsService, updatePackageService } from "./package.service";
 import { formatPackageResponse } from "./package.response";
 
 export const createPackageController = async (req: Request, res: Response) => {
@@ -139,6 +139,25 @@ export const getPackageBySlugController = async (
     });
   } catch (error: any) {
     return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getPackageCardsController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const data = await getPackageCardsService();
+
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

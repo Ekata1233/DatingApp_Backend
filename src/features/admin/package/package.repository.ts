@@ -339,5 +339,47 @@ async findPackageDetailsBySlug(slug: string) {
     },
   });
 }
+
+async findPackageCards() {
+  return this.prisma.package.findMany({
+    orderBy: {
+      sortOrder: "asc",
+    },
+    select: {
+      id: true,
+      name: true,
+      badgeLabel: true,
+      discoveryPool: true,
+      active: true,
+
+      prices: {
+        where: {
+          billingCycle: "MONTHLY",
+          active: true,
+        },
+        select: {
+          price: true,
+          originalPrice: true,
+        },
+        take: 1,
+      },
+
+      limits: {
+        where: {
+          enabled: true,
+        },
+        select: {
+          feature: {
+            select: {
+              title: true,
+              description: true,
+              category: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 }
 

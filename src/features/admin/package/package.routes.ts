@@ -1,5 +1,5 @@
 import express from "express";
-import { createPackageController, getAllPackagesController, getPackageByIdController, getPackageBySlugController, updatePackageController } from "./package.controller";
+import { createPackageController, getAllPackagesController, getPackageByIdController, getPackageBySlugController, getPackageCardsController, updatePackageController } from "./package.controller";
 
 const router = express.Router();
 
@@ -13,5 +13,7 @@ router.get("/get/list", getAllPackagesController);
 
 router.get("/get/slug/:slug", getPackageBySlugController);
 
+router.get("/get/cards", getPackageCardsController);
 router.get("/get/:id", getPackageByIdController);
+
 export default router;

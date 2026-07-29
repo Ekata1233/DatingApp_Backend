@@ -191,3 +191,48 @@ export const getPackageBySlugService = async (slug: string) => {
 
   return pkg;
 };
+
+export const getPackageCardsService = async () => {
+  const packages = await packageRepository.findPackageCards();
+
+  return packages.map((pkg) => {
+    const categoryCount: Record<string, number> = {};
+
+    pkg.limits.forEach((item) => {
+      const category = item.feature.category;
+
+      categoryCount[category] =
+        (categoryCount[category] || 0) + 1;
+    });
+
+    const totalFeatures = pkg.limits.length;
+    const totalCategories = Object.keys(categoryCount).length;
+
+    return {
+      id: pkg.id,
+      name: pkg.name,
+      badgeLabel: pkg.badgeLabel,
+      discoveryPool: pkg.discoveryPool,
+      active: pkg.active,
+
+      price:
+        pkg.prices[0]?.price != null
+          ? Number(pkg.prices[0].price)
+          : null,
+
+      originalPrice:
+        pkg.prices[0]?.originalPrice != null
+          ? Number(pkg.prices[0].originalPrice)
+          : null,
+
+      features: pkg.limits.map((limit) => ({
+        title: limit.feature.title,
+        description: limit.feature.description,
+      })),
+
+      categoryCount,
+
+      featureSummary: `${totalFeatures} features across ${totalCategories} categories`,
+    };
+  });
+};
