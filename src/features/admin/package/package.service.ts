@@ -163,4 +163,31 @@ export const updatePackageService = async (
   console.timeEnd("Total Update Package API");
 
   return result;
-};14
+};
+
+
+
+
+export const getAllPackagesService = async () => {
+  return packageRepository.findAllPackages();
+};
+
+export const getPackageByIdService = async (id: string) => {
+  const pkg = await packageRepository.findPackageDetailsById(id);
+
+  if (!pkg) {
+    throw new Error("Package not found");
+  }
+
+  return pkg;
+};
+
+export const getPackageBySlugService = async (slug: string) => {
+  const pkg = await packageRepository.findPackageDetailsBySlug(slug);
+
+  if (!pkg) {
+    throw new Error("Package not found");
+  }
+
+  return pkg;
+};

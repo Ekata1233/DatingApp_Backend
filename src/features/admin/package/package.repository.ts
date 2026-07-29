@@ -259,4 +259,85 @@ console.timeEnd("package.findUnique");
 return result;
   });
 }
+
+async findAllPackages() {
+  return this.prisma.package.findMany({
+    orderBy: {
+      sortOrder: "asc",
+    },
+    include: {
+      prices: {
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+      limits: {
+        include: {
+          feature: {
+            select: {
+              id: true,
+              code: true,
+              title: true,
+              category: true,
+              description: true,
+            },
+          },
+        },
+      },
+    },
+  });
 }
+
+async findPackageDetailsById(id: string) {
+  return this.prisma.package.findUnique({
+    where: { id },
+    include: {
+      prices: {
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+      limits: {
+        include: {
+          feature: {
+            select: {
+              id: true,
+              code: true,
+              title: true,
+              category: true,
+              description: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+async findPackageDetailsBySlug(slug: string) {
+  return this.prisma.package.findUnique({
+    where: { slug },
+    include: {
+      prices: {
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+      limits: {
+        include: {
+          feature: {
+            select: {
+              id: true,
+              code: true,
+              title: true,
+              category: true,
+              description: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+}
+
