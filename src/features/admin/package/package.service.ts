@@ -229,6 +229,7 @@ export const getPackageCardsService = async () => {
         title: limit.feature.title,
         description: limit.feature.description,
         limit: limit.limit,
+         resetPeriod: limit.resetPeriod,
       })),
 
       categoryCount,

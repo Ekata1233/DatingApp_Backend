@@ -372,6 +372,7 @@ async findPackageCards() {
 
         select: {
            limit: true,
+           resetPeriod: true,
           feature: {
             select: {
               title: true,
