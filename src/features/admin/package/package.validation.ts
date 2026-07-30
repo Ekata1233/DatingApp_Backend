@@ -2,7 +2,7 @@
 
 
 import { z } from "zod";
-import { PackageType, BillingCycle, ResetPeriod } from "@prisma/client";
+import { PackageType, BillingCycle, ResetPeriod, FeatureCategory } from "@prisma/client";
 
 const billingCycleSchema = z.nativeEnum(BillingCycle);
 const resetPeriodSchema = z.nativeEnum(ResetPeriod);
@@ -84,3 +84,30 @@ export const updatePackageSchema = createPackageSchema.partial().extend({
 });
 
 export type UpdatePackageInput = z.infer<typeof updatePackageSchema>;
+
+
+export const packageFeatureSchema = z.object({
+  category: z.nativeEnum(FeatureCategory),
+
+  code: z
+    .string()
+    .trim()
+    .min(2)
+    .transform((v) => v.toUpperCase()),
+
+  slug: z
+    .string()
+    .trim()
+    .min(2)
+    .transform((v) => v.toLowerCase()),
+
+  title: z.string().trim().min(2),
+
+  description: z.string().optional(),
+
+  icon: z.string().optional(),
+
+  sortOrder: z.number().int().default(0),
+
+  active: z.boolean().default(true),
+});

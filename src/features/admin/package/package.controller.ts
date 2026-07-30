@@ -1,9 +1,13 @@
 
 
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { createPackageSchema, updatePackageSchema } from "./package.validation";
-import { createOrUpdatePackageService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, getPackageCardsService, updatePackageService } from "./package.service";
+import { createOrUpdatePackageService, createPackageFeatureService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, getPackageCardsService, getPackageFeaturesBySlugService, updatePackageService} from "./package.service";
 import { formatPackageResponse } from "./package.response";
+
+interface Params {
+  slug: string;
+}
 
 export const createPackageController = async (req: Request, res: Response) => {
   try {
@@ -161,5 +165,41 @@ export const getPackageCardsController = async (
       success: false,
       message: error.message,
     });
+  }
+};
+
+export const createPackageFeature = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const feature = await createPackageFeatureService(req.body);
+
+    res.status(201).json({
+      success: true,
+      message: "Package feature created successfully.",
+      data: feature,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+export const getPackageFeaturesBySlug = async (
+  req: Request<Params>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { slug } = req.params;
+
+    const features = await getPackageFeaturesBySlugService(slug);
+
+    res.status(200).json({
+      success: true,
+      data: features,
+    });
+  } catch (error) {
+    next(error);
   }
 };
