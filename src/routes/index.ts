@@ -49,6 +49,7 @@ import employeesRoutes from "../features/admin/employee/registration-login/emplo
 import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
 import roseRoutes from "../features/rose/rose.routes"
 import editProfileRoutes from "../features/user/profile/edit-profile/editProfile.routes"
+import purchaseRoutes from "../features/admin/purchaseStore/purchaseStore.routes"
 
 const router = Router();
 
@@ -67,7 +68,7 @@ router.use("/question", questionRoutes);
 router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes);
 
 
 

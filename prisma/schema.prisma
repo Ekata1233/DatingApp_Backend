@@ -849,21 +849,23 @@ model BoostEvent {
 }
 
 model BoostPurchase {
-  id               String             @id @default(uuid()) @db.Uuid
-  userId           String             @db.Uuid
-  boostOptionId    String             @db.Uuid
-  quantity         Int
-  amount           Decimal
-  paymentId        String
-  status           PaymentStatus
-  createdAt        DateTime           @default(now())
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  boostOption      BoostOption        @relation(fields: [boostOptionId], references: [id])
-  BoostTransaction BoostTransaction[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  userId              String                @db.Uuid
+  boostOptionId       String                @db.Uuid
+  quantity            Int
+  amount              Decimal
+  paymentMethod       PurchasePaymentMethod
+  paymentId           String?               @db.Uuid
+  walletTransactionId String?               @db.Uuid
+  payment             Payment?              @relation(fields: [paymentId], references: [id])
+  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
+  createdAt           DateTime              @default(now())
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boostOption         BoostOption           @relation(fields: [boostOptionId], references: [id])
+  BoostTransaction    BoostTransaction[]
 
   @@index([userId])
   @@index([paymentId])
-  @@index([status])
 }
 
 model BoostTransaction {
@@ -962,16 +964,28 @@ enum FeatureCategory {
   CHAT
   TRUST
   PRIVACY
-  STATUS
-  EVENTS
+  STATUS_BADGES
+  REAL_LIFE_EVENTS
   PERKS
-  FOREVER_LOVE
+  FOREVER_LOVE_PROGRAMME
+  ELITE_ACCESS
+  STATUS_PRIVACY
+  PREMIUM_EXPERIENCES
+  NETWORKING_GROWTH
+  EVERYTHING_IN_VIP
+  MAXIMUM_PRIVACY
+  CURATED_ELITE_MATCHING
+  ELITE_STATUS
+  WHITE_GLOVE_EXPERIENCES
+  GLOBAL_EXPERIENCES
+  EXECUTIVE_NETWORK
 }
 
 model PackageFeature {
   id            String          @id @default(uuid()) @db.Uuid
   category      FeatureCategory
-  code          String          @unique
+  code          String
+  slug          String
   title         String
   description   String?
   icon          String?
@@ -1092,19 +1106,21 @@ model UserRoseBalance {
 }
 
 model RosePurchase {
-  id              String            @id @default(uuid()) @db.Uuid
-  userId          String            @db.Uuid
-  quantity        Int
-  amount          Decimal           @db.Decimal(10, 2)
-  paymentId       String
-  status          PaymentStatus
-  createdAt       DateTime          @default(now())
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  RoseTransaction RoseTransaction[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  userId              String                @db.Uuid
+  quantity            Int
+  amount              Decimal               @db.Decimal(10, 2)
+  paymentMethod       PurchasePaymentMethod
+  paymentId           String?               @db.Uuid
+  walletTransactionId String?               @db.Uuid
+  payment             Payment?              @relation(fields: [paymentId], references: [id])
+  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
+  createdAt           DateTime              @default(now())
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  RoseTransaction     RoseTransaction[]
 
   @@index([userId])
   @@index([paymentId])
-  @@index([status])
 }
 
 model RoseTransaction {
@@ -1168,15 +1184,18 @@ model UserComplimentBalance {
 }
 
 model ComplimentPurchase {
-  id           String                  @id @default(uuid()) @db.Uuid
-  userId       String                  @db.Uuid
-  quantity     Int
-  amount       Decimal                 @db.Decimal(10, 2)
-  paymentId    String
-  status       PaymentStatus
-  createdAt    DateTime                @default(now())
-  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions ComplimentTransaction[]
+  id                  String                  @id @default(uuid()) @db.Uuid
+  userId              String                  @db.Uuid
+  quantity            Int
+  amount              Decimal                 @db.Decimal(10, 2)
+  paymentMethod       PurchasePaymentMethod
+  paymentId           String?                 @db.Uuid
+  walletTransactionId String?                 @db.Uuid
+  payment             Payment?                @relation(fields: [paymentId], references: [id])
+  walletTransaction   WalletTransaction?      @relation(fields: [walletTransactionId], references: [id])
+  createdAt           DateTime                @default(now())
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions        ComplimentTransaction[]
 
   @@index([userId])
   @@index([paymentId])
@@ -1239,21 +1258,25 @@ enum ComplimentStatus {
 }
 
 model Payment {
-  id              String         @id @default(uuid()) @db.Uuid
-  userId          String         @db.Uuid
-  amount          Decimal        @db.Decimal(10, 2)
-  currency        String         @default("INR")
-  payment_id      String?        @unique
-  transactionId   String?
-  status          PaymentStatus  @default(PENDING)
-  purpose         PaymentPurpose
-  referenceId     String?        @db.Uuid
-  packagePriceId  String?        @db.Uuid
-  gatewayResponse Json?
-  paidAt          DateTime?
-  created_at      DateTime       @default(now())
-  waitlist        Waitlist?
-  UserPackage     UserPackage[]
+  id                 String               @id @default(uuid()) @db.Uuid
+  userId             String               @db.Uuid
+  amount             Decimal              @db.Decimal(10, 2)
+  currency           String               @default("INR")
+  payment_id         String?              @unique
+  transactionId      String?
+  status             PaymentStatus        @default(PENDING)
+  purpose            PaymentPurpose
+  referenceId        String?              @db.Uuid
+  packagePriceId     String?              @db.Uuid
+  gatewayResponse    Json?
+  paidAt             DateTime?
+  created_at         DateTime             @default(now())
+  waitlist           Waitlist?
+  UserPackage        UserPackage[]
+  BoostPurchase      BoostPurchase[]
+  RosePurchase       RosePurchase[]
+  ComplimentPurchase ComplimentPurchase[]
+  DatePlanPurchase   DatePlanPurchase[]
 }
 
 model Notification {
@@ -1467,24 +1490,33 @@ enum ConfirmedDateStatus {
 }
 
 model DatePlanUserStats {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @unique @db.Uuid
-  balance   Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @db.Uuid
+  totalDatePlan     Int      @default(0)
+  balance           Int      @default(0)
+  purchasedDataPlan Int      @default(0)
+  weeklyLimit       Int      @default(0)
+  totalDetePlanUsed Int      @default(0)
+  lastResetAt       DateTime @default(now())
+  nextResetAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model DatePlanPurchase {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  quantity  Int
-  amount    Float    @default(0.00)
-  paymentId String
-  status    String   @default("COMPLETED") // COMPLETED, PENDING, FAILED
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String                @id @default(uuid()) @db.Uuid
+  userId              String                @db.Uuid
+  quantity            Int
+  amount              Float                 @default(0.00)
+  paymentMethod       PurchasePaymentMethod
+  paymentId           String?               @db.Uuid
+  walletTransactionId String?               @db.Uuid
+  payment             Payment?              @relation(fields: [paymentId], references: [id])
+  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   user         User                  @relation(fields: [userId], references: [id])
   transactions DatePlanTransaction[]
@@ -1725,8 +1757,12 @@ model WalletTransaction {
   balanceAfter  Decimal
   createdAt     DateTime           @default(now())
 
-  wallet Wallet    @relation(fields: [walletId], references: [id])
-  gift   UserGift?
+  wallet             Wallet               @relation(fields: [walletId], references: [id])
+  gift               UserGift?
+  BoostPurchase      BoostPurchase[]
+  RosePurchase       RosePurchase[]
+  ComplimentPurchase ComplimentPurchase[]
+  DatePlanPurchase   DatePlanPurchase[]
 
   @@index([walletId])
   @@index([type])
@@ -2187,4 +2223,89 @@ model EventPartner {
   @@index([state])
   @@index([status])
   @@map("event_partners")
+}
+
+enum PurchasePaymentMethod {
+  PACKAGE
+  WALLET
+  PAYMENT_GATEWAY
+}
+
+enum StoreFeatureType {
+  // Roses
+  ROSE_SEND_COST
+  REVEAL_ROSE_SENDER
+
+  // Compliments
+  COMPLIMENT_SEND_COST
+  REVEAL_COMPLIMENT_SENDER
+
+  // Likes
+  REVEAL_LIKED_YOU
+
+  // Boost
+  BOOST_DURATION
+  BOOST_SINGLE_PRICE
+  BOOST_VISIBILITY_MULTIPLIER
+
+  // Super Boost
+  SUPER_BOOST_DURATION
+  SUPER_BOOST_SINGLE_PRICE
+  SUPER_BOOST_VISIBILITY_MULTIPLIER
+
+  // Date Plan
+  DATE_PLAN_POST_COST
+  DATE_PLAN_BOOST_COST
+  DATE_PLAN_FREE_FOR_VIP
+}
+
+model StoreFeature {
+  id           String           @id @default(uuid()) @db.Uuid
+  itemType     StoreItemType
+  feature      StoreFeatureType @unique
+  title        String
+  description  String?
+  intValue     Int?
+  decimalValue Decimal?         @db.Decimal(10, 2)
+  boolValue    Boolean?
+  unit         String?
+  enabled      Boolean          @default(true)
+  premiumFree  Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([feature])
+  @@map("store_features")
+}
+
+model StorePack {
+  id           String         @id @default(uuid()) @db.Uuid
+  itemType     StoreItemType
+  title        String
+  quantity     Int
+  pricePerUnit Decimal        @db.Decimal(10, 2)
+  totalPrice   Decimal        @db.Decimal(10, 2)
+  badge        StorePackBadge @default(NONE)
+  sortOrder    Int            @default(0)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([itemType, isActive])
+  @@map("store_packs")
+}
+
+enum StoreItemType {
+  ROSE
+  COMPLIMENT
+  BOOST
+  SUPER_BOOST
+  DATE_PLAN
+  COINS
+}
+
+enum StorePackBadge {
+  NONE
+  MOST_POPULAR
+  BEST_VALUE
 }

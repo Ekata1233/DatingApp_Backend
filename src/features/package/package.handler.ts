@@ -52,7 +52,7 @@ export async function initializePlanUsage(
             // 7. Initialize Welcome Coins
             initializeWelcomeCoins(userId, packageId, welcomeCoins, now, tx),
             // 8. Initialize Date Plan Balance
-            initializeDatePlans(userId, packageId, datePlan, now, tx),
+            initializeDatePlans(userId, packageId, datePlan, now, nextWeek, tx),
         ]);
 
         featuresInitialized = results.filter(Boolean).length;
@@ -91,8 +91,9 @@ async function initializeRoses(
                 userId,
                 quantity: rosesLimit,
                 amount: 0.00,
-                paymentId: `PACKAGE_${packageId}_${Date.now()}`,
-                status: 'COMPLETED',
+                paymentMethod: "PACKAGE",
+                paymentId: packageId,
+                walletTransactionId: null,
                 createdAt: now,
             }
         });
@@ -166,8 +167,9 @@ async function initializeCompliments(
                 userId,
                 quantity: complimentsLimit,
                 amount: 0.00,
-                paymentId: `PACKAGE_${packageId}_${Date.now()}`,
-                status: 'COMPLETED',
+                paymentMethod: "PACKAGE",
+                paymentId: packageId,
+                walletTransactionId: null,
                 createdAt: now,
             }
         });
@@ -270,13 +272,13 @@ async function initializeBoosts(
                 boostOptionId: boostOption.id,
                 quantity: boostsLimit,
                 amount: 0.00,
-                paymentId: `PACKAGE_${packageId}_${Date.now()}`,
-                status: 'COMPLETED',
+                paymentMethod: "PACKAGE",
+                paymentId: packageId,
+                walletTransactionId: null,
                 createdAt: now,
             }
         });
 
-        console.log("boost purchase : ", boostPurchase)
 
         // Run transaction and balance update in parallel
         const promises = [
@@ -408,6 +410,7 @@ async function initializeDatePlans(
     packageId: string,
     datePlan: number,
     now: Date,
+    nextWeek: Date,
     tx: any
 ): Promise<boolean> {
     if (datePlan <= 0) return false;
@@ -417,6 +420,8 @@ async function initializeDatePlans(
             where: { userId }
         });
 
+        const currentTotalDatePlan = existingBalance?.totalDatePlan || 0;
+        const newTotalDatePlan = currentTotalDatePlan + datePlan;
         const currentBalance = existingBalance?.balance || 0;
         const newBalance = currentBalance + datePlan;
 
@@ -426,8 +431,9 @@ async function initializeDatePlans(
                 userId,
                 quantity: datePlan,
                 amount: 0.00,
-                paymentId: `PACKAGE_${packageId}_${Date.now()}`,
-                status: 'COMPLETED',
+                paymentMethod: "PACKAGE",
+                paymentId: packageId,
+                walletTransactionId: null,
                 createdAt: now,
             }
         });
@@ -448,10 +454,20 @@ async function initializeDatePlans(
                 where: { userId },
                 create: {
                     userId,
+                    totalDatePlan: newTotalDatePlan,
                     balance: newBalance,
+                    purchasedDataPlan: 0,
+                    weeklyLimit: datePlan,
+                    totalDetePlanUsed: 0,
+                    lastResetAt: now,
+                    nextResetAt: nextWeek,
                 },
                 update: {
+                    totalDatePlan: newTotalDatePlan,
                     balance: newBalance,
+                    weeklyLimit: datePlan,
+                    lastResetAt: now,
+                    nextResetAt: nextWeek,
                 }
             })
         ]);

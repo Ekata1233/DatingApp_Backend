@@ -529,7 +529,13 @@ let referrer: {id: string;} | null = null;
       tx.datePlanUserStats.create({
         data: {
           userId: newUser.id,
+          totalDatePlan:0,
           balance: 0,
+          purchasedDataPlan: 0,
+          weeklyLimit: 0, // Configure as per your business logic
+          totalDetePlanUsed: 0,
+          lastResetAt: now,
+          nextResetAt: nextWeek,
         },
       }),
       // Initialize UserRoseBalance
