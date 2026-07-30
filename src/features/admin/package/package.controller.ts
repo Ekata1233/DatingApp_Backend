@@ -2,7 +2,8 @@
 
 import { Request, Response } from "express";
 import { createPackageSchema, updatePackageSchema } from "./package.validation";
-import { createOrUpdatePackageService, updatePackageService } from "./package.service";
+import { createOrUpdatePackageService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, getPackageCardsService, updatePackageService } from "./package.service";
+import { formatPackageResponse } from "./package.response";
 
 export const createPackageController = async (req: Request, res: Response) => {
   try {
@@ -86,3 +87,79 @@ export const updatePackageController = async (
     }
 
 }
+
+export const getAllPackagesController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const packages = await getAllPackagesService();
+
+    return res.status(200).json({
+      success: true,
+      data: packages.map(formatPackageResponse),
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getPackageByIdController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const pkg = await getPackageByIdService(req.params.id as string);
+
+    return res.status(200).json({
+      success: true,
+      data: formatPackageResponse(pkg),
+    });
+  } catch (error: any) {
+    return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getPackageBySlugController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const pkg = await getPackageBySlugService(req.params.slug as string);
+
+    return res.status(200).json({
+      success: true,
+      data: formatPackageResponse(pkg),
+    });
+  } catch (error: any) {
+    return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getPackageCardsController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const data = await getPackageCardsService();
+
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

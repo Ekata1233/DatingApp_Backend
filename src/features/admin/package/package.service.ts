@@ -88,70 +88,154 @@ function getDefaultMonths(billingCycle: string): number {
 
 
 export const updatePackageService = async (
-    input: UpdatePackageInput
+  input: UpdatePackageInput
 ) => {
+  console.time("Total Update Package API");
 
-    const existing = await packageRepository.findPackageById(input.id);
+  console.time("findPackageById");
+  const existing = await packageRepository.findPackageById(input.id);
+  console.timeEnd("findPackageById");
 
-    if (!existing) {
-        throw new Error("Package not found");
+  if (!existing) {
+    throw new Error("Package not found");
+  }
+
+  // slug validation
+  if (input.slug) {
+    console.time("findPackageBySlug");
+
+    const slug = await packageRepository.findPackageBySlug(input.slug);
+
+    console.timeEnd("findPackageBySlug");
+
+    if (slug && slug.id !== input.id) {
+      throw new Error("Slug already exists");
+    }
+  }
+
+  let featureMap = new Map<string, string>();
+
+  if (input.limits?.length) {
+    const codes = input.limits.map((x) => x.featureCode);
+
+    console.time("findFeaturesByCodes");
+
+    const features = await packageRepository.findFeaturesByCodes(codes);
+
+    console.timeEnd("findFeaturesByCodes");
+
+    const found = new Set(features.map((x) => x.code));
+
+    const invalid = codes.filter((x) => !found.has(x));
+
+    if (invalid.length) {
+      throw new Error(`Invalid feature codes : ${invalid.join(",")}`);
     }
 
-    // slug validation
-    if (input.slug) {
+    features.forEach((f) => {
+      featureMap.set(f.code, f.id);
+    });
+  }
 
-        const slug = await packageRepository.findPackageBySlug(input.slug);
+  const prices =
+    input.prices?.map((p) => ({
+      ...p,
+      months: p.months ?? getDefaultMonths(p.billingCycle),
+    })) ?? [];
 
-        if (slug && slug.id !== input.id) {
-            throw new Error("Slug already exists");
-        }
-    }
+  const limits =
+    input.limits?.map((l) => ({
+      ...l,
+      limit: l.unlimited ? null : l.limit,
+    })) ?? [];
 
-    let featureMap = new Map<string, string>();
+  console.time("updatePackage");
 
-    if (input.limits?.length) {
+  const result = await packageRepository.updatePackage(
+    input.id,
+    input,
+    prices,
+    limits,
+    featureMap
+  );
 
-        const codes = input.limits.map(x => x.featureCode);
+  console.timeEnd("updatePackage");
+  console.timeEnd("Total Update Package API");
 
-        const features =
-            await packageRepository.findFeaturesByCodes(codes);
+  return result;
+};
 
-        const found = new Set(features.map(x => x.code));
 
-        const invalid = codes.filter(x => !found.has(x));
 
-        if (invalid.length) {
-            throw new Error(
-                `Invalid feature codes : ${invalid.join(",")}`
-            );
-        }
 
-        features.forEach(f => {
-            featureMap.set(f.code, f.id);
-        });
+export const getAllPackagesService = async () => {
+  return packageRepository.findAllPackages();
+};
 
-    }
+export const getPackageByIdService = async (id: string) => {
+  const pkg = await packageRepository.findPackageDetailsById(id);
 
-    const prices =
-        input.prices?.map(p => ({
-            ...p,
-            months:
-                p.months ??
-                getDefaultMonths(p.billingCycle)
-        })) ?? [];
+  if (!pkg) {
+    throw new Error("Package not found");
+  }
 
-    const limits =
-        input.limits?.map(l => ({
-            ...l,
-            limit: l.unlimited ? null : l.limit
-        })) ?? [];
+  return pkg;
+};
 
-    return await packageRepository.updatePackage(
-        input.id,
-        input,
-        prices,
-        limits,
-        featureMap
-    );
+export const getPackageBySlugService = async (slug: string) => {
+  const pkg = await packageRepository.findPackageDetailsBySlug(slug);
 
-}
+  if (!pkg) {
+    throw new Error("Package not found");
+  }
+
+  return pkg;
+};
+
+export const getPackageCardsService = async () => {
+  const packages = await packageRepository.findPackageCards();
+
+  return packages.map((pkg) => {
+    const categoryCount: Record<string, number> = {};
+
+    pkg.limits.forEach((item) => {
+      const category = item.feature.category;
+
+      categoryCount[category] =
+        (categoryCount[category] || 0) + 1;
+    });
+
+    const totalFeatures = pkg.limits.length;
+    const totalCategories = Object.keys(categoryCount).length;
+
+    return {
+      id: pkg.id,
+      name: pkg.name,
+      slug:pkg.slug,
+      badgeLabel: pkg.badgeLabel,
+      discoveryPool: pkg.discoveryPool,
+      active: pkg.active,
+
+      price:
+        pkg.prices[0]?.price != null
+          ? Number(pkg.prices[0].price)
+          : null,
+
+      originalPrice:
+        pkg.prices[0]?.originalPrice != null
+          ? Number(pkg.prices[0].originalPrice)
+          : null,
+
+      features: pkg.limits.map((limit) => ({
+        title: limit.feature.title,
+        description: limit.feature.description,
+        limit: limit.limit,
+         resetPeriod: limit.resetPeriod,
+      })),
+
+      categoryCount,
+
+      featureSummary: `${totalFeatures} features across ${totalCategories} categories`,
+    };
+  });
+};
