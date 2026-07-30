@@ -275,7 +275,7 @@ export const getPackageFeaturesBySlugService = async (slug: string) => {
   return await prisma.packageFeature.findMany({
     where: {
       slug,
-      active: true,
+      
     },
     orderBy: [
       {
