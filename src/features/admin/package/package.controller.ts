@@ -67,28 +67,59 @@ export const updatePackageController = async (
         });
 
     } catch (error: any) {
+  console.error(error);
 
-        if (error.name === "ZodError") {
+  if (error.name === "ZodError") {
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: error.errors,
+    });
+  }
 
-            return res.status(400).json({
+  if (
+    error.code === "P2002" ||
+    error.message?.includes("already exists")
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
 
-                success: false,
+  if (error.code === "P2025") {
+    return res.status(404).json({
+      success: false,
+      message: "Package not found.",
+    });
+  }
 
-                errors: error.errors
+  if (error.code === "P2003") {
+    return res.status(400).json({
+      success: false,
+      message: "Cannot update package because related records exist.",
+    });
+  }
 
-            });
+  if (error.code === "P2000") {
+    return res.status(400).json({
+      success: false,
+      message: "One or more field values are too long.",
+    });
+  }
 
-        }
+  if (error.code === "P2028") {
+    return res.status(500).json({
+      success: false,
+      message: "Database transaction timed out. Please try again.",
+    });
+  }
 
-        return res.status(400).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
-    }
+  return res.status(500).json({
+    success: false,
+    message: error.message || "Internal server error.",
+  });
+}
 
 }
 
