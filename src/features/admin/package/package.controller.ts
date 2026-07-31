@@ -1,9 +1,13 @@
 
 
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { createPackageSchema, updatePackageSchema } from "./package.validation";
-import { createOrUpdatePackageService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, getPackageCardsService, updatePackageService } from "./package.service";
+import { createOrUpdatePackageService, createPackageFeatureService, getAllPackagesService, getPackageByIdService, getPackageBySlugService, getPackageCardsService, getPackageFeaturesBySlugService, updatePackageService} from "./package.service";
 import { formatPackageResponse } from "./package.response";
+
+interface Params {
+  slug: string;
+}
 
 export const createPackageController = async (req: Request, res: Response) => {
   try {
@@ -63,28 +67,59 @@ export const updatePackageController = async (
         });
 
     } catch (error: any) {
+  console.error(error);
 
-        if (error.name === "ZodError") {
+  if (error.name === "ZodError") {
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: error.errors,
+    });
+  }
 
-            return res.status(400).json({
+  if (
+    error.code === "P2002" ||
+    error.message?.includes("already exists")
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
 
-                success: false,
+  if (error.code === "P2025") {
+    return res.status(404).json({
+      success: false,
+      message: "Package not found.",
+    });
+  }
 
-                errors: error.errors
+  if (error.code === "P2003") {
+    return res.status(400).json({
+      success: false,
+      message: "Cannot update package because related records exist.",
+    });
+  }
 
-            });
+  if (error.code === "P2000") {
+    return res.status(400).json({
+      success: false,
+      message: "One or more field values are too long.",
+    });
+  }
 
-        }
+  if (error.code === "P2028") {
+    return res.status(500).json({
+      success: false,
+      message: "Database transaction timed out. Please try again.",
+    });
+  }
 
-        return res.status(400).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
-    }
+  return res.status(500).json({
+    success: false,
+    message: error.message || "Internal server error.",
+  });
+}
 
 }
 
@@ -161,5 +196,41 @@ export const getPackageCardsController = async (
       success: false,
       message: error.message,
     });
+  }
+};
+
+export const createPackageFeature = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const feature = await createPackageFeatureService(req.body);
+
+    res.status(201).json({
+      success: true,
+      message: "Package feature created successfully.",
+      data: feature,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+export const getPackageFeaturesBySlug = async (
+  req: Request<Params>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { slug } = req.params;
+
+    const features = await getPackageFeaturesBySlugService(slug);
+
+    res.status(200).json({
+      success: true,
+      data: features,
+    });
+  } catch (error) {
+    next(error);
   }
 };

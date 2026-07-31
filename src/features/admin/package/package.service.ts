@@ -1,5 +1,6 @@
 
 
+import { FeatureCategory } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { PackageRepository } from "./package.repository";
 import { CreatePackageInput, UpdatePackageInput } from "./package.validation";
@@ -237,5 +238,52 @@ export const getPackageCardsService = async () => {
 
       featureSummary: `${totalFeatures} features across ${totalCategories} categories`,
     };
+  });
+};
+
+
+
+
+interface PackageFeatureDTO {
+  category: FeatureCategory;
+  code: string;
+  slug: string;
+  title: string;
+  description?: string;
+  icon?: string;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export const createPackageFeatureService = async (
+  data: PackageFeatureDTO
+) => {
+  return await prisma.packageFeature.create({
+    data: {
+      category: data.category,
+      code: data.code,
+      slug: data.slug,
+      title: data.title,
+      description: data.description,
+      icon: data.icon,
+      sortOrder: data.sortOrder ?? 0,
+      active: data.active ?? true,
+    },
+  });
+};
+export const getPackageFeaturesBySlugService = async (slug: string) => {
+  return await prisma.packageFeature.findMany({
+    where: {
+      slug,
+      
+    },
+    orderBy: [
+      {
+        category: "asc",
+      },
+      {
+        sortOrder: "asc",
+      },
+    ],
   });
 };
