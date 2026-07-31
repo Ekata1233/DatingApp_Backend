@@ -1079,7 +1079,6 @@ model UserRose {
   id         String   @id @default(uuid()) @db.Uuid
   senderId   String   @db.Uuid
   receiverId String   @db.Uuid
-  type       RoseType
   createdAt  DateTime @default(now())
   sender     User     @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
@@ -1141,7 +1140,8 @@ model RoseTransaction {
 enum RoseTransactionType {
   PACKAGE_CREDIT
   PURCHASE
-  SEND
+  PACKAGE_SEND
+  PURCHASE_SEND
   REFUND
   ADMIN_CREDIT
   ADMIN_DEBIT
@@ -1220,7 +1220,8 @@ model ComplimentTransaction {
 enum ComplimentTransactionType {
   PACKAGE_CREDIT
   PURCHASE
-  SEND
+  PACKAGE_SEND
+  PURCHASE_SEND
   REFUND
   ADMIN_CREDIT
   ADMIN_DEBIT
@@ -1244,10 +1245,6 @@ model UserGift {
   @@index([receiverId])
   @@index([senderId])
   @@index([giftId])
-}
-
-enum RoseType {
-  PURCHASED
 }
 
 enum ComplimentStatus {
@@ -1797,6 +1794,7 @@ enum TransactionSource {
   REFERRAL_PURCHASE
   WAITLIST_REFERRAL_SIGNUP
   WAITLIST_REFERRAL_PAYMENT
+  GIFT_PURCHASE
 }
 
 enum MessageType {

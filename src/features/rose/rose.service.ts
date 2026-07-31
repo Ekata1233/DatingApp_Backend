@@ -11,6 +11,7 @@ import {
   checkMatch,
   getRoseHistory,
   addPurchasedRoses,
+  createRoseLedger,
 } from './rose.repository';
 import { ROSE_CONSTANTS } from './rose.constants';
 import {
@@ -26,7 +27,7 @@ export const sendRoseService = async (
   senderId: string,
   data: SendRoseDTO
 ): Promise<SendRoseResponse> => {
-  const { receiverId, roseType } = data;
+  const { receiverId } = data;
 
   // Validate not sending to self
   if (senderId === receiverId) {
@@ -84,14 +85,23 @@ export const sendRoseService = async (
   // Execute transaction
   return prisma.$transaction(async (tx) => {
     // Deduct rose from balance
-    await deductRose(senderId, roseType, tx);
+    const deduction = await deductRose(senderId, tx);
 
     // Create rose transaction
     const rose = await createRoseTransaction(
       {
         senderId,
         receiverId,
-        type: roseType,
+      },
+      tx
+    );
+
+    await createRoseLedger(
+      {
+        userId: senderId,
+        type: deduction.transactionType,
+        quantity: 1,
+        roseBalanceAfter: deduction.balance.totalRoses,
       },
       tx
     );
@@ -107,7 +117,6 @@ export const sendRoseService = async (
     console.log('Rose sent successfully', {
       senderId,
       receiverId,
-      roseType,
       roseId: rose.id,
     });
 
@@ -134,11 +143,10 @@ export const sendRoseService = async (
       id: rose.id,
       senderId: rose.senderId,
       receiverId: rose.receiverId,
-      type: rose.type,
       createdAt: rose.createdAt,
       sender: {
         id: sender.id,
-        full_name: sender.full_name,
+        full_name: sender.full_name ?? " ",
         photos: sender.photos.map(photo => photo.media_url),
       },
     };

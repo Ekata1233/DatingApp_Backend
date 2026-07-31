@@ -1,21 +1,18 @@
 // rose.types.ts
-import { RoseType } from '@prisma/client';
 
 export interface SendRoseDTO {
   receiverId: string;
-  roseType: RoseType;
 }
 
 export interface RoseResponse {
   id: string;
   senderId: string;
   receiverId: string;
-  type: RoseType;
   message?: string;
   createdAt: Date;
   sender?: {
     id: string;
-    name: string;
+    full_name: string;
     photos: string[];
   };
 }
@@ -29,7 +26,6 @@ export interface RoseTransaction {
   id: string;
   senderId: string;
   receiverId: string;
-  type: RoseType;
   createdAt: Date;
 }
 

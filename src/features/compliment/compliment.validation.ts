@@ -1,0 +1,96 @@
+import { z } from "zod";
+
+/* -------------------------------------------------------------------------- */
+/*                               Send Compliment                              */
+/* -------------------------------------------------------------------------- */
+
+export const sendComplimentSchema = z.object({
+  receiverId: z.string().uuid({ message: "Receiver ID must be a valid UUID" }),
+  ideaId: z.string().min(1, { message: "Compliment idea is required" }),
+  message: z
+    .string()
+    .max(140, { message: "Message cannot exceed 140 characters" })
+    .trim()
+    .optional()
+    .nullable()
+    .default(null),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                            Purchase Compliments                            */
+/* -------------------------------------------------------------------------- */
+
+export const purchaseComplimentSchema = z.object({
+  quantity: z
+    .number()
+    .int({ message: "Quantity must be a number" })
+    .min(1, { message: "Quantity must be at least 1" }),
+  paymentMethod: z.enum(["WALLET", "PAYMENT_GATEWAY"], {
+    errorMap: () => ({ message: "Payment method must be either WALLET or PAYMENT_GATEWAY" }),
+  }),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                              Pagination Query                              */
+/* -------------------------------------------------------------------------- */
+
+export const paginationSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(20),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                          Get Sent/Received History                         */
+/* -------------------------------------------------------------------------- */
+
+export const complimentHistorySchema = paginationSchema.extend({
+  status: z
+    .enum(["PENDING", "ACCEPTED", "REJECTED", "EXPIRED"])
+    .optional(),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                         Admin Create Category                              */
+/* -------------------------------------------------------------------------- */
+
+export const createComplimentCategorySchema = z.object({
+  name: z.string().trim().min(2).max(50),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                          Admin Update Category                             */
+/* -------------------------------------------------------------------------- */
+
+export const updateComplimentCategorySchema = z
+  .object({
+    name: z.string().trim().min(2).max(50).optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided for update",
+  });
+
+/* -------------------------------------------------------------------------- */
+/*                            Admin Create Idea                               */
+/* -------------------------------------------------------------------------- */
+
+export const createComplimentIdeaSchema = z.object({
+  categoryId: z.string().min(1, { message: "Category ID is required" }),
+  text: z.string().trim().min(2).max(140),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                            Admin Update Idea                               */
+/* -------------------------------------------------------------------------- */
+
+export const updateComplimentIdeaSchema = z
+  .object({
+    categoryId: z.string().optional(),
+    text: z.string().trim().min(2).max(140).optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided for update",
+  });

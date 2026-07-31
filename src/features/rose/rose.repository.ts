@@ -1,7 +1,8 @@
 // rose.repository.ts
-import { PrismaClient, RoseType, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, RoseTransactionType } from '@prisma/client';
 import { ROSE_CONSTANTS } from './rose.constants';
 import { RoseHistoryQuery } from './rose.types';
+
 
 export const getBalance = async (userId: string, prisma: PrismaClient) => {
   return prisma.userRoseBalance.findUnique({
@@ -15,6 +16,7 @@ export const createBalance = async (userId: string, prisma: PrismaClient) => {
       userId,
       totalRoses: 0,
       lastResetAt: new Date(),
+      nextResetAt: new Date(),
     },
   });
 };
@@ -44,15 +46,69 @@ export const getOrCreateBalance = async (userId: string, prisma: PrismaClient) =
 
 export const deductRose = async (
   userId: string,
-  roseType: RoseType,
   prisma: PrismaClient | Prisma.TransactionClient
 ) => {
-  // Only purchased roses are available (weekly plans)
-  return prisma.userRoseBalance.update({
+  const balance = await prisma.userRoseBalance.findUnique({
     where: { userId },
-    data: {
-      totalRoses: { decrement: 1 },
-    },
+  });
+
+  if (!balance) {
+    throw new Error("Rose balance not found");
+  }
+
+  if (balance.totalRoses <= 0) {
+    throw new Error("No roses available");
+  }
+
+  // Priority:
+  // 1. freeRoses (package)
+  // 2. purchasedRoses
+
+  if (balance.freeRoses > 0) {
+    const updated = await prisma.userRoseBalance.update({
+      where: { userId },
+      data: {
+        freeRoses: { decrement: 1 },
+        totalRoses: { decrement: 1 },
+        totalRosesSent: { increment: 1 },
+      },
+    });
+
+    return {
+      balance: updated,
+      transactionType: RoseTransactionType.PACKAGE_SEND,
+    };
+  }
+
+  if (balance.purchasedRoses > 0) {
+    const updated = await prisma.userRoseBalance.update({
+      where: { userId },
+      data: {
+        purchasedRoses: { decrement: 1 },
+        totalRoses: { decrement: 1 },
+        totalRosesSent: { increment: 1 },
+      },
+    });
+
+    return {
+      balance: updated,
+      transactionType: RoseTransactionType.PURCHASE_SEND,
+    };
+  }
+   throw new Error("No roses available");
+};
+
+export const createRoseLedger = async (
+  data: {
+    userId: string;
+    type: RoseTransactionType;
+    quantity: number;
+    roseBalanceAfter: number;
+  },
+  prisma: Prisma.TransactionClient
+) => {
+  return prisma.roseTransaction.create({
+    data,
   });
 };
 
@@ -60,7 +116,6 @@ export const createRoseTransaction = async (
   data: {
     senderId: string;
     receiverId: string;
-    type: RoseType;
   },
   prisma: PrismaClient | Prisma.TransactionClient
 ) => {
@@ -68,7 +123,6 @@ export const createRoseTransaction = async (
     data: {
       senderId: data.senderId,
       receiverId: data.receiverId,
-      type: data.type,
     },
   });
 };

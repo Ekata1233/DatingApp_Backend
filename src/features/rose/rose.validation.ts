@@ -1,7 +1,6 @@
 // rose.validation.ts
 
 import { z } from "zod";
-import { RoseType } from "@prisma/client";
 import { AppError } from "./AppError";
 
 /* -------------------------------------------------------------------------- */
@@ -11,10 +10,6 @@ import { AppError } from "./AppError";
 export const sendRoseSchema = z.object({
   receiverId: z.uuid({
     message: "Invalid receiver ID format",
-  }),
-
-  roseType: z.enum([RoseType.PURCHASED], {
-    message: "Rose type must be PURCHASED",
   }),
 
   message: z
