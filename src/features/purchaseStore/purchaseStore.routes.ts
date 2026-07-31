@@ -1,13 +1,14 @@
-// purchaseStore.routes.ts
 import { Router } from "express";
+import { createPurchaseSchema } from "./purchaseStore.validation";
+import { createPurchaseController } from "./purchaseStore.controller";
+import authMiddleware from "../../middleware/auth.middleware";
 
 const router = Router();
 
 router.post(
-    "/create",
-    authenticate,
-    validate(createPurchaseSchema),
-    createPurchaseController
+  "/purchase-store/create",
+  authMiddleware,
+  createPurchaseController
 );
 
 export default router;

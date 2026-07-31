@@ -1,15 +1,7 @@
-// purchaseStore.types.ts
-
+import { PurchasePaymentMethod } from "@prisma/client";
 
 
 export interface CreatePurchaseDto {
-  /**
-   * Store pack selected by the user
-   */
   storePackId: string;
-
-  /**
-   * Payment method selected by the user
-   */
-  paymentMethod: PaymentMethod;
+  paymentMethod: PurchasePaymentMethod;
 }

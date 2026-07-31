@@ -50,6 +50,7 @@ import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
 import roseRoutes from "../features/rose/rose.routes"
 import editProfileRoutes from "../features/user/profile/edit-profile/editProfile.routes"
 import purchaseRoutes from "../features/admin/purchaseStore/purchaseStore.routes"
+import purchaseStoreRoutes from "../features/purchaseStore/purchaseStore.routes"
 
 const router = Router();
 
@@ -96,6 +97,8 @@ router.use("/user", swipeRoutes);
 //
 
 router.use("/user", dateNowRoutes);
+
+router.use("/user", purchaseStoreRoutes);
 
 router.use(
   "/admin/date-now",

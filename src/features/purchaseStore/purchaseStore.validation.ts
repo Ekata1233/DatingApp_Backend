@@ -1,15 +1,22 @@
-// purchaseStore.validation.ts
-import { z } from 'zod';
+import { z } from "zod";
 
+// Define the enum (matching your Prisma enum)
+export enum PurchasePaymentMethod {
+  PACKAGE = "PACKAGE",
+  WALLET = "WALLET",
+  PAYMENT_GATEWAY = "PAYMENT_GATEWAY",
+}
+
+// Create the Zod schema
 export const createPurchaseSchema = z.object({
-    storeItemId: z.string()
-        .uuid()
-        .min(1, "Store item ID is required"),
+  storePackId: z.string().uuid(),
 
-    paymentMethod: z.enum(["WALLET", "PAYU"], {
-        errorMap: () => ({ message: "Payment method must be either WALLET or PAYU" })
-    })
+  paymentMethod: z.enum([
+    PurchasePaymentMethod.PACKAGE,
+    PurchasePaymentMethod.WALLET,
+    PurchasePaymentMethod.PAYMENT_GATEWAY,
+  ]),
 });
 
-// If you want to infer the TypeScript type
+// Optional: Infer the TypeScript type from the schema
 export type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
