@@ -4,12 +4,12 @@ import { BoostType } from "@prisma/client";
 export async function initializePlanUsage(
     userId: string,
     packageId: string,
+    paymentId: string,
     tx: any
 ) {
     try {
         // 1. Get package features with their limits
-        console.log("user Id : ", userId)
-        console.log("packageId : ", packageId)
+
         const packageFeatures = await tx.planLimit.findMany({
             where: {
                 packageId,
@@ -20,7 +20,6 @@ export async function initializePlanUsage(
             },
         });
 
-        console.log("package Features : ", packageFeatures)
 
         if (!packageFeatures.length) {
             console.warn(`No features found for package ${packageId}`);
@@ -44,15 +43,15 @@ export async function initializePlanUsage(
         // Execute all feature initializations in parallel
         const results = await Promise.all([
             // 4. Initialize Rose Balance
-            initializeRoses(userId, packageId, rosesLimit, now, nextWeek, tx),
+            initializeRoses(userId, packageId,paymentId, rosesLimit, now, nextWeek, tx),
             // 5. Initialize Compliment Balance
-            initializeCompliments(userId, packageId, complimentsLimit, now, nextWeek, tx),
+            initializeCompliments(userId, packageId,paymentId, complimentsLimit, now, nextWeek, tx),
             // 6. Initialize Boost Balance
-            initializeBoosts(userId, packageId, boostsLimit, now, nextWeek, tx),
+            initializeBoosts(userId, packageId,paymentId, boostsLimit, now, nextWeek, tx),
             // 7. Initialize Welcome Coins
-            initializeWelcomeCoins(userId, packageId, welcomeCoins, now, tx),
+            initializeWelcomeCoins(userId, packageId,paymentId, welcomeCoins, now, tx),
             // 8. Initialize Date Plan Balance
-            initializeDatePlans(userId, packageId, datePlan, now, nextWeek, tx),
+            initializeDatePlans(userId, packageId,paymentId, datePlan, now, nextWeek, tx),
         ]);
 
         featuresInitialized = results.filter(Boolean).length;
@@ -68,6 +67,7 @@ export async function initializePlanUsage(
 async function initializeRoses(
     userId: string,
     packageId: string,
+    paymentId: string,
     rosesLimit: number,
     now: Date,
     nextWeek: Date,
@@ -85,6 +85,7 @@ async function initializeRoses(
         const newTotalRoses = currentTotalRoses + rosesLimit;
         const newFreeRoses = currentFreeRoses + rosesLimit;
 
+        console.log("paymentId : ", paymentId)
         // Create purchase first (needed for transaction)
         const rosePurchase = await tx.rosePurchase.create({
             data: {
@@ -92,7 +93,7 @@ async function initializeRoses(
                 quantity: rosesLimit,
                 amount: 0.00,
                 paymentMethod: "PACKAGE",
-                paymentId: packageId,
+                paymentId: paymentId,
                 walletTransactionId: null,
                 createdAt: now,
             }
@@ -144,6 +145,7 @@ async function initializeRoses(
 async function initializeCompliments(
     userId: string,
     packageId: string,
+    paymentId: string,
     complimentsLimit: number,
     now: Date,
     nextWeek: Date,
@@ -168,7 +170,7 @@ async function initializeCompliments(
                 quantity: complimentsLimit,
                 amount: 0.00,
                 paymentMethod: "PACKAGE",
-                paymentId: packageId,
+                paymentId: paymentId,
                 walletTransactionId: null,
                 createdAt: now,
             }
@@ -220,6 +222,7 @@ async function initializeCompliments(
 async function initializeBoosts(
     userId: string,
     packageId: string,
+    paymentId: string,
     boostsLimit: number,
     now: Date,
     nextWeek: Date,
@@ -273,7 +276,7 @@ async function initializeBoosts(
                 quantity: boostsLimit,
                 amount: 0.00,
                 paymentMethod: "PACKAGE",
-                paymentId: packageId,
+                paymentId: paymentId,
                 walletTransactionId: null,
                 createdAt: now,
             }
@@ -342,6 +345,7 @@ async function initializeBoosts(
 async function initializeWelcomeCoins(
     userId: string,
     packageId: string,
+    paymentId: string,
     welcomeCoins: number,
     now: Date,
     tx: any
@@ -408,6 +412,7 @@ async function initializeWelcomeCoins(
 async function initializeDatePlans(
     userId: string,
     packageId: string,
+    paymentId: string,
     datePlan: number,
     now: Date,
     nextWeek: Date,
@@ -432,7 +437,7 @@ async function initializeDatePlans(
                 quantity: datePlan,
                 amount: 0.00,
                 paymentMethod: "PACKAGE",
-                paymentId: packageId,
+                paymentId: paymentId,
                 walletTransactionId: null,
                 createdAt: now,
             }

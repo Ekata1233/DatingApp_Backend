@@ -14,7 +14,7 @@ const router = Router();
  * POST /compliments/send
  */
 router.post(
-  "/send",
+  "/compliments/send",
   authMiddleware,
   sendComplimentController
 );
