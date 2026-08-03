@@ -2,8 +2,8 @@ import { prisma } from "../../prisma/prismaClient";
 import { AppError } from "../rose/AppError";
 import { checkBlockedStatus, checkMatch } from "../rose/rose.repository";
 import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
-import { createComplimentLedger, createUserCompliment, deductCompliment, getComplimentBalance } from "./compliment.repository";
-import { ComplimentBalanceResponse, SendComplimentDto, SendComplimentResponse } from "./compliment.types";
+import { createComplimentLedger, createUserCompliment, deductCompliment, getComplimentBalance, getComplimentBalanceByUserId, getComplimentHistory } from "./compliment.repository";
+import { ComplimentBalancebyIdResponse, ComplimentBalanceResponse, ComplimentHistoryQuery, SendComplimentDto, SendComplimentResponse } from "./compliment.types";
 
 
 export const sendComplimentService = async (
@@ -163,4 +163,23 @@ export const sendComplimentService = async (
             },
         };
     });
+};
+
+export async function getComplimentBalanceService(
+  userId: string
+): Promise<ComplimentBalancebyIdResponse> {
+  const balance = await getComplimentBalanceByUserId(userId);
+
+  if (!balance) {
+    throw new Error("Compliment balance not found.");
+  }
+
+  return balance;
+}
+
+export const getComplimentHistoryService = async (
+  userId: string,
+  query: ComplimentHistoryQuery
+) => {
+  return getComplimentHistory(userId, query, prisma);
 };

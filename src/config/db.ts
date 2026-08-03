@@ -76,7 +76,7 @@ if (!pgCached) {
 
 // export default connectPostgres;
 
-export function connectPostgres(): Pool {
+export async function connectPostgres(): Promise<Pool> {
   
   if (pgCached.pool) {
     return pgCached.pool;

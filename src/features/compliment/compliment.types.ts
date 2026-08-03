@@ -77,6 +77,16 @@ export interface ComplimentBalanceResponse {
   lastResetAt: Date;
 }
 
+export interface ComplimentBalancebyIdResponse {
+  totalCompliments: number;
+  freeCompliments: number;
+  purchasedCompliments: number;
+  weeklyLimit: number;
+  totalComplimentsSent: number;
+  lastResetAt: Date;
+  nextResetAt: Date;
+}
+
 export interface UserComplimentResponse {
   id: string;
   senderId: string;
@@ -132,4 +142,12 @@ export interface ComplimentNotificationPayload {
   receiverId: string;
   complimentId: string;
   message?: string | null;
+}
+
+export interface ComplimentHistoryQuery {
+  page?: number;
+  limit?: number;
+  type?: "sent" | "received";
+  startDate?: string;
+  endDate?: string;
 }

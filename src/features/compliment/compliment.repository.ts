@@ -1,4 +1,6 @@
 import { ComplimentTransactionType, Prisma, PrismaClient } from "@prisma/client";
+import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
+import { ComplimentHistoryQuery } from "./compliment.types";
 
 const prisma = new PrismaClient();
 
@@ -174,4 +176,136 @@ export const createComplimentLedger = async (
   return prisma.complimentTransaction.create({
     data,
   });
+};
+
+export async function getComplimentBalanceByUserId(userId: string) {
+  return prisma.userComplimentBalance.findUnique({
+    where: {
+      userId,
+    },
+    select: {
+      totalCompliments: true,
+      freeCompliments: true,
+      purchasedCompliments: true,
+      weeklyLimit: true,
+      totalComplimentsSent: true,
+      lastResetAt: true,
+      nextResetAt: true,
+    },
+  });
+};
+
+export const getComplimentHistory = async (
+  userId: string,
+  query: ComplimentHistoryQuery,
+  prisma: PrismaClient
+) => {
+  const page = query.page || 1;
+
+  const limit = Math.min(
+    query.limit || COMPLIMENT_CONSTANTS.DEFAULT_PAGE_SIZE,
+    COMPLIMENT_CONSTANTS.MAX_PAGE_SIZE
+  );
+
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.UserComplimentWhereInput =
+    query.type === "sent"
+      ? {
+          senderId: userId,
+        }
+      : query.type === "received"
+      ? {
+          receiverId: userId,
+        }
+      : {
+          OR: [
+            {
+              senderId: userId,
+            },
+            {
+              receiverId: userId,
+            },
+          ],
+        };
+
+  if (query.startDate || query.endDate) {
+    where.createdAt = {};
+
+    if (query.startDate) {
+      (where.createdAt as Prisma.DateTimeFilter).gte = new Date(
+        query.startDate
+      );
+    }
+
+    if (query.endDate) {
+      (where.createdAt as Prisma.DateTimeFilter).lte = new Date(
+        query.endDate
+      );
+    }
+  }
+
+  const [compliments, totalItems] = await Promise.all([
+    prisma.userCompliment.findMany({
+      where,
+      include: {
+        sender: {
+          select: {
+            id: true,
+            full_name: true,
+            photos: {
+              where: {
+                is_primary: true,
+              },
+              select: {
+                media_url: true,
+              },
+              take: 1,
+            },
+          },
+        },
+        receiver: {
+          select: {
+            id: true,
+            full_name: true,
+            photos: {
+              where: {
+                is_primary: true,
+              },
+              select: {
+                media_url: true,
+              },
+              take: 1,
+            },
+          },
+        },
+        idea: {
+          select: {
+            id: true,
+            text: true,
+            category: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip,
+      take: limit,
+    }),
+
+    prisma.userCompliment.count({
+      where,
+    }),
+  ]);
+
+  return {
+    compliments,
+    pagination: {
+      currentPage: page,
+      totalPages: Math.ceil(totalItems / limit),
+      totalItems,
+      itemsPerPage: limit,
+    },
+  };
 };

@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { sendComplimentController } from "./compliment.controller";
+import { getComplimentBalanceController, getComplimentHistoryController, sendComplimentController } from "./compliment.controller";
 import authMiddleware from "../../middleware/auth.middleware";
 
 const router = Router();
@@ -17,6 +17,18 @@ router.post(
   "/compliments/send",
   authMiddleware,
   sendComplimentController
+);
+
+router.get(
+  "/compliments/balance",
+  authMiddleware,
+  getComplimentBalanceController
+);
+
+router.get(
+  "/compliments/history",
+  authMiddleware,
+  getComplimentHistoryController
 );
 
 export default router;
