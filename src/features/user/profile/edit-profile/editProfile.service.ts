@@ -1,3 +1,4 @@
+import { MediaType, QuestionCategory, QuestionScreen } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import {
   updateUserData,
@@ -8,8 +9,10 @@ import {
   upsertUserBio,
   validateQuestionOptions,
   replaceUserAnswers,
+  getEditProfileRepository,
 } from "./editProfile.repository";
 import * as userEduWorkRepository from "./editProfile.service";
+import { EditProfileResponse } from "./editProfile.types";
 
 //--------------------------------BASIC INFO UPDATE--------------------------------
 
@@ -460,3 +463,231 @@ export const updateLocationService = async (
     };
   });
 };
+
+export async function getEditProfileService(
+  userId: string
+): Promise<EditProfileResponse> {
+  const profile = await getEditProfileRepository(userId);
+
+  if (!profile) {
+    throw new Error("Profile not found");
+  }
+
+  const photos = profile.photos
+    .filter((item) => item.media_type === MediaType.IMAGE)
+    .map((item) => ({
+      id: item.id,
+      url: item.media_url,
+      order: item.order,
+      isPrimary: item.is_primary,
+    }));
+
+  const videoItem =
+    profile.photos.find((item) => item.media_type === MediaType.VIDEO) ?? null;
+
+  const lifestyle = profile.answer
+    .filter(item => item.question.screen === QuestionScreen.LIFESTYLE)
+    .map(item => ({
+      id: item.option.id,
+      question: item.question.title,
+      option: item.option.label,
+    }));
+
+  const interests = profile.answer
+    .filter(item => item.question.screen === QuestionScreen.THINGS_U_LOVE)
+    .map(item => ({
+      id: item.option.id,
+      question: item.question.title,
+      option: item.option.label,
+    }));
+
+  return {
+    basicDetails: {
+      fullName: profile.full_name,
+      email: profile.email,
+      phoneNumber: profile.phone_number,
+      birthDate: profile.birth_date,
+      height: profile.height,
+      gender: profile.gender,
+      genderOption: profile.gender_option,
+      religion: profile.profile?.religion ? {
+        id: profile.profile.religion.id,
+        name: profile.profile.religion.name,
+      } : null,
+      community: profile.profile?.community ? {
+        id: profile.profile.community.id,
+        name: profile.profile.community.name,
+      } : null,
+      zodiac: profile.about?.zodiac ?? null,
+      loveLanguage: profile.about?.loveLanguage ?? null,
+      communicationStyle: profile.about?.communicationStyle ?? null,
+    },
+
+    photos,
+
+    video: videoItem
+      ? {
+        id: videoItem.id,
+        url: videoItem.media_url,
+      }
+      : null,
+
+    bio: {
+      bio: profile.bio?.bio ?? null,
+    },
+
+    lookingFor: {
+      id: profile.intention?.id ?? null,
+      title: profile.intention?.title ?? null,
+    },
+
+    profile: {
+      interestedIn: profile.profile?.interested_in ?? null,
+      sexualOrientation: profile.profile?.sexual_orientation ?? null,
+
+    },
+
+    educationCareer: profile.eduWork
+      ? {
+        highestEducation: profile.eduWork.highestEdu,
+        degree: profile.eduWork.degree,
+        collegeName: profile.eduWork.collegeName,
+        graduationYear: profile.eduWork.graduationYear,
+
+        profession: profile.eduWork.profession
+          ? {
+            id: profile.eduWork.profession.id,
+            name: profile.eduWork.profession.name,
+          }
+          : null,
+
+        companyName: profile.eduWork.companyName,
+
+        employmentType: profile.eduWork.employmentType
+          ? {
+            id: profile.eduWork.employmentType.id,
+            name: profile.eduWork.employmentType.name,
+          }
+          : null,
+
+        experience: profile.eduWork.experience
+          ? {
+            id: profile.eduWork.experience.id,
+            title: profile.eduWork.experience.title,
+          }
+          : null,
+
+        ambition: profile.eduWork.ambition
+          ? {
+            id: profile.eduWork.ambition.id,
+            title: profile.eduWork.ambition.title,
+          }
+          : null,
+
+        salaryRange: profile.eduWork.salaryRange
+          ? {
+            id: profile.eduWork.salaryRange.id,
+            title: profile.eduWork.salaryRange.title,
+          }
+          : null,
+
+        bigDreams: profile.eduWork.bigDreams,
+      }
+      : null,
+
+    family: profile.familyProfile
+      ? {
+        // ✅ Transform MasterValue relations properly
+        familyStatus: profile.familyProfile.familyStatus ? {
+          id: profile.familyProfile.familyStatus.id,
+          value: profile.familyProfile.familyStatus.value,
+        } : null,
+
+        familyType: profile.familyProfile.familyType ? {
+          id: profile.familyProfile.familyType.id,
+          value: profile.familyProfile.familyType.value,
+        } : null,
+
+        fatherOccupation: profile.familyProfile.fatherOccupation ? {
+          id: profile.familyProfile.fatherOccupation.id,
+          value: profile.familyProfile.fatherOccupation.value,
+        } : null,
+
+        fatherOrganisation: profile.familyProfile.fatherOrganisation ? {
+          id: profile.familyProfile.fatherOrganisation.id,
+          value: profile.familyProfile.fatherOrganisation.value,
+        } : null,
+
+        motherOccupation: profile.familyProfile.motherOccupation ? {
+          id: profile.familyProfile.motherOccupation.id,
+          value: profile.familyProfile.motherOccupation.value,
+        } : null,
+
+        motherOrganisation: profile.familyProfile.motherOrganisation ? {
+          id: profile.familyProfile.motherOrganisation.id,
+          value: profile.familyProfile.motherOrganisation.value,
+        } : null,
+
+        familyHome: profile.familyProfile.familyHome ? {
+          id: profile.familyProfile.familyHome.id,
+          value: profile.familyProfile.familyHome.value,
+        } : null,
+
+        nativePlace: profile.familyProfile.nativePlace ? {
+          id: profile.familyProfile.nativePlace.id,
+          value: profile.familyProfile.nativePlace.value,
+        } : null,
+
+        familyIncome: profile.familyProfile.familyIncome ? {
+          id: profile.familyProfile.familyIncome.id,
+          title: profile.familyProfile.familyIncome.title,
+        } : null,
+
+        // ✅ Use the actual UUID from UserSibling
+        siblings: profile.familyProfile.siblings.map((item) => ({
+          id: item.id,
+          relation: item.relation ? {
+            id: item.relation.id,
+            value: item.relation.value,
+          } : null,
+          occupation: item.occupation ? {
+            id: item.occupation.id,
+            value: item.occupation.value,
+          } : null,
+          maritalStatus: item.marital ? {
+            id: item.marital.id,
+            value: item.marital.value,
+          } : null,
+        })),
+      }
+      : null,
+
+    lifestyle,
+    interests,
+
+    prompts: profile.userPrompts.map((item) => ({
+      id: item.id,
+      promptId: item.prompt.id,
+      question: item.prompt.question,
+      answer: item.answer,
+      displayOrder: item.displayOrder,
+    })),
+    location: {
+      country: profile.profile?.country,
+      state: profile.profile?.state,
+      city: profile.profile?.city,
+      area: profile.profile?.area,
+
+      latitude: profile.profile?.latitude
+        ? Number(profile.profile.latitude)
+        : null,
+
+      longitude: profile.profile?.longitude
+        ? Number(profile.profile.longitude)
+        : null,
+
+      maxDistanceKm:
+        profile.profile?.max_distance_km,
+    },
+  };
+}

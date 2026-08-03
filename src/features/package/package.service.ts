@@ -407,6 +407,7 @@ async function activateNewSubscription(
 ) {
   const startDate = new Date();
   const endDate = calculateEndDate(price.billingCycle, startDate);
+  console.log("payment : ", payment)
 
   const userPackage = await tx.userPackage.create({
     data: {
@@ -426,7 +427,7 @@ async function activateNewSubscription(
   });
 
   // Initialize feature usage for new active packages
-  const featuresInitialized = await initializePlanUsage(userId, pkg.id, tx);
+  const featuresInitialized = await initializePlanUsage(userId, pkg.id,payment.payment_id, tx);
 
   return {
     userPackage,

@@ -48,6 +48,7 @@ import employeeRoutes from "../features/admin/employee/roles-permissions/employe
 import employeesRoutes from "../features/admin/employee/registration-login/employees.routes"
 import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
 import roseRoutes from "../features/rose/rose.routes"
+import compliRoutes from "../features/compliment/compliment.routes"
 import editProfileRoutes from "../features/user/profile/edit-profile/editProfile.routes"
 import purchaseRoutes from "../features/admin/purchaseStore/purchaseStore.routes"
 import purchaseStoreRoutes from "../features/purchaseStore/purchaseStore.routes"
@@ -78,7 +79,10 @@ router.use("/user",waitlistRoutes,)
 
 
 // router.use("/users",usersRoutes)
+
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes)
+
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

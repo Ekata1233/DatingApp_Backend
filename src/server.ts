@@ -54,11 +54,10 @@ const startServer = async () => {
 
     // PostgreSQL Pool (if you use it separately)
     await connectPostgres();
-    console.log("✅ PostgreSQL Pool Connected");
 
 
     // Prisma warm connection
-    prisma.$connect();
+    await prisma.$connect();
     console.log("✅ Prisma Connected");
 
 
