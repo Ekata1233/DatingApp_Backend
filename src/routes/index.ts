@@ -51,7 +51,7 @@ import roseRoutes from "../features/rose/rose.routes"
 import editProfileRoutes from "../features/user/profile/edit-profile/editProfile.routes"
 import purchaseRoutes from "../features/admin/purchaseStore/purchaseStore.routes"
 import purchaseStoreRoutes from "../features/purchaseStore/purchaseStore.routes"
-
+import giftRoutes from "../features/gift/gift.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -78,7 +78,7 @@ router.use("/user",waitlistRoutes,)
 
 
 // router.use("/users",usersRoutes)
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

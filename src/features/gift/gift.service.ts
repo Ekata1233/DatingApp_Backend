@@ -1,4 +1,9 @@
-import { Prisma, TransactionStatus, TransactionType, TransactionSource } from "@prisma/client";
+import {
+  Prisma,
+  TransactionStatus,
+  TransactionType,
+  TransactionSource,
+} from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { AppError } from "../rose/AppError";
 import { GiftRepository } from "./gift.repository";
@@ -6,7 +11,7 @@ import { SendGiftDTO } from "./gift.validation";
 
 export const sendGiftService = async (
   senderId: string,
-  payload: SendGiftDTO
+  payload: SendGiftDTO,
 ) => {
   const { receiverId, giftId, message } = payload;
 
@@ -47,7 +52,7 @@ export const sendGiftService = async (
 
     const balanceBefore = wallet.balance;
     const balanceAfter = wallet.balance.minus(
-      new Prisma.Decimal(gift.coinCost)
+      new Prisma.Decimal(gift.coinCost),
     );
 
     // Deduct balance
@@ -93,7 +98,15 @@ export const sendGiftService = async (
           select: {
             id: true,
             full_name: true,
-            profile_image: true,
+            photos: {
+              where: {
+                is_primary: true,
+              },
+              select: {
+                media_url: true,
+              },
+              take: 1,
+            },
           },
         },
       },
@@ -101,7 +114,14 @@ export const sendGiftService = async (
 
     return {
       walletBalance: updatedWallet.balance,
-      gift: userGift,
+      gift: {
+        ...userGift,
+        receiver: {
+          id: userGift.receiver.id,
+          full_name: userGift.receiver.full_name,
+          profile_image: userGift.receiver.photos[0]?.media_url ?? null,
+        },
+      },
     };
   });
 };

@@ -10,18 +10,26 @@ export const GiftRepository = {
   });
 },
 
-  findReceiver(receiverId: string) {
-    return prisma.user.findUnique({
-      where: {
-        id: receiverId,
+findReceiver(receiverId: string) {
+  return prisma.user.findUnique({
+    where: {
+      id: receiverId,
+    },
+    select: {
+      id: true,
+      full_name: true,
+      photos: {
+        where: {
+          is_primary: true,
+        },
+        select: {
+          media_url: true,
+        },
+        take: 1,
       },
-      select: {
-        id: true,
-        full_name: true,
-        profile_image: true,
-      },
-    });
-  },
+    },
+  });
+},
 
   findWallet(userId: string) {
     return prisma.wallet.findUnique({
