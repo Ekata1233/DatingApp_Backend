@@ -37,7 +37,7 @@ router.patch(
 );
 
 router.get(
-  "/edit",
+  "/profile/details",
   authMiddleware,
   getEditProfileController
 );

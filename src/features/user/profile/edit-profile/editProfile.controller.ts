@@ -255,7 +255,7 @@ export async function getEditProfileController(
 
     return res.status(200).json({
       success: true,
-      message: "Edit profile fetched successfully.",
+      message: "profile fetched successfully.",
       data: profile,
     });
   } catch (error) {
