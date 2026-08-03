@@ -1943,6 +1943,7 @@ enum QuestionScreen {
   INTEREST_HOBBY
   DREAM_PLAN
   HEALTH_WELLNESS
+  NETWORKING_INTENT
 }
 
 enum SwipeAction {

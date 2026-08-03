@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "QuestionScreen" ADD VALUE 'NETWORKING_INTENT';

@@ -62,7 +62,7 @@ export const updateBio = async (
         message: "Unauthorized"
       });
     }
-  const userId = req.user.id;
+  const userId = (req as any).user.id;
    
 
     const validatedData =

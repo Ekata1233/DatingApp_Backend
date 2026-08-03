@@ -424,6 +424,7 @@ export async function getEditProfileRepository(userId: string) {
               id: true,
               title: true,
               category: true,
+              screen: true,
             },
           },
           option: {

@@ -1,4 +1,4 @@
-import { MediaType, QuestionCategory } from "@prisma/client";
+import { MediaType, QuestionCategory, QuestionScreen } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import {
   updateUserData,
@@ -486,7 +486,7 @@ export async function getEditProfileService(
     profile.photos.find((item) => item.media_type === MediaType.VIDEO) ?? null;
 
   const lifestyle = profile.answer
-    .filter(item => item.question.category === QuestionCategory.LIFESTYLE)
+    .filter(item => item.question.screen === QuestionScreen.LIFESTYLE)
     .map(item => ({
       id: item.option.id,
       question: item.question.title,
@@ -494,7 +494,7 @@ export async function getEditProfileService(
     }));
 
   const interests = profile.answer
-    .filter(item => item.question.category === QuestionCategory.THINGS_YOU_LOVE)
+    .filter(item => item.question.screen === QuestionScreen.THINGS_U_LOVE)
     .map(item => ({
       id: item.option.id,
       question: item.question.title,
@@ -518,9 +518,9 @@ export async function getEditProfileService(
         id: profile.profile.community.id,
         name: profile.profile.community.name,
       } : null,
-      zodiac: profile.about?.zodiac,
-      loveLanguage: profile.about?.loveLanguage,
-      communicationStyle: profile.about?.communicationStyle,
+      zodiac: profile.about?.zodiac ?? null,
+      loveLanguage: profile.about?.loveLanguage ?? null,
+      communicationStyle: profile.about?.communicationStyle ?? null,
     },
 
     photos,

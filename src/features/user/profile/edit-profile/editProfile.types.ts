@@ -20,6 +20,11 @@ export interface IdName {
     name: string;
 }
 
+export interface IdValue {
+  id: number | string;
+  value: string;
+}
+
 export interface IdTitle {
     id: string | number;
     title: string;
@@ -48,11 +53,11 @@ export interface BasicDetailsResponse {
   birthDate: Date | null;
   height: number | null;
 
-  gender: Gender;
+  gender: Gender| null;
   genderOption: GenderOption | null;
 
-  religion: string | null;
-  community: string | null;
+  religion: IdName | null;
+  community: IdName | null;
 
   zodiac: Zodiac | null;
   loveLanguage: LoveLanguage | null;
@@ -83,22 +88,6 @@ export interface LookingForResponse {
 export interface ProfileResponse {
     interestedIn: Gender | null;
     sexualOrientation: GenderOption | null;
-
-    religion: IdName | null;
-
-    community: IdName | null;
-
-    languages: IdName[];
-
-    country: string | null;
-    state: string | null;
-    city: string | null;
-    area: string | null;
-
-    latitude: number | null;
-    longitude: number | null;
-
-    maxDistanceKm: number | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -144,21 +133,21 @@ export interface SiblingResponse {
 }
 
 export interface FamilyResponse {
-    familyStatus: IdName | null;
+    familyStatus: IdValue | null;
 
-    familyType: IdName | null;
+    familyType: IdValue | null;
 
-    fatherOccupation: IdName | null;
+    fatherOccupation: IdValue | null;
 
-    fatherOrganisation: IdName | null;
+    fatherOrganisation: IdValue | null;
 
-    motherOccupation: IdName | null;
+    motherOccupation: IdValue | null;
 
-    motherOrganisation: IdName | null;
+    motherOrganisation: IdValue | null;
 
-    familyHome: IdName | null;
+    familyHome: IdValue | null;
 
-    nativePlace: IdName | null;
+    nativePlace: IdValue | null;
 
     familyIncome: IdTitle | null;
 
