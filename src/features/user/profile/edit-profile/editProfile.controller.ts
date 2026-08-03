@@ -1,5 +1,5 @@
-import { Request, Response } from "express";
-import { updateBasicInfoService, updateBioService } from "./editProfile.service";
+import { NextFunction, Request, Response } from "express";
+import { getEditProfileService, updateBasicInfoService, updateBioService } from "./editProfile.service";
 import { updateBasicInfoSchema, updateBioSchema, updateEduWorkSchema, updateLocationSchema, updateUserPromptSchema } from "./editProfile.validation";
 import * as userEduWorkService from "./editProfile.service";
 import {
@@ -9,6 +9,7 @@ import {
 import {
   updateQuestionAnswersService
 } from "./editProfile.service";
+
 export const updateBasicInfo = async (
   req: Request,
   res: Response
@@ -145,7 +146,6 @@ export const updateQuestionAnswers = async (
   }
 };
 
-
 export const updateEduWork = async (
   req: Request,
   res: Response
@@ -181,8 +181,6 @@ export const updateEduWork = async (
 
   }
 };
-
-
 
 export const updateUserPrompt = async (
   req: Request,
@@ -244,3 +242,23 @@ export const updateLocation = async (
     });
   }
 };
+
+export async function getEditProfileController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const userId = (req as any).user.id;
+
+    const profile = await getEditProfileService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Edit profile fetched successfully.",
+      data: profile,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

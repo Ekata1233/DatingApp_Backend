@@ -2,7 +2,7 @@ import { prisma } from "../../prisma/prismaClient";
 import { AppError } from "../rose/AppError";
 import { checkBlockedStatus, checkMatch } from "../rose/rose.repository";
 import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
-import { createComplimentLedger, createUserCompliment, deductCompliment, getComplimentBalance, getComplimentBalanceByUserId, getComplimentHistory } from "./compliment.repository";
+import { createComplimentLedger, createUserCompliment, deductCompliment, getComplimentBalance, getComplimentBalanceByUserId, getComplimentDashboard, getComplimentHistory } from "./compliment.repository";
 import { ComplimentBalancebyIdResponse, ComplimentBalanceResponse, ComplimentHistoryQuery, SendComplimentDto, SendComplimentResponse } from "./compliment.types";
 
 
@@ -182,4 +182,10 @@ export const getComplimentHistoryService = async (
   query: ComplimentHistoryQuery
 ) => {
   return getComplimentHistory(userId, query, prisma);
+};
+
+export const getComplimentDashboardService = async (
+  userId: string
+) => {
+  return getComplimentDashboard(userId, prisma);
 };

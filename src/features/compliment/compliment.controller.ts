@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
-import { getComplimentBalanceService, getComplimentHistoryService, sendComplimentService } from "./compliment.service";
+import { getComplimentBalanceService, getComplimentDashboardService, getComplimentHistoryService, sendComplimentService } from "./compliment.service";
 import { SendComplimentDto } from "./compliment.types";
 
 export const sendComplimentController = async (
@@ -59,6 +59,26 @@ export const getComplimentHistoryController = async (
       message: "Compliment history fetched successfully.",
       data: history.compliments,
       pagination: history.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getComplimentDashboardController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const data = await getComplimentDashboardService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Compliment dashboard fetched successfully.",
+      data,
     });
   } catch (error) {
     next(error);

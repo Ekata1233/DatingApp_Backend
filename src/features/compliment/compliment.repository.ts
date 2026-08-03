@@ -309,3 +309,43 @@ export const getComplimentHistory = async (
     },
   };
 };
+
+export const getComplimentDashboard = async (
+  userId: string,
+  prisma: PrismaClient
+) => {
+  const [complimentBalance, roseBalance, wallet] = await Promise.all([
+    prisma.userComplimentBalance.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        totalCompliments: true,
+      },
+    }),
+
+    prisma.userRoseBalance.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        totalRoses: true,
+      },
+    }),
+
+    prisma.wallet.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        balance: true,
+      },
+    }),
+  ]);
+
+  return {
+    compliments: complimentBalance?.totalCompliments ?? 0,
+    roses: roseBalance?.totalRoses ?? 0,
+    balance: Number(wallet?.balance ?? 0),
+  };
+};

@@ -152,7 +152,7 @@ export const findQuestionByKey =
       }
     });
 
-};
+  };
 export const validateQuestionOptions =
   async (
     questionId: string,
@@ -168,7 +168,8 @@ export const validateQuestionOptions =
       }
     });
 
-};
+  };
+
 export const replaceUserAnswers =
   async (
     userId: string,
@@ -213,4 +214,242 @@ export const replaceUserAnswers =
       }
     );
 
-};
+  };
+
+export async function getEditProfileRepository(userId: string) {
+  return prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+      full_name: true,
+      email: true,
+      phone_number: true,
+      birth_date: true,
+      height: true,
+      gender: true,
+      gender_option: true,
+      looking_for: true,
+      looking_for_option: true,
+      intention: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+      bio: {
+        select: {
+          bio: true,
+        },
+      },
+      photos: {
+        select: {
+          id: true,
+          media_url: true,
+          media_type: true,
+          order: true,
+          is_primary: true,
+        },
+        orderBy: {
+          order: "asc",
+        },
+      },
+      profile: {
+        select: {
+          interested_in: true,
+          sexual_orientation: true,
+          country: true,
+          state: true,
+          city: true,
+          area: true,
+          latitude: true,
+          longitude: true,
+          max_distance_km: true,
+          religion: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          community: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          languages: {
+            select: {
+              language: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      about: {
+        select: {
+          zodiac: true,
+          loveLanguage: true,
+          communicationStyle: true
+        }
+      },
+      eduWork: {
+        select: {
+          highestEdu: true,
+          degree: true,
+          collegeName: true,
+          graduationYear: true,
+          profession: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          employmentType: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          experience: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          ambition: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          salaryRange: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          companyName: true,
+          bigDreams: true,
+        },
+      },
+      familyProfile: {
+        select: {
+          familyStatus: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          familyType: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          fatherOccupation: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          fatherOrganisation: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          motherOccupation: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          motherOrganisation: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          familyHome: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          nativePlace: {
+            select: {
+              id: true,
+              value: true,
+            },
+          },
+          familyIncome: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          siblings: {
+            select: {
+              relation: {
+                select: {
+                  id: true,
+                  value: true,
+                },
+              },
+              occupation: {
+                select: {
+                  id: true,
+                  value: true,
+                },
+              },
+              marital: {
+                select: {
+                  id: true,
+                  value: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      answer: {
+        select: {
+          question: {
+            select: {
+              id: true,
+              title: true,
+              category: true,
+            },
+          },
+          option: {
+            select: {
+              id: true,
+              label: true,
+            },
+          },
+        },
+      },
+      userPrompts: {
+        select: {
+          id: true,
+          answer: true,
+          displayOrder: true,
+          prompt: {
+            select: {
+              id: true,
+              question: true,
+            },
+          },
+        },
+        orderBy: {
+          displayOrder: "asc",
+        },
+      },
+    },
+  });
+}
