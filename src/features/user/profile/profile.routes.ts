@@ -194,7 +194,7 @@ router.patch("/profile/interested-in", authMiddleware, InterestedInController);
  *                 summary: intentionId is missing
  *                 value:
  *                   success: false
- *                   message: intentionId is required
+ *                   message: optionId is required
  *               ValidationError:
  *                 summary: Validation Error
  *                 value:
