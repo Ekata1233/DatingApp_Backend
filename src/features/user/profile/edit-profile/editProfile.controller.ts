@@ -125,7 +125,7 @@ export const updateQuestionAnswers = async (
       });
     }
 
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const body = updateQuestionAnswerSchema.parse(req.body);
 
@@ -158,7 +158,7 @@ export const updateEduWork = async (
       });
     }
 
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const body = updateEduWorkSchema.parse(req.body);
 
@@ -187,7 +187,7 @@ export const updateUserPrompt = async (
   res: Response
 ) => {
   try {
-    const userId = req.user!.id;
+    const userId = (req as any).user!.id;
 
     const body = updateUserPromptSchema.parse(req.body);
 
@@ -221,7 +221,7 @@ export const updateLocation = async (
       });
     }
 
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const body = updateLocationSchema.parse(req.body);
 

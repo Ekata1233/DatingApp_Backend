@@ -464,6 +464,16 @@ export const updateLocationService = async (
   });
 };
 
+function formatDate(date: Date | null): string | null {
+  if (!date) return null;
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+}
+
 export async function getEditProfileService(
   userId: string
 ): Promise<EditProfileResponse> {
@@ -506,7 +516,7 @@ export async function getEditProfileService(
       fullName: profile.full_name,
       email: profile.email,
       phoneNumber: profile.phone_number,
-      birthDate: profile.birth_date,
+      birthDate:  formatDate(profile.birth_date),
       height: profile.height,
       gender: profile.gender,
       genderOption: profile.gender_option,
@@ -539,6 +549,7 @@ export async function getEditProfileService(
     lookingFor: {
       id: profile.intention?.id ?? null,
       title: profile.intention?.title ?? null,
+      description: profile.intention?.description ?? null,
     },
 
     profile: {

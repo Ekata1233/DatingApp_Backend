@@ -236,6 +236,7 @@ export async function getEditProfileRepository(userId: string) {
         select: {
           id: true,
           title: true,
+          description: true,
         },
       },
       bio: {

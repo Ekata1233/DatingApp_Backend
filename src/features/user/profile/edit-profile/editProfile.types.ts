@@ -50,7 +50,7 @@ export interface BasicDetailsResponse {
   fullName: string | null;
   email: string | null;
   phoneNumber: string | null;
-  birthDate: Date | null;
+  birthDate: string | null;
   height: number | null;
 
   gender: Gender| null;
@@ -79,6 +79,7 @@ export interface BioResponse {
 export interface LookingForResponse {
     id: string | null;
     title: string | null;
+    description: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
