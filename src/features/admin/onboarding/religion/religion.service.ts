@@ -300,3 +300,27 @@ export const deleteReligionWithCommunities = async (
     });
   });
 };
+
+/**
+ * Get All Active Religions
+ */
+export const getActiveReligionData = async () => {
+  return prisma.religion.findMany({
+    where: {
+      active: true,
+    },
+    include: {
+      communities: {
+        where: {
+          active: true,
+        },
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
+    orderBy: {
+      priority: "asc",
+    },
+  });
+};
