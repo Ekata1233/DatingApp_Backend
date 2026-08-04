@@ -232,6 +232,7 @@ export async function getEditProfileRepository(userId: string) {
       gender_option: true,
       looking_for: true,
       looking_for_option: true,
+      profile_completion: true,
       intention: {
         select: {
           id: true,

@@ -16,6 +16,7 @@ import { SaveAnswerDTO } from "./profile.types";
 import imagekit from "../../../utils/imagekit";
 import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
 import { ReferralService } from "../referral/referral.service";
+import { redis } from "../../../lib/redis";
 
 //profile update service
 export const updateProfileService = async (
@@ -74,6 +75,8 @@ export const updateProfileService = async (
     data: { profile_completion: score },
   });
 
+  await redis.del(`profile:edit:${userId}`);
+
   return user;
 };
 
@@ -121,6 +124,8 @@ export const updateInterestedInService = async (
     where: { id: userId },
     data: { profile_completion: score },
   });
+
+  await redis.del(`profile:edit:${userId}`);
 
   return {
     updatedProfile,
@@ -188,6 +193,8 @@ export const updateReligionService = async (
     },
   });
 
+  await redis.del(`profile:edit:${userId}`);
+
   return updatedProfile;
 };
 
@@ -216,6 +223,7 @@ export const updateReligionService = async (
 //   return updatedUser;
 // };
 
+
 //LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION
 export const updateLookingForService = async (
   userId: string,
@@ -235,7 +243,7 @@ export const updateLookingForService = async (
 
   const score = await calculateProfileScore(userId);
 
-  return prisma.user.update({
+  const result = await prisma.user.update({
     where: { id: userId },
     data: {
       intentionId: selectedOption.intentionId,
@@ -250,6 +258,10 @@ export const updateLookingForService = async (
       },
     },
   });
+
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 //Address
@@ -261,43 +273,53 @@ export const updateAddressService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { looking_for: true },
-  });
-
   const currentStep = "ADDRESS";
   const nextStep = getNextStep(currentStep);
 
-  const profile = await prisma.userProfile.upsert({
-    where: { user_id: userId },
-    update: { country, state, city },
-    create: { user_id: userId, country, state, city },
-  });
-
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      onboarding_step: currentStep,
-      next_step: nextStep,
-    },
-    select: {
-      onboarding_step: true,
-    },
-  });
-
-  // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { profile_completion: score },
+  const result = await prisma.$transaction(async (tx) => {
+    const profile = await tx.userProfile.upsert({
+      where: {
+        user_id: userId,
+      },
+      update: {
+        country,
+        state,
+        city,
+      },
+      create: {
+        user_id: userId,
+        country,
+        state,
+        city,
+      },
+    });
+
+    const onboarding = await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        onboarding_step: currentStep,
+        next_step: nextStep,
+        profile_completion: score,
+      },
+      select: {
+        onboarding_step: true,
+        next_step: true,
+      },
+    });
+
+    return {
+      profile,
+      onboarding,
+    };
   });
 
-  return {
-    profile,
-    onboarding: updatedUser,
-  };
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 //About Yourself
@@ -410,6 +432,8 @@ export const updateLocationService = async (
     data: { profile_completion: score },
   });
 
+  await redis.del(`profile:edit:${userId}`);
+
   return profile;
 };
 
@@ -465,6 +489,7 @@ export const updateUserAnswerService = async (
     data: { profile_completion: score },
   });
 
+  await redis.del(`profile:edit:${userId}`);
   return {
     questionId,
     savedOptions: optionIds,
@@ -517,6 +542,7 @@ export const updateEducationService = async (
     },
   });
 
+  await redis.del(`profile:edit:${userId}`);
   return {
     eduWork,
     onboarding: updatedUser,
@@ -584,6 +610,7 @@ export const updateWorkService = async (
     },
   });
 
+  await redis.del(`profile:edit:${userId}`);
   return {
     eduWork,
     onboarding,
@@ -676,33 +703,34 @@ export const updateFamilyProfileService = async (
   });
 
   const familyProfile = await prisma.userFamilyProfile.findUnique({
-  where: {
-    userId,
-  },
-  include: {
-    siblings: {
-      include: {
-        relation: true,
-        occupation: true,
-        marital: true,
-      },
+    where: {
+      userId,
     },
-    familyStatus: true,
-    familyType: true,
-    fatherOccupation: true,
-    fatherOrganisation: true,
-    motherOccupation: true,
-    motherOrganisation: true,
-    familyHome: true,
-    nativePlace: true,
-    familyIncome: true,
-  },
-});
+    include: {
+      siblings: {
+        include: {
+          relation: true,
+          occupation: true,
+          marital: true,
+        },
+      },
+      familyStatus: true,
+      familyType: true,
+      fatherOccupation: true,
+      fatherOrganisation: true,
+      motherOccupation: true,
+      motherOrganisation: true,
+      familyHome: true,
+      nativePlace: true,
+      familyIncome: true,
+    },
+  });
 
-return {
-  updatedProfile: familyProfile,
-  updatedUser,
-};
+  await redis.del(`profile:edit:${userId}`);
+  return {
+    updatedProfile: familyProfile,
+    updatedUser,
+  };
 };
 
 //language
@@ -762,7 +790,7 @@ export const updateLanguageService = async (
     });
   });
 
-  return prisma.userLanguage.findMany({
+  const result = await prisma.userLanguage.findMany({
     where: {
       userId,
     },
@@ -775,6 +803,10 @@ export const updateLanguageService = async (
       },
     },
   });
+
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 // Upload Photos
@@ -864,8 +896,6 @@ export const uploadUserMediaService = async (
   };
 };
 
-
-
 // Update Photo
 export const updateUserMediaService = async (
   userId: string,
@@ -918,6 +948,7 @@ export const updateUserMediaService = async (
     },
   });
 
+  await redis.del(`profile:edit:${userId}`);
   return updatedMedia;
 };
 
@@ -926,23 +957,33 @@ export const setPrimaryPhotoService = async (
   userId: string,
   photoId: string,
 ) => {
-  await prisma.userPhoto.updateMany({
-    where: { user_id: userId },
-    data: { is_primary: false },
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.userPhoto.updateMany({
+      where: {
+        user_id: userId,
+      },
+      data: {
+        is_primary: false,
+      },
+    });
+
+    const photo = await tx.userPhoto.updateMany({
+      where: {
+        id: photoId,
+        user_id: userId,
+        media_type: "IMAGE",
+      },
+      data: {
+        is_primary: true,
+      },
+    });
+
+    return photo;
   });
 
-  const photo = await prisma.userPhoto.updateMany({
-  where: {
-    id: photoId,
-    user_id: userId,
-    media_type: "IMAGE",
-  },
-  data: {
-    is_primary: true,
-  },
-});
+  await redis.del(`profile:edit:${userId}`);
 
-  return photo;
+  return result;
 };
 
 //Delete Photo
@@ -968,6 +1009,8 @@ export const deleteUserMediaService = async (
       id: mediaId,
     },
   });
+
+  await redis.del(`profile:edit:${userId}`);
 
   return {
     message:
@@ -1023,6 +1066,8 @@ export const updateUserVideoService = async (
     },
   });
 
+  await redis.del(`profile:edit:${userId}`);
+
   return updatedVideo;
 };
 
@@ -1030,46 +1075,57 @@ export const updateUserVideoService = async (
 export const updateUserBioService = async (userId: string, bio?: string) => {
   if (!userId) throw new Error("User ID is required");
 
-  // ✅ Upsert Bio
-  const userBio = await prisma.userBio.upsert({
-    where: { user_id: userId },
-    update: {
-      bio,
-    },
-    create: {
-      user_id: userId,
-      bio,
-    },
-  });
-
-  // ✅ Onboarding Step
   const currentStep = "USER_BIO";
   const nextStep = getNextStep(currentStep);
 
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      onboarding_step: currentStep,
-      next_step: nextStep,
-    },
-    select: {
-      onboarding_step: true,
-      next_step: true,
-    },
+  const result = await prisma.$transaction(async (tx) => {
+    const userBio = await tx.userBio.upsert({
+      where: {
+        user_id: userId,
+      },
+      update: {
+        bio,
+      },
+      create: {
+        user_id: userId,
+        bio,
+      },
+    });
+
+    const updatedUser = await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        onboarding_step: currentStep,
+        next_step: nextStep,
+      },
+      select: {
+        onboarding_step: true,
+        next_step: true,
+      },
+    });
+
+    const score = await calculateProfileScore(userId);
+
+    await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        profile_completion: score,
+      },
+    });
+
+    return {
+      bio: userBio,
+      onboarding: updatedUser,
+    };
   });
 
-  // 👉 UPDATE SCORE
-  const score = await calculateProfileScore(userId);
+  await redis.del(`profile:edit:${userId}`);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { profile_completion: score },
-  });
-
-  return {
-    bio: userBio,
-    onboarding: updatedUser,
-  };
+  return result;
 };
 
 //prompt
@@ -1136,7 +1192,7 @@ export const updateUserPromptService = async (
     });
   });
 
-  return prisma.userPrompt.findMany({
+  const result = await prisma.userPrompt.findMany({
     where: {
       userId,
     },
@@ -1151,14 +1207,15 @@ export const updateUserPromptService = async (
       displayOrder: "asc",
     },
   });
+
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 // Complete Onboarding Service
 export const completeOnboardingService = async (userId: string) => {
   if (!userId) throw new Error("User ID is missing");
-
-  // Update profile completion score
-  const score = await calculateProfileScore(userId);
 
   const user = await prisma.user.update({
     where: {
@@ -1179,5 +1236,6 @@ export const completeOnboardingService = async (userId: string) => {
     console.error("Referral registration reward failed:", error);
   }
 
+  await redis.del(`profile:edit:${userId}`);
   return user;
 };
