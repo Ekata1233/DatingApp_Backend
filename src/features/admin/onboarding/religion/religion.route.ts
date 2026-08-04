@@ -10,6 +10,7 @@ import {
   updateCommunity,
   deleteCommunity,
   deleteReligion,
+  getActiveReligion,
 } from "./religion.controller";
 
 const router = Router();
@@ -19,6 +20,7 @@ router.post("/create", create);
 router.put("/update/:id", update);
 
 router.get("/get-all", getAll);
+router.get("/get", getActiveReligion);
 
 router.get("/get/:id", getOne);
 

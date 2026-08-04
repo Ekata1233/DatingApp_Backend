@@ -10,6 +10,7 @@ import {
   updateCommunityData,
   deleteCommunityData,
   deleteReligionWithCommunities,
+  getActiveReligionData,
 } from "./religion.service";
 
 /**
@@ -213,6 +214,26 @@ export const deleteReligion = async (
     res.json({
       success: true,
       message: "Religion and all communities deleted successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get Active Religions
+ */
+export const getActiveReligion = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const data = await getActiveReligionData();
+
+    res.status(200).json({
+      success: true,
+      data,
     });
   } catch (err) {
     next(err);

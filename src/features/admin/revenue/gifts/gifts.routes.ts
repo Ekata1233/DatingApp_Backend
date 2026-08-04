@@ -61,10 +61,7 @@ router.put(
  * Delete Gift Category
  * DELETE /gifts/delete/:id
  */
-router.delete(
-  "/gift-category/delete/:id",
-  deleteGiftCategoryController
-);
+      
 
 
 /**
