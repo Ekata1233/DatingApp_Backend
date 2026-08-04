@@ -21,8 +21,8 @@ export interface IdName {
 }
 
 export interface IdValue {
-  id: number | string;
-  value: string;
+    id: number | string;
+    value: string;
 }
 
 export interface IdTitle {
@@ -47,21 +47,21 @@ export interface VideoResponse {
 /* -------------------------------------------------------------------------- */
 
 export interface BasicDetailsResponse {
-  fullName: string | null;
-  email: string | null;
-  phoneNumber: string | null;
-  birthDate: string | null;
-  height: number | null;
+    fullName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+    birthDate: string | null;
+    height: number | null;
 
-  gender: Gender| null;
-  genderOption: GenderOption | null;
+    gender: Gender | null;
+    genderOption: GenderOption | null;
 
-  religion: IdName | null;
-  community: IdName | null;
-
-  zodiac: Zodiac | null;
-  loveLanguage: LoveLanguage | null;
-  communicationStyle: CommunicationStyle | null;
+    religion: IdName | null;
+    community: IdName | null;
+    languages: IdName[];
+    zodiac: Zodiac | null;
+    loveLanguage: LoveLanguage | null;
+    communicationStyle: CommunicationStyle | null;
 }
 
 /* -------------------------------------------------------------------------- */

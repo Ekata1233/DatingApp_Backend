@@ -146,7 +146,6 @@ export const getFeedService = async ({
       return cached;
     }
 
-
     const user = await prisma.user.findUnique({
       where: {
         id: userId,
@@ -253,6 +252,7 @@ export const getFeedService = async ({
       },
     });
 
+
     if (user) {
       await redis.set(USER_CACHE_KEY, user, {
         ex: USER_CACHE_TTL,
@@ -261,6 +261,8 @@ export const getFeedService = async ({
 
     return user;
   };
+
+
 
   const boostPromise = async () => {
     const boosts = prisma.boostUsage.findMany({
@@ -534,6 +536,8 @@ export const getFeedService = async ({
         },
       },
     });
+
+    console.log("hydreated suers : ", hydrated);
     const byId = new Map(hydrated.map((u) => [u.id, u]));
     let pageFilled = false;
     for (const r of rows) {
