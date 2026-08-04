@@ -13,6 +13,10 @@ import {
 } from "./editProfile.repository";
 import * as userEduWorkRepository from "./editProfile.service";
 import { EditProfileResponse } from "./editProfile.types";
+import { redis } from "../../../../lib/redis";
+
+
+const CACHE_TTL = 604800;
 
 //--------------------------------BASIC INFO UPDATE--------------------------------
 
@@ -33,7 +37,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     communicationStyle,
   } = payload;
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     //--------------------------------------------------
     // USER
     //--------------------------------------------------
@@ -126,12 +130,20 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
       message: "Basic information updated successfully.",
     };
   });
+
+  // Clear cache only after a successful transaction
+  await redis.del(`profile:edit:${userId}`);
+
+  console.log("🗑️ Edit profile cache cleared");
+
+  return result;
+
 };
 
 //aboutme
 export const updateBioService = async (userId: string, bio: string) => {
   const updatedBio = await upsertUserBio(userId, bio);
-
+  await redis.del(`profile:edit:${userId}`);
   return updatedBio;
 };
 
@@ -209,7 +221,7 @@ export const updateQuestionAnswersService = async (
 ) => {
   const { questionKey, optionIds, description } = payload;
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     //-----------------------------------
     // Find Question
     //-----------------------------------
@@ -273,10 +285,14 @@ export const updateQuestionAnswersService = async (
       message: "Question updated successfully.",
     };
   });
+
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 export const updateEduWorkService = async (userId: string, payload: any) => {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Optional FK validation
 
     if (payload.professionId) {
@@ -352,12 +368,16 @@ export const updateEduWorkService = async (userId: string, payload: any) => {
       message: "Education & Work updated successfully.",
     };
   });
+
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 export const updateUserPromptService = async (userId: string, payload: any) => {
   const { categoryId, promptId, answer, displayOrder } = payload;
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Validate Category
     const category = await tx.promptCategory.findUnique({
       where: {
@@ -416,13 +436,17 @@ export const updateUserPromptService = async (userId: string, payload: any) => {
       data: userPrompt,
     };
   });
+
+ await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 export const updateLocationService = async (
   userId: string,
   payload: any
 ) => {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
 
     const profileData: any = {};
 
@@ -462,6 +486,10 @@ export const updateLocationService = async (
       message: "Location updated successfully.",
     };
   });
+
+   await redis.del(`profile:edit:${userId}`);
+
+  return result;
 };
 
 function formatDate(date: Date | null): string | null {
@@ -477,6 +505,18 @@ function formatDate(date: Date | null): string | null {
 export async function getEditProfileService(
   userId: string
 ): Promise<EditProfileResponse> {
+  const CACHE_KEY = `profile:edit:${userId}`;
+
+  // 1. Check Redis
+  const cachedProfile = await redis.get<EditProfileResponse>(CACHE_KEY);
+
+  if (cachedProfile) {
+    console.log("✅ Edit Profile from Redis");
+    return cachedProfile;
+  }
+
+  console.log("📦 Edit Profile from Database");
+
   const profile = await getEditProfileRepository(userId);
 
   if (!profile) {
@@ -511,12 +551,12 @@ export async function getEditProfileService(
       option: item.option.label,
     }));
 
-  return {
+  const response: EditProfileResponse = {
     basicDetails: {
       fullName: profile.full_name,
       email: profile.email,
       phoneNumber: profile.phone_number,
-      birthDate:  formatDate(profile.birth_date),
+      birthDate: formatDate(profile.birth_date),
       height: profile.height,
       gender: profile.gender,
       genderOption: profile.gender_option,
@@ -701,4 +741,14 @@ export async function getEditProfileService(
         profile.profile?.max_distance_km,
     },
   };
+
+  // 3. Save to Redis
+  await redis.set(CACHE_KEY, response, {
+    ex: CACHE_TTL,
+  });
+
+  console.log("💾 Edit Profile cached");
+
+  return response;
+
 }
