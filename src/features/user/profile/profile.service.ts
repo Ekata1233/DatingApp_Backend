@@ -219,23 +219,35 @@ export const updateReligionService = async (
 //LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION
 export const updateLookingForService = async (
   userId: string,
-  intentionId: string,
+  optionId: string,
 ) => {
   if (!userId) throw new Error("User ID is required");
 
-  const currentStep = "LOOKING_FOR";
+  const selectedOption = await prisma.intentionOption.findUnique({
+    where: {
+      id: optionId,
+    },
+  });
+
+  if (!selectedOption) {
+    throw new Error("Invalid option selected");
+  }
 
   const score = await calculateProfileScore(userId);
 
   return prisma.user.update({
     where: { id: userId },
     data: {
-      intentionId,
-      onboarding_step: currentStep,
+      intentionId: selectedOption.intentionId,
+      onboarding_step: "LOOKING_FOR",
       profile_completion: score,
     },
     include: {
-      intention: true,
+      intention: {
+        include: {
+          options: true,
+        },
+      },
     },
   });
 };

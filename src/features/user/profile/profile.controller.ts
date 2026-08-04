@@ -136,29 +136,31 @@ export const updateLookingForController = async (
       });
     }
 
-    const { intentionId } = req.body;
+    const { optionId } = req.body;
 
     // Basic validation
-    if (!intentionId) {
+    if (!optionId) {
       return res.status(400).json({
         success: false,
-        message: "intentionId is required",
+        message: "optionId is required",
       });
     }
-    const intention = await prisma.intention.findUnique({
+
+    // Find selected option
+    const option = await prisma.intentionOption.findUnique({
       where: {
-        id: intentionId,
+        id: optionId,
       },
     });
 
-    if (!intention) {
+    if (!option) {
       return res.status(404).json({
         success: false,
-        message: "Invalid intention",
+        message: "Invalid option",
       });
     }
 
-    const user = await updateLookingForService(userId, intentionId);
+    const user = await updateLookingForService(userId, optionId);
 
     return res.status(200).json({
       success: true,
