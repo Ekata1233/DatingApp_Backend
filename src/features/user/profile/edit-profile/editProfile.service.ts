@@ -552,6 +552,7 @@ export async function getEditProfileService(
     }));
 
   const response: EditProfileResponse = {
+    profileScore: profile.profile_completion ?? 0,
     basicDetails: {
       fullName: profile.full_name,
       email: profile.email,
