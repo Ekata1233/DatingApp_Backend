@@ -20,13 +20,45 @@ export const createStorePackRepo = (
 };
 
 export const findFeatureByType = (
+  itemType: StoreItemType,
   feature: string
 ) => {
-  return prisma.storeFeature.findUnique({
-    where: { feature: feature as any },
+  return prisma.storeFeature.findFirst({
+    where: {
+      itemType,
+      feature: feature as any,
+    },
   });
 };
-
+export const updateStoreFeatureRepo = (
+  id: string,
+  data: CreateStoreFeatureDTO
+) => {
+  return prisma.storeFeature.update({
+    where: { id },
+    data,
+  });
+};
+export const findPackByQuantity = (
+  itemType: StoreItemType,
+  quantity: number
+) => {
+  return prisma.storePack.findFirst({
+    where: {
+      itemType,
+      quantity,
+    },
+  });
+};
+export const updateStorePackRepo = (
+  id: string,
+  data: CreateStorePackDTO
+) => {
+  return prisma.storePack.update({
+    where: { id },
+    data,
+  });
+};
 export const getStoreDataRepository = async (
     itemType: StoreItemType
   ) => {

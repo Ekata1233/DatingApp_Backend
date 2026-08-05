@@ -1169,7 +1169,8 @@ router.delete("/profile/photos/:photoId", authMiddleware, deletePhotoController)
 
 
 
-router.patch("/profile/video", authMiddleware, updateVideoController);
+
+router.post("/profile/video", authMiddleware, updateVideoController);
 
 
 
