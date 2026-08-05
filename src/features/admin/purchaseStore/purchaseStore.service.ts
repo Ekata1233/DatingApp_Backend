@@ -1,15 +1,18 @@
 import { StoreItemType } from "@prisma/client";
-import { createStoreFeatureRepo, createStorePackRepo, findFeatureByType, getStoreDataRepository } from "./purchaseStore.repository";
+import { createStoreFeatureRepo, createStorePackRepo, findFeatureByType, findPackByQuantity, getStoreDataRepository, updateStoreFeatureRepo, updateStorePackRepo } from "./purchaseStore.repository";
 import { CreateStoreFeatureDTO, CreateStorePackDTO } from "./purchaseStore.types";
-
 
 export const createStoreFeatureService = async (
   body: CreateStoreFeatureDTO
 ) => {
-  const exists = await findFeatureByType(body.feature);
+  const exists = await findFeatureByType(
+    body.itemType,
+    body.feature
+  );
 
+  // If same itemType + feature exists, update it
   if (exists) {
-    throw new Error("FEATURE_ALREADY_EXISTS");
+    return await updateStoreFeatureRepo(exists.id, body);
   }
 
   return await createStoreFeatureRepo(body);
@@ -18,6 +21,16 @@ export const createStoreFeatureService = async (
 export const createStorePackService = async (
   body: CreateStorePackDTO
 ) => {
+  const exists = await findPackByQuantity(
+    body.itemType,
+    body.quantity
+  );
+
+  // Same itemType + quantity -> update
+  if (exists) {
+    return await updateStorePackRepo(exists.id, body);
+  }
+
   return await createStorePackRepo(body);
 };
 
