@@ -437,7 +437,7 @@ export const updateUserPromptService = async (userId: string, payload: any) => {
     };
   });
 
- await redis.del(`profile:edit:${userId}`);
+  await redis.del(`profile:edit:${userId}`);
 
   return result;
 };
@@ -487,7 +487,7 @@ export const updateLocationService = async (
     };
   });
 
-   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`profile:edit:${userId}`);
 
   return result;
 };
@@ -565,6 +565,11 @@ export async function getEditProfileService(
         id: profile.profile.religion.id,
         name: profile.profile.religion.name,
       } : null,
+      languages:
+        profile.profile?.languages?.map((item) => ({
+          id: item.language.id,
+          name: item.language.name,
+        })) ?? [],
       community: profile.profile?.community ? {
         id: profile.profile.community.id,
         name: profile.profile.community.name,
