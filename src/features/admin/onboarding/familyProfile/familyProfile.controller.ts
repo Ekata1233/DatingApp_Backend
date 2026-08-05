@@ -1,6 +1,6 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { createCategoryValidation, createFamilyIncomeValidation, createMasterValueValidation, updateCategoryValidation, updateFamilyIncomeValidation, updateMasterValueValidation } from "./familyProfile.validation";
-import { createCategoryService, createFamilyIncomeService, createMasterValueService, deleteCategoryService, deleteFamilyIncomeService, deleteMasterValueService, getCategoriesService, getFamilyIncomeService, getMasterValuesService, updateCategoryService, updateFamilyIncomeService, updateMasterValueService } from "./familyProfile.service";
+import { createCategoryService, createFamilyIncomeService, createMasterValueService, deleteCategoryService, deleteFamilyIncomeService, deleteMasterValueService, getCategoriesService, getFamilyIncomeService, getFamilyOptionsService, getMasterValuesService, updateCategoryService, updateFamilyIncomeService, updateMasterValueService } from "./familyProfile.service";
 
 export const createCategoryController = async (
   req: Request,
@@ -268,5 +268,25 @@ export const getFamilyIncomeController = async (
       success: false,
       message: error.message,
     });
+  }
+};
+
+export const getFamilyOptionsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const type = String(req.query.type || "");
+
+    const data = await getFamilyOptionsService(type);
+
+    return res.status(200).json({
+      success: true,
+      message: "Family options fetched successfully",
+      data,
+    });
+  } catch (error) {
+    next(error);
   }
 };

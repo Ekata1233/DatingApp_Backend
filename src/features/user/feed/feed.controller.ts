@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getFeedService } from "./feed.service";
+import { getFeedDetailsService, getFeedService } from "./feed.service";
 import { FeedMode } from "./feed.types";
 
 export const getFeedController = async (req: Request, res: Response) => {
@@ -36,6 +36,51 @@ export const getFeedController = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+
+export const getFeedDetailsController = async (
+  req: Request, 
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = (req as any).user?.id;
+
+    if (!currentUserId) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized - User not authenticated'
+      });
+      return;
+    }
+
+    // Validate userId parameter
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+      return;
+    }
+
+    const userDetails = await getFeedDetailsService(userId, currentUserId);
+
+    res.status(200).json({
+      success: true,
+      message: 'User feed details fetched successfully',
+      data: userDetails,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Error in getFeedDetailsController:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch user details',
+      timestamp: new Date().toISOString()
     });
   }
 };

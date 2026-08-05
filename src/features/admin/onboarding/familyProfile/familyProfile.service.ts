@@ -304,3 +304,72 @@ export const getFamilyIncomeService = async () => {
     },
   });
 };
+
+const CATEGORY_MAP: Record<string, string> = {
+  familyStatus: "FAMILY_STATUS",
+  familyType: "FAMILY_TYPE",
+  fatherOccupation: "FATHER_OCCUPATION",
+  fatherOrganisation: "FATHER_ORGANISATION",
+  motherOccupation: "MOTHER_OCCUPATION",
+  motherOrganisation: "MOTHER_ORGANISATION",
+  siblingRelation: "SIBLING_RELATION",
+  siblingOccupation: "SIBLING_OCCUPATION",
+  siblingMarital: "SIBLING_MARITAL",
+  familyHome: "FAMILY_HOME",
+  nativePlace: "NATIVE_PLACE",
+};
+
+export const getFamilyOptionsService = async (type: string) => {
+  if (!type) {
+    throw new Error("Type is required");
+  }
+
+  // Family Income comes from a separate table
+  if (type === "familyIncome") {
+    const incomes = await prisma.familyIncome.findMany({
+      where: {
+        active: true,
+      },
+      orderBy: {
+        priority: "asc",
+      },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+
+    return incomes.map((item) => ({
+      id: item.id,
+      value: item.title,
+    }));
+  }
+
+  const categoryCode = CATEGORY_MAP[type];
+
+  if (!categoryCode) {
+    throw new Error("Invalid type");
+  }
+
+  const category = await prisma.masterCategory.findUnique({
+    where: {
+      code: categoryCode,
+    },
+    select: {
+      values: {
+        where: {
+          active: true,
+        },
+        orderBy: {
+          priority: "asc",
+        },
+        select: {
+          id: true,
+          value: true,
+        },
+      },
+    },
+  });
+
+  return category?.values ?? [];
+};
