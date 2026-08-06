@@ -236,8 +236,8 @@ export async function getEditProfileRepository(userId: string) {
       intention: {
         select: {
           id: true,
-          title: true,
-          description: true,
+          option: true,
+          optDescription: true,
         },
       },
       bio: {

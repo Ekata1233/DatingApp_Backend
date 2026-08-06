@@ -78,7 +78,7 @@ export interface BioResponse {
 
 export interface LookingForResponse {
     id: string | null;
-    title: string | null;
+    option: string | null;
     description: string | null;
 }
 
