@@ -243,17 +243,18 @@ export const updateLookingForService = async (
 
   const score = await calculateProfileScore(userId);
 
+
   const result = await prisma.user.update({
     where: { id: userId },
     data: {
-      intentionId: selectedOption.intentionId,
+      intentionId: selectedOption.id, // ✅ Save the option ID
       onboarding_step: "LOOKING_FOR",
       profile_completion: score,
     },
     include: {
       intention: {
         include: {
-          options: true,
+          intention: true,
         },
       },
     },

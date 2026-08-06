@@ -594,10 +594,9 @@ export async function getEditProfileService(
 
     lookingFor: {
       id: profile.intention?.id ?? null,
-      title: profile.intention?.title ?? null,
-      description: profile.intention?.description ?? null,
+      option: profile.intention?.option ?? null,
+      description: profile.intention?.optDescription ?? null,
     },
-
     profile: {
       interestedIn: profile.profile?.interested_in ?? null,
       sexualOrientation: profile.profile?.sexual_orientation ?? null,

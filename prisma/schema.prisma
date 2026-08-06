@@ -62,7 +62,7 @@ model User {
   datePlanStats        DatePlanUserStats?
   datePlanPurchases    DatePlanPurchase[]
   datePlanTransactions DatePlanTransaction[]
-  intention            Intention?            @relation(fields: [intentionId], references: [id])
+  intention            IntentionOption?      @relation(fields: [intentionId], references: [id])
   userPrompts          UserPrompt[]
   UserPlanUsage        UserPlanUsage[]
   waitlist             Waitlist?
@@ -712,7 +712,6 @@ model Intention {
   sortOrder   Int               @default(0)
   isActive    Boolean           @default(true)
   options     IntentionOption[]
-  users       User[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -723,6 +722,7 @@ model IntentionOption {
   optDescription String?
   intentionId    String    @db.Uuid
   intention      Intention @relation(fields: [intentionId], references: [id], onDelete: Cascade)
+  users          User[]
   createdAt      DateTime  @default(now())
 }
 
@@ -855,7 +855,7 @@ model BoostPurchase {
   quantity            Int
   amount              Decimal
   paymentMethod       PurchasePaymentMethod
-  paymentId           String?             
+  paymentId           String?
   walletTransactionId String?               @db.Uuid
   payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
   walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
@@ -1110,7 +1110,7 @@ model RosePurchase {
   quantity            Int
   amount              Decimal               @db.Decimal(10, 2)
   paymentMethod       PurchasePaymentMethod
-  paymentId           String?              
+  paymentId           String?
   walletTransactionId String?               @db.Uuid
   payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
   walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
@@ -1189,7 +1189,7 @@ model ComplimentPurchase {
   quantity            Int
   amount              Decimal                 @db.Decimal(10, 2)
   paymentMethod       PurchasePaymentMethod
-  paymentId           String?                 
+  paymentId           String?
   walletTransactionId String?                 @db.Uuid
   payment             Payment?                @relation(fields: [paymentId], references: [payment_id])
   walletTransaction   WalletTransaction?      @relation(fields: [walletTransactionId], references: [id])
@@ -1508,7 +1508,7 @@ model DatePlanPurchase {
   quantity            Int
   amount              Float                 @default(0.00)
   paymentMethod       PurchasePaymentMethod
-  paymentId           String?              
+  paymentId           String?
   walletTransactionId String?               @db.Uuid
   payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
   walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
