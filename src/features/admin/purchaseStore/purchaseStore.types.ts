@@ -23,3 +23,12 @@ export interface CreateStorePackDTO {
   sortOrder?: number;
   isActive?: boolean;
 }
+
+export interface CreateStoreInfoDTO {
+  itemType: StoreItemType;
+  title: string;
+  description: string;
+  tag?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}

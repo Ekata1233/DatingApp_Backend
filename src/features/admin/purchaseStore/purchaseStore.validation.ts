@@ -91,3 +91,23 @@ export const createStorePackSchema = z.object({
     .default(true)
     .optional(),
 });
+
+
+
+export const createStoreInfoSchema = z.object({
+  itemType: z.nativeEnum(StoreItemType),
+
+  title: z.string().trim().min(1).max(100),
+
+  description: z.string().trim().min(1).max(500),
+
+  tag: z.string().trim().max(30).optional(),
+
+  sortOrder: z.number().int().optional(),
+
+  isActive: z.boolean().optional(),
+});
+
+export const updateStoreInfoSchema =
+  createStoreInfoSchema.partial();
+

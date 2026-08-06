@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createStoreFeature, createStorePack, getComplimentStoreController, getRoseStoreController } from "./purchaseStore.controller";
+import { createStoreFeature, createStoreInfoController, createStorePack, getComplimentStoreController, getRoseStoreController, getStoreController } from "./purchaseStore.controller";
 
 
 
@@ -15,7 +15,13 @@ router.post("/purchase-store/features", createStoreFeature);
 
 router.post("/purchase-store/packs",  createStorePack);
 
+router.post(
+  "/purchase-store/info",
+  createStoreInfoController
+); 
+
 router.get("/purchase-store/roses", getRoseStoreController);
 
 router.get("/purchase-store/compliments", getComplimentStoreController);
+router.get("/purchase-store/:itemType", getStoreController);
 export default router;
