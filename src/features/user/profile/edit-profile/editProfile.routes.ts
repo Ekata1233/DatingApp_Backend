@@ -1,5 +1,5 @@
 import express from "express";
-import { getEditProfileController, updateBasicInfo, updateBio, updateEduWork, updateLocation, updateQuestionAnswers, updateUserPrompt} from "./editProfile.controller";
+import { deleteUserPromptController, getEditProfileController, updateBasicInfo, updateBio, updateEduWork, updateLocation, updateQuestionAnswers, updateUserPrompt} from "./editProfile.controller";
 import authMiddleware from "../../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -35,6 +35,8 @@ router.patch(
   authMiddleware,
   updateLocation
 );
+
+router.delete("/edit-profile/prompt/:promptId", authMiddleware, deleteUserPromptController);
 
 router.get(
   "/profile/details",

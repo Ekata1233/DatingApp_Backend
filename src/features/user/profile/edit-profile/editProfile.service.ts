@@ -492,6 +492,37 @@ export const updateLocationService = async (
   return result;
 };
 
+export const deleteUserPromptService = async (
+  userId: string,
+  promptId: string
+) => {
+  const userPrompt = await prisma.userPrompt.findUnique({
+    where: {
+      userId_promptId: {
+        userId,
+        promptId,
+      },
+    },
+  });
+
+  if (!userPrompt) {
+    throw new Error("Prompt not found.");
+  }
+
+  const result = await prisma.userPrompt.delete({
+    where: {
+      userId_promptId: {
+        userId,
+        promptId,
+      },
+    },
+  });
+
+  await redis.del(`profile:edit:${userId}`);
+
+  return result;
+};
+
 function formatDate(date: Date | null): string | null {
   if (!date) return null;
 

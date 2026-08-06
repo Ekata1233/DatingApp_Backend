@@ -1123,21 +1123,21 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
       },
     });
 
-    const score = await calculateProfileScore(userId);
-
-    await tx.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        profile_completion: score,
-      },
-    });
-
     return {
       bio: userBio,
       onboarding: updatedUser,
     };
+  });
+
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      profile_completion: score,
+    },
   });
 
   await redis.del(`profile:edit:${userId}`);
