@@ -1,6 +1,7 @@
 import { StoreItemType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { CreateStoreFeatureDTO, CreateStorePackDTO } from "./purchaseStore.types";
+import { CreateStoreInfoDTO } from "./purchaseStore.validation";
 
 
 export const createStoreFeatureRepo = (
@@ -89,3 +90,47 @@ export const getStoreDataRepository = async (
       packs,
     };
   };
+
+  export const createStoreInfoRepo = (
+  data: CreateStoreInfoDTO
+) => {
+  return prisma.storeInfo.create({
+    data,
+  });
+};
+
+export const updateStoreInfoRepo = (
+  id: string,
+  data: CreateStoreInfoDTO
+) => {
+  return prisma.storeInfo.update({
+    where: { id },
+    data,
+  });
+};
+
+export const findStoreInfoByTitle = (
+  itemType: StoreItemType,
+  title: string
+) => {
+  return prisma.storeInfo.findFirst({
+    where: {
+      itemType,
+      title,
+    },
+  });
+};
+
+export const getStoreInfoRepo = (
+  itemType: StoreItemType
+) => {
+  return prisma.storeInfo.findMany({
+    where: {
+      itemType,
+      isActive: true,
+    },
+    orderBy: {
+      sortOrder: "asc",
+    },
+  });
+};

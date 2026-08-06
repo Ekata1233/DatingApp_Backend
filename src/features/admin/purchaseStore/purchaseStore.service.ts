@@ -1,6 +1,7 @@
 import { StoreItemType } from "@prisma/client";
-import { createStoreFeatureRepo, createStorePackRepo, findFeatureByType, findPackByQuantity, getStoreDataRepository, updateStoreFeatureRepo, updateStorePackRepo } from "./purchaseStore.repository";
-import { CreateStoreFeatureDTO, CreateStorePackDTO } from "./purchaseStore.types";
+import { createStoreFeatureRepo, createStoreInfoRepo, createStorePackRepo, findFeatureByType, findPackByQuantity, findStoreInfoByTitle, getStoreDataRepository, updateStoreFeatureRepo, updateStoreInfoRepo,  updateStorePackRepo } from "./purchaseStore.repository";
+import { CreateStoreFeatureDTO, CreateStoreInfoDTO, CreateStorePackDTO } from "./purchaseStore.types";
+
 
 export const createStoreFeatureService = async (
   body: CreateStoreFeatureDTO
@@ -34,6 +35,22 @@ export const createStorePackService = async (
   return await createStorePackRepo(body);
 };
 
+export const createStoreInfoService = async (
+  body: CreateStoreInfoDTO
+) => {
+  const exists = await findStoreInfoByTitle(
+    body.itemType,
+    body.title
+  );
+
+  // Same itemType + title -> update
+  if (exists) {
+    return await updateStoreInfoRepo(exists.id, body);
+  }
+
+  return await createStoreInfoRepo(body);
+};
+
 export const getStoreService = async (
   itemType: StoreItemType
 ) => {
@@ -43,6 +60,7 @@ export const getStoreService = async (
     itemType,
     features: store.features,
     packs: store.packs,
+    info: store.info,
   };
 };
 
@@ -53,3 +71,4 @@ export const getRoseStoreService = () => {
 export const getComplimentStoreService = () => {
   return getStoreService(StoreItemType.COMPLIMENT);
 };
+

@@ -37,10 +37,14 @@ export const createComplimentCategoryService = async (
  * Get All Compliment Categories
  */
 export const getAllComplimentCategoryService = async () => {
-  const cache = await redis.get(ALL_CACHE_KEY) as string | null;
+  const cache = await redis.get(ALL_CACHE_KEY);
 
   if (cache) {
-    return JSON.parse(cache);
+    if (typeof cache === "string") {
+      return JSON.parse(cache);
+    }
+
+    return cache;
   }
 
   const categories = await prisma.complimentCategory.findMany({
@@ -57,9 +61,9 @@ export const getAllComplimentCategoryService = async () => {
   await redis.set(
     ALL_CACHE_KEY,
     JSON.stringify(categories),
-     {
-    ex: 60 * 60,
-  }
+    {
+      ex: 60 * 60,
+    }
   );
 
   return categories;
@@ -200,12 +204,15 @@ export const createComplimentIdeaService = async (
 // =====================================
 
 export const getAllComplimentIdeaService = async () => {
-  const cache = (await redis.get(ALL_IDEA_CACHE_KEY)) as string | null;
+  const cache = await redis.get(ALL_IDEA_CACHE_KEY);
 
   if (cache) {
-    return JSON.parse(cache);
-  }
+    if (typeof cache === "string") {
+      return JSON.parse(cache);
+    }
 
+    return cache;
+  }
 
   const ideas = await prisma.complimentIdea.findMany({
     include: {
@@ -221,14 +228,13 @@ export const getAllComplimentIdeaService = async () => {
     ],
   });
 
-
-await redis.set(
-  ALL_IDEA_CACHE_KEY,
-  JSON.stringify(ideas),
-  {
-    ex: 60 * 60,
-  }
-);
+  await redis.set(
+    ALL_IDEA_CACHE_KEY,
+    JSON.stringify(ideas),
+    {
+      ex: 60 * 60,
+    }
+  );
 
   return ideas;
 };
