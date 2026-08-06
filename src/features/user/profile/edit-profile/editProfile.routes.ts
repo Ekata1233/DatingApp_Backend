@@ -36,7 +36,7 @@ router.patch(
   updateLocation
 );
 
-router.delete("/edit-profile/:promptId", authMiddleware, deleteUserPromptController);
+router.delete("/edit-profile/prompt/:promptId", authMiddleware, deleteUserPromptController);
 
 router.get(
   "/profile/details",
