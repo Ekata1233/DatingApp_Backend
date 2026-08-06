@@ -56,14 +56,14 @@ export const updateBio = async (
 ) => {
   try {
 
-     if (!req.user) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized"
       });
     }
-  const userId = (req as any).user.id;
-   
+    const userId = (req as any).user.id;
+
 
     const validatedData =
       updateBioSchema.parse(req.body);
@@ -240,6 +240,30 @@ export const updateLocation = async (
       success: false,
       message: error.message,
     });
+  }
+};
+
+export const deleteUserPromptController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { promptId } = req.params;
+
+    if (typeof promptId !== "string") {
+      throw new Error("Invalid promptId");
+    }
+
+    await userEduWorkService.deleteUserPromptService(userId, promptId);
+
+    res.status(200).json({
+      success: true,
+      message: "Prompt deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
