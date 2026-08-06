@@ -139,7 +139,7 @@
 //   // -------------------------
 //   const USER_CACHE_TTL = 60 * 10;
 //   const USER_CACHE_KEY = `feed:user:${userId}`;
-  
+
 //   const currentUserPromise = async (): Promise<CurrentUser | null> => {
 //     const cached = await redis.get<CurrentUser>(USER_CACHE_KEY);
 
@@ -630,7 +630,7 @@ import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
-import { CurrentUser, FeedParams } from "./feed.types";
+import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
 
 /**
@@ -919,11 +919,11 @@ export const getFeedService = async ({
         JOIN user_profiles p ON p.user_id = u.id
         WHERE ${matchConditions}
           ${cursorState
-            ? Prisma.sql`AND (
+          ? Prisma.sql`AND (
                 (EXTRACT(EPOCH FROM u.created_at) * 1000) < ${cursorState.k}
                 OR ((EXTRACT(EPOCH FROM u.created_at) * 1000) = ${cursorState.k} AND u.id < ${cursorState.id}::uuid)
               )`
-            : Prisma.empty}
+          : Prisma.empty}
         ORDER BY sort_val DESC, u.id DESC
         LIMIT ${batchSize};
       `;
@@ -937,14 +937,14 @@ export const getFeedService = async ({
         WHERE ${matchConditions}
           AND ST_DWithin(p.location::geography, ${me}, ${maxDistance * 1000})
           ${cursorState
-            ? Prisma.sql`AND (
+          ? Prisma.sql`AND (
                 (p.location::geography <-> ${me}) > ${cursorState.k}
                 OR (
                   (p.location::geography <-> ${me}) = ${cursorState.k}
                   AND u.id > ${cursorState.id}::uuid
                 )
               )`
-            : Prisma.empty}
+          : Prisma.empty}
         ORDER BY p.location::geography <-> ${me} ASC, u.id ASC
         LIMIT ${batchSize};
       `;
@@ -975,7 +975,7 @@ export const getFeedService = async ({
         height: true,
         created_at: true,
         last_active_at: true,
-        
+
         profile: {
           select: {
             city: true,
@@ -983,7 +983,7 @@ export const getFeedService = async ({
             longitude: true,
           },
         },
-        
+
         eduWork: {
           select: {
             professionId: true,
@@ -995,7 +995,7 @@ export const getFeedService = async ({
             },
           },
         },
-        
+
         photos: {
           where: {
             is_primary: true,
@@ -1062,26 +1062,26 @@ export const getFeedService = async ({
       height: user.height,
       created_at: user.created_at,
       last_active_at: user.last_active_at,
-      
+
       profile: {
         city: user.profile?.city || null,
         latitude: user.profile?.latitude || null,
         longitude: user.profile?.longitude || null,
       },
-      
+
       eduWork: {
         professionId: user.eduWork?.professionId || null,
         profession: user.eduWork?.profession || null,
       },
-      
+
       photos: user.photos || [],
-      
+
       // Static values - no calculation needed
       matchScore: STATIC_MATCH_SCORE,
       distanceKm: meters != null ? Math.round((meters / 1000) * 100) / 100 : 0,
       trust: STATIC_TRUST,
       replyTime: STATIC_REPLY_TIME,
-      
+
       // Dynamic presence
       isOnline: presence?.isOnline || false,
       lastActiveAt: presence?.lastActiveAt || null,
@@ -1118,3 +1118,212 @@ export const getFeedService = async ({
     nextCursor,
   };
 };
+
+
+export const getFeedDetailsService = async (
+  userId: string,
+  currentUserId: string
+): Promise<UserFeedResponse> => {
+  // Optional: Check if current user has access to view this profile
+  // await validateAccess(currentUserId, userId);
+
+  // Fetch user with all related data
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      profile: {
+        include: {
+          religion: true,
+          community: true,
+          languages: {
+            include: {
+              language: true
+            }
+          }
+        }
+      },
+      bio: true,
+      intention: true,
+      eduWork: {
+        include: {
+          profession: true,
+          employmentType: true,
+          experience: true,
+          ambition: true,
+          salaryRange: true
+        }
+      },
+      familyProfile: {
+        include: {
+          familyStatus: true,
+          familyType: true,
+          fatherOccupation: true,
+          fatherOrganisation: true,
+          motherOccupation: true,
+          motherOrganisation: true,
+          familyHome: true,
+          nativePlace: true,
+          familyIncome: true,
+          siblings: {
+            include: {
+              relation: true,
+              occupation: true,
+              marital: true
+            }
+          }
+        }
+      },
+      photos: {
+        orderBy: {
+          order: 'asc'
+        }
+      },
+      userPrompts: {
+        include: {
+          prompt: {
+            include: {
+              category: true
+            }
+          }
+        },
+        orderBy: {
+          displayOrder: 'asc'
+        }
+      },
+      answer: {
+        include: {
+          question: true,
+          option: true
+        }
+      }
+    }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Transform data to required format
+  return transformUserData(user);
+};
+
+// Helper function to transform user data
+const transformUserData = (user: any): UserFeedResponse => {
+  // Extract lifestyle answers (screen = LIFESTYLE)
+  const lifestyleAnswers = user.answer.filter(
+    (a: any) => a.question.screen === 'LIFESTYLE'
+  );
+
+  // Extract interests (screen = THINGS_U_LOVE)
+  const interestAnswers = user.answer.filter(
+    (a: any) => a.question.screen === 'THINGS_U_LOVE'
+  );
+
+  // Calculate age from birth_date
+  const age = calculateAge(user.birth_date);
+
+  // Get primary photo
+  const primaryPhoto = user.photos.find((p: any) => p.is_primary) || user.photos[0];
+
+  // Get mother tongue from languages
+  const motherTongue = user.profile?.languages?.[0]?.language?.name || null;
+
+  // Extract zodiac sign from birth_date
+  const zodiac = user.userAbout?.zodiac || null;
+  const communicationStyle = user.userAbout?.communicationStyle || null;
+  const loveLanguage = user.userAbout?.loveLanguage || null;
+
+  return {
+    userId: user.id,
+    fullName: user.full_name,
+    age: age,
+    gender: user.gender,
+
+    // Static values
+    matchScore: STATIC_MATCH_SCORE,
+    trust: STATIC_TRUST,
+    replyTime: STATIC_REPLY_TIME,
+
+    // Basic Info
+    bio: user.bio?.bio || null,
+    lookingFor: user.intention?.title || null,
+    religion: user.profile?.religion?.name || null,
+    motherTongue: motherTongue,
+    height: user.height,
+    city: user.profile?.city || null,
+    state: user.profile?.state || null,
+    country: user.profile?.country || null,
+    zodiac: zodiac,
+
+    // Communication & Love Language
+      communicationStyle: communicationStyle,
+      loveLanguage: loveLanguage,
+
+    // Photos
+    photos: user.photos.map((photo: any) => ({
+      id: photo.id,
+      url: photo.media_url,
+      isPrimary: photo.is_primary,
+      order: photo.order,
+      mediaType: photo.media_type
+    })),
+
+    // Prompts
+    prompts: user.userPrompts.map((prompt: any) => ({
+      id: prompt.id,
+      question: prompt.prompt.question,
+      answer: prompt.answer,
+      category: prompt.prompt.category?.name || null,
+      displayOrder: prompt.displayOrder
+    })),
+
+    // Career
+    career: {
+      highestEducation: user.eduWork?.highestEdu || null,
+      degree: user.eduWork?.degree || null,
+      collegeName: user.eduWork?.collegeName || null,
+      graduationYear: user.eduWork?.graduationYear || null,
+      profession: user.eduWork?.profession?.name || null,
+      companyName: user.eduWork?.companyName || null,
+      employmentType: user.eduWork?.employmentType?.name || null,
+      experience: user.eduWork?.experience?.title || null,
+      ambition: user.eduWork?.ambition?.title || null,
+      salaryRange: user.eduWork?.salaryRange?.title || null,
+      bigDreams: user.eduWork?.bigDreams || null
+    },
+
+    // Lifestyle
+    lifestyle: lifestyleAnswers.map((answer: any) => ({
+      question: answer.question.title,
+      answer: answer.option.label,
+      description: answer.description || null
+    })),
+
+    // Interests
+    interests: interestAnswers.map((answer: any) => ({
+      question: answer.question.title,
+      answer: answer.option.label,
+      description: answer.description || null
+    })),
+
+    // Family
+    family: {
+      familyStatus: user.familyProfile?.familyStatus?.value || null,
+      familyType: user.familyProfile?.familyType?.value || null,
+      fatherOccupation: user.familyProfile?.fatherOccupation?.value || null,
+      fatherOrganisation: user.familyProfile?.fatherOrganisation?.value || null,
+      motherOccupation: user.familyProfile?.motherOccupation?.value || null,
+      motherOrganisation: user.familyProfile?.motherOrganisation?.value || null,
+      familyHome: user.familyProfile?.familyHome?.value || null,
+      nativePlace: user.familyProfile?.nativePlace?.value || null,
+      familyIncome: user.familyProfile?.familyIncome?.title || null,
+      siblings: user.familyProfile?.siblings.map((sibling: any) => ({
+        relation: sibling.relation?.value || null,
+        occupation: sibling.occupation?.value || null,
+        marital: sibling.marital?.value || null
+      })) || []
+    }
+  };
+};
+
+

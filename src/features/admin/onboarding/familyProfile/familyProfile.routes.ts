@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createCategoryController, createFamilyIncomeController, createMasterValueController, deleteCategoryController, deleteFamilyIncomeController, deleteMasterValueController, getCategoriesController, getFamilyIncomeController, getMasterValuesController, updateCategoryController, updateFamilyIncomeController, updateMasterValueController } from "./familyProfile.controller";
+import { createCategoryController, createFamilyIncomeController, createMasterValueController, deleteCategoryController, deleteFamilyIncomeController, deleteMasterValueController, getCategoriesController, getFamilyIncomeController, getFamilyOptionsController, getMasterValuesController, updateCategoryController, updateFamilyIncomeController, updateMasterValueController } from "./familyProfile.controller";
 
 const router = Router();
 
@@ -26,4 +26,6 @@ router.delete("/family-values/:id", deleteMasterValueController);
 
 router.patch("/family-incomes/:id", updateFamilyIncomeController);
 router.delete("/family-incomes/:id", deleteFamilyIncomeController);
+
+router.get("/family/options", getFamilyOptionsController);
 export default router;
