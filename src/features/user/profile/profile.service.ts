@@ -818,6 +818,10 @@ export const uploadUserMediaService = async (
 ) => {
   if (!userId) throw new Error("User ID is required");
 
+  console.log("User ID:", userId);
+  // console.log("Files received:", files);
+  console.log("Media type:", mediaType);
+
   if (!files || files.length === 0) {
     throw new Error(
       mediaType === "IMAGE"
@@ -1027,17 +1031,13 @@ export const updateUserVideoService = async (
 ) => {
   if (!userId) throw new Error("User ID is required");
 
-  // Find existing user video
+  // Check existing video
   const existingVideo = await prisma.userPhoto.findFirst({
     where: {
       user_id: userId,
       media_type: "VIDEO",
     },
   });
-
-  if (!existingVideo) {
-    throw new Error("Video not found");
-  }
 
   const base64File = file.data.toString("base64");
 
@@ -1047,14 +1047,30 @@ export const updateUserVideoService = async (
     folder: "/user-videos",
   });
 
-  const updatedVideo = await prisma.userPhoto.update({
-    where: {
-      id: existingVideo.id,
-    },
-    data: {
-      media_url: uploadResponse.url,
-    },
-  });
+  let video;
+
+  if (existingVideo) {
+    // Update existing record
+    video = await prisma.userPhoto.update({
+      where: {
+        id: existingVideo.id,
+      },
+      data: {
+        media_url: uploadResponse.url,
+      },
+    });
+  } else {
+    // First upload
+    video = await prisma.userPhoto.create({
+      data: {
+        user_id: userId,
+        media_url: uploadResponse.url,
+        media_type: "VIDEO",
+        order: 1,
+        is_primary: false,
+      },
+    });
+  }
 
   const score = await calculateProfileScore(userId);
 
@@ -1069,7 +1085,7 @@ export const updateUserVideoService = async (
 
   await redis.del(`profile:edit:${userId}`);
 
-  return updatedVideo;
+  return video;
 };
 
 //Bio

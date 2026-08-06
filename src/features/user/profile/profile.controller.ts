@@ -1,5 +1,12 @@
 import { Request, Response } from "express";
-import { answerValidation, bioValidation, familyProfileValidation, locationValidation, profileValidation, promptValidation } from "./profile.validation";
+import {
+  answerValidation,
+  bioValidation,
+  familyProfileValidation,
+  locationValidation,
+  profileValidation,
+  promptValidation,
+} from "./profile.validation";
 import {
   updateProfileService,
   updateInterestedInService,
@@ -23,7 +30,7 @@ import {
   deleteUserMediaService,
   updateUserMediaService,
   uploadUserMediaService,
-  updateUserVideoService
+  updateUserVideoService,
 } from "./profile.service";
 import { LookingFor } from "@prisma/client";
 import { ZodError } from "zod";
@@ -45,7 +52,7 @@ export const profileController = async (req: Request, res: Response) => {
       birth_date,
       height,
       gender,
-      gender_option
+      gender_option,
     );
 
     return res.status(200).json({
@@ -64,16 +71,17 @@ export const profileController = async (req: Request, res: Response) => {
 };
 
 //Interested In
-export const InterestedInController = async (
-  req: Request,
-  res: Response,
-) => {
+export const InterestedInController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
     const { interested_in, sexual_orientation } = req.body;
 
-    const user = await updateInterestedInService(userId, interested_in, sexual_orientation);
+    const user = await updateInterestedInService(
+      userId,
+      interested_in,
+      sexual_orientation,
+    );
 
     return res.status(200).json({
       success: true,
@@ -92,10 +100,7 @@ export const InterestedInController = async (
 };
 
 //Religion
-export const ReligionController = async (
-  req: Request,
-  res: Response
-) => {
+export const ReligionController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -104,7 +109,7 @@ export const ReligionController = async (
     const profile = await updateReligionService(
       userId,
       Number(religionId),
-      Number(communityId)
+      Number(communityId),
     );
 
     return res.status(200).json({
@@ -112,7 +117,6 @@ export const ReligionController = async (
       message: "Religion saved successfully",
       data: profile,
     });
-
   } catch (error: any) {
     return res.status(400).json({
       success: false,
@@ -182,12 +186,7 @@ export const addressController = async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const { country, state, city } = req.body;
 
-    const user = await updateAddressService(
-      userId,
-      country,
-      state,
-      city
-    );
+    const user = await updateAddressService(userId, country, state, city);
 
     return res.status(200).json({
       success: true,
@@ -204,10 +203,7 @@ export const addressController = async (req: Request, res: Response) => {
 };
 
 //Location
-export const updateLocationController = async (
-  req: Request,
-  res: Response
-) => {
+export const updateLocationController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
 
@@ -220,11 +216,7 @@ export const updateLocationController = async (
 
     const { latitude, longitude } = locationValidation.parse(req.body);
 
-    const profile = await updateLocationService(
-      userId,
-      latitude,
-      longitude
-    );
+    const profile = await updateLocationService(userId, latitude, longitude);
 
     return res.status(200).json({
       success: true,
@@ -280,10 +272,7 @@ export const updateLocationController = async (
 // };
 
 //Save answer
-export const saveUserAnswerController = async (
-  req: Request,
-  res: Response
-) => {
+export const saveUserAnswerController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -304,20 +293,12 @@ export const saveUserAnswerController = async (
   }
 };
 
-//Education 
-export const educatioController = async (
-  req: Request,
-  res: Response
-) => {
+//Education
+export const educatioController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
-    const {
-      highestEdu,
-      collegeName,
-      degree,
-      graduationYear,
-    } = req.body;
+    const { highestEdu, collegeName, degree, graduationYear } = req.body;
 
     const user = await updateEducationService(userId, {
       highestEdu,
@@ -341,10 +322,7 @@ export const educatioController = async (
 };
 
 //work
-export const workController = async (
-  req: Request,
-  res: Response
-) => {
+export const workController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -383,10 +361,7 @@ export const workController = async (
 };
 
 //Family Profile
-export const FamilyProfileController = async (
-  req: Request,
-  res: Response
-) => {
+export const FamilyProfileController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -409,26 +384,19 @@ export const FamilyProfileController = async (
 };
 
 //Languages
-export const LanguageController = async (
-  req: Request,
-  res: Response
-) => {
+export const LanguageController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
     const { languageIds } = req.body;
 
-    const languages = await updateLanguageService(
-      userId,
-      languageIds
-    );
+    const languages = await updateLanguageService(userId, languageIds);
 
     return res.status(200).json({
       success: true,
       message: "Languages saved successfully",
       data: languages,
     });
-
   } catch (error: any) {
     return res.status(400).json({
       success: false,
@@ -438,10 +406,7 @@ export const LanguageController = async (
 };
 
 //Photos
-export const uploadPhotoController = async (
-  req: Request,
-  res: Response,
-) => {
+export const uploadPhotoController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -476,11 +441,7 @@ export const uploadPhotoController = async (
       }
     }
 
-    const result = await uploadUserMediaService(
-      userId,
-      images,
-      "IMAGE",
-    );
+    const result = await uploadUserMediaService(userId, images, "IMAGE");
 
     return res.status(200).json({
       success: true,
@@ -521,12 +482,7 @@ export const updatePhotoController = async (
       });
     }
 
-    const photo = await updateUserMediaService(
-      userId,
-      photoId,
-      image,
-      "IMAGE",
-    );
+    const photo = await updateUserMediaService(userId, photoId, image, "IMAGE");
 
     return res.status(200).json({
       success: true,
@@ -572,11 +528,7 @@ export const deletePhotoController = async (
     const userId = (req as any).user.id;
     const { photoId } = req.params;
 
-    const result = await deleteUserMediaService(
-      userId,
-      photoId,
-      "IMAGE",
-    );
+    const result = await deleteUserMediaService(userId, photoId, "IMAGE");
 
     return res.status(200).json({
       success: true,
@@ -597,11 +549,7 @@ export const deleteVideoController = async (
     const userId = (req as any).user.id;
     const { videoId } = req.params;
 
-    const result = await deleteUserMediaService(
-      userId,
-      videoId,
-      "VIDEO",
-    );
+    const result = await deleteUserMediaService(userId, videoId, "VIDEO");
 
     return res.status(200).json({
       success: true,
@@ -615,14 +563,14 @@ export const deleteVideoController = async (
   }
 };
 
-
-export const updateVideoController = async (
-  req: Request,
-  res: Response,
-) => {
+export const updateVideoController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
+    console.log("User ID:", userId);
+    console.log("Files received:", req.files);
+
+    // CHANGE START
     if (!req.files || !req.files.video) {
       return res.status(400).json({
         success: false,
@@ -630,7 +578,10 @@ export const updateVideoController = async (
       });
     }
 
-    const video = req.files.video;
+    const video = req.files.video as any;
+    // CHANGE END
+
+    console.log("Video received:", video);
 
     if (!video.mimetype.startsWith("video")) {
       return res.status(400).json({
@@ -639,10 +590,7 @@ export const updateVideoController = async (
       });
     }
 
-    const updatedVideo = await updateUserVideoService(
-      userId,
-      video,
-    );
+    const updatedVideo = await updateUserVideoService(userId, video);
 
     return res.status(200).json({
       success: true,
@@ -657,10 +605,7 @@ export const updateVideoController = async (
   }
 };
 
-export const updateUserBioController = async (
-  req: Request,
-  res: Response
-) => {
+export const updateUserBioController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -691,10 +636,7 @@ export const updateUserBioController = async (
 };
 
 //prompt
-export const UserPromptController = async (
-  req: Request,
-  res: Response
-) => {
+export const UserPromptController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
@@ -715,10 +657,7 @@ export const UserPromptController = async (
   }
 };
 
-export const completeOnboardingController = async (
-  req: any,
-  res: any
-) => {
+export const completeOnboardingController = async (req: any, res: any) => {
   try {
     const userId = req.user.id;
 
