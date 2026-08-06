@@ -352,12 +352,14 @@ model UserSibling {
   id              String            @id @default(uuid()) @db.Uuid
   familyProfileId String            @db.Uuid
   familyProfile   UserFamilyProfile @relation(fields: [familyProfileId], references: [id], onDelete: Cascade)
-  relationId      Int?
-  relation        MasterValue?      @relation("SiblingRelation", fields: [relationId], references: [id])
-  occupationId    Int?
-  occupation      MasterValue?      @relation("SiblingOccupation", fields: [occupationId], references: [id])
-  maritalId       Int?
-  marital         MasterValue?      @relation("SiblingMarital", fields: [maritalId], references: [id])
+  siblingTypeId   Int
+  siblingType     MasterValue       @relation("SiblingType", fields: [siblingTypeId], references: [id])
+
+  maritalId Int?
+  marital   MasterValue? @relation("SiblingMarital", fields: [maritalId], references: [id])
+
+  occupationId Int?
+  occupation   MasterValue? @relation("SiblingOccupation", fields: [occupationId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -392,7 +394,7 @@ model MasterValue {
   fatherOrganisations UserFamilyProfile[] @relation("FatherOrganisation")
   motherOccupations   UserFamilyProfile[] @relation("MotherOccupation")
   motherOrganisations UserFamilyProfile[] @relation("MotherOrganisation")
-  siblingRelations    UserSibling[]       @relation("SiblingRelation")
+  siblingTypes        UserSibling[]       @relation("SiblingType")
   siblingOccupations  UserSibling[]       @relation("SiblingOccupation")
   siblingMaritals     UserSibling[]       @relation("SiblingMarital")
   familyHomes         UserFamilyProfile[] @relation("FamilyHome")

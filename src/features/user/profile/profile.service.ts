@@ -632,9 +632,9 @@ export const updateFamilyProfileService = async (
     motherOrganisationId?: number;
 
     siblings?: {
-      relationId: number;
-      occupationId: number;
-      maritalId: number;
+      siblingTypeId: number;
+      occupationId?: number;
+      maritalId?: number;
     }[];
     familyHomeId?: number;
     nativePlaceId?: number;
@@ -669,11 +669,11 @@ export const updateFamilyProfileService = async (
 
     if (siblings.length) {
       await prisma.userSibling.createMany({
-        data: siblings.map((item: any) => ({
+        data: siblings.map((item) => ({
           familyProfileId: updatedProfile.id,
-          relationId: item.relationId,
-          occupationId: item.occupationId,
-          maritalId: item.maritalId,
+          siblingTypeId: item.siblingTypeId,
+          occupationId: item.occupationId ?? null,
+          maritalId: item.maritalId ?? null,
         })),
       });
     }
@@ -710,7 +710,7 @@ export const updateFamilyProfileService = async (
     include: {
       siblings: {
         include: {
-          relation: true,
+          siblingType: true,
           occupation: true,
           marital: true,
         },

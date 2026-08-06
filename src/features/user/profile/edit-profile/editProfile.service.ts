@@ -582,6 +582,14 @@ export async function getEditProfileService(
       option: item.option.label,
     }));
 
+  const networkingIntent = profile.answer
+    .filter(item => item.question.screen === QuestionScreen.NETWORKING_INTENT)
+    .map(item => ({
+      id: item.option.id,
+      question: item.question.title,
+      option: item.option.label,
+    }));
+
   const response: EditProfileResponse = {
     profileScore: profile.profile_completion ?? 0,
     basicDetails: {
@@ -751,6 +759,7 @@ export async function getEditProfileService(
 
     lifestyle,
     interests,
+    networkingIntent,
 
     prompts: profile.userPrompts.map((item) => ({
       id: item.id,
