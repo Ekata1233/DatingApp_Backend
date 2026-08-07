@@ -76,13 +76,13 @@ export const familyProfileValidation = z.object({
   motherOccupationId: z.number().int().optional(),
   motherOrganisationId: z.number().int().optional(),
 
- siblings: z.array(
-  z.object({
-    relationId: z.number().int(),
-    occupationId: z.number().int(),
-    maritalId: z.number().int(),
-  })
-).optional(),
+  siblings: z.array(
+    z.object({
+      siblingTypeId: z.number().int(),
+      occupationId: z.number().int().optional(),
+      maritalId: z.number().int().optional(),
+    })
+  ).optional(),
 
   familyHomeId: z.number().int().optional(),
   nativePlaceId: z.number().int().optional(),

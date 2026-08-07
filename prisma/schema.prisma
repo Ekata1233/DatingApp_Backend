@@ -2238,6 +2238,7 @@ enum StoreFeatureType {
   ROSE_SEND_COST
   REVEAL_ROSE_SENDER
 
+  WHO_LIKED_YOU_REVEAL_COST
   // Compliments
   COMPLIMENT_SEND_COST
   REVEAL_COMPLIMENT_SENDER
@@ -2259,6 +2260,21 @@ enum StoreFeatureType {
   DATE_PLAN_POST_COST
   DATE_PLAN_BOOST_COST
   DATE_PLAN_FREE_FOR_VIP
+}
+
+model StoreInfo {
+  id          String        @id @default(uuid()) @db.Uuid
+  itemType    StoreItemType
+  title       String
+  description String
+  tag         String? // e.g. PRIORITY, NEW
+  sortOrder   Int           @default(0)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([itemType, isActive])
+  @@map("store_info")
 }
 
 model StoreFeature {
