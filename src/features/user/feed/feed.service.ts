@@ -1117,7 +1117,7 @@ export const getFeedService = async ({
     users: sortedUsers,
     nextCursor,
   };
-
+};
 
 
 export const getFeedDetailsService = async (
@@ -1166,11 +1166,11 @@ export const getFeedDetailsService = async (
           familyIncome: true,
           siblings: {
             include: {
-              siblingType: true,
-              siblingOccupation: true,
-              siblingMarital: true,
-            },
-          },
+              relation: true,
+              occupation: true,
+              marital: true
+            }
+          }
         }
       },
       photos: {
@@ -1256,8 +1256,8 @@ const transformUserData = (user: any): UserFeedResponse => {
     zodiac: zodiac,
 
     // Communication & Love Language
-    communicationStyle: communicationStyle,
-    loveLanguage: loveLanguage,
+      communicationStyle: communicationStyle,
+      loveLanguage: loveLanguage,
 
     // Photos
     photos: user.photos.map((photo: any) => ({
