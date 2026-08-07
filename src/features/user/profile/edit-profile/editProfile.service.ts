@@ -588,7 +588,20 @@ export async function getEditProfileService(
       id: item.option.id,
       question: item.question.title,
       option: item.option.label,
+      description: item.description,
     }));
+
+    console.log("networkingIntent", networkingIntent);
+
+  const siblings = profile.familyProfile?.siblings ?? [];
+
+  const brothers = siblings.filter(
+    (s) => s.siblingType?.value === "Brother"
+  );
+
+  const sisters = siblings.filter(
+    (s) => s.siblingType?.value === "Sister"
+  );
 
   const response: EditProfileResponse = {
     profileScore: profile.profile_completion ?? 0,
@@ -739,21 +752,45 @@ export async function getEditProfileService(
         } : null,
 
         // ✅ Use the actual UUID from UserSibling
-        siblings: profile.familyProfile.siblings.map((item) => ({
-          id: item.id,
-          relation: item.relation ? {
-            id: item.relation.id,
-            value: item.relation.value,
-          } : null,
-          occupation: item.occupation ? {
-            id: item.occupation.id,
-            value: item.occupation.value,
-          } : null,
-          maritalStatus: item.marital ? {
-            id: item.marital.id,
-            value: item.marital.value,
-          } : null,
-        })),
+        siblings: {
+          brothers: {
+            count: brothers.length,
+            details: brothers.map((item) => ({
+              id: item.id,
+              occupation: item.occupation
+                ? {
+                  id: item.occupation.id,
+                  value: item.occupation.value,
+                }
+                : null,
+              maritalStatus: item.marital
+                ? {
+                  id: item.marital.id,
+                  value: item.marital.value,
+                }
+                : null,
+            })),
+          },
+
+          sisters: {
+            count: sisters.length,
+            details: sisters.map((item) => ({
+              id: item.id,
+              occupation: item.occupation
+                ? {
+                  id: item.occupation.id,
+                  value: item.occupation.value,
+                }
+                : null,
+              maritalStatus: item.marital
+                ? {
+                  id: item.marital.id,
+                  value: item.marital.value,
+                }
+                : null,
+            })),
+          },
+        }
       }
       : null,
 

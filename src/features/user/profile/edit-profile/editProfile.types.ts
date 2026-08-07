@@ -123,14 +123,21 @@ export interface EducationCareerResponse {
 /*                               Family                                       */
 /* -------------------------------------------------------------------------- */
 
-export interface SiblingResponse {
-    id: string;
+export interface SiblingDetailResponse {
+  id: string;
+  occupation: IdName | null;
+  maritalStatus: IdName | null;
+}
 
-    relation: IdName | null;
-
-    occupation: IdName | null;
-
-    maritalStatus: IdName | null;
+export interface FamilySiblingsResponse {
+  brothers: {
+    count: number;
+    details: SiblingDetailResponse[];
+  };
+  sisters: {
+    count: number;
+    details: SiblingDetailResponse[];
+  };
 }
 
 export interface FamilyResponse {
@@ -152,7 +159,7 @@ export interface FamilyResponse {
 
     familyIncome: IdTitle | null;
 
-    siblings: SiblingResponse[];
+    siblings: FamilySiblingsResponse[];
 }
 
 /* -------------------------------------------------------------------------- */
