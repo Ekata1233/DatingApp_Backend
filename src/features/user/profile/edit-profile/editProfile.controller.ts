@@ -16,14 +16,14 @@ export const updateBasicInfo = async (
 ) => {
   try {
 
-    if (!req.user) {
+    if (!(req as any).user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
       });
     }
 
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const validatedData =
       updateBasicInfoSchema.parse(req.body);
@@ -56,7 +56,7 @@ export const updateBio = async (
 ) => {
   try {
 
-    if (!req.user) {
+    if (!(req as any).user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized"
@@ -118,7 +118,7 @@ export const updateQuestionAnswers = async (
   res: Response
 ) => {
   try {
-    if (!req.user) {
+    if (!(req as any).user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
@@ -151,7 +151,7 @@ export const updateEduWork = async (
   res: Response
 ) => {
   try {
-    if (!req.user) {
+    if (!(req as any).user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
@@ -214,7 +214,7 @@ export const updateLocation = async (
   res: Response
 ) => {
   try {
-    if (!req.user) {
+    if (!(req as any).user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
