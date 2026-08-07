@@ -16,10 +16,10 @@ import {
   updateAddressService,
   // updateAboutYourselfService,
   updateUserAnswerService,
-  uploadUserPhotosService,
-  updateUserPhotoService,
+
+  
   setPrimaryPhotoService,
-  deleteUserPhotoService,
+ 
   updateUserBioService,
   updateEducationService,
   updateWorkService,
@@ -475,6 +475,14 @@ export const updatePhotoController = async (
 
     const image = req.files.image;
 
+    // TypeScript fix: make sure image is a single UploadedFile
+    if (Array.isArray(image)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only one image is allowed.",
+      });
+    }
+
     if (!image.mimetype.startsWith("image")) {
       return res.status(400).json({
         success: false,
@@ -482,7 +490,12 @@ export const updatePhotoController = async (
       });
     }
 
-    const photo = await updateUserMediaService(userId, photoId, image, "IMAGE");
+    const photo = await updateUserMediaService(
+      userId,
+      photoId,
+      image,
+      "IMAGE",
+    );
 
     return res.status(200).json({
       success: true,

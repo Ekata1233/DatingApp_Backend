@@ -23,5 +23,5 @@ router.post(
 router.get("/purchase-store/roses", getRoseStoreController);
 
 router.get("/purchase-store/compliments", getComplimentStoreController);
-router.get("/purchase-store/:itemType", getStoreController);
+router.get("/purchase-store/all-data/:itemType", getStoreController);
 export default router;
