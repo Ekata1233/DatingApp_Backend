@@ -63,21 +63,21 @@ export const getUserDetailsService = async (userId: string) => {
           experience: {
             select: {
               id: true,
-              name: true,
+              title: true,
             },
           },
 
           ambition: {
             select: {
               id: true,
-              name: true,
+              title: true,
             },
           },
 
           salaryRange: {
             select: {
               id: true,
-              name: true,
+              title: true,
             },
           },
 

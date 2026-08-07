@@ -204,7 +204,18 @@ export const calculateProfileScore = async (userId: string) => {
     }),
 
     prisma.userFamilyProfile.findUnique({
-      where: { userId: userId },
+      where: {
+        userId,
+      },
+      include: {
+        siblings: {
+          select: {
+            siblingTypeId: true,
+            occupationId: true,
+            maritalId: true,
+          },
+        },
+      },
     }),
 
     prisma.userBio.findUnique({
@@ -293,7 +304,7 @@ export const calculateProfileScore = async (userId: string) => {
   if (profile?.city)
     score += PROFILE_WEIGHTS.PROFILE.CITY;
 
-  
+
   if (profile?.latitude && profile?.longitude)
     score += PROFILE_WEIGHTS.PROFILE.LOCATION_COORDINATES;
 
@@ -360,10 +371,10 @@ export const calculateProfileScore = async (userId: string) => {
   if (family?.motherOrganisationId)
     score += PROFILE_WEIGHTS.FAMILY.MOTHER_ORGANIZATION;
 
-  if (family?.siblingRelationId)
+  if (family?.siblings?.some((sibling) => sibling.siblingTypeId))
     score += PROFILE_WEIGHTS.FAMILY.SIBLING_RELATION;
 
-  if (family?.siblingOccupationId)
+  if (family?.siblings?.some((sibling) => sibling.occupationId))
     score += PROFILE_WEIGHTS.FAMILY.SIBLING_OCCUPATION;
 
   if (family?.familyHomeId)
