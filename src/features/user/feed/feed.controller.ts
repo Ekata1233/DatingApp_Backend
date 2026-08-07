@@ -42,7 +42,7 @@ export const getFeedController = async (req: Request, res: Response) => {
 
 
 export const getFeedDetailsController = async (
-  req: Request, 
+  req: Request,
   res: Response
 ): Promise<void> => {
   try {
@@ -66,6 +66,10 @@ export const getFeedDetailsController = async (
       return;
     }
 
+    if (typeof userId !== "string") {
+      throw new Error("Invalid userId");
+    }
+
     const userDetails = await getFeedDetailsService(userId, currentUserId);
 
     res.status(200).json({
@@ -76,7 +80,7 @@ export const getFeedDetailsController = async (
     });
   } catch (error: any) {
     console.error('Error in getFeedDetailsController:', error);
-    
+
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch user details',

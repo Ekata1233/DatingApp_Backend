@@ -13,6 +13,22 @@ export const getUserNotifications = async (req: Request, res: Response) => {
 export const markRead = async (req: Request, res: Response) => {
   const { id } = req.params;
 
+   if (!id) {
+      res.status(400).json({
+        success: false,
+        message: "ID is required",
+      });
+      return;
+    }
+
+    if (typeof id !== "string") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid ID",
+      });
+      return;
+    }
+    
   const data = await service.markAsRead(id);
 
   res.json({ success: true, data });
