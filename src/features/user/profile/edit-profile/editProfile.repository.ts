@@ -397,7 +397,8 @@ export async function getEditProfileRepository(userId: string) {
           },
           siblings: {
             select: {
-              relation: {
+              id: true,
+              siblingType: {
                 select: {
                   id: true,
                   value: true,
@@ -421,6 +422,7 @@ export async function getEditProfileRepository(userId: string) {
       },
       answer: {
         select: {
+          description: true,
           question: {
             select: {
               id: true,
