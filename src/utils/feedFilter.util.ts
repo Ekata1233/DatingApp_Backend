@@ -16,24 +16,69 @@ export type Preferences = {
   maxHeight?: number;
 
 
-  interests?: string[];
-   languages?: string[];
+  interests?: {
+  key: string;
+  values: string[];
+}[];
+  languages?: {
+  key: string;
+  values: string[];
+}[];
 
-  zodiac?: string[];
+zodiac?: {
+  key: string;
+  values: string[];
+}[];
 
-  education?: string[];
-  occupation?: string[];
+education?: {
+  key: string;
+  values: string[];
+}[];
 
-  communicationStyle?: string[];
-  loveStyle?: string[];
+occupation?: {
+  key: string;
+  values: string[];
+}[];
 
-  pets?: string[];
-  diet?: string[];
-  drinking?: string[];
-  smoking?: string[];
-  workout?: string[];
+communicationStyle?: {
+  key: string;
+  values: string[];
+}[];
 
-  socialMedia?: string[];
+loveStyle?: {
+  key: string;
+  values: string[];
+}[];
+
+pets?: {
+  key: string;
+  values: string[];
+}[];
+
+diet?: {
+  key: string;
+  values: string[];
+}[];
+
+drinking?: {
+  key: string;
+  values: string[];
+}[];
+
+smoking?: {
+  key: string;
+  values: string[];
+}[];
+
+workout?: {
+  key: string;
+  values: string[];
+}[];
+
+socialMedia?: {
+  key: string;
+  values: string[];
+}[];
 };
 
 export const buildFilterQuery = (filters: Preferences) => {
