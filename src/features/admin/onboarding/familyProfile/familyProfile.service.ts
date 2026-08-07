@@ -15,7 +15,7 @@ export const createCategoryService = async (
   if (existing) {
     throw new Error("Category code already exists");
   }
-
+//hjfggfghfghf
   return prisma.masterCategory.create({
     data: {
       code: data.code,
