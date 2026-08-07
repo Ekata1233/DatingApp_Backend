@@ -718,7 +718,7 @@ const DEFAULT_PAGE_LIMIT = 20;
 const OVERFETCH = 3;
 const MAX_ROUNDS = 5;
 const STATIC_MATCH_SCORE = 78;
-const STATIC_TRUST = "75%";
+const STATIC_TRUST = 75;
 const STATIC_REPLY_TIME = "5 m reply";
 
 // VERIFY which column stores orientation. Unified on profile.sexual_orientation.
@@ -1117,7 +1117,7 @@ export const getFeedService = async ({
     users: sortedUsers,
     nextCursor,
   };
-};
+
 
 
 export const getFeedDetailsService = async (
@@ -1166,11 +1166,11 @@ export const getFeedDetailsService = async (
           familyIncome: true,
           siblings: {
             include: {
-              relation: true,
-              occupation: true,
-              marital: true
-            }
-          }
+              siblingType: true,
+              siblingOccupation: true,
+              siblingMarital: true,
+            },
+          },
         }
       },
       photos: {
@@ -1256,8 +1256,8 @@ const transformUserData = (user: any): UserFeedResponse => {
     zodiac: zodiac,
 
     // Communication & Love Language
-      communicationStyle: communicationStyle,
-      loveLanguage: loveLanguage,
+    communicationStyle: communicationStyle,
+    loveLanguage: loveLanguage,
 
     // Photos
     photos: user.photos.map((photo: any) => ({
