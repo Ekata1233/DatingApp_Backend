@@ -177,7 +177,6 @@ export const deleteMasterValueService = async (
       fatherOrganisations: true,
       motherOccupations: true,
       motherOrganisations: true,
-      siblingRelations: true,
       siblingOccupations: true,
       siblingMaritals: true,
       familyHomes: true,

@@ -30,21 +30,58 @@ export const getUserDetailsService = async (userId: string) => {
       about: {
         select: {
           maritalStatus: true,
-          childStatus : true,
-          numberOfChildren : true,
-          childLivingArrangement : true,
-          livingSituation : true,
+          childStatus: true,
+          numberOfChildren: true,
+          childLivingArrangement: true,
+          livingSituation: true,
         },
       },
 
       eduWork: {
         select: {
           highestEdu: true,
+          degree: true,
           collegeName: true,
-          incomeRange: true,
-          workingWith: true,
-          workingAs: true,
+          graduationYear: true,
+
+          profession: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+
           companyName: true,
+
+          employmentType: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+
+          experience: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+
+          ambition: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+
+          salaryRange: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+
+          bigDreams: true,
         },
       },
 

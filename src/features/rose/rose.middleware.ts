@@ -23,7 +23,7 @@ class RateLimiterStore {
 
   constructor() {
     this.store = new Map();
-    
+
     // Clean up expired entries every 5 minutes
     this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
   }
@@ -112,13 +112,13 @@ const defaultKeyGenerator = (req: Request): string => {
   if (user?.id) {
     return `rate-limit:${user.id}`;
   }
-  
+
   // Fallback to IP address
-  const ip = req.ip || 
-             req.connection.remoteAddress || 
-             req.socket.remoteAddress || 
-             'unknown';
-  
+  const ip = req.ip ||
+    req.connection.remoteAddress ||
+    req.socket.remoteAddress ||
+    'unknown';
+
   return `rate-limit:${ip}`;
 };
 
@@ -171,22 +171,24 @@ export function rateLimiter(options: RateLimiterOptions) {
         const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
         res.setHeader('Retry-After', String(retryAfter));
 
-        return res.status(statusCode).json({
+        res.status(statusCode).json({
           success: false,
           error: {
             code: 'RATE_LIMIT_EXCEEDED',
-            message: message,
-            retryAfter: retryAfter,
+            message,
+            retryAfter,
             resetTime: new Date(result.resetTime).toISOString(),
           },
         });
+
+        return;
       }
 
       // Store rate limit info on response for potential undo
       const originalEnd = res.end;
       const originalJson = res.json;
-      
-      res.json = function(body) {
+
+      res.json = function (body) {
         // If skipping successful/failed requests, adjust count
         if (skipSuccessfulRequests && res.statusCode < 400) {
           rateLimiterStore.decrement(key);

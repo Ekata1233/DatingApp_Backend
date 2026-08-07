@@ -8,18 +8,18 @@ const prisma = new PrismaClient();
 /*                              User / Balance                                */
 /* -------------------------------------------------------------------------- */
 
-export async function findUserById(
-  userId: string,
-  tx: Prisma.TransactionClient = prisma
-) {
-  return tx.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      isDeleted: true, 
-    },
-  });
-}
+// export async function findUserById(
+//   userId: string,
+//   tx: Prisma.TransactionClient = prisma
+// ) {
+//   return tx.user.findUnique({
+//     where: { id: userId },
+//     select: {
+//       id: true,
+//       isDeleted: true, 
+//     },
+//   });
+// }
 
 export async function getComplimentBalance(
   userId: string,
