@@ -651,6 +651,15 @@ import { redis } from "../../../lib/redis";
 // =========================
 // HELPERS
 // =========================
+
+type UserSiblingWithDetails = Prisma.UserSiblingGetPayload<{
+  include: {
+    siblingType: true;
+    occupation: true;
+    marital: true;
+  };
+}>;
+
 export const calculateAge = (
   birthDate: Date | string | null
 ): number | null => {
@@ -1166,11 +1175,11 @@ export const getFeedDetailsService = async (
           familyIncome: true,
           siblings: {
             include: {
-              relation: true,
+              siblingType: true,
               occupation: true,
-              marital: true
-            }
-          }
+              marital: true,
+            },
+          },
         }
       },
       photos: {
@@ -1256,8 +1265,8 @@ const transformUserData = (user: any): UserFeedResponse => {
     zodiac: zodiac,
 
     // Communication & Love Language
-      communicationStyle: communicationStyle,
-      loveLanguage: loveLanguage,
+    communicationStyle: communicationStyle,
+    loveLanguage: loveLanguage,
 
     // Photos
     photos: user.photos.map((photo: any) => ({
@@ -1317,11 +1326,14 @@ const transformUserData = (user: any): UserFeedResponse => {
       familyHome: user.familyProfile?.familyHome?.value || null,
       nativePlace: user.familyProfile?.nativePlace?.value || null,
       familyIncome: user.familyProfile?.familyIncome?.title || null,
-      siblings: user.familyProfile?.siblings.map((sibling: any) => ({
-        relation: sibling.relation?.value || null,
-        occupation: sibling.occupation?.value || null,
-        marital: sibling.marital?.value || null
-      })) || []
+      siblings:
+        user.familyProfile?.siblings?.map(
+          (sibling: UserSiblingWithDetails) => ({
+            relation: sibling.siblingType?.value || null,
+            occupation: sibling.occupation?.value || null,
+            marital: sibling.marital?.value || null,
+          })
+        ) || [],
     }
   };
 };
