@@ -12,7 +12,7 @@ export const createOrUpdateRewardConfig = async (
     packageReward: payload.packageReward,
     waitlistReward: payload.waitlistReward,
     title: payload.title,
-    descriptions: payload.descriptions,
+    descriptions: payload.descriptions as any,
   };
 
   if (existing) {

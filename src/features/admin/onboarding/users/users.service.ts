@@ -1,9 +1,10 @@
-import connectPostgres from "../../../config/db";
+
+import connectPostgres from "../../../../config/db";
 import { User } from "./users.types";
 
 export async function fetchAllUsers(): Promise<User[]> {
   try {
-    const pool = connectPostgres();
+    const pool = await connectPostgres();
 
     const result = await pool.query(
       "SELECT * FROM users"
