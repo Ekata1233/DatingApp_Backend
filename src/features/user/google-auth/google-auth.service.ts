@@ -9,8 +9,8 @@ export const googleLoginService = async (idToken: string) => {
 
   const user = await prisma.user.upsert({
     where: { google_id: sub },
-    update: { email, name },
-    create: { google_id: sub, email, name },
+    update: { email, full_name: name },
+    create: { google_id: sub, email, full_name: name },
   });
 
   const token = jwt.sign(

@@ -1,17 +1,12 @@
 import { MediaType, QuestionCategory, QuestionScreen } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import {
-  updateUserData,
-  upsertUserProfile,
-  findQuestionByKey,
-  deleteExistingAnswers,
-  createUserAnswers,
+ 
   upsertUserBio,
-  validateQuestionOptions,
-  replaceUserAnswers,
+  
   getEditProfileRepository,
 } from "./editProfile.repository";
-import * as userEduWorkRepository from "./editProfile.service";
+
 import { EditProfileResponse } from "./editProfile.types";
 import { redis } from "../../../../lib/redis";
 

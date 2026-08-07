@@ -125,8 +125,8 @@ export interface EducationCareerResponse {
 
 export interface SiblingDetailResponse {
   id: string;
-  occupation: IdName | null;
-  maritalStatus: IdName | null;
+  occupation: IdValue | null;
+  maritalStatus: IdValue | null;
 }
 
 export interface FamilySiblingsResponse {
@@ -159,7 +159,7 @@ export interface FamilyResponse {
 
     familyIncome: IdTitle | null;
 
-    siblings: FamilySiblingsResponse[];
+    siblings: FamilySiblingsResponse;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -191,10 +191,25 @@ export interface PromptResponse {
 /* -------------------------------------------------------------------------- */
 /*                           Edit Profile Response                            */
 /* -------------------------------------------------------------------------- */
+export interface NetworkingIntentResponse {
+  id: string;
+  question: string;
+  option: string;
+  description: string | null;
+}
 
+export interface LocationResponse {
+  country: string | null | undefined;
+  state: string | null | undefined;
+  city: string | null | undefined;
+  area: string | null | undefined;
+  latitude: number | null;
+  longitude: number | null;
+  maxDistanceKm: number | null | undefined;
+}
 export interface EditProfileResponse {
     basicDetails: BasicDetailsResponse;
-
+  lifestyle: InterestResponse[];
     photos: PhotoResponse[];
 
     video: VideoResponse | null;
@@ -210,6 +225,8 @@ export interface EditProfileResponse {
     family: FamilyResponse | null;
 
     interests: InterestResponse[];
-
+networkingIntent: NetworkingIntentResponse[];
+ location: LocationResponse;
     prompts: PromptResponse[];
+    profileScore: number;
 }
