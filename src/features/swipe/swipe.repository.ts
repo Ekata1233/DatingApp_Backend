@@ -72,7 +72,7 @@ export const checkExistingSwipe = async (
     select: {
       id: true,
       action: true,
-      createdAt: true,
+      created_at: true,
     },
   });
 };
