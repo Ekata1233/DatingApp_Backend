@@ -1,79 +1,62 @@
-// // import { Server as SocketIOServer } from "socket.io";
-// // import { Server as HTTPServer } from "http";
-// // import registerSockets from "../sockets";
+import { Server as HttpServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
 
-// // export default function setupSocket(server: HTTPServer) {
+import { registerChatSocket } from "../modules/chat/sockets/chat.socket";
+import { socketAuthMiddleware } from "../middleware/socketAuth";
 
-// //   const io = new SocketIOServer(server, {
-// //     cors: {
-// //       origin: "*",
-// //     },
-// //   });
+let io: SocketIOServer;
 
-// //    io.on("connection", (socket) => {
-// //     console.log("User connected:", socket.id);
-// //   });
-
-// //   registerSockets(io);
-// // }
-
-// import { Server } from "socket.io";
-// import http from "http";
-
-// export const initSocket = (server: http.Server) => {
-//   const io = new Server(server, {
-//     cors: {
-//       origin: "*",
-//     },
-//   });
-
-//   console.log("try to connect web socket")
-
-//   io.on("connection", (socket) => {
-//     console.log("User connected:", socket.id);
-
-//     socket.on("disconnect", () => {
-//       console.log("User disconnected");
-//     });
-//   });
-
-//   return io;
-// };
-
-
-import { Server } from "socket.io";
-import http from "http";
-
-let io: Server;
-
-export const initSocket = (server: http.Server) => {
-  io = new Server(server, {
+export const initializeSocket = (server: HttpServer): SocketIOServer => {
+  io = new SocketIOServer(server, {
     cors: {
-      origin: "*",
+      origin: process.env.FRONTEND_URL || "*",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+
+    transports: ["websocket", "polling"],
+
+    pingInterval: 25000,
+    pingTimeout: 20000,
+
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 2 * 60 * 1000,
+      skipMiddlewares: false,
     },
   });
 
-  console.log("try to connect web socket");
+  /**
+   * Authenticate every socket connection
+   */
+  io.use(socketAuthMiddleware);
+
+  /**
+   * Register socket modules
+   */
+  registerChatSocket(io);
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
+    console.log(`Socket connected: ${socket.id}`);
 
-    socket.on("join", (userId) => {
-      socket.join(userId); // user room
-      console.log("User joined room:", userId);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("User disconnected");
+    socket.on("disconnect", (reason) => {
+      console.log(
+        `Socket disconnected: ${socket.id}, reason: ${reason}`
+      );
     });
   });
+
+  console.log("Socket.IO initialized");
 
   return io;
 };
 
-export const getIO = () => {
+/**
+ * Get Socket.IO instance from anywhere in the application.
+ */
+export const getIO = (): SocketIOServer => {
   if (!io) {
-    throw new Error("Socket not initialized");
+    throw new Error("Socket.IO has not been initialized");
   }
+
   return io;
 };

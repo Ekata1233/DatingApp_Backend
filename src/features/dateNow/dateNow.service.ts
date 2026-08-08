@@ -1,7 +1,7 @@
 // Date Now Service
 import { prisma } from "../../prisma/prismaClient";
 import {
-  
+
   PlanStatus,
   TransactionType,
   TransactionStatus,
@@ -60,12 +60,12 @@ export const updateDraftDatePlan = async (
   }
 
   const {
-  vibeIds,
-  eventDate,
-  eventTime,
-  activityId,
-  ...planData
-} = payload;
+    vibeIds,
+    eventDate,
+    eventTime,
+    activityId,
+    ...planData
+  } = payload;
   let eventDateTime: Date | undefined;
 
   if (eventDate && eventTime) {
@@ -73,15 +73,15 @@ export const updateDraftDatePlan = async (
   }
 
   const updatedPlan = await prisma.$transaction(async (tx) => {
-   await tx.datePlan.update({
-  where: {
-    id: planId,
-  },
-  data: {
-    ...planData,
-    ...(eventDateTime && { eventDateTime }),
-  } as Prisma.DatePlanUncheckedUpdateInput,
-});
+    await tx.datePlan.update({
+      where: {
+        id: planId,
+      },
+      data: {
+        ...planData,
+        ...(eventDateTime && { eventDateTime }),
+      } as Prisma.DatePlanUncheckedUpdateInput,
+    });
 
     if (vibeIds) {
       await tx.datePlanVibe.deleteMany({
@@ -671,53 +671,54 @@ export const approveDatePlanRequest = async (
       });
 
     // Find existing conversation
-    let conversation =
-      await tx.conversation.findFirst({
-        where: {
-          OR: [
-            {
-              user1Id: request.plan.userId,
-              user2Id: request.requesterId,
+    let conversation = await tx.conversationParticipant.findFirst({
+      where: {
+        participants: {
+          every: {
+            userId: {
+              in: [
+                request.plan.userId,
+                request.requesterId,
+              ],
             },
-            {
-              user1Id: request.requesterId,
-              user2Id: request.plan.userId,
-            },
-          ],
+          },
         },
-      });
+      },
+    });
 
     // Create conversation if not exists
     if (!conversation) {
-      conversation =
-        await tx.conversation.create({
-          data: {
-            user1Id: request.plan.userId,
-            user2Id: request.requesterId,
+      conversation = await tx.conversationParticipant.create({
+        data: {
+          participants: {
+            create: [
+              {
+                userId: request.plan.userId,
+              },
+              {
+                userId: request.requesterId,
+              },
+            ],
           },
-        });
+        },
+      });
     }
 
     // Create Date Confirmed Message
     await tx.chatMessage.create({
       data: {
         conversationId: conversation.id,
-
-        senderId: null,
-
-        type: "DATE_CONFIRMED",
-
+        senderId: request.requesterId,
+        messageType: "DATE_CONFIRMED",
         metadata: {
-          confirmedDateId:
-            confirmedDate.id,
+          confirmedDateId: confirmedDate.id,
         },
       },
     });
 
     return {
       success: true,
-      confirmedDateId:
-        confirmedDate.id,
+      confirmedDateId: confirmedDate.id,
     };
   });
 };
