@@ -1,8 +1,8 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
+import { socketAuthMiddleware } from "../middleware/socketAuth.middleware";
+import { registerChatSocket } from "../features/chat/socket/chat.socket";
 
-import { registerChatSocket } from "../modules/chat/sockets/chat.socket";
-import { socketAuthMiddleware } from "../middleware/socketAuth";
 
 let io: SocketIOServer;
 
