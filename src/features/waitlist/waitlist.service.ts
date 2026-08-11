@@ -39,3 +39,17 @@ export const joinFreeWaitlistService = async (
     return waitlist;
   });
 };
+
+export const getWaitlistService = async (userId: string) => {
+  const waitlist = await prisma.waitlist.findUnique({
+    where: {
+      userId,
+    },
+  });
+
+  if (!waitlist) {
+    throw new Error("User has not joined the waitlist");
+  }
+
+  return waitlist;
+};
