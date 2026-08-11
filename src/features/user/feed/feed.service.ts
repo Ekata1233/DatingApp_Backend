@@ -1256,7 +1256,8 @@ const transformUserData = (user: any): UserFeedResponse => {
 
     // Basic Info
     bio: user.bio?.bio || null,
-    lookingFor: user.intention?.title || null,
+    lookingFor: user.intention?.option || null,
+    lookingFor_subtitle: user.intention?.optDescription || null,
     religion: user.profile?.religion?.name || null,
     motherTongue: motherTongue,
     height: user.height,

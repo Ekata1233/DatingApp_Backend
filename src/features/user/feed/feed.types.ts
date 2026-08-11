@@ -41,6 +41,7 @@ export interface UserFeedResponse {
   // Basic Info
   bio: string | null;
   lookingFor: string | null;
+  lookingFor_subtitle: string | null;
   religion: string | null;
   motherTongue: string | null;
   height: number | null;
