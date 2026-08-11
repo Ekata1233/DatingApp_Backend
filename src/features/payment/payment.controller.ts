@@ -119,7 +119,7 @@ export const paymentReturnController = async (
 
     return res.redirect(
       302,
-      "https://www.fetchtrue.com/stepdone"
+      "https://www.welvors.com/stepdone/"
     );
   } catch (error) {
     console.error(error);
