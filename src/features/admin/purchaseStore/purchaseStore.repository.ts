@@ -1,6 +1,6 @@
 import { StoreItemType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
-import { CreateStoreFeatureDTO, CreateStoreInfoDTO, CreateStorePackDTO } from "./purchaseStore.types";
+import { CreateStoreFeatureDTO, CreateStoreInfoDTO, CreateStorePackDTO, UpdateStoreInfoDTO, UpdateStorePackDTO } from "./purchaseStore.types";
 
 
 export const createStoreFeatureRepo = (
@@ -52,11 +52,29 @@ export const findPackByQuantity = (
 };
 export const updateStorePackRepo = (
   id: string,
-  data: CreateStorePackDTO
+  data: UpdateStorePackDTO
 ) => {
   return prisma.storePack.update({
     where: { id },
     data,
+  });
+};
+export const findStorePackById = (
+  id: string
+) => {
+  return prisma.storePack.findUnique({
+    where: {
+      id,
+    },
+  });
+};
+export const deleteStorePackRepo = (
+  id: string
+) => {
+  return prisma.storePack.delete({
+    where: {
+      id,
+    },
   });
 };
 export const getStoreDataRepository = async (
@@ -109,15 +127,7 @@ export const getStoreDataRepository = async (
   });
 };
 
-export const updateStoreInfoRepo = (
-  id: string,
-  data: CreateStoreInfoDTO
-) => {
-  return prisma.storeInfo.update({
-    where: { id },
-    data,
-  });
-};
+
 
 export const findStoreInfoByTitle = (
   itemType: StoreItemType,
@@ -144,4 +154,27 @@ export const getStoreInfoRepo = (
     },
   });
 };
+export const updateStoreInfoRepo = (
+  id: string,
+  data: UpdateStoreInfoDTO
+) => {
+  return prisma.storeInfo.update({
+    where: { id },
+    data,
+  });
+};
+export const findStoreInfoById = (
+  id: string
+) => {
+  return prisma.storeInfo.findUnique({
+    where: { id },
+  });
+};
 
+export const deleteStoreInfoRepo = (
+  id: string
+) => {
+  return prisma.storeInfo.delete({
+    where: { id },
+  });
+};
