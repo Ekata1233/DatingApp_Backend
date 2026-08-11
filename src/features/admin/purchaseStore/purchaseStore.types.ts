@@ -28,7 +28,27 @@ export interface CreateStoreInfoDTO {
   itemType: StoreItemType;
   title: string;
   description: string;
-  tag?: string;
+  tag?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+  
+export interface UpdateStoreInfoDTO {
+  itemType?: StoreItemType;
+  title?: string;
+  description?: string;
+  tag?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+export interface UpdateStorePackDTO {
+  itemType?: StoreItemType;
+  title?: string;
+  quantity?: number;
+  pricePerUnit?: number;
+  totalPrice?: number;
+  badge?: StorePackBadge;
   sortOrder?: number;
   isActive?: boolean;
 }

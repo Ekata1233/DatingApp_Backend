@@ -101,7 +101,12 @@ export const createStoreInfoSchema = z.object({
 
   description: z.string().trim().min(1).max(500),
 
-  tag: z.string().trim().max(30).optional(),
+  tag: z
+    .string()
+    .trim()
+    .max(30)
+    .optional()
+    .nullable(),
 
   sortOrder: z.number().int().optional(),
 
@@ -111,3 +116,5 @@ export const createStoreInfoSchema = z.object({
 export const updateStoreInfoSchema =
   createStoreInfoSchema.partial();
 
+export const updateStorePackSchema =
+  createStorePackSchema.partial();
