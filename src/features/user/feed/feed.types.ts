@@ -43,6 +43,7 @@ export interface UserFeedResponse {
   lookingFor: string | null;
   lookingFor_subtitle: string | null;
   religion: string | null;
+  community: string | null;
   motherTongue: string | null;
   height: number | null;
   city: string | null;

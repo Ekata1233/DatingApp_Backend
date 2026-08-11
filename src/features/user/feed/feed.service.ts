@@ -1259,6 +1259,7 @@ const transformUserData = (user: any): UserFeedResponse => {
     lookingFor: user.intention?.option || null,
     lookingFor_subtitle: user.intention?.optDescription || null,
     religion: user.profile?.religion?.name || null,
+    community: user.profile?.community?.name || null,
     motherTongue: motherTongue,
     height: user.height,
     city: user.profile?.city || null,

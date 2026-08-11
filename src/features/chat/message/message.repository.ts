@@ -29,7 +29,7 @@ export const messageRepository = {
    * Find message by ID.
    */
   async findById(messageId: string) {
-    return prisma.message.findUnique({
+    return prisma.chatMessage.findUnique({
       where: {
         id: messageId,
       },
@@ -56,7 +56,7 @@ export const messageRepository = {
     replyToMessageId?: string | null;
   }) {
     return prisma.$transaction(async (tx) => {
-      const message = await tx.message.create({
+      const message = await tx.chatMessage.create({
         data: {
           conversationId: data.conversationId,
           senderId: data.senderId,
@@ -121,7 +121,7 @@ export const messageRepository = {
     cursor?: string,
     limit = 30
   ) {
-    return prisma.message.findMany({
+    return prisma.chatMessage.findMany({
       where: {
         conversationId,
         deletedAt: null,
@@ -161,7 +161,7 @@ export const messageRepository = {
    * Mark a single message as delivered.
    */
   async markDelivered(messageId: string) {
-    return prisma.message.update({
+    return prisma.chatMessage.update({
       where: {
         id: messageId,
       },
@@ -176,7 +176,7 @@ export const messageRepository = {
    * Mark a single message as read.
    */
   async markRead(messageId: string) {
-    return prisma.message.update({
+    return prisma.chatMessage.update({
       where: {
         id: messageId,
       },
@@ -218,7 +218,7 @@ export const messageRepository = {
    * Soft delete message.
    */
   async softDelete(messageId: string) {
-    return prisma.message.update({
+    return prisma.chatMessage.update({
       where: {
         id: messageId,
       },
@@ -245,7 +245,7 @@ export const messageRepository = {
     messageId: string,
     conversationId: string
   ) {
-    return prisma.message.findFirst({
+    return prisma.chatMessage.findFirst({
       where: {
         id: messageId,
         conversationId,
