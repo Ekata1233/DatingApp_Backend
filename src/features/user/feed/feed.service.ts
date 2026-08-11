@@ -1229,6 +1229,11 @@ const transformUserData = (user: any): UserFeedResponse => {
     (a: any) => a.question.screen === 'THINGS_U_LOVE'
   );
 
+  // Extract networking (screen = NETWORKING)
+  const networkingAnswers = user.answer.filter(
+    (a: any) => a.question.screen === 'NETWORKING_INTENT'
+  );
+
   // Calculate age from birth_date
   const age = calculateAge(user.birth_date);
 
@@ -1313,6 +1318,12 @@ const transformUserData = (user: any): UserFeedResponse => {
 
     // Interests
     interests: interestAnswers.map((answer: any) => ({
+      question: answer.question.title,
+      answer: answer.option.label,
+      description: answer.description || null
+    })),
+
+    networkingAnswers: networkingAnswers.map((answer: any) => ({
       question: answer.question.title,
       answer: answer.option.label,
       description: answer.description || null

@@ -69,6 +69,8 @@ export interface UserFeedResponse {
   
   // Interests
   interests: AnswerDetail[];
+
+  networkingAnswers: AnswerDetail[];
   
   // Family
   family: FamilyInfo;
