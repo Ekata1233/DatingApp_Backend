@@ -166,7 +166,7 @@ export const chatRepository = {
     cursor?: string,
     limit = 30
   ) {
-    return prisma.message.findMany({
+    return prisma.chatMessage.findMany({
       where: {
         conversationId,
         deletedAt: null,
@@ -211,7 +211,7 @@ export const chatRepository = {
     mediaUrl?: string;
   }) {
     return prisma.$transaction(async (tx) => {
-      const message = await tx.message.create({
+      const message = await tx.chatMessage.create({
         data: {
           conversationId: data.conversationId,
           senderId: data.senderId,
@@ -267,7 +267,7 @@ export const chatRepository = {
     conversationId: string,
     receiverId: string
   ) {
-    return prisma.message.updateMany({
+    return prisma.chatMessage.updateMany({
       where: {
         conversationId,
         senderId: {
@@ -290,7 +290,7 @@ export const chatRepository = {
     conversationId: string,
     userId: string
   ) {
-    return prisma.message.updateMany({
+    return prisma.chatMessage.updateMany({
       where: {
         conversationId,
         senderId: {
@@ -310,7 +310,7 @@ export const chatRepository = {
    * Find message.
    */
   async findMessageById(messageId: string) {
-    return prisma.message.findUnique({
+    return prisma.chatMessage.findUnique({
       where: {
         id: messageId,
       },
@@ -321,7 +321,7 @@ export const chatRepository = {
    * Soft delete message.
    */
   async deleteMessage(messageId: string) {
-    return prisma.message.update({
+    return prisma.chatMessage.update({
       where: {
         id: messageId,
       },

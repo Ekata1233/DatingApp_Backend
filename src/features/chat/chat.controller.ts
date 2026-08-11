@@ -18,7 +18,7 @@ export const createConversation = async (
   res: Response
 ) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const data =
       createConversationSchema.parse(req.body);
@@ -55,7 +55,7 @@ export const getConversations = async (
   res: Response
 ) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const data =
       getConversationsSchema.parse(req.query);
@@ -93,7 +93,7 @@ export const getMessages = async (
   res: Response
 ) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const data = getMessagesSchema.parse({
       conversationId:
@@ -138,7 +138,7 @@ export const sendMessage = async (
   res: Response
 ) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const data =
       sendMessageSchema.parse(req.body);
@@ -178,7 +178,7 @@ export const markConversationRead = async (
   res: Response
 ) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const data =
       markConversationReadSchema.parse(
@@ -218,7 +218,7 @@ export const deleteMessage = async (
   res: Response
 ) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const data =
       deleteMessageSchema.parse({

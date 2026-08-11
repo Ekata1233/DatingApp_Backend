@@ -10,8 +10,8 @@ import {
   markConversationRead,
   sendMessage,
 } from "./chat.controller";
+import authMiddleware from "../../middleware/auth.middleware";
 
-import { authMiddleware } from "../../middleware/auth";
 
 const router = Router();
 

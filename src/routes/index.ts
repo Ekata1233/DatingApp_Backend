@@ -10,7 +10,7 @@ import mobileAuthRoutes from "../features/user/mobile-auth/auth.routes";
 import googleAuthRoutes from "../features/user/google-auth/google-auth.routes";
 import userManageRoutes from "../features/user/management/user.route";
 import profileRoutes from "../features/user/profile/profile.routes";
-import messageRoutes from "../features/user/messages/message.route";
+// import messageRoutes from "../features/user/messages/message.route";
 import religionRoutes from "../features/admin/onboarding/religion/religion.route";
 import educationRoutes from "../features/admin/onboarding/education/education.routes";
 import workDetailsRoutes from "../features/admin/onboarding/workDetails/workDetails.routes";
@@ -80,9 +80,9 @@ router.use("/user",waitlistRoutes,)
 
 // router.use("/users",usersRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,messageRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

@@ -1153,6 +1153,7 @@ export const getFeedDetailsService = async (
       },
       bio: true,
       intention: true,
+      about: true,
       eduWork: {
         include: {
           profession: true,
@@ -1238,9 +1239,9 @@ const transformUserData = (user: any): UserFeedResponse => {
   const motherTongue = user.profile?.languages?.[0]?.language?.name || null;
 
   // Extract zodiac sign from birth_date
-  const zodiac = user.userAbout?.zodiac || null;
-  const communicationStyle = user.userAbout?.communicationStyle || null;
-  const loveLanguage = user.userAbout?.loveLanguage || null;
+  const zodiac = user.about?.zodiac || null;
+  const communicationStyle = user.about?.communicationStyle || null;
+  const loveLanguage = user.about?.loveLanguage || null;
 
   return {
     userId: user.id,
