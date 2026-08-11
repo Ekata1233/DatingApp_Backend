@@ -37,9 +37,9 @@ dotenv.config();
 
 import app from "./app";
 import connectPostgres, { connectDB } from "./config/db";
-import { initSocket } from "./config/socket";
 import { prisma } from "./prisma/prismaClient";
 import http from "http";
+import { initializeSocket } from "./config/socket";
 
 const PORT = process.env.PORT || 4000;
 
@@ -50,22 +50,15 @@ const startServer = async () => {
     // MongoDB
     await connectDB();
     console.log("✅ MongoDB Connected");
-
-
-    // PostgreSQL Pool (if you use it separately)
     await connectPostgres();
-
-
-    // Prisma warm connection
     await prisma.$connect();
     console.log("✅ Prisma Connected");
 
-
     const server = http.createServer(app);
-
-
-    initSocket(server);
-
+    /**
+     * Initialize Socket.IO
+     */
+    initializeSocket(server);
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

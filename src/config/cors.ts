@@ -5,6 +5,7 @@ const allowedOrigins = [
   "https://dating-landing-page-two.vercel.app",
   "https://www.welvors.com",
   "https://welvors.com",
+  "https://stay-bea-panel.vercel.app",
 ];
 
 const corsOptions: CorsOptions = {
