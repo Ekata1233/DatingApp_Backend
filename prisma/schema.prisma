@@ -1582,6 +1582,7 @@ model ChatMessage {
   senderId       String      @db.Uuid
   content        String?
   messageType    MessageType @default(TEXT)
+  mediaUrl       String?
   metadata       Json?
   createdAt      DateTime    @default(now())
   deliveredAt    DateTime?
