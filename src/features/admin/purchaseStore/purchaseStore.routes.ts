@@ -14,11 +14,7 @@ import {
 
 const router = Router();
 
-/*
-|--------------------------------------------------------------------------
-| Store Features
-|--------------------------------------------------------------------------
-*/
+
 
 router.post("/purchase-store/features", createStoreFeature);
 
