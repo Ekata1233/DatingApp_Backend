@@ -138,7 +138,7 @@ export async function createPaymentLink(userId: string, body: any) {
     order_id: orderId,
 
     successURL: "https://dating-app-backend-plum.vercel.app/api/payments/return",
-    failureURL: "https://www.welvors.com/stepdone/",
+    failureURL: "https://dating-app-backend-plum.vercel.app/api/payments/return",
 
 
     customer: {
