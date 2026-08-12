@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { joinFreeWaitlistService } from "./waitlist.service";
+import { getWaitlistService, joinFreeWaitlistService } from "./waitlist.service";
 
 export const joinWaitlistController = async (
   req: Request,
@@ -18,6 +18,28 @@ export const joinWaitlistController = async (
     });
   } catch (error: any) {
     return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getWaitlistController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const waitlist = await getWaitlistService(
+      (req as any).user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Waitlist details fetched successfully.",
+      data: waitlist,
+    });
+  } catch (error: any) {
+    return res.status(404).json({
       success: false,
       message: error.message,
     });
