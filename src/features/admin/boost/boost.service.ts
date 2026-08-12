@@ -42,6 +42,17 @@ export const createBoostService = async (data: CreateBoostInput) => {
 
     // update/create options
     for (const opt of options) {
+      /*
+       * NEW LOGIC:
+       *
+       * If ID is provided -> update by ID.
+       *
+       * If ID is NOT provided but the same boostCount already exists
+       * -> update that existing option instead of creating a new one.
+       *
+       * Otherwise -> create a new option.
+       */
+
       if (opt.id) {
         await prisma.boostOption.update({
           where: { id: opt.id },
@@ -59,25 +70,55 @@ export const createBoostService = async (data: CreateBoostInput) => {
           },
         });
       } else {
-        await prisma.boostOption.create({
-          data: {
-            boost_id: existingBoost.id,
-            label: opt.label,
-            boostCount: opt.boostCount,
-            timePerBoost: opt.timePerBoost,
-            pricePerBoost: opt.pricePerBoost,
-            discounted_price: opt.discounted_price ?? 0,
-            discount_percent: opt.discount_percent ?? null,
-            totalPrice: opt.totalPrice,
-            is_best_value: opt.is_best_value ?? false,
-            is_popular: opt.is_popular ?? false,
-          },
-        });
+        // NEW: find existing option by boostCount
+        const existingOption = existingBoost.options.find(
+          (existing) =>
+            existing.boostCount === opt.boostCount
+        );
+
+        if (existingOption) {
+          // Same boostCount -> UPDATE existing option
+          await prisma.boostOption.update({
+            where: {
+              id: existingOption.id,
+            },
+            data: {
+              label: opt.label,
+              boostCount: opt.boostCount,
+              timePerBoost: opt.timePerBoost,
+              pricePerBoost: opt.pricePerBoost,
+              discounted_price: opt.discounted_price ?? 0,
+              discount_percent: opt.discount_percent ?? null,
+              totalPrice: opt.totalPrice,
+              is_best_value: opt.is_best_value ?? false,
+              is_popular: opt.is_popular ?? false,
+              is_active: true,
+            },
+          });
+        } else {
+          // Different boostCount -> CREATE new option
+          await prisma.boostOption.create({
+            data: {
+              boost_id: existingBoost.id,
+              label: opt.label,
+              boostCount: opt.boostCount,
+              timePerBoost: opt.timePerBoost,
+              pricePerBoost: opt.pricePerBoost,
+              discounted_price: opt.discounted_price ?? 0,
+              discount_percent: opt.discount_percent ?? null,
+              totalPrice: opt.totalPrice,
+              is_best_value: opt.is_best_value ?? false,
+              is_popular: opt.is_popular ?? false,
+            },
+          });
+        }
       }
     }
 
     return prisma.boost.findUnique({
-      where: { id: existingBoost.id },
+      where: {
+        id: existingBoost.id,
+      },
       include: {
         options: {
           where: {
@@ -94,6 +135,7 @@ export const createBoostService = async (data: CreateBoostInput) => {
       name: boostName,
       title: boostData.title,
       description: boostData.description,
+
       options: {
         create: options.map((opt) => ({
           label: opt.label,
@@ -108,6 +150,7 @@ export const createBoostService = async (data: CreateBoostInput) => {
         })),
       },
     },
+
     include: {
       options: true,
     },
