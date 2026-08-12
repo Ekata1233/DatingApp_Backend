@@ -208,22 +208,38 @@ export const chatSocketService = {
         userId: string,
         payload: MessageDeliveredSocketPayload
     ) {
-        const message =
-            await messageService.markDelivered({
-                userId,
-                messageId:payload.messageId,
-            });
-
-        /**
-         * Notify conversation participants.
-         */
-        io.to(
-            `conversation:${message.conversationId}`
-        ).emit("message:delivered", {
-            messageId: message.id,
-            conversationId:message.conversationId,
-            deliveredAt:message.deliveredAt,
+        const message = await messageService.markDelivered({
+            userId,
+            messageId: payload.messageId,
         });
+
+        console.log("✅ MESSAGE DELIVERED:", {
+            messageId: message.id,
+            senderId: message.senderId,
+            receiverUserId: userId,
+            conversationId: message.conversationId,
+            deliveredAt: message.deliveredAt,
+        });
+
+        const senderRoom = `user:${message.senderId}`;
+
+        console.log("📡 EMITTING DELIVERY EVENT TO:", senderRoom);
+
+        const socketsInRoom = await io.in(senderRoom).fetchSockets();
+
+        console.log("👥 SOCKETS IN SENDER ROOM:", {
+            room: senderRoom,
+            count: socketsInRoom.length,
+            sockets: socketsInRoom.map((s) => s.id),
+        });
+
+        io.to(senderRoom).emit("message:delivered", {
+            messageId: message.id,
+            conversationId: message.conversationId,
+            deliveredAt: message.deliveredAt,
+        });
+
+        console.log("📡 DELIVERY EVENT EMITTED");
 
         return message;
     },

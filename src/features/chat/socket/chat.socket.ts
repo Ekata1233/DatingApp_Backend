@@ -15,6 +15,10 @@ export const registerChatSocket = (io: Server) => {
      */
     socket.join(`user:${userId}`);
 
+    console.log(
+      "👤 USER ROOM JOINED:",
+      `user:${userId}`
+    );
     /**
      * Register chat events
      */
