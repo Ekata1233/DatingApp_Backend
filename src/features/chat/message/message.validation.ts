@@ -31,12 +31,6 @@ export const createMessageSchema = z
       .url("Invalid media URL")
       .optional()
       .nullable(),
-
-    replyToMessageId: z
-      .string()
-      .uuid("Invalid reply message ID")
-      .optional()
-      .nullable(),
   })
   .superRefine((data, ctx) => {
     /**

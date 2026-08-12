@@ -8,7 +8,6 @@ export interface CreateMessageInput {
   content?: string | null;
   messageType: MessageType;
   mediaUrl?: string | null;
-  replyToMessageId?: string | null;
 }
 
 export interface GetMessagesInput {

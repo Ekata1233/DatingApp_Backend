@@ -72,19 +72,19 @@ export const messageService = {
      *    make sure replied message exists
      *    in the same conversation.
      */
-    if (data.replyToMessageId) {
-      const replyMessage =
-        await messageRepository.findReplyMessage(
-          data.replyToMessageId,
-          data.conversationId
-        );
+    // if (data.replyToMessageId) {
+    //   const replyMessage =
+    //     await messageRepository.findReplyMessage(
+    //       data.replyToMessageId,
+    //       data.conversationId
+    //     );
 
-      if (!replyMessage) {
-        throw new Error(
-          "Reply message not found"
-        );
-      }
-    }
+    //   if (!replyMessage) {
+    //     throw new Error(
+    //       "Reply message not found"
+    //     );
+    //   }
+    // }
 
     /**
      * 5. Save message.
@@ -96,8 +96,6 @@ export const messageService = {
         content: data.content,
         messageType: data.messageType,
         mediaUrl: data.mediaUrl,
-        replyToMessageId:
-          data.replyToMessageId,
       });
 
     return message;
