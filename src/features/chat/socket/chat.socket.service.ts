@@ -211,9 +211,7 @@ export const chatSocketService = {
         const message =
             await messageService.markDelivered({
                 userId,
-
-                messageId:
-                    payload.messageId,
+                messageId:payload.messageId,
             });
 
         /**
@@ -223,12 +221,8 @@ export const chatSocketService = {
             `conversation:${message.conversationId}`
         ).emit("message:delivered", {
             messageId: message.id,
-
-            conversationId:
-                message.conversationId,
-
-            deliveredAt:
-                message.deliveredAt,
+            conversationId:message.conversationId,
+            deliveredAt:message.deliveredAt,
         });
 
         return message;
