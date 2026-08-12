@@ -1,86 +1,7 @@
 import { prisma } from "../../../prisma/prismaClient";
-import { BoostType } from "@prisma/client";
-import { CreateBoostInput } from "./boost.validation";
+import { BoostType, Prisma } from "@prisma/client";
+import { BoostFeaturesInput, BoostInfoInput, CreateBoostInput } from "./boost.validation";
 
-// export const createBoostService = async (data: CreateBoostInput) => {
-//   const { options, ...boostData } = data;
-
-//   // ✅ enum validation
-//   if (!Object.values(BoostType).includes(boostData.name as BoostType)) {
-//     throw new Error("Invalid boost type");
-//   }
-
-//   const boostName = boostData.name as BoostType;
-
-//   // ✅ check existing
-//   const existingBoost = await prisma.boost.findFirst({
-//     where: { name: boostName },
-//     include: { options: true },
-//   });
-
-//   // ✅ UPDATE FLOW
-//   if (existingBoost) {
-//     await prisma.boostOption.deleteMany({
-//       where: { boost_id: existingBoost.id },
-//     });
-
-//     const updated = await prisma.boost.update({
-//       where: { id: existingBoost.id },
-//       data: {
-//         name: boostName,
-//         title: boostData.title,
-//         description: boostData.description,
-
-//         options: {
-//           create: options.map((opt) => ({
-//             label: opt.label,
-//             boostCount: opt.boostCount,
-//             timePerBoost: opt.timePerBoost,
-
-//             pricePerBoost: opt.pricePerBoost.toString(),
-//             discounted_price: (opt.discounted_price ?? 0).toString(),
-//             discount_percent: opt.discount_percent ?? null,
-//             totalPrice: opt.totalPrice.toString(),
-
-//             is_best_value: opt.is_best_value ?? false,
-//             is_popular: opt.is_popular ?? false,
-//           })),
-//         },
-//       },
-//       include: { options: true },
-//     });
-
-//     return updated;
-//   }
-
-//   // ✅ CREATE FLOW
-//   const created = await prisma.boost.create({
-//     data: {
-//       name: boostName,
-//       title: boostData.title,
-//       description: boostData.description,
-
-//       options: {
-//         create: options.map((opt) => ({
-//           label: opt.label,
-//           boostCount: opt.boostCount,
-//           timePerBoost: opt.timePerBoost,
-
-//           pricePerBoost: opt.pricePerBoost.toString(),
-//           discounted_price: (opt.discounted_price ?? 0).toString(),
-//           discount_percent: opt.discount_percent ?? null,
-//           totalPrice: opt.totalPrice.toString(),
-
-//           is_best_value: opt.is_best_value ?? false,
-//           is_popular: opt.is_popular ?? false,
-//         })),
-//       },
-//     },
-//     include: { options: true },
-//   });
-
-//   return created;
-// };
 
 export const createBoostService = async (data: CreateBoostInput) => {
   const { options, ...boostData } = data;
@@ -195,8 +116,293 @@ export const createBoostService = async (data: CreateBoostInput) => {
 
 // ✅ GET API
 export const getBoostsService = async () => {
-  return prisma.boost.findMany({
-    include: { options: true },
-    orderBy: { created_at: "desc" },
+  const boosts = await prisma.boost.findMany({
+    include: {
+      options: {
+        where: {
+          is_active: true,
+        },
+      },
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+  });
+
+  return boosts.map((boost) => ({
+    // Basic Boost Data
+    id: boost.id,
+    name: boost.name,
+    title: boost.title,
+    description: boost.description,
+    is_active: boost.is_active,
+
+    // 1. FEATURES
+    boostDuration: boost.boostDuration,
+    singleBoostWalletPrice: boost.singleBoostWalletPrice,
+    visibilityMultiplier: boost.visibilityMultiplier,
+
+    // 2. OPTIONS
+    options: boost.options,
+
+    // 3. INFO
+    whyBoostWorks: boost.whyBoostWorks,
+    boostVsSuperBoost: boost.boostVsSuperBoost,
+
+    created_at: boost.created_at,
+    updated_at: boost.updated_at,
+  }));
+};
+
+
+// ============================================================
+// BOOST INFO CREATE / UPDATE
+// ============================================================
+
+export const createOrUpdateBoostInfoService = async (
+  data: BoostInfoInput
+) => {
+  const boostName = data.name as BoostType;
+
+  // Existing Boost pack must already exist
+  const existingBoost = await prisma.boost.findUnique({
+    where: {
+      name: boostName,
+    },
+  });
+
+  if (!existingBoost) {
+    throw new Error(
+      `Boost with name ${data.name} does not exist. Create the boost pack first.`
+    );
+  }
+
+  /*
+   * IMPORTANT:
+   *
+   * If info already exists:
+   * old whyBoostWorks is completely replaced
+   * old boostVsSuperBoost is completely replaced
+   *
+   * If info does not exist:
+   * it is simply added.
+   *
+   * Existing pack/options/prices are NOT touched.
+   */
+
+  return prisma.boost.update({
+    where: {
+      id: existingBoost.id,
+    },
+
+    data: {
+      whyBoostWorks: data.whyBoostWorks,
+      boostVsSuperBoost: data.boostVsSuperBoost,
+    },
+
+    include: {
+      options: {
+        where: {
+          is_active: true,
+        },
+      },
+    },
+  });
+};
+
+// ============================================================
+// BOOST INFO GET
+// ============================================================
+
+export const getBoostInfoService = async (name: BoostType) => {
+  const boost = await prisma.boost.findUnique({
+    where: {
+      name,
+    },
+    select: {
+      id: true,
+      name: true,
+      whyBoostWorks: true,
+      boostVsSuperBoost: true,
+    },
+  });
+
+  if (!boost) {
+    throw new Error("Boost not found");
+  }
+
+  return boost;
+};
+
+// ============================================================
+// BOOST INFO DELETE
+// ============================================================
+
+export const deleteBoostInfoService = async (name: BoostType) => {
+  const existingBoost = await prisma.boost.findUnique({
+    where: {
+      name,
+    },
+  });
+
+  if (!existingBoost) {
+    throw new Error("Boost not found");
+  }
+
+  /*
+   * ONLY delete Boost Info.
+   *
+   * The actual Boost pack remains.
+   * BoostOption remains.
+   * UserBoost remains.
+   * BoostPurchase remains.
+   */
+
+  return prisma.boost.update({
+    where: {
+      id: existingBoost.id,
+    },
+
+    data: {
+      whyBoostWorks: Prisma.JsonNull,
+      boostVsSuperBoost: Prisma.JsonNull,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      whyBoostWorks: true,
+      boostVsSuperBoost: true,
+    },
+  });
+};
+
+// ============================================================
+// CREATE / UPDATE BOOST FEATURES
+// ============================================================
+
+export const createOrUpdateBoostFeaturesService = async (
+  data: BoostFeaturesInput
+) => {
+  const boostName = data.name as BoostType;
+
+  // Find existing Boost pack
+  const existingBoost = await prisma.boost.findUnique({
+    where: {
+      name: boostName,
+    },
+  });
+
+  if (!existingBoost) {
+    throw new Error(
+      `Boost with name ${data.name} does not exist. Create the boost pack first.`
+    );
+  }
+
+  /*
+   * Same name:
+   * OLD FEATURES are replaced with NEW FEATURES.
+   *
+   * Existing:
+   * - Boost options
+   * - Prices
+   * - UserBoost
+   * - BoostPurchase
+   * - Why Boost Works
+   * - Boost vs Super Boost
+   *
+   * are NOT changed.
+   */
+
+  return prisma.boost.update({
+    where: {
+      id: existingBoost.id,
+    },
+
+    data: {
+      boostDuration: data.boostDuration,
+      singleBoostWalletPrice: data.singleBoostWalletPrice,
+      visibilityMultiplier: data.visibilityMultiplier,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      boostDuration: true,
+      singleBoostWalletPrice: true,
+      visibilityMultiplier: true,
+    },
+  });
+};
+
+// ============================================================
+// GET BOOST FEATURES
+// ============================================================
+
+export const getBoostFeaturesService = async (
+  name: BoostType
+) => {
+  const boost = await prisma.boost.findUnique({
+    where: {
+      name,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      boostDuration: true,
+      singleBoostWalletPrice: true,
+      visibilityMultiplier: true,
+    },
+  });
+
+  if (!boost) {
+    throw new Error("Boost not found");
+  }
+
+  return boost;
+};
+
+// ============================================================
+// RESET BOOST FEATURES
+// ============================================================
+
+export const resetBoostFeaturesService = async (
+  name: BoostType
+) => {
+  const existingBoost = await prisma.boost.findUnique({
+    where: {
+      name,
+    },
+  });
+
+  if (!existingBoost) {
+    throw new Error("Boost not found");
+  }
+
+  /*
+   * These fields are NOT nullable.
+   *
+   * Therefore DELETE means RESET TO DEFAULT.
+   */
+
+  return prisma.boost.update({
+    where: {
+      id: existingBoost.id,
+    },
+
+    data: {
+      boostDuration: 30,
+      singleBoostWalletPrice: 60,
+      visibilityMultiplier: 10,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      boostDuration: true,
+      singleBoostWalletPrice: true,
+      visibilityMultiplier: true,
+    },
   });
 };
