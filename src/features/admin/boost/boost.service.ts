@@ -1,5 +1,5 @@
 import { prisma } from "../../../prisma/prismaClient";
-import { BoostType } from "@prisma/client";
+import { BoostType, Prisma } from "@prisma/client";
 import { BoostFeaturesInput, BoostInfoInput, CreateBoostInput } from "./boost.validation";
 
 
@@ -116,7 +116,7 @@ export const createBoostService = async (data: CreateBoostInput) => {
 
 // ✅ GET API
 export const getBoostsService = async () => {
-  return prisma.boost.findMany({
+  const boosts = await prisma.boost.findMany({
     include: {
       options: {
         where: {
@@ -128,6 +128,30 @@ export const getBoostsService = async () => {
       created_at: "desc",
     },
   });
+
+  return boosts.map((boost) => ({
+    // Basic Boost Data
+    id: boost.id,
+    name: boost.name,
+    title: boost.title,
+    description: boost.description,
+    is_active: boost.is_active,
+
+    // 1. FEATURES
+    boostDuration: boost.boostDuration,
+    singleBoostWalletPrice: boost.singleBoostWalletPrice,
+    visibilityMultiplier: boost.visibilityMultiplier,
+
+    // 2. OPTIONS
+    options: boost.options,
+
+    // 3. INFO
+    whyBoostWorks: boost.whyBoostWorks,
+    boostVsSuperBoost: boost.boostVsSuperBoost,
+
+    created_at: boost.created_at,
+    updated_at: boost.updated_at,
+  }));
 };
 
 
@@ -240,8 +264,8 @@ export const deleteBoostInfoService = async (name: BoostType) => {
     },
 
     data: {
-      whyBoostWorks: null,
-      boostVsSuperBoost: null,
+      whyBoostWorks: Prisma.JsonNull,
+      boostVsSuperBoost: Prisma.JsonNull,
     },
 
     select: {

@@ -20,14 +20,15 @@ import { chatSocketService } from "./chat.socket.service";
  */
 export const registerChatEvents = (
   io: Server,
-  socket: AuthenticatedSocket
+  socket: AuthenticatedSocket,
+  userId: string
 ) => {
   /**
    * User ID comes from socket authentication.
    *
    * NEVER trust senderId from client.
    */
-  const userId = socket.userId;
+
 
   console.log(
     `Registering chat events for user: ${userId}`
@@ -44,7 +45,9 @@ export const registerChatEvents = (
       payload: JoinConversationSocketPayload,
       callback?: Function
     ) => {
+       
       try {
+       
         if (!payload?.conversationId) {
           throw new Error(
             "Conversation ID is required"
@@ -66,6 +69,9 @@ export const registerChatEvents = (
           result
         );
 
+        console.log(
+          `User ${userId} joined conversation ${payload.conversationId}`
+        );
         /**
          * Optional acknowledgement callback.
          */

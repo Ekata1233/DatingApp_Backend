@@ -135,6 +135,24 @@ export const chatService = {
     };
   },
 
+  async verifyConversationParticipant(
+    conversationId: string,
+    userId: string
+  ) {
+    const participant =
+      await chatRepository.findParticipant(
+        conversationId,
+        userId
+      );
+
+    if (!participant) {
+      throw new Error(
+        "You are not a participant of this conversation"
+      );
+    }
+
+    return participant;
+  },
   /**
    * Send message.
    */

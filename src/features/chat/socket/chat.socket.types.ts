@@ -27,8 +27,6 @@ export interface SendMessageSocketPayload {
   messageType: MessageType;
 
   mediaUrl?: string | null;
-
-  replyToMessageId?: string | null;
 }
 
 /**

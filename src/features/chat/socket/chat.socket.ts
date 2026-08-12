@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import { AuthenticatedSocket } from "../../../middleware/socketAuth.middleware";
+import { registerChatEvents } from "./chat.events";
 
 export const registerChatSocket = (io: Server) => {
   io.on("connection", (socket) => {
@@ -7,14 +8,21 @@ export const registerChatSocket = (io: Server) => {
 
     const userId = authSocket.userId;
 
-    console.log(
-      `User ${userId} connected with socket ${socket.id}`
-    );
+
 
     /**
      * Join user's personal room
      */
     socket.join(`user:${userId}`);
+
+    /**
+     * Register chat events
+     */
+    registerChatEvents(
+      io,
+      authSocket,
+      userId
+    );
 
     /**
      * User starts typing

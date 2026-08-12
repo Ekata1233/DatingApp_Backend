@@ -38,6 +38,11 @@ export const initializeSocket = (server: HttpServer): SocketIOServer => {
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
+    socket.onAny((event, ...args) => {
+    console.log("🔥 SOCKET EVENT RECEIVED:", event);
+    console.log("🔥 SOCKET EVENT PAYLOAD:", args);
+  });
+
     socket.on("disconnect", (reason) => {
       console.log(
         `Socket disconnected: ${socket.id}, reason: ${reason}`

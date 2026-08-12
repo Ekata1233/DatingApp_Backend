@@ -53,7 +53,6 @@ export const messageRepository = {
     content?: string | null;
     messageType: MessageType;
     mediaUrl?: string | null;
-    replyToMessageId?: string | null;
   }) {
     return prisma.$transaction(async (tx) => {
       const message = await tx.chatMessage.create({
@@ -62,40 +61,10 @@ export const messageRepository = {
           senderId: data.senderId,
           content: data.content ?? null,
           messageType: data.messageType,
-
-          /**
-           * Add this only if your Message model
-           * contains mediaUrl.
-           */
           mediaUrl: data.mediaUrl ?? null,
-
-          /**
-           * Add this only if your Message model
-           * has replyToMessageId.
-           */
-          replyToMessageId:
-            data.replyToMessageId ?? null,
-        },
-
-        include: {
-          replyToMessage: {
-            select: {
-              id: true,
-              senderId: true,
-              content: true,
-              messageType: true,
-              createdAt: true,
-            },
-          },
         },
       });
 
-      /**
-       * Update conversation timestamp.
-       *
-       * This makes the conversation appear
-       * at the top of the inbox.
-       */
       await tx.conversation.update({
         where: {
           id: data.conversationId,
@@ -143,17 +112,17 @@ export const messageRepository = {
           }
         : {}),
 
-      include: {
-        replyToMessage: {
-          select: {
-            id: true,
-            senderId: true,
-            content: true,
-            messageType: true,
-            createdAt: true,
-          },
-        },
-      },
+      // include: {
+      //   replyToMessage: {
+      //     select: {
+      //       id: true,
+      //       senderId: true,
+      //       content: true,
+      //       messageType: true,
+      //       createdAt: true,
+      //     },
+      //   },
+      // },
     });
   },
 
@@ -195,7 +164,7 @@ export const messageRepository = {
     conversationId: string,
     userId: string
   ) {
-    return prisma.message.updateMany({
+    return prisma.chatMessage.updateMany({
       where: {
         conversationId,
 

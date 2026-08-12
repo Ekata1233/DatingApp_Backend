@@ -32,8 +32,6 @@ export const createMessage = async (
                 content: data.content,
                 messageType: data.messageType,
                 mediaUrl: data.mediaUrl,
-                replyToMessageId:
-                    data.replyToMessageId,
             });
 
         return res.status(201).json({
