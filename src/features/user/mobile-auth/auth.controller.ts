@@ -32,6 +32,7 @@ export const verifyOtpController = async (req: Request, res: Response) => {
       success: true,
       message: "Phone verified successfully",
       token: user.token,
+      is_register: user.is_register,
       user: user.user, // optional: return user data too
     });
   } catch (error: any) {
