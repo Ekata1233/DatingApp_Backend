@@ -1,4 +1,4 @@
-import { OptionType } from "@prisma/client";
+import { OptionType, Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { GetPlansQuery } from "./dateNow.types";
 
@@ -474,5 +474,134 @@ export const getDatePlanDetailsService = async (planId: string) => {
 
       confirmedDate: plan.DateConfirmed,
     },
+  };
+};
+
+export const createDatePlanPackageInfoService = async (
+  payload: {
+    howOnePlanWorks?: Prisma.InputJsonValue;
+    whyPeopleBuyPlans?: Prisma.InputJsonValue;
+    goodToKnow?: Prisma.InputJsonValue;
+  },
+) => {
+  return prisma.$transaction(async (tx) => {
+    // Find existing common info
+    const existing = await tx.datePlanPackageInfo.findFirst();
+
+    // If old data exists, delete it
+    if (existing) {
+      await tx.datePlanPackageInfo.delete({
+        where: {
+          id: existing.id,
+        },
+      });
+    }
+
+    // Create new data
+    return tx.datePlanPackageInfo.create({
+      data: {
+        ...(payload.howOnePlanWorks !== undefined && {
+          howOnePlanWorks: payload.howOnePlanWorks,
+        }),
+
+        ...(payload.whyPeopleBuyPlans !== undefined && {
+          whyPeopleBuyPlans: payload.whyPeopleBuyPlans,
+        }),
+
+        ...(payload.goodToKnow !== undefined && {
+          goodToKnow: payload.goodToKnow,
+        }),
+      },
+    });
+  });
+};
+export const getDatePlanPackageInfoService = async () => {
+  return prisma.datePlanPackageInfo.findFirst();
+};
+
+
+export const createDatePlanPackageFeaturesService = async (
+  payload: {
+    costToPostPlan?: number;
+    costToPostPlanActive?: boolean;
+    costToPostPlanPaidOnly?: boolean;
+
+    planBoostPrice?: number;
+    planBoostActive?: boolean;
+    planBoostPaidOnly?: boolean;
+  },
+) => {
+  return prisma.$transaction(async (tx) => {
+    // Find existing common features
+    const existing = await tx.datePlanPackageFeatures.findFirst();
+
+    // Delete old data
+    if (existing) {
+      await tx.datePlanPackageFeatures.delete({
+        where: {
+          id: existing.id,
+        },
+      });
+    }
+
+    // Create new data
+    return tx.datePlanPackageFeatures.create({
+      data: {
+        ...(payload.costToPostPlan !== undefined && {
+          costToPostPlan: new Prisma.Decimal(
+            payload.costToPostPlan,
+          ),
+        }),
+
+        ...(payload.costToPostPlanActive !== undefined && {
+          costToPostPlanActive: payload.costToPostPlanActive,
+        }),
+
+        ...(payload.costToPostPlanPaidOnly !== undefined && {
+          costToPostPlanPaidOnly: payload.costToPostPlanPaidOnly,
+        }),
+
+        ...(payload.planBoostPrice !== undefined && {
+          planBoostPrice: new Prisma.Decimal(
+            payload.planBoostPrice,
+          ),
+        }),
+
+        ...(payload.planBoostActive !== undefined && {
+          planBoostActive: payload.planBoostActive,
+        }),
+
+        ...(payload.planBoostPaidOnly !== undefined && {
+          planBoostPaidOnly: payload.planBoostPaidOnly,
+        }),
+      },
+    });
+  });
+};
+
+export const getDatePlanPackageFeaturesService = async () => {
+  return prisma.datePlanPackageFeatures.findFirst();
+};
+
+export const getAllDatePlanPackageDataService = async () => {
+  const [packages, info, features] = await Promise.all([
+    prisma.datePlanPackage.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        sortOrder: "asc",
+      },
+    }),
+
+    prisma.datePlanPackageInfo.findFirst(),
+
+    prisma.datePlanPackageFeatures.findFirst(),
+  ]);
+
+  return {
+    packages,
+    info,
+    features,
   };
 };

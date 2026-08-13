@@ -8,8 +8,13 @@ import {
   getDatePlanPackages,
   getDatePlansService,
   getDatePlanDetailsService,
+  createDatePlanPackageInfoService,
+  getDatePlanPackageInfoService,
+  createDatePlanPackageFeaturesService,
+  getDatePlanPackageFeaturesService,
+  getAllDatePlanPackageDataService,
 } from "./dateNow.service";
-import { upsertDatePlanOptionsSchema } from "./dateNow.Validation";
+import { datePlanPackageFeaturesSchema, datePlanPackageInfoSchema, upsertDatePlanOptionsSchema } from "./dateNow.Validation";
 import imagekit from "../../../utils/imagekit";
 
 interface OptionItem {
@@ -567,6 +572,165 @@ const result = await getDatePlanDetailsService(planId);
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+export const createDatePlanPackageInfoController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const parsed = datePlanPackageInfoSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        success: false,
+        message: parsed.error.issues[0]?.message || "Validation failed",
+      });
+      return;
+    }
+
+    const result = await createDatePlanPackageInfoService(parsed.data);
+
+    res.status(201).json({
+      success: true,
+      message: "Date plan package info saved successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "Create Date Plan Package Info Error:",
+      error,
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to save date plan package info",
+    });
+  }
+};
+export const getDatePlanPackageInfoController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const result = await getDatePlanPackageInfoService();
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "Get Date Plan Package Info Error:",
+      error,
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get date plan package info",
+    });
+  }
+};
+
+export const createDatePlanPackageFeaturesController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const parsed = datePlanPackageFeaturesSchema.safeParse(
+      req.body,
+    );
+
+    if (!parsed.success) {
+      res.status(400).json({
+        success: false,
+        message: parsed.error.issues[0]?.message || "Validation failed",
+      });
+      return;
+    }
+
+    const result =
+      await createDatePlanPackageFeaturesService(parsed.data);
+
+    res.status(201).json({
+      success: true,
+      message: "Date plan package features saved successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "Create Date Plan Package Features Error:",
+      error,
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to save date plan package features",
+    });
+  }
+};
+export const getDatePlanPackageFeaturesController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const result =
+      await getDatePlanPackageFeaturesService();
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "Get Date Plan Package Features Error:",
+      error,
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get date plan package features",
+    });
+  }
+};
+
+export const getAllDatePlanPackageDataController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const result = await getAllDatePlanPackageDataService();
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "Get All Date Plan Package Data Error:",
+      error,
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get date plan package data",
     });
   }
 };

@@ -8,7 +8,12 @@ import {
   updateDatePlanPackageController,
   createDatePlanPackageController,
   getDatePlansController,
-  getDatePlanDetailsController
+  getDatePlanDetailsController,
+  createDatePlanPackageInfoController,
+  getDatePlanPackageInfoController,
+  createDatePlanPackageFeaturesController,
+  getDatePlanPackageFeaturesController,
+  getAllDatePlanPackageDataController
 } from "./dateNow.controller";
 
 const router = express.Router();
@@ -16,6 +21,7 @@ const router = express.Router();
 // No multer needed - uses existing file handling middleware
 router.post("/create-options", upsertDatePlanOptions);
 router.get("/options", getOptions);
+
 router.post(
   "/date-plan-packages",
   createDatePlanPackageController
@@ -40,5 +46,36 @@ router.get(
   "/date-plans/:planId",
  
   getDatePlanDetailsController
+);
+// ==========================================
+// COMMON DATE PLAN PACKAGE INFO
+// ==========================================
+
+router.post(
+  "/date-plan-package-info",
+  createDatePlanPackageInfoController,
+);
+
+router.get(
+  "/date-plan-package-info",
+  getDatePlanPackageInfoController,
+);
+
+// ==========================================
+// COMMON DATE PLAN PACKAGE FEATURES
+// ==========================================
+
+router.post(
+  "/date-plan-package-features",
+  createDatePlanPackageFeaturesController,
+);
+
+router.get(
+  "/date-plan-package-features",
+  getDatePlanPackageFeaturesController,
+);
+router.get(
+  "/date-plan-packages/all",
+  getAllDatePlanPackageDataController,
 );
 export default router;
