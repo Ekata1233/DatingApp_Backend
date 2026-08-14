@@ -1,16 +1,18 @@
 import { Server, Socket } from "socket.io";
-import messageService from "../features/user/messages/message.service";
+import { messageService } from "../features/chat/message/message.service";
+import { MessageType } from "@prisma/client";
 
 interface UsersMap {
   [userId: string]: string;
 }
 
 interface SendMessageData {
-  senderId: string;
+  userId: string;
   receiverId: string;
-  content: string;
-  type?: "text" | "image" | "video" | "emoji";
-  status?: "sent" | "delivered" | "seen";
+  conversationId: string;
+  content?: string | null;
+  messageType: MessageType;
+  mediaUrl?: string | null;
 }
 
 interface TypingData {

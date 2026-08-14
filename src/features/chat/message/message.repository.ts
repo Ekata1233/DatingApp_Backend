@@ -257,4 +257,21 @@ export const messageRepository = {
       },
     });
   },
+
+  async findOtherParticipant(
+  conversationId: string,
+  userId: string
+) {
+  return prisma.conversationParticipant.findFirst({
+    where: {
+      conversationId,
+      userId: {
+        not: userId,
+      },
+    },
+    select: {
+      userId: true,
+    },
+  });
+}
 };
