@@ -823,6 +823,19 @@ export const getFeedService = async ({
     });
   };
 
+  const formatBirthDate = (date: Date | string | null): string | null => {
+    if (!date) return null;
+
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    return `${day}-${month}-${year}`;
+  };
+
   const [currentUser, activeBoosts] = await Promise.all([
     currentUserPromise(),
     boostPromise(),
@@ -1005,16 +1018,29 @@ export const getFeedService = async ({
           },
         },
 
+        // photos: {
+        //   where: {
+        //     is_primary: true,
+        //   },
+        //   select: {
+        //     id: true,
+        //     media_url: true,
+        //     media_type: true,
+        //   },
+        //   take: 1,
+        // },
         photos: {
-          where: {
-            is_primary: true,
-          },
           select: {
             id: true,
             media_url: true,
             media_type: true,
+            order: true,
+            is_primary: true,
           },
-          take: 1,
+          orderBy: {
+            order: 'asc'  // Sort by order (0, 1, 2, 3...)
+          },
+          take: 1,  // Take only the first one (index 0)
         },
       },
     });
@@ -1066,7 +1092,7 @@ export const getFeedService = async ({
     return {
       id: user.id,
       full_name: user.full_name,
-      birth_date: user.birth_date,
+      birth_date: formatBirthDate(user.birth_date),
       age: calculateAge(user.birth_date),
       height: user.height,
       created_at: user.created_at,
