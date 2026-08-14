@@ -25,6 +25,8 @@ import { redis } from "../../../lib/redis";
 // =========================
 // HELPERS
 // =========================
+const CACHE_TTL = 604800;
+
 
 type UserSiblingWithDetails = Prisma.UserSiblingGetPayload<{
   include: {
@@ -599,10 +601,18 @@ export const getFeedDetailsService = async (
   userId: string,
   currentUserId: string
 ): Promise<UserFeedResponse> => {
-  // Optional: Check if current user has access to view this profile
-  // await validateAccess(currentUserId, userId);
+    const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
 
-  // Fetch user with all related data
+  // 1. Check Redis
+  const cachedFeedDetails =
+    await redis.get<UserFeedResponse>(CACHE_KEY);
+
+  if (cachedFeedDetails) {
+    console.log("✅ Feed Details from Redis");
+    return cachedFeedDetails;
+  }
+
+  console.log("📦 Feed Details from Database");
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -679,8 +689,18 @@ export const getFeedDetailsService = async (
     throw new Error('User not found');
   }
 
-  // Transform data to required format
-  return transformUserData(user);
+  // 3. Transform data
+  const response: UserFeedResponse = transformUserData(user);
+
+  // 4. Save to Redis
+  await redis.set(CACHE_KEY, response, {
+    ex: CACHE_TTL,
+  });
+
+  console.log("💾 Feed Details cached");
+
+  // 5. Return response
+  return response;
 };
 
 // Helper function to transform user data

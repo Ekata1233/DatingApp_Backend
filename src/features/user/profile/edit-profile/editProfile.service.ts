@@ -1,9 +1,9 @@
 import { MediaType, QuestionCategory, QuestionScreen } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import {
- 
+
   upsertUserBio,
-  
+
   getEditProfileRepository,
 } from "./editProfile.repository";
 
@@ -128,6 +128,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
 
   // Clear cache only after a successful transaction
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   console.log("🗑️ Edit profile cache cleared");
 
@@ -139,6 +140,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
 export const updateBioService = async (userId: string, bio: string) => {
   const updatedBio = await upsertUserBio(userId, bio);
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return updatedBio;
 };
 
@@ -282,6 +284,7 @@ export const updateQuestionAnswersService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -365,6 +368,7 @@ export const updateEduWorkService = async (userId: string, payload: any) => {
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -433,6 +437,7 @@ export const updateUserPromptService = async (userId: string, payload: any) => {
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -483,6 +488,7 @@ export const updateLocationService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -514,6 +520,7 @@ export const deleteUserPromptService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -586,7 +593,7 @@ export async function getEditProfileService(
       description: item.description,
     }));
 
-    console.log("networkingIntent", networkingIntent);
+  console.log("networkingIntent", networkingIntent);
 
   const siblings = profile.familyProfile?.siblings ?? [];
 
