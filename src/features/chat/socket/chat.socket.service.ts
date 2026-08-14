@@ -300,10 +300,9 @@ export const chatSocketService = {
             `conversation:${conversationId}`
         ).emit("conversation:read", {
             conversationId,
-
             userId,
-
-            readAt: new Date(),
+            readAt: result.readAt,
+            count: result.count,
         });
 
         return result;

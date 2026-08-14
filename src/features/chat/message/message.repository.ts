@@ -104,12 +104,12 @@ export const messageRepository = {
 
       ...(cursor
         ? {
-            skip: 1,
+          skip: 1,
 
-            cursor: {
-              id: cursor,
-            },
-          }
+          cursor: {
+            id: cursor,
+          },
+        }
         : {}),
 
       // include: {
@@ -164,22 +164,49 @@ export const messageRepository = {
     conversationId: string,
     userId: string
   ) {
-    return prisma.chatMessage.updateMany({
-      where: {
-        conversationId,
+    return prisma.$transaction(async (tx) => {
+      const readAt = new Date();
 
-        senderId: {
-          not: userId,
+      // 1. Mark all received messages as read
+      const messages =
+        await tx.chatMessage.updateMany({
+          where: {
+            conversationId,
+
+            senderId: {
+              not: userId,
+            },
+
+            readAt: null,
+
+            deletedAt: null,
+          },
+
+          data: {
+            readAt,
+          },
+        });
+
+      // 2. Update user's conversation read position
+      await tx.conversationParticipant.update({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId,
+          },
         },
 
-        readAt: null,
+        data: {
+          lastReadAt: readAt,
+        },
+      });
 
-        deletedAt: null,
-      },
-
-      data: {
-        readAt: new Date(),
-      },
+      return {
+        count: messages.count,
+        conversationId,
+        userId,
+        readAt,
+      };
     });
   },
 
