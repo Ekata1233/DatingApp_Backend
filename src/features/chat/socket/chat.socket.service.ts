@@ -1,6 +1,6 @@
 // src/modules/chat/sockets/chat.socket.service.ts
 
-import { Server } from "socket.io";
+import { Server,Socket } from "socket.io";
 
 import { chatService } from "../chat.service";
 import { messageService } from "../message/message.service";
@@ -145,7 +145,8 @@ export const chatSocketService = {
     async startTyping(
         io: Server,
         userId: string,
-        payload: TypingSocketPayload
+        payload: TypingSocketPayload,
+        socket: Socket
     ) {
         /**
          * Don't need DB query for every keystroke.
@@ -156,16 +157,7 @@ export const chatSocketService = {
         io.to(
             `conversation:${payload.conversationId}`
         )
-            .except(
-            /**
-             * We need socket.id here if we want to
-             * exclude sender.
-             *
-             * This method receives only io currently,
-             * so this implementation can broadcast
-             * to the room.
-             */
-        )
+            .except(socket.id )
             .emit("typing:start", {
                 conversationId:
                     payload.conversationId,

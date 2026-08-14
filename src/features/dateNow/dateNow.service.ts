@@ -671,7 +671,7 @@ export const approveDatePlanRequest = async (
       });
 
     // Find existing conversation
-    let conversation = await tx.conversationParticipant.findFirst({
+    let conversation = await tx.conversation.findFirst({
       where: {
         participants: {
           every: {
@@ -684,11 +684,14 @@ export const approveDatePlanRequest = async (
           },
         },
       },
+      include: {
+        participants: true,
+      },
     });
 
     // Create conversation if not exists
     if (!conversation) {
-      conversation = await tx.conversationParticipant.create({
+      conversation = await tx.conversation.create({
         data: {
           participants: {
             create: [
@@ -700,6 +703,9 @@ export const approveDatePlanRequest = async (
               },
             ],
           },
+        },
+        include: {
+          participants: true,
         },
       });
     }

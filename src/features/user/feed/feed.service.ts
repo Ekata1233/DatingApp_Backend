@@ -263,7 +263,12 @@ export const getFeedService = async ({
   // -------------------------
   // UI structured filters
   // -------------------------
-  const filterQuery = filters ? buildFilterQuery(filters) : { where: {} };
+const filterQuery = filters ? buildFilterQuery(filters) : { where: {} };
+
+console.log(
+  "FINAL FILTER QUERY:",
+  JSON.stringify(filterQuery, null, 2)
+);  
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
   );

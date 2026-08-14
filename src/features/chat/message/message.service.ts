@@ -52,14 +52,14 @@ export const messageService = {
     /**
      * 3. Validate media.
      */
-    if (
-      [
-        MessageType.IMAGE,
-        MessageType.VIDEO,
-        MessageType.AUDIO,
-        MessageType.FILE,
-      ].includes(data.messageType)
-    ) {
+    const mediaMessageTypes: MessageType[] = [
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.AUDIO,
+      MessageType.FILE,
+    ];
+
+    if (mediaMessageTypes.includes(data.messageType)) {
       if (!data.mediaUrl) {
         throw new Error(
           "Media URL is required"
