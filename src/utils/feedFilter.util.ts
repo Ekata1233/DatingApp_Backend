@@ -9,13 +9,14 @@ export type Preferences = {
 
   interestedIn?: string;
   sexualOrientation?: string;
+
   minAge?: number;
   maxAge?: number;
-
+distanceKm?: number;
   minHeight?: number;
   maxHeight?: number;
 
-
+intentionOption?: string[];
   interests?: {
   key: string;
   values: string[];
@@ -151,6 +152,17 @@ export const buildFilterQuery = (filters: Preferences) => {
     };
   }
 
+  // -------------------------
+// INTENTION OPTION FILTER
+// -------------------------
+if (
+  filters.intentionOption &&
+  filters.intentionOption.length > 0
+) {
+  userWhere.intentionId = {
+    in: filters.intentionOption,
+  };
+}
   // -------------------------
 // INTERESTS FILTER BY KEY (FINAL ✔)
 // -------------------------
