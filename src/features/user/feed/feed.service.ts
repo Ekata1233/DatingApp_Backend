@@ -25,6 +25,8 @@ import { redis } from "../../../lib/redis";
 // =========================
 // HELPERS
 // =========================
+const CACHE_TTL = 604800;
+
 
 type UserSiblingWithDetails = Prisma.UserSiblingGetPayload<{
   include: {
@@ -308,7 +310,7 @@ if (
       users: [],
       nextCursor: null,
       filterRestricted: true,
-      message: "Ambition filter is available only for active VIP users.",
+      message: "Ambition filter is available only for active VIP Package users.",
     };
   }
 }
@@ -316,6 +318,9 @@ if (
 const filterQuery = filters
   ? buildFilterQuery(filters)
   : { where: {} };
+
+  const distanceKm = filters?.distanceKm || currentUser.profile.max_distance_km || 50;
+
 
 console.log(
   "FINAL FILTER QUERY:",
@@ -397,6 +402,7 @@ console.log(
         rows.length
       );
     } else {
+      const distanceLimit = distanceKm;
       const candidateStart = performance.now();
       rows = await prisma.$queryRaw<{ id: string; sort_val: number }[]>`
         SELECT
@@ -405,7 +411,7 @@ console.log(
         FROM users u
         JOIN user_profiles p ON p.user_id = u.id
         WHERE ${matchConditions}
-          AND ST_DWithin(p.location::geography, ${me}, ${maxDistance * 1000})
+          AND ST_DWithin(p.location::geography, ${me}, ${distanceLimit * 1000})
           ${cursorState
           ? Prisma.sql`AND (
                 (p.location::geography <-> ${me}) > ${cursorState.k}
@@ -653,10 +659,18 @@ export const getFeedDetailsService = async (
   userId: string,
   currentUserId: string
 ): Promise<UserFeedResponse> => {
-  // Optional: Check if current user has access to view this profile
-  // await validateAccess(currentUserId, userId);
+    const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
 
-  // Fetch user with all related data
+  // 1. Check Redis
+  const cachedFeedDetails =
+    await redis.get<UserFeedResponse>(CACHE_KEY);
+
+  if (cachedFeedDetails) {
+    console.log("✅ Feed Details from Redis");
+    return cachedFeedDetails;
+  }
+
+  console.log("📦 Feed Details from Database");
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -733,8 +747,18 @@ export const getFeedDetailsService = async (
     throw new Error('User not found');
   }
 
-  // Transform data to required format
-  return transformUserData(user);
+  // 3. Transform data
+  const response: UserFeedResponse = transformUserData(user);
+
+  // 4. Save to Redis
+  await redis.set(CACHE_KEY, response, {
+    ex: CACHE_TTL,
+  });
+
+  console.log("💾 Feed Details cached");
+
+  // 5. Return response
+  return response;
 };
 
 // Helper function to transform user data

@@ -76,6 +76,7 @@ export const updateProfileService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return user;
 };
@@ -126,6 +127,7 @@ export const updateInterestedInService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return {
     updatedProfile,
@@ -194,6 +196,7 @@ export const updateReligionService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return updatedProfile;
 };
@@ -261,6 +264,7 @@ export const updateLookingForService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -319,6 +323,7 @@ export const updateAddressService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -434,6 +439,7 @@ export const updateLocationService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return profile;
 };
@@ -491,6 +497,7 @@ export const updateUserAnswerService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return {
     questionId,
     savedOptions: optionIds,
@@ -544,6 +551,7 @@ export const updateEducationService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return {
     eduWork,
     onboarding: updatedUser,
@@ -612,6 +620,7 @@ export const updateWorkService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return {
     eduWork,
     onboarding,
@@ -728,6 +737,7 @@ export const updateFamilyProfileService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return {
     updatedProfile: familyProfile,
     updatedUser,
@@ -806,6 +816,7 @@ export const updateLanguageService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -954,6 +965,7 @@ export const updateUserMediaService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return updatedMedia;
 };
 
@@ -987,6 +999,7 @@ export const setPrimaryPhotoService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -1016,6 +1029,7 @@ export const deleteUserMediaService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return {
     message:
@@ -1084,6 +1098,7 @@ export const updateUserVideoService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return video;
 };
@@ -1141,6 +1156,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -1226,6 +1242,7 @@ export const updateUserPromptService = async (
   });
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
 
   return result;
 };
@@ -1254,5 +1271,6 @@ export const completeOnboardingService = async (userId: string) => {
   }
 
   await redis.del(`profile:edit:${userId}`);
+  await redis.del(`feed:details:${userId}`);
   return user;
 };
