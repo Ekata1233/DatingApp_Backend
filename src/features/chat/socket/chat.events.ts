@@ -14,6 +14,7 @@ import {
 } from "./chat.socket.types";
 
 import { chatSocketService } from "./chat.socket.service";
+import { conversationJoinRateLimit, messageReadRateLimit, messageSendRateLimit, typingRateLimit } from "../../../middleware/rateLimit/socket.rateLimit";
 
 /**
  * Register all chat socket events.
@@ -45,22 +46,37 @@ export const registerChatEvents = (
       payload: JoinConversationSocketPayload,
       callback?: Function
     ) => {
-       
+
       try {
-       
+
         if (!payload?.conversationId) {
           throw new Error(
             "Conversation ID is required"
           );
         }
 
-        const result =
-          await chatSocketService.joinConversation(
-            socket,
-            userId,
-            payload
-          );
+        const result = await chatSocketService.joinConversation(
+          socket,
+          userId,
+          payload
+        );
 
+        const rateLimit = await conversationJoinRateLimit(userId);
+
+        if (!rateLimit.allowed) {
+          socket.emit("rate_limit:exceeded", {
+            success: false,
+            code: "RATE_LIMIT_EXCEEDED",
+            message:
+              "Too many conversation join requests.",
+            action: "conversation-join",
+            limit: rateLimit.limit,
+            remaining: rateLimit.remaining,
+            retryAfter: rateLimit.retryAfter,
+          });
+
+          return;
+        }
         /**
          * Send confirmation to current user.
          */
@@ -160,6 +176,30 @@ export const registerChatEvents = (
           );
         }
 
+        const rateLimit = await messageSendRateLimit(userId);
+
+        console.log("MESSAGE RATE LIMIT:", {
+          userId,
+          allowed: rateLimit.allowed,
+          remaining: rateLimit.remaining,
+          limit: rateLimit.limit,
+          retryAfter: rateLimit.retryAfter,
+        });
+
+        if (!rateLimit.allowed) {
+          socket.emit("rate_limit:exceeded", {
+            success: false,
+            code: "RATE_LIMIT_EXCEEDED",
+            message:
+              "Too many messages. Please try again later.",
+            action: "message-send",
+            limit: rateLimit.limit,
+            remaining: rateLimit.remaining,
+            retryAfter: rateLimit.retryAfter,
+          });
+
+          return;
+        }
         /**
          * IMPORTANT:
          *
@@ -210,6 +250,12 @@ export const registerChatEvents = (
           return;
         }
 
+        const rateLimit =
+          await typingRateLimit(userId);
+
+        if (!rateLimit.allowed) {
+          return;
+        }
         /**
          * Verify user is actually part of
          * the conversation.
@@ -328,6 +374,25 @@ export const registerChatEvents = (
             "Message ID is required"
           );
         }
+
+        const rateLimit =
+          await messageReadRateLimit(userId);
+
+        if (!rateLimit.allowed) {
+          socket.emit("rate_limit:exceeded", {
+            success: false,
+            code: "RATE_LIMIT_EXCEEDED",
+            message:
+              "Too many message read requests.",
+            action: "message-read",
+            limit: rateLimit.limit,
+            remaining: rateLimit.remaining,
+            retryAfter: rateLimit.retryAfter,
+          });
+
+          return;
+        }
+
 
         const message =
           await chatSocketService.markMessageRead(
