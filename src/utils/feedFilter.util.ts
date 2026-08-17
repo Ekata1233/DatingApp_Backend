@@ -15,8 +15,11 @@ export type Preferences = {
 distanceKm?: number;
   minHeight?: number;
   maxHeight?: number;
-
+  religionIds?: number[];
+  communityIds?: number[];
 intentionOption?: string[];
+  professionIds?: number[];
+  ambitionIds?: number[];
   interests?: {
   key: string;
   values: string[];
@@ -26,10 +29,7 @@ intentionOption?: string[];
   values: string[];
 }[];
 
-zodiac?: {
-  key: string;
-  values: string[];
-}[];
+zodiac?: string[];
 
 education?: {
   key: string;
@@ -45,7 +45,15 @@ communicationStyle?: {
   key: string;
   values: string[];
 }[];
+travel?: {
+  key: string;
+  values: string[];
+}[];
 
+sleep?: {
+  key: string;
+  values: string[];
+}[];
 loveStyle?: {
   key: string;
   values: string[];
@@ -116,6 +124,30 @@ export const buildFilterQuery = (filters: Preferences) => {
     };
   }
 
+// -------------------------
+// RELIGION FILTER
+// -------------------------
+if (
+  filters.religionIds &&
+  filters.religionIds.length > 0
+) {
+  profileWhere.religionId = {
+    in: filters.religionIds,
+  };
+}
+
+// -------------------------
+// COMMUNITY FILTER
+// -------------------------
+if (
+  filters.communityIds &&
+  filters.communityIds.length > 0
+) {
+  profileWhere.communityId = {
+    in: filters.communityIds,
+  };
+}
+
   // -------------------------
   // LOCATION FILTER (UserProfile) ✔ FIXED
   // -------------------------
@@ -163,6 +195,54 @@ if (
     in: filters.intentionOption,
   };
 }
+// -------------------------
+// ZODIAC FILTER
+// -------------------------
+if (
+  filters.zodiac &&
+  filters.zodiac.length > 0
+) {
+  userWhere.about = {
+    is: {
+      zodiac: {
+        in: filters.zodiac,
+      },
+    },
+  };
+}
+
+// -------------------------
+// PROFESSION FILTER
+// -------------------------
+if (
+  filters.professionIds &&
+  filters.professionIds.length > 0
+) {
+  userWhere.eduWork = {
+    is: {
+      professionId: {
+        in: filters.professionIds,
+      },
+    },
+  };
+}
+
+// -------------------------
+// AMBITION FILTER
+// -------------------------
+if (
+  filters.ambitionIds &&
+  filters.ambitionIds.length > 0
+) {
+  userWhere.eduWork = {
+    is: {
+      ambitionId: {
+        in: filters.ambitionIds,
+      },
+    },
+  };
+}
+
   // -------------------------
 // INTERESTS FILTER BY KEY (FINAL ✔)
 // -------------------------
@@ -368,22 +448,23 @@ if (filters.workout && filters.workout.length > 0) {
     })),
   ];
 }
-
 // -------------------------
-// ZODIAC FILTER
+// travel
 // -------------------------
-if (filters.zodiac && filters.zodiac.length > 0) {
+if (filters.travel && filters.travel.length > 0) {
   userWhere.AND = [
     ...(userWhere.AND || []),
-    ...filters.zodiac.map((group) => ({
+    ...filters.travel.map((group) => ({
       answer: {
         some: {
           option: {
             value: {
-              in: group.values.map((v: string) => v.toLowerCase()),
+              in: group.values.map((v: string) =>
+                v.toLowerCase()
+              ),
             },
             question: {
-              key: group.key, // e.g. "zodiac"
+              key: group.key,
             },
           },
         },
@@ -391,6 +472,31 @@ if (filters.zodiac && filters.zodiac.length > 0) {
     })),
   ];
 }
+// -------------------------
+// SLEEP
+// -------------------------
+if (filters.sleep && filters.sleep.length > 0) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    ...filters.sleep.map((group) => ({
+      answer: {
+        some: {
+          option: {
+            value: {
+              in: group.values.map((v: string) =>
+                v.toLowerCase()
+              ),
+            },
+            question: {
+              key: group.key,
+            },
+          },
+        },
+      },
+    })),
+  ];
+}
+
 
 // -------------------------
 // LANGUAGES FILTER

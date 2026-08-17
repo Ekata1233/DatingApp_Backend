@@ -225,6 +225,38 @@ export const getFeedService = async ({
     throw new Error("User profile not found");
   }
 
+  // -------------------------
+// VIP PACKAGE CHECK
+// -------------------------
+const activeVipPackage = await prisma.userPackage.findFirst({
+  where: {
+    user_id: userId,
+    status: "ACTIVE",
+
+    // Change `name` if your Package model uses another field
+    package: {
+      name: "VIP",
+    },
+
+    OR: [
+      {
+        endDate: null,
+      },
+      {
+        endDate: {
+          gt: new Date(),
+        },
+      },
+    ],
+  },
+  select: {
+    id: true,
+  },
+});
+
+const hasActiveVip = !!activeVipPackage;
+
+console.log("HAS ACTIVE VIP:", hasActiveVip);
   // const boostedUserIds = new Set(activeBoosts.map((b) => b.user_id));
 
   const { interested_in, sexual_orientation } = currentUser.profile;
@@ -263,12 +295,34 @@ export const getFeedService = async ({
   // -------------------------
   // UI structured filters
   // -------------------------
-const filterQuery = filters ? buildFilterQuery(filters) : { where: {} };
+// -------------------------
+// VIP-ONLY FILTER CHECK
+// -------------------------
+
+if (
+  filters?.ambitionIds &&
+  filters.ambitionIds.length > 0
+) {
+  if (!hasActiveVip) {
+    return {
+      users: [],
+      nextCursor: null,
+      filterRestricted: true,
+      message: "Ambition filter is available only for active VIP users.",
+    };
+  }
+}
+
+const filterQuery = filters
+  ? buildFilterQuery(filters)
+  : { where: {} };
 
 console.log(
   "FINAL FILTER QUERY:",
   JSON.stringify(filterQuery, null, 2)
+
 );  
+
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
   );
