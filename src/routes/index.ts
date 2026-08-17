@@ -54,6 +54,7 @@ import purchaseRoutes from "../features/admin/purchaseStore/purchaseStore.routes
 import purchaseStoreRoutes from "../features/purchaseStore/purchaseStore.routes"
 import giftRoutes from "../features/gift/gift.routes"
 import chatRoutes from "../features/chat/chat.routes";
+import mediaRoutes from "../features/chat/media/media.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -114,5 +115,7 @@ router.use('/payments', paymentRoutes);
 router.use('/revenue', giftsRoutes,complimentRoutes);
 
 router.use("/user/chat", chatRoutes);
+
+router.use("/chat/media", mediaRoutes);
 
 export default router;
