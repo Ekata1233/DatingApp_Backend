@@ -227,17 +227,24 @@ export const getFeedService = async ({
     throw new Error("User profile not found");
   }
 
-  // -------------------------
+ // -------------------------
 // VIP PACKAGE CHECK
+// VIP + VIP_ELITE
 // -------------------------
+
+// -------------------------
+// VIP / VIP_ELITE PACKAGE CHECK
+// -------------------------
+
 const activeVipPackage = await prisma.userPackage.findFirst({
   where: {
     user_id: userId,
     status: "ACTIVE",
 
-    // Change `name` if your Package model uses another field
     package: {
-      name: "VIP",
+      name: {
+        in: ["VIP", "VIP_ELITE"],
+      },
     },
 
     OR: [
@@ -253,12 +260,18 @@ const activeVipPackage = await prisma.userPackage.findFirst({
   },
   select: {
     id: true,
+    package: {
+      select: {
+        name: true,
+      },
+    },
   },
 });
 
 const hasActiveVip = !!activeVipPackage;
 
-console.log("HAS ACTIVE VIP:", hasActiveVip);
+console.log("ACTIVE VIP PACKAGE:", activeVipPackage);
+console.log("HAS ACTIVE VIP/VIP_ELITE:", hasActiveVip);
   // const boostedUserIds = new Set(activeBoosts.map((b) => b.user_id));
 
   const { interested_in, sexual_orientation } = currentUser.profile;
@@ -310,23 +323,126 @@ if (
       users: [],
       nextCursor: null,
       filterRestricted: true,
-      message: "Ambition filter is available only for active VIP Package users.",
+      message: "Ambition filter is available only for VIP and VIP Elite users.",
     };
   }
 }
 
+
+
+// -------------------------
+// FAMILY INCOME RANGE
+// VIP ONLY
+// -------------------------
+
+let familyIncomeIds: number[] = [];
+
+if (
+  filters?.familyIncomeMin !== undefined ||
+  filters?.familyIncomeMax !== undefined
+) {
+  // Check VIP access
+  if (!hasActiveVip) {
+    return {
+      users: [],
+      nextCursor: null,
+      filterRestricted: true,
+      message:
+        "Family income filter is available only for VIP and VIP Elite users.",
+    };
+  }
+
+  const minAmount = filters.familyIncomeMin ?? 0;
+  const maxAmount =
+    filters.familyIncomeMax ?? Number.MAX_SAFE_INTEGER;
+
+  const matchingIncomeRanges =
+    await prisma.familyIncome.findMany({
+      where: {
+        active: true,
+
+        AND: [
+          {
+            minAmount: {
+              lte: maxAmount,
+            },
+          },
+          {
+            OR: [
+              {
+                maxAmount: null,
+              },
+              {
+                maxAmount: {
+                  gte: minAmount,
+                },
+              },
+            ],
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+        title: true,
+        minAmount: true,
+        maxAmount: true,
+      },
+    });
+
+  familyIncomeIds = matchingIncomeRanges.map(
+    (income) => income.id
+  );
+
+  console.log(
+    "MATCHING FAMILY INCOME:",
+    matchingIncomeRanges
+  );
+
+  console.log(
+    "MATCHING FAMILY INCOME IDS:",
+    familyIncomeIds
+  );
+}
+
+if (
+  filters?.networkingIntentIds &&
+  filters.networkingIntentIds.length > 0
+) {
+  if (!hasActiveVip) {
+    return {
+      users: [],
+      nextCursor: null,
+      filterRestricted: true,
+      message:
+        "Networking Intent filter is available only for active VIP or VIP Elite users.",
+    };
+  }
+}
+// -------------------------
+// BUILD FILTER QUERY
+// -------------------------
+
 const filterQuery = filters
-  ? buildFilterQuery(filters)
+  ? buildFilterQuery({
+      ...filters,
+      familyIncomeIds,
+    })
   : { where: {} };
 
-  const distanceKm = filters?.distanceKm || currentUser.profile.max_distance_km || 50;
+// -------------------------
+// DISTANCE
+// -------------------------
 
+const distanceKm =
+  filters?.distanceKm ||
+  currentUser.profile.max_distance_km ||
+  50;
 
 console.log(
   "FINAL FILTER QUERY:",
   JSON.stringify(filterQuery, null, 2)
-
-);  
+); 
 
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),

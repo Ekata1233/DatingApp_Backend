@@ -19,7 +19,7 @@ distanceKm?: number;
   communityIds?: number[];
 intentionOption?: string[];
   professionIds?: number[];
-  ambitionIds?: number[];
+  
   interests?: {
   key: string;
   values: string[];
@@ -88,6 +88,12 @@ socialMedia?: {
   key: string;
   values: string[];
 }[];
+// VIP / VIP_ELITE filter
+  ambitionIds?: number[];
+  familyIncomeMin?: number;
+familyIncomeMax?: number;
+ familyIncomeIds?: number[];
+  networkingIntentIds?: string[];
 };
 
 export const buildFilterQuery = (filters: Preferences) => {
@@ -243,6 +249,46 @@ if (
   };
 }
 
+// -------------------------
+// FAMILY INCOME FILTER - VIP ONLY
+// -------------------------
+if (
+  filters.familyIncomeIds &&
+  filters.familyIncomeIds.length > 0
+) {
+  userWhere.familyProfile = {
+    is: {
+      familyIncomeId: {
+        in: filters.familyIncomeIds,
+      },
+    },
+  };
+}
+// -------------------------
+// NETWORKING INTENT FILTER
+// VIP / VIP_ELITE
+// -------------------------
+
+if (
+  filters.networkingIntentIds &&
+  filters.networkingIntentIds.length > 0
+) {
+  userWhere.AND = [
+    ...(userWhere.AND || []),
+    {
+      answer: {
+        some: {
+          option_id: {
+            in: filters.networkingIntentIds,
+          },
+          question: {
+            screen: "NETWORKING_INTENT",
+          },
+        },
+      },
+    },
+  ];
+}
   // -------------------------
 // INTERESTS FILTER BY KEY (FINAL ✔)
 // -------------------------
@@ -265,26 +311,23 @@ if (filters.interests && filters.interests.length > 0) {
 
 
 // -------------------------
-// EDUCATION FILTER (✔ SAME PATTERN)
+// EDUCATION FILTER
+// UserEduWork.highestEdu
 // -------------------------
 if (filters.education && filters.education.length > 0) {
-  userWhere.AND = [
-    ...(userWhere.AND || []),
-    ...filters.education.map((group) => ({
-      answer: {
-        some: {
-          option: {
-            value: {
-              in: group.values.map((v: string) => v.toLowerCase()),
-            },
-            question: {
-              key: group.key, // e.g. "education"
-            },
-          },
-        },
+  const educationValues = filters.education.flatMap(
+    (group) => group.values
+  );
+
+  userWhere.eduWork = {
+    is: {
+      highestEdu: {
+        in: educationValues.map((value: string) =>
+          value.toUpperCase()
+        ),
       },
-    })),
-  ];
+    },
+  };
 }
 
 // -------------------------
