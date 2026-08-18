@@ -57,18 +57,16 @@ export const chatService = {
   /**
    * Get user's conversations.
    */
-  async getConversations(
-    data: GetConversationsInput
-  ) {
+  async getConversations(data: GetConversationsInput) {
     const conversations =
       await chatRepository.findUserConversations(
         data.userId,
         data.cursor,
-        data.limit
+        data.limit,
+        data.type
       );
 
-    const hasMore =
-      conversations.length > data.limit;
+    const hasMore = conversations.length > data.limit;
 
     const items = hasMore
       ? conversations.slice(0, data.limit)

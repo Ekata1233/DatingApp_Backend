@@ -30,7 +30,15 @@ export interface GetConversationsInput {
   userId: string;
   cursor?: string;
   limit: number;
+  type: ConversationFilter;
 }
+export type ConversationFilter =
+  | "all"
+  | "unread"
+  | "online"
+  | "nearby"
+  | "date"
+  | "gift";
 
 export interface MarkConversationReadInput {
   userId: string;

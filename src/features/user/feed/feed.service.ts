@@ -7,21 +7,6 @@ import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
 
-/**
- * PERFORMANCE PREREQUISITES (run these migrations — code cannot substitute):
- *   CREATE INDEX CONCURRENTLY idx_user_profiles_location
- *     ON user_profiles USING GIST (location);
- *   CREATE INDEX CONCURRENTLY idx_swipes_swiper_target
- *     ON swipes ("swiperId", "targetUserId");
- *   CREATE INDEX CONCURRENTLY idx_userblock_blocker
- *     ON "UserBlock" ("blockerId", "blockedId");
- *   CREATE INDEX CONCURRENTLY idx_userblock_blocked
- *     ON "UserBlock" ("blockedId", "blockerId");
- *   CREATE INDEX CONCURRENTLY idx_boost_active
- *     ON boost_usage (user_id) WHERE is_active;
- * Verify with: EXPLAIN (ANALYZE, BUFFERS) <feed query>  -> no "Seq Scan".
- */
-
 // =========================
 // HELPERS
 // =========================
