@@ -1652,7 +1652,8 @@ model Event {
   // Step 2
   //---------------------------------
   city            String?
-  eventPartner    String?
+  eventPartnerId  String?
+  eventPartner    EventPartner? @relation(fields: [eventPartnerId], references: [id])
   officialPartner Boolean @default(false)
 
   //---------------------------------
@@ -1712,6 +1713,7 @@ model Event {
   @@index([city])
   @@index([eventDate])
   @@index([currentStep])
+  @@index([eventPartnerId])
 }
 
 model EventGallery {
@@ -2278,6 +2280,8 @@ model EventPartner {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
+  events           Event[]
+
   @@index([businessName])
   @@index([city])
   @@index([state])
@@ -2384,4 +2388,18 @@ enum StorePackBadge {
   NONE
   MOST_POPULAR
   BEST_VALUE
+}
+
+model UserCompatibility {
+  id           String   @id @default(uuid())
+  userId       String
+  targetUserId String
+  score        Int
+  percentage   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, targetUserId])
+  @@index([userId, score])
+  @@index([userId, targetUserId])
 }

@@ -588,6 +588,7 @@ console.log(
   const enriched = page.map((user) => {
     const presence = presenceMap[user.id];
     const meters = meterById.get(user.id);
+    
 
     return {
       id: user.id,

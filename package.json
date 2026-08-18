@@ -8,7 +8,8 @@
     "swagger": "ts-node scripts/generate-swagger.ts",
     "build": "npm run swagger && tsc",
     "start": "node dist/server.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "worker:dev": "tsx watch src/worker.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,7 @@
     "@upstash/redis": "^1.38.0",
     "axios": "^1.13.6",
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.1.2",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
@@ -59,6 +61,7 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3"
   }
 }

@@ -17,6 +17,7 @@ import imagekit from "../../../utils/imagekit";
 import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
 import { ReferralService } from "../referral/referral.service";
 import { redis } from "../../../lib/redis";
+import { queueMatchScoreCalculation } from "../../../queues/match-score.queue";
 
 //profile update service
 export const updateProfileService = async (
@@ -437,6 +438,12 @@ export const updateLocationService = async (
     where: { id: userId },
     data: { profile_completion: score },
   });
+
+  console.log("before bull mq")
+  await queueMatchScoreCalculation(
+    userId,
+  );
+  console.log("after bullmq")
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
