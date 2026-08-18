@@ -9,6 +9,7 @@ import {
 
 import { EditProfileResponse } from "./editProfile.types";
 import { redis } from "../../../../lib/redis";
+import { queueMatchScoreCalculation } from "../../../../queues/match-score.queue";
 
 
 const CACHE_TTL = 604800;
@@ -126,6 +127,10 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     };
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   // Clear cache only after a successful transaction
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -139,6 +144,9 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
 //aboutme
 export const updateBioService = async (userId: string, bio: string) => {
   const updatedBio = await upsertUserBio(userId, bio);
+  await queueMatchScoreCalculation(
+    userId,
+  );
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
   return updatedBio;
@@ -283,6 +291,10 @@ export const updateQuestionAnswersService = async (
     };
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -367,6 +379,10 @@ export const updateEduWorkService = async (userId: string, payload: any) => {
     };
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -436,6 +452,10 @@ export const updateUserPromptService = async (userId: string, payload: any) => {
     };
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -487,6 +507,10 @@ export const updateLocationService = async (
     };
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -518,6 +542,10 @@ export const deleteUserPromptService = async (
       },
     },
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);

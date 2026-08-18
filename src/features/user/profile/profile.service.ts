@@ -76,6 +76,10 @@ export const updateProfileService = async (
     data: { profile_completion: score },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -127,6 +131,9 @@ export const updateInterestedInService = async (
     data: { profile_completion: score },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -196,6 +203,10 @@ export const updateReligionService = async (
     },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -264,6 +275,10 @@ export const updateLookingForService = async (
     },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -322,6 +337,10 @@ export const updateAddressService = async (
       onboarding,
     };
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -503,6 +522,10 @@ export const updateUserAnswerService = async (
     data: { profile_completion: score },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
   return {
@@ -556,6 +579,10 @@ export const updateEducationService = async (
       onboarding_step: true,
     },
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -625,6 +652,10 @@ export const updateWorkService = async (
       onboarding_step: true,
     },
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -743,6 +774,10 @@ export const updateFamilyProfileService = async (
     },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
   return {
@@ -821,6 +856,10 @@ export const updateLanguageService = async (
       },
     },
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -971,6 +1010,10 @@ export const updateUserMediaService = async (
     },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
   return updatedMedia;
@@ -1005,6 +1048,10 @@ export const setPrimaryPhotoService = async (
     return photo;
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -1034,6 +1081,10 @@ export const deleteUserMediaService = async (
       id: mediaId,
     },
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -1104,6 +1155,10 @@ export const updateUserVideoService = async (
     },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -1161,6 +1216,10 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
       profile_completion: score,
     },
   });
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
@@ -1248,6 +1307,10 @@ export const updateUserPromptService = async (
     },
   });
 
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
@@ -1276,6 +1339,10 @@ export const completeOnboardingService = async (userId: string) => {
   } catch (error) {
     console.error("Referral registration reward failed:", error);
   }
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
