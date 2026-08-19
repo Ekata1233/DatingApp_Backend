@@ -6,12 +6,15 @@ export const upsertDatePlanOptionsService = async (
   type: OptionType,
   options: any[],
 ) => {
-  // Industry-level transaction with proper timeout and error handling
   return prisma.$transaction(
     async (tx) => {
       const incomingValues = options.map((item) => item.value);
 
-      // Soft delete records not present in request
+      // =====================================================
+      // 1. DEACTIVATE OLD ACTIVE OPTIONS
+      //    ONLY FOR THE SAME TYPE
+      // =====================================================
+
       await tx.datePlanOption.updateMany({
         where: {
           type,
@@ -25,8 +28,16 @@ export const upsertDatePlanOptionsService = async (
         },
       });
 
+      // =====================================================
+      // 2. UPSERT EACH OPTION
+      // =====================================================
+
       for (const item of options) {
-        // Find only ACTIVE records
+        // ---------------------------------------------------
+        // Check ACTIVE record
+        // Same TYPE + Same VALUE
+        // ---------------------------------------------------
+
         const existingActive = await tx.datePlanOption.findFirst({
           where: {
             type,
@@ -36,7 +47,11 @@ export const upsertDatePlanOptionsService = async (
         });
 
         if (existingActive) {
-          // Update active record
+          // -------------------------------------------------
+          // Already active
+          // Just update its details
+          // -------------------------------------------------
+
           await tx.datePlanOption.update({
             where: {
               id: existingActive.id,
@@ -46,46 +61,67 @@ export const upsertDatePlanOptionsService = async (
               value: item.value,
               icon: item.icon,
               sortOrder: item.sortOrder ?? 0,
-            },
-          });
-        } else {
-          // Check for inactive record to reactivate
-          const existingInactive = await tx.datePlanOption.findFirst({
-            where: {
-              type,
-              value: item.value,
-              isActive: false,
+              isActive: true,
             },
           });
 
-          if (existingInactive) {
-            // Reactivate the inactive record
-            await tx.datePlanOption.update({
-              where: {
-                id: existingInactive.id,
-              },
-              data: {
-                label: item.label,
-                icon: item.icon,
-                sortOrder: item.sortOrder ?? 0,
-                isActive: true,
-              },
-            });
-          } else {
-            // Create NEW record
-            await tx.datePlanOption.create({
-              data: {
-                type,
-                label: item.label,
-                value: item.value,
-                icon: item.icon,
-                sortOrder: item.sortOrder ?? 0,
-                isActive: true,
-              },
-            });
-          }
+          continue;
         }
+
+        // ---------------------------------------------------
+        // Check INACTIVE record
+        // Same TYPE + Same VALUE
+        // ---------------------------------------------------
+
+        const existingInactive = await tx.datePlanOption.findFirst({
+          where: {
+            type,
+            value: item.value,
+            isActive: false,
+          },
+        });
+
+        if (existingInactive) {
+          // -------------------------------------------------
+          // Reactivate old record
+          // DO NOT CREATE DUPLICATE
+          // -------------------------------------------------
+
+          await tx.datePlanOption.update({
+            where: {
+              id: existingInactive.id,
+            },
+            data: {
+              label: item.label,
+              value: item.value,
+              icon: item.icon,
+              sortOrder: item.sortOrder ?? 0,
+              isActive: true,
+            },
+          });
+
+          continue;
+        }
+
+        // ---------------------------------------------------
+        // Completely NEW option
+        // ---------------------------------------------------
+
+        await tx.datePlanOption.create({
+          data: {
+            type,
+            label: item.label,
+            value: item.value,
+            icon: item.icon,
+            sortOrder: item.sortOrder ?? 0,
+            isActive: true,
+          },
+        });
       }
+
+      // =====================================================
+      // 3. RETURN ONLY ACTIVE OPTIONS FOR THIS TYPE
+      // =====================================================
 
       return tx.datePlanOption.findMany({
         where: {
@@ -98,9 +134,8 @@ export const upsertDatePlanOptionsService = async (
       });
     },
     {
-      // Industry-level transaction options to prevent timeout errors
-      timeout: 30000, // 30 seconds - plenty of time for bulk operations
-      maxWait: 10000, // 10 seconds max wait for transaction to start
+      timeout: 30000,
+      maxWait: 10000,
     },
   );
 };

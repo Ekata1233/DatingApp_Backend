@@ -1,28 +1,85 @@
+
+import { BusinessType } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 
-export const registerPartner = async (data: any) => {
-  const existingPartner = await prisma.eventPartner.findFirst({
+interface RegisterEventPartnerData {
+  businessName: string;
+  legalEntity: string;
+  businessType: BusinessType;
+
+  contactPerson: string;
+  email: string;
+  phone: string;
+
+  gstNumber?: string | null;
+  panNumber?: string | null;
+
+  experienceYears?: number | null;
+  description?: string | null;
+
+  monthlyEventsMin?: number | null;
+  monthlyEventsMax?: number | null;
+  teamSize?: number | null;
+
+  venueNames: string[];
+
+  address?: string | null;
+  areaName?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
+
+  coverageAreas: string[];
+  references: string[];
+
+  website?: string | null;
+
+  logo?: string | null;
+  gstCertificate?: string | null;
+  businessProof?: string | null;
+}
+
+export const registerPartnerService = async (
+  data: RegisterEventPartnerData
+) => {
+  // ============================================
+  // CHECK EMAIL
+  // ============================================
+
+  const existingEmail = await prisma.eventPartner.findUnique({
     where: {
-      OR: [
-        { email: data.email },
-        ...(data.gstNumber ? [{ gstNumber: data.gstNumber }] : []),
-      ],
+      email: data.email,
     },
   });
 
-  if (existingPartner) {
-    throw new Error("Partner already registered.");
-  }
-
-  if (
-    data.monthlyEventsMin &&
-    data.monthlyEventsMax &&
-    Number(data.monthlyEventsMin) > Number(data.monthlyEventsMax)
-  ) {
+  if (existingEmail) {
     throw new Error(
-      "monthlyEventsMin cannot be greater than monthlyEventsMax."
+      "A partner with this email already exists."
     );
   }
+
+  // ============================================
+  // CHECK GST
+  // ============================================
+
+  if (data.gstNumber) {
+    const existingGst = await prisma.eventPartner.findUnique({
+      where: {
+        gstNumber: data.gstNumber,
+      },
+    });
+
+    if (existingGst) {
+      throw new Error(
+        "A partner with this GST number already exists."
+      );
+    }
+  }
+
+  // ============================================
+  // CREATE EVENT PARTNER
+  // ============================================
 
   const partner = await prisma.eventPartner.create({
     data: {
@@ -37,23 +94,15 @@ export const registerPartner = async (data: any) => {
       gstNumber: data.gstNumber,
       panNumber: data.panNumber,
 
-      experienceYears: data.experienceYears
-        ? Number(data.experienceYears)
-        : null,
-
+      experienceYears: data.experienceYears,
       description: data.description,
 
-      monthlyEventsMin: data.monthlyEventsMin
-        ? Number(data.monthlyEventsMin)
-        : null,
+      monthlyEventsMin: data.monthlyEventsMin,
+      monthlyEventsMax: data.monthlyEventsMax,
 
-      monthlyEventsMax: data.monthlyEventsMax
-        ? Number(data.monthlyEventsMax)
-        : null,
+      teamSize: data.teamSize,
 
-      teamSize: data.teamSize ? Number(data.teamSize) : null,
-
-      venueNames: data.venueNames || [],
+      venueNames: data.venueNames,
 
       address: data.address,
       areaName: data.areaName,
@@ -62,17 +111,35 @@ export const registerPartner = async (data: any) => {
       country: data.country,
       pincode: data.pincode,
 
-      coverageAreas: data.coverageAreas || [],
-
-      references: data.references || [],
+      coverageAreas: data.coverageAreas,
+      references: data.references,
 
       website: data.website,
 
+      // ImageKit URLs
       logo: data.logo,
       gstCertificate: data.gstCertificate,
       businessProof: data.businessProof,
+
+      // status automatically PENDING
+      // isActive automatically true
+      // isDeleted automatically false
     },
   });
 
   return partner;
+};
+
+export const getAllPartnersService = async () => {
+  const partners = await prisma.eventPartner.findMany({
+    where: {
+      isDeleted: false,
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return partners;
 };

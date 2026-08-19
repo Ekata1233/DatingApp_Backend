@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { OptionType } from "@prisma/client";
 import {
   upsertDatePlanOptionsService,
@@ -24,412 +24,275 @@ interface OptionItem {
   sortOrder?: number;
 }
 
-export const upsertDatePlanOptions = async (req: Request, res: Response) => {
+
+
+
+export const upsertDatePlanOptions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const { type } = req.body;
+    console.log("═══════════════════════════════════════════════");
+    console.log("🖼️ DATE PLAN OPTIONS - FILE DEBUG");
+    console.log("═══════════════════════════════════════════════");
 
+    console.log("📦 req.body:", req.body);
+    console.log("📁 req.files:", req.files);
 
-    // ============ VALIDATION 1: Check type ============
+    // =====================================================
+    // 1. GET TYPE
+    // =====================================================
+
+    const type = req.body.type as OptionType;
+
+    // =====================================================
+    // 2. PARSE OPTIONS
+    // =====================================================
+
+    let options: any = req.body.options;
+
+    if (typeof options === "string") {
+      try {
+        options = JSON.parse(options);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid options JSON format",
+        });
+      }
+    }
+
+    // =====================================================
+    // 3. BASIC OPTIONS VALIDATION
+    // =====================================================
+
     if (!type) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "type",
-            message: "type is required",
-            received: undefined,
-          },
-        ],
+        message: "Type is required",
       });
     }
 
-    // ============ VALIDATION 2: Check if type is valid enum ============
-    const validTypes = Object.values(OptionType);
-    if (!validTypes.includes(type as OptionType)) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "type",
-            message: `Invalid type. Must be one of: ${validTypes.join(", ")}`,
-            received: type,
-          },
-        ],
-      });
-    }
-
-    // ============ VALIDATION 3: Check if options exist ============
-    if (!req.body.options) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "options",
-            message: "options is required",
-            received: undefined,
-          },
-        ],
-      });
-    }
-
-    // ============ PARSE OPTIONS ============
-    let options: OptionItem[] = [];
-    let rawOptions = req.body.options;
-
-    if (typeof rawOptions === "string") {
-      try {
-        let cleanedOptions = rawOptions;
-        cleanedOptions = cleanedOptions.replace(/,(\s*[}\]])/g, "$1");
-        cleanedOptions = cleanedOptions.replace(/,\s*\]/g, "]");
-        cleanedOptions = cleanedOptions.replace(/,\s*\}/g, "}");
-        options = JSON.parse(cleanedOptions);
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: [
-            {
-              field: "options",
-              message: "Invalid JSON format. Must be a valid JSON string",
-              received: rawOptions,
-            },
-          ],
-        });
-      }
-    } else if (Array.isArray(rawOptions)) {
-      options = rawOptions;
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "options",
-            message: "Options must be a valid JSON string or array",
-            received: typeof rawOptions,
-          },
-        ],
-      });
-    }
-
-    // ============ VALIDATION 4: Check if options is array ============
     if (!Array.isArray(options)) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "options",
-            message: "Options must be an array",
-            received: typeof options,
-          },
-        ],
+        message: "Options must be an array",
       });
     }
 
-    // ============ VALIDATION 5: Check if options is not empty ============
     if (options.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "options",
-            message: "Options array cannot be empty. At least one option is required",
-            received: options.length,
-          },
-        ],
+        message: "At least one option is required",
       });
     }
 
-    // ============ VALIDATION 6: Validate each option ============
-    const optionErrors: Array<{
-      field: string;
-      message: string;
-      index: number;
-    }> = [];
+    // =====================================================
+    // 4. GET FILES
+    // =====================================================
 
-    options.forEach((opt, index) => {
-      if (!opt || typeof opt !== 'object') {
-        optionErrors.push({
-          field: `options[${index}]`,
-          message: `Option at index ${index} is invalid`,
-          index,
-        });
-        return;
-      }
-
-      if (!opt.label || opt.label.trim() === "") {
-        optionErrors.push({
-          field: `options[${index}].label`,
-          message: `Label is required for option at index ${index}`,
-          index,
-        });
-      }
-
-      if (!opt.value || opt.value.trim() === "") {
-        optionErrors.push({
-          field: `options[${index}].value`,
-          message: `Value is required for option at index ${index}`,
-          index,
-        });
-      }
-
-      const duplicateIndex = options.findIndex(
-        (o, i) => i !== index && o && o.value === opt.value,
-      );
-      if (duplicateIndex !== -1) {
-        optionErrors.push({
-          field: `options[${index}].value`,
-          message: `Duplicate value "${opt.value}" found at index ${index} and ${duplicateIndex}`,
-          index,
-        });
-      }
-
-      if (
-        opt.sortOrder !== undefined &&
-        (typeof opt.sortOrder !== "number" || opt.sortOrder < 0)
-      ) {
-        optionErrors.push({
-          field: `options[${index}].sortOrder`,
-          message: `sortOrder must be a non-negative number for option at index ${index}`,
-          index,
-        });
-      }
-    });
-
-    if (optionErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Validation failed: ${optionErrors.length} error(s) found`,
-        errors: optionErrors,
-      });
-    }
-
-    console.log("═══════════════════════════════════════════════");
-    console.log("🖼️  ICON DEBUG LOGS");
-    console.log("═══════════════════════════════════════════════");
-
-    // ============ HANDLE FILES ============
     const files = req.files as any;
 
-    console.log("📁 Raw req.files:", JSON.stringify(files, null, 2));
+    console.log("📁 Raw files:", files);
 
-    // ============ EXTRACT ICON FILES WITH INDEX MAPPING ============
-    let iconFileMap: Map<number, any> = new Map();
+    // =====================================================
+    // 5. CREATE FILE MAP
+    // =====================================================
+
+    const iconFiles: Record<number, any> = {};
 
     if (files) {
-      if (Array.isArray(files)) {
-        files.forEach((file, index) => {
-          iconFileMap.set(index, file);
-        });
-        console.log(`📁 Found ${iconFileMap.size} files in array`);
-      } else if (typeof files === 'object' && !Array.isArray(files)) {
-        const iconKeys = Object.keys(files).filter(key => key.startsWith('icons'));
+      Object.keys(files).forEach((key) => {
+        const match = key.match(/^icons\[(\d+)\]$/);
 
-        if (iconKeys.length > 0) {
-          console.log(`📁 Found ${iconKeys.length} icon field(s): ${iconKeys.join(', ')}`);
+        if (match) {
+          const index = Number(match[1]);
 
-          iconKeys.forEach(key => {
-            const match = key.match(/\[(\d+)\]/);
-            if (match) {
-              const index = parseInt(match[1]);
-              const file = files[key];
-              const fileData = Array.isArray(file) ? file[0] : file;
-              if (fileData) {
-                iconFileMap.set(index, fileData);
-                console.log(`  ✅ Mapped ${key} -> option index ${index}`);
-              }
-            } else if (key === 'icons') {
-              const fileData = Array.isArray(files.icons) ? files.icons : [files.icons];
-              fileData.forEach((file: any, idx: number) => {
-                iconFileMap.set(idx, file);
-                console.log(`  ✅ Mapped icons[${idx}] -> option index ${idx}`);
-              });
-            }
-          });
-        } else {
-          console.log('ℹ️ No icon fields found');
+          const file = Array.isArray(files[key])
+            ? files[key][0]
+            : files[key];
+
+          iconFiles[index] = file;
+
+          console.log(
+            `✅ Found icon file for option ${index}:`,
+            file.name || file.originalname,
+          );
         }
-      }
+      });
     }
 
-    console.log(`📁 Total icon files found: ${iconFileMap.size}`);
+    console.log(
+      `📁 Total icon files found: ${
+        Object.keys(iconFiles).length
+      }`,
+    );
 
-    for (const [index, file] of iconFileMap.entries()) {
-      console.log(`  File for option ${index}:`);
-      console.log(`    Name: ${file.originalname || file.name}`);
-      console.log(`    Size: ${(file.size / 1024).toFixed(2)} KB`);
-      console.log(`    Type: ${file.mimetype}`);
-    }
+    // =====================================================
+    // 6. UPLOAD ICONS TO IMAGEKIT
+    // =====================================================
 
-    // ============ VALIDATE EACH FILE ============
-    const fileErrors: Array<{
-      field: string;
-      message: string;
-      fileName: string;
-    }> = [];
+    for (let i = 0; i < options.length; i++) {
+      const file = iconFiles[i];
 
-    for (const [index, file] of iconFileMap.entries()) {
       if (!file) {
-        fileErrors.push({
-          field: `icons[${index}]`,
-          message: `File is missing for option at index ${index}`,
-          fileName: "unknown",
-        });
+        console.log(
+          `ℹ️ No icon uploaded for option ${i}: ${options[i].label}`,
+        );
+
+        // Keep existing icon value if one was sent
+        if (options[i].icon === undefined) {
+          options[i].icon = null;
+        }
+
         continue;
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        fileErrors.push({
-          field: `icons[${index}]`,
-          message: `File "${file.originalname || file.name}" exceeds 5MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`,
-          fileName: file.originalname || file.name,
-        });
-      }
-
-      const validMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-      if (!file.mimetype || !validMimeTypes.includes(file.mimetype)) {
-        fileErrors.push({
-          field: `icons[${index}]`,
-          message: `File "${file.originalname || file.name}" is not a valid image. Allowed types: ${validMimeTypes.join(', ')}`,
-          fileName: file.originalname || file.name,
-        });
-      }
-
-      if (!file.buffer && !file.data) {
-        fileErrors.push({
-          field: `icons[${index}]`,
-          message: `File "${file.originalname || file.name}" appears to be empty or corrupted`,
-          fileName: file.originalname || file.name,
-        });
-      }
-    }
-
-    if (fileErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `File validation failed: ${fileErrors.length} error(s) found`,
-        errors: fileErrors,
-      });
-    }
-
-    // ============ UPLOAD FILES TO IMAGEKIT ============
-    if (iconFileMap.size > 0) {
-      try {
-        console.log(`🔄 Uploading ${iconFileMap.size} icon(s) to ImageKit...`);
-
-        const uploadPromises = Array.from(iconFileMap.entries()).map(async ([optionIndex, file]) => {
-          console.log(`  Uploading file for option ${optionIndex}: ${file.originalname || file.name}`);
-
-          const uploadResponse = await imagekit.upload({
-            file: file.buffer || file.data,
-            fileName: `${Date.now()}-${options[optionIndex]?.value || 'option'}-${file.originalname || file.name}`,
-            folder: "/date-plan-options",
-          });
-
-          console.log(`  ✅ Uploaded to: ${uploadResponse.url}`);
-
-          return {
-            url: uploadResponse.url,
-            optionIndex: optionIndex,
-          };
-        });
-
-        const uploadResults = await Promise.all(uploadPromises);
-
-        // ============ CRITICAL FIX: Set icons for uploaded files ============
-
-
-        // Then set icons for uploaded files
-        uploadResults.forEach(({ url, optionIndex }) => {
-          if (options[optionIndex]) {
-            options[optionIndex].icon = url;
-            console.log(`  ✅ Assigned icon to option ${optionIndex}: ${options[optionIndex].label}`);
-          }
-        });
-
-        console.log(`✅ Successfully uploaded ${uploadResults.length} icon(s)`);
-      } catch (error: any) {
-        console.error('❌ Image upload failed:', error);
-        return res.status(500).json({
-          success: false,
-          message: "Image upload failed",
-          error: error.message || "Failed to upload images to ImageKit",
-        });
-      }
-    } else {
-      console.log("ℹ️ No new icons uploaded");
-    }
-
-    console.log('📦 Final options with icons:');
-    options.forEach((opt, index) => {
-      if (opt) {
-        console.log(`  Option ${index + 1}: ${opt.label} -> Icon: ${opt.icon || '❌ No icon'}`);
-      }
-    });
-
-    // ============ FINAL VALIDATION: Zod ============
-    try {
-      // Filter out any invalid options before validation
-      const validOptions = options
-        .filter(opt => opt && typeof opt === "object" && opt.label && opt.value)
-        .map(opt => ({
-          ...opt,
-        }));
-
-      if (validOptions.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: [
-            {
-              field: "options",
-              message: "No valid options found",
-            },
-          ],
-        });
-      }
-
-      const validated = upsertDatePlanOptionsSchema.parse({
-        type,
-        options: validOptions,
-      });
-
-      const result = await upsertDatePlanOptionsService(
-        validated.type,
-        validated.options as any,
+      console.log(
+        `📤 Uploading icon for option ${i}: ${
+          file.name || file.originalname
+        }`,
       );
 
-      return res.status(200).json({
-        success: true,
-        message: "Options saved successfully",
-        data: result,
-      });
-    } catch (error: any) {
-      console.error('❌ Zod validation error:', error);
-      if (error.name === "ZodError") {
+      // ===================================================
+      // 7. FILE SIZE VALIDATION
+      // ===================================================
+
+      if (file.size > 5 * 1024 * 1024) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
-          errors: error.errors.map((err: any) => ({
-            field: err.path.join("."),
-            message: err.message,
-            received: err.received,
-            expected: err.expected,
-          })),
+          message: `Icon for "${options[i].label}" must be less than 5 MB.`,
         });
       }
-      throw error;
+
+      // ===================================================
+      // 8. FILE TYPE VALIDATION
+      // ===================================================
+
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "image/svg+xml",
+      ];
+
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid image type for "${options[i].label}". Only JPG, PNG, WEBP, GIF and SVG are allowed.`,
+        });
+      }
+
+      // ===================================================
+      // 9. GET FILE BUFFER
+      // ===================================================
+
+      const fileBuffer = file.buffer || file.data;
+
+      if (!fileBuffer) {
+        return res.status(400).json({
+          success: false,
+          message: `Unable to read uploaded icon for "${options[i].label}".`,
+        });
+      }
+
+      // ===================================================
+      // 10. UPLOAD TO IMAGEKIT
+      // ===================================================
+
+      const uploadResponse = await imagekit.upload({
+        file: fileBuffer,
+
+        fileName: `${Date.now()}-${
+          file.originalname || file.name
+        }`,
+
+        folder: "/date-plan-options",
+      });
+
+      console.log(
+        `✅ ImageKit uploaded: ${uploadResponse.url}`,
+      );
+
+      // ===================================================
+      // 11. ASSIGN IMAGEKIT URL
+      // ===================================================
+
+      options[i].icon = uploadResponse.url;
     }
+
+    // =====================================================
+    // 12. DEBUG FINAL OPTIONS
+    // =====================================================
+
+    console.log("📦 FINAL OPTIONS:");
+
+    options.forEach((option: any, index: number) => {
+      console.log(
+        `Option ${index + 1}: ${option.label}`,
+      );
+
+      console.log(
+        `Icon: ${
+          option.icon
+            ? option.icon
+            : "❌ No icon"
+        }`,
+      );
+    });
+
+    // =====================================================
+    // 13. ZOD VALIDATION
+    // =====================================================
+
+    const validatedData =
+      upsertDatePlanOptionsSchema.safeParse({
+        type,
+        options,
+      });
+
+    if (!validatedData.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validatedData.error.issues,
+      });
+    }
+
+    // =====================================================
+    // 14. SAVE TO DATABASE
+    // =====================================================
+
+    const result =
+      await upsertDatePlanOptionsService(
+        validatedData.data.type,
+        validatedData.data.options,
+      );
+
+    // =====================================================
+    // 15. RESPONSE
+    // =====================================================
+
+    return res.status(200).json({
+      success: true,
+      message: "Options saved successfully",
+      data: result,
+    });
+
   } catch (error: any) {
-    console.error('❌ Fatal error:', error);
+    console.error(
+      "❌ Upsert Date Plan Options Error:",
+      error,
+    );
+
     return res.status(500).json({
       success: false,
-      message: error instanceof Error ? error.message : "Something went wrong",
+      message:
+        error?.message ||
+        "Failed to save date plan options",
     });
   }
 };

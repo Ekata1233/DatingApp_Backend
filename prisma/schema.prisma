@@ -1728,7 +1728,7 @@ model EventGallery {
 model EventAmenity {
   id        String  @id @default(uuid()) @db.Uuid
   eventId   String  @db.Uuid
-  name      String
+  name      String                                                                           
   icon      String?
   sortOrder Int     @default(0)
   event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
