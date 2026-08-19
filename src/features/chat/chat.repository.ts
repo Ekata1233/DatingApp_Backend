@@ -254,6 +254,11 @@ export const chatRepository = {
 
             profilePhoto:
               otherUser.photos[0]?.media_url ?? null,
+
+            matchPercentage: 92,
+            trustPercentage: 85,
+
+            isOnline: true,
           },
 
           lastMessage:
@@ -442,4 +447,28 @@ export const chatRepository = {
       },
     });
   },
+
+  // async findOtherParticipant(
+  //   conversationId: string,
+  //   userId: string
+  // ) {
+  //   const conversation =
+  //     await prisma.conversation.findUnique({
+  //       where: {
+  //         id: conversationId,
+  //       },
+  //       select: {
+  //         userAId: true,
+  //         userBId: true,
+  //       },
+  //     });
+
+  //   if (!conversation) {
+  //     throw new Error("Conversation not found");
+  //   }
+
+  //   return conversation.userAId === userId
+  //     ? conversation.userBId
+  //     : conversation.userAId;
+  // },
 };

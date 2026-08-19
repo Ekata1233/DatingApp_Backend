@@ -6,6 +6,7 @@ import { chatService } from "../chat.service";
 import { messageService } from "../message/message.service";
 
 import {
+    ConversationUpdatePayload,
     JoinConversationSocketPayload,
     LeaveConversationSocketPayload,
     MessageDeliveredSocketPayload,
@@ -299,4 +300,16 @@ export const chatSocketService = {
 
         return result;
     },
+    
+};
+
+export const emitConversationUpdate = (
+  io: Server,
+  userId: string,
+  payload: ConversationUpdatePayload
+) => {
+  io.to(`user:${userId}`).emit(
+    "conversation:update",
+    payload
+  );
 };
