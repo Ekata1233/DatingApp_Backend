@@ -448,27 +448,132 @@ export const chatRepository = {
     });
   },
 
-  // async findOtherParticipant(
-  //   conversationId: string,
-  //   userId: string
-  // ) {
-  //   const conversation =
-  //     await prisma.conversation.findUnique({
-  //       where: {
-  //         id: conversationId,
-  //       },
-  //       select: {
-  //         userAId: true,
-  //         userBId: true,
-  //       },
-  //     });
+  async findOtherParticipant(
+    conversationId: string,
+    userId: string
+  ) {
+    const participant =
+      await prisma.conversationParticipant.findFirst({
+        where: {
+          conversationId,
+          userId: {
+            not: userId,
+          },
+        },
+        select: {
+          userId: true,
+        },
+      });
 
-  //   if (!conversation) {
-  //     throw new Error("Conversation not found");
-  //   }
+    if (!participant) {
+      throw new Error(
+        "Other participant not found"
+      );
+    }
 
-  //   return conversation.userAId === userId
-  //     ? conversation.userBId
-  //     : conversation.userAId;
-  // },
+    return participant.userId;
+  },
+
+  async hasPreviousMessages(
+    conversationId: string
+  ) {
+    const count =
+      await prisma.chatMessage.count({
+        where: {
+          conversationId,
+        },
+      });
+
+    return count > 0;
+  },
+
+  async findOtherParticipantDetails(
+    conversationId: string,
+    userId: string
+  ) {
+    const participant =
+      await prisma.conversationParticipant.findFirst({
+        where: {
+          conversationId,
+          userId: {
+            not: userId,
+          },
+        },
+        select: {
+          userId: true,
+
+          user: {
+            select: {
+              id: true,
+              name: true,
+              age: true,
+
+              photos: {
+                where: {
+                  is_primary: true,
+                },
+                select: {
+                  media_url: true,
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+
+    if (!participant) {
+      throw new Error(
+        "Other participant not found"
+      );
+    }
+
+    return participant.user;
+  },
+  async getUnreadCount(
+    conversationId: string,
+    userId: string
+  ) {
+    const participant =
+      await prisma.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId,
+          },
+        },
+        select: {
+          lastReadAt: true,
+        },
+      });
+
+    if (!participant) {
+      throw new Error(
+        "Conversation participant not found"
+      );
+    }
+
+    const unreadCount =
+      await prisma.chatMessage.count({
+        where: {
+          conversationId,
+
+          // Don't count your own messages
+          senderId: {
+            not: userId,
+          },
+
+          // Messages after the user's last read time
+          ...(participant.lastReadAt
+            ? {
+              createdAt: {
+                gt: participant.lastReadAt,
+              },
+            }
+            : {}),
+        },
+      });
+
+    return unreadCount;
+  },
 };

@@ -1,6 +1,6 @@
 // src/modules/chat/sockets/chat.socket.service.ts
 
-import { Server,Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
 
 import { chatService } from "../chat.service";
 import { messageService } from "../message/message.service";
@@ -42,6 +42,17 @@ export const chatSocketService = {
             payload.conversationId,
             userId
         );
+
+        /**
+   * 2. Check whether this conversation
+   *    already has messages.
+   */
+        const hasPreviousMessages =
+            await chatService.hasPreviousMessages(
+                payload.conversationId
+            );
+
+        const isNew = !hasPreviousMessages;
         /**
          * Save message to database.
          */
@@ -75,6 +86,55 @@ export const chatSocketService = {
         io.to(
             `conversation:${payload.conversationId}`
         ).emit("message:receive", message);
+
+        /**
+  * 4. Find the other participant.
+  */
+        const receiverId =
+            await chatService.getOtherParticipant(
+                payload.conversationId,
+                userId
+            );
+
+        const unreadCount =
+            await chatService.getUnreadCount(
+                payload.conversationId,
+                receiverId
+            );
+
+        let user;
+
+        if (isNew) {
+            user =
+                await chatService.getOtherParticipantDetails(
+                    payload.conversationId,
+                    userId
+                );
+        }
+
+        /**
+         * 5. Notify receiver's conversation list.
+         */
+        io.to(`user:${receiverId}`).emit(
+            "conversation:update",
+            {
+                conversationId:
+                    payload.conversationId,
+                isNew,
+                ...(isNew && {
+                    user,
+                }),
+                lastMessage: {
+                    id: message.id,
+                    content: message.content,
+                    senderId: message.senderId,
+                    createdAt: message.createdAt,
+                },
+
+                senderId: userId,
+                unreadCount
+            }
+        );
 
         /**
          * Return saved message to event handler.
@@ -158,7 +218,7 @@ export const chatSocketService = {
         io.to(
             `conversation:${payload.conversationId}`
         )
-            .except(socket.id )
+            .except(socket.id)
             .emit("typing:start", {
                 conversationId:
                     payload.conversationId,
@@ -300,16 +360,16 @@ export const chatSocketService = {
 
         return result;
     },
-    
+
 };
 
 export const emitConversationUpdate = (
-  io: Server,
-  userId: string,
-  payload: ConversationUpdatePayload
+    io: Server,
+    userId: string,
+    payload: ConversationUpdatePayload
 ) => {
-  io.to(`user:${userId}`).emit(
-    "conversation:update",
-    payload
-  );
+    io.to(`user:${userId}`).emit(
+        "conversation:update",
+        payload
+    );
 };
