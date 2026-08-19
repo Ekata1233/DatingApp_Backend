@@ -57,15 +57,14 @@ export const getConversations = async (
   try {
     const userId = (req as any).user.id;
 
-    const data =
-      getConversationsSchema.parse(req.query);
+    const data = getConversationsSchema.parse(req.query);
 
-    const result =
-      await chatService.getConversations({
-        userId,
-        cursor: data.cursor,
-        limit: data.limit,
-      });
+    const result = await chatService.getConversations({
+      userId,
+      cursor: data.cursor,
+      limit: data.limit,
+      type: data.type,
+    });
 
     return res.status(200).json({
       success: true,
@@ -73,10 +72,7 @@ export const getConversations = async (
       pagination: result.pagination,
     });
   } catch (error) {
-    console.error(
-      "getConversations error:",
-      error
-    );
+    console.error("getConversations error:", error);
 
     return res.status(400).json({
       success: false,

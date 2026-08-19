@@ -2,6 +2,35 @@
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
+import { ConversationFilter } from "./chat.types";
+
+export const calculateAge = (
+  birthDate: Date | null
+): number | null => {
+  if (!birthDate) {
+    return null;
+  }
+
+  const today = new Date();
+
+  let age =
+    today.getFullYear() -
+    birthDate.getFullYear();
+
+  const month =
+    today.getMonth() -
+    birthDate.getMonth();
+
+  if (
+    month < 0 ||
+    (month === 0 &&
+      today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+
+  return age;
+};
 
 export const chatRepository = {
   /**
@@ -101,9 +130,10 @@ export const chatRepository = {
   async findUserConversations(
     userId: string,
     cursor?: string,
-    limit = 20
+    limit = 20,
+    type: ConversationFilter = "all"
   ) {
-    return prisma.conversation.findMany({
+    const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
           some: {
@@ -120,20 +150,35 @@ export const chatRepository = {
 
       ...(cursor
         ? {
-            skip: 1,
-            cursor: {
-              id: cursor,
-            },
-          }
+          skip: 1,
+          cursor: {
+            id: cursor,
+          },
+        }
         : {}),
 
       include: {
         participants: {
-          select: {
-            id: true,
-            userId: true,
-            joinedAt: true,
-            lastReadAt: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                full_name: true,
+                birth_date: true,
+
+                photos: {
+                  where: {
+                    is_primary: true,
+                  },
+                  take: 1,
+                  select: {
+                    id: true,
+                    media_url: true,
+                    media_type: true,
+                  },
+                },
+              },
+            },
           },
         },
 
@@ -149,6 +194,7 @@ export const chatRepository = {
             senderId: true,
             content: true,
             messageType: true,
+            mediaUrl: true,
             createdAt: true,
             deliveredAt: true,
             readAt: true,
@@ -156,6 +202,76 @@ export const chatRepository = {
         },
       },
     });
+
+    // Convert DB result into chat-list response
+    const result = await Promise.all(
+      conversations.map(async (conversation) => {
+        const currentParticipant =
+          conversation.participants.find(
+            (participant) =>
+              participant.userId === userId
+          );
+
+        const otherParticipant =
+          conversation.participants.find(
+            (participant) =>
+              participant.userId !== userId
+          );
+
+        if (!currentParticipant || !otherParticipant) {
+          return null;
+        }
+
+        const unreadCount =
+          await prisma.chatMessage.count({
+            where: {
+              conversationId: conversation.id,
+
+              senderId: {
+                not: userId,
+              },
+
+              ...(currentParticipant.lastReadAt
+                ? {
+                  createdAt: {
+                    gt: currentParticipant.lastReadAt,
+                  },
+                }
+                : {}),
+            },
+          });
+
+        const otherUser = otherParticipant.user;
+        console.log("other user : ", otherUser)
+
+        return {
+          conversationId: conversation.id,
+
+          user: {
+            id: otherUser.id,
+            fullName: otherUser.full_name,
+            age: calculateAge(otherUser.birth_date),
+
+            profilePhoto:
+              otherUser.photos[0]?.media_url ?? null,
+
+            matchPercentage: 92,
+            trustPercentage: 85,
+
+            isOnline: true,
+          },
+
+          lastMessage:
+            conversation.messages[0] ?? null,
+
+          unreadCount,
+
+          updatedAt: conversation.updatedAt,
+        };
+      })
+    );
+
+    return result.filter(Boolean);
   },
 
   /**
@@ -180,11 +296,11 @@ export const chatRepository = {
 
       ...(cursor
         ? {
-            skip: 1,
-            cursor: {
-              id: cursor,
-            },
-          }
+          skip: 1,
+          cursor: {
+            id: cursor,
+          },
+        }
         : {}),
 
       select: {
@@ -331,4 +447,28 @@ export const chatRepository = {
       },
     });
   },
+
+  // async findOtherParticipant(
+  //   conversationId: string,
+  //   userId: string
+  // ) {
+  //   const conversation =
+  //     await prisma.conversation.findUnique({
+  //       where: {
+  //         id: conversationId,
+  //       },
+  //       select: {
+  //         userAId: true,
+  //         userBId: true,
+  //       },
+  //     });
+
+  //   if (!conversation) {
+  //     throw new Error("Conversation not found");
+  //   }
+
+  //   return conversation.userAId === userId
+  //     ? conversation.userBId
+  //     : conversation.userAId;
+  // },
 };

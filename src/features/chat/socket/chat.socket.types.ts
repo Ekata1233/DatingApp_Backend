@@ -107,3 +107,18 @@ export interface MessageReadEventPayload {
   conversationId: string;
   readAt: Date;
 }
+
+export interface ConversationUpdatePayload {
+  conversationId: string;
+
+  lastMessage: {
+    id: string;
+    content: string | null;
+    senderId: string;
+    createdAt: Date;
+  };
+
+  unreadCount: number;
+
+  senderId: string;
+}

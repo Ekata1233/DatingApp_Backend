@@ -77,13 +77,22 @@ export const getMessagesSchema = z.object({
 export const getConversationsSchema = z.object({
   cursor: z.string().uuid().optional(),
 
-  limit: z
-    .coerce
+  limit: z.coerce
     .number()
-    .int()
     .min(1)
-    .max(100)
+    .max(50)
     .default(20),
+
+  type: z
+    .enum([
+      "all",
+      "unread",
+      "online",
+      "nearby",
+      "date",
+      "gift",
+    ])
+    .default("all"),
 });
 
 export const markConversationReadSchema = z.object({

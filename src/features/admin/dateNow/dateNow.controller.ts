@@ -357,7 +357,7 @@ export const updateDatePlanPackageController = async (
   res: Response,
 ): Promise<void> => {
   try {
-    
+
     const { id } = req.params as { id: string };
 
     const packageData = await updateDatePlanPackage(id, req.body);
@@ -428,7 +428,7 @@ export const getDatePlanDetailsController = async (
   try {
     const { planId } = req.params as { planId: string };
 
-const result = await getDatePlanDetailsService(planId);
+    const result = await getDatePlanDetailsService(planId);
 
     return res.status(200).json(result);
   } catch (error: any) {
