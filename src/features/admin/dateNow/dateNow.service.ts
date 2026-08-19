@@ -8,35 +8,11 @@ export const upsertDatePlanOptionsService = async (
 ) => {
   return prisma.$transaction(
     async (tx) => {
-      const incomingValues = options.map((item) => item.value);
-
-      // =====================================================
-      // 1. DEACTIVATE OLD ACTIVE OPTIONS
-      //    ONLY FOR THE SAME TYPE
-      // =====================================================
-
-      await tx.datePlanOption.updateMany({
-        where: {
-          type,
-          isActive: true,
-          value: {
-            notIn: incomingValues,
-          },
-        },
-        data: {
-          isActive: false,
-        },
-      });
-
-      // =====================================================
-      // 2. UPSERT EACH OPTION
-      // =====================================================
-
       for (const item of options) {
-        // ---------------------------------------------------
-        // Check ACTIVE record
+        // =====================================================
+        // 1. CHECK ACTIVE RECORD
         // Same TYPE + Same VALUE
-        // ---------------------------------------------------
+        // =====================================================
 
         const existingActive = await tx.datePlanOption.findFirst({
           where: {
@@ -47,11 +23,7 @@ export const upsertDatePlanOptionsService = async (
         });
 
         if (existingActive) {
-          // -------------------------------------------------
-          // Already active
-          // Just update its details
-          // -------------------------------------------------
-
+          // Existing record → UPDATE
           await tx.datePlanOption.update({
             where: {
               id: existingActive.id,
@@ -68,10 +40,10 @@ export const upsertDatePlanOptionsService = async (
           continue;
         }
 
-        // ---------------------------------------------------
-        // Check INACTIVE record
+        // =====================================================
+        // 2. CHECK INACTIVE RECORD
         // Same TYPE + Same VALUE
-        // ---------------------------------------------------
+        // =====================================================
 
         const existingInactive = await tx.datePlanOption.findFirst({
           where: {
@@ -82,11 +54,7 @@ export const upsertDatePlanOptionsService = async (
         });
 
         if (existingInactive) {
-          // -------------------------------------------------
-          // Reactivate old record
-          // DO NOT CREATE DUPLICATE
-          // -------------------------------------------------
-
+          // Old record exists → REACTIVATE
           await tx.datePlanOption.update({
             where: {
               id: existingInactive.id,
@@ -103,9 +71,9 @@ export const upsertDatePlanOptionsService = async (
           continue;
         }
 
-        // ---------------------------------------------------
-        // Completely NEW option
-        // ---------------------------------------------------
+        // =====================================================
+        // 3. COMPLETELY NEW RECORD
+        // =====================================================
 
         await tx.datePlanOption.create({
           data: {
@@ -120,7 +88,7 @@ export const upsertDatePlanOptionsService = async (
       }
 
       // =====================================================
-      // 3. RETURN ONLY ACTIVE OPTIONS FOR THIS TYPE
+      // 4. RETURN ALL ACTIVE OPTIONS FOR THIS TYPE
       // =====================================================
 
       return tx.datePlanOption.findMany({
