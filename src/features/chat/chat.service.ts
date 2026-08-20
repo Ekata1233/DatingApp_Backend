@@ -73,7 +73,7 @@ export const chatService = {
       : conversations;
 
     const nextCursor = hasMore
-      ? items[items.length - 1]?.id ?? null
+      ? items[items.length - 1]?.conversationId ?? null
       : null;
 
     return {
@@ -307,6 +307,44 @@ export const chatService = {
 
     return chatRepository.deleteMessage(
       data.messageId
+    );
+  },
+
+  async getOtherParticipant(
+    conversationId: string,
+    userId: string
+  ) {
+    return chatRepository.findOtherParticipant(
+      conversationId,
+      userId
+    );
+  },
+
+  async hasPreviousMessages(
+    conversationId: string
+  ) {
+    return chatRepository.hasPreviousMessages(
+      conversationId
+    );
+  },
+
+  async getOtherParticipantDetails(
+    conversationId: string,
+    userId: string
+  ) {
+    return chatRepository.findOtherParticipantDetails(
+      conversationId,
+      userId
+    );
+  },
+
+  async getUnreadCount(
+    conversationId: string,
+    userId: string
+  ) {
+    return chatRepository.getUnreadCount(
+      conversationId,
+      userId
     );
   },
 };
