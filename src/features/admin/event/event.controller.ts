@@ -398,3 +398,69 @@ export const publishEventController = async (
     });
   }
 };
+
+//get apis
+//get all
+export const getAllEventsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const events = await EventService.getAllEvents();
+
+    return res.status(200).json({
+      success: true,
+      message: "Events fetched successfully",
+      data: events,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//get for mobile card
+export const getEventListController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const events = await EventService.getEventList();
+
+    return res.status(200).json({
+      success: true,
+      message: "Events fetched successfully",
+      data: events,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//get details
+export const getEventDetailsController = async (
+  req: Request<EventParams>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const event =
+      await EventService.getEventDetails(
+        req.params.id
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Event details fetched successfully",
+      data: event,
+    });
+  } catch (error: any) {
+    return res.status(404).json({
+      success: false,
+      message:
+        error?.message ||
+        "Failed to fetch event details",
+    });
+  }
+};

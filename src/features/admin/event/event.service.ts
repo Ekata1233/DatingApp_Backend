@@ -902,3 +902,326 @@ export const publishEvent = async (eventId: string) => {
     nextStep: null,
   };
 };
+
+//get apis
+//get all
+export const getAllEvents = async () => {
+  const events = await prisma.event.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+
+    include: {
+      // ========================================
+      // EVENT PARTNER
+      // ========================================
+
+      eventPartner: {
+        select: {
+          id: true,
+          businessName: true,
+          legalEntity: true,
+          businessType: true,
+          contactPerson: true,
+          email: true,
+          phone: true,
+          gstNumber: true,
+          panNumber: true,
+          experienceYears: true,
+          description: true,
+          monthlyEventsMin: true,
+          monthlyEventsMax: true,
+          teamSize: true,
+          venueNames: true,
+          address: true,
+          areaName: true,
+          city: true,
+          state: true,
+          country: true,
+          pincode: true,
+          coverageAreas: true,
+          references: true,
+          website: true,
+          logo: true,
+          gstCertificate: true,
+          businessProof: true,
+          status: true,
+          isActive: true,
+          isDeleted: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+
+      // ========================================
+      // STEP 5 - GALLERY
+      // ========================================
+
+      galleryImages: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          imageUrl: true,
+          sortOrder: true,
+          createdAt: true,
+        },
+      },
+
+      // ========================================
+      // STEP 5 - AMENITIES
+      // ========================================
+
+      amenities: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+          sortOrder: true,
+        },
+      },
+
+      // ========================================
+      // STEP 5 - ITINERARY
+      // ========================================
+
+      itinerary: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          time: true,
+          title: true,
+          description: true,
+          icon: true,
+          sortOrder: true,
+        },
+      },
+
+      // ========================================
+      // STEP 5 - WHY SHOULD COME
+      // ========================================
+
+      whyShouldCome: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          icon: true,
+          sortOrder: true,
+        },
+      },
+
+      // ========================================
+      // STEP 6 - SAFETY
+      // ========================================
+
+      safetyFeatures: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  return events;
+};
+
+//get for mobile card
+export const getEventList = async () => {
+  const events = await prisma.event.findMany({
+    where: {
+      status: "LIVE",
+    },
+
+    orderBy: {
+      eventDate: "asc",
+    },
+
+    select: {
+      id: true,
+      eventType: true,
+      title: true,
+      eventDate: true,
+      startTime: true,
+      fullAddress: true,
+      entryPrice: true,
+    },
+  });
+
+  return events.map((event) => ({
+    ...event,
+
+    // Static values for now
+    leftSpot: 3,
+    interested: 40,
+  }));
+};
+
+//get details 
+export const getEventDetails = async (
+  eventId: string
+) => {
+  const event = await prisma.event.findUnique({
+    where: {
+      id: eventId,
+    },
+
+    select: {
+      // ========================================
+      // EVENT BASIC
+      // ========================================
+
+      id: true,
+      title: true,
+      eventType: true,
+
+      // ========================================
+      // PARTNER
+      // ========================================
+
+      eventPartnerId: true,
+
+      officialPartner: true,
+
+      // ========================================
+      // DATE / TIME
+      // ========================================
+
+      eventDate: true,
+      startTime: true,
+      endTime: true,
+
+      // ========================================
+      // TICKETS
+      // ========================================
+
+      capacity: true,
+      entryPrice: true,
+
+      // ========================================
+      // LOCATION
+      // ========================================
+
+      fullAddress: true,
+      latitude: true,
+      longitude: true,
+
+      // ========================================
+      // EXPERIENCE
+      // ========================================
+
+      heroImage: true,
+      aboutEvent: true,
+
+      galleryImages: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+        select: {
+          id: true,
+          imageUrl: true,
+          sortOrder: true,
+        },
+      },
+
+      whyShouldCome: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          icon: true,
+          sortOrder: true,
+        },
+      },
+
+      amenities: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+          sortOrder: true,
+        },
+      },
+
+      itinerary: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+        select: {
+          id: true,
+          time: true,
+          title: true,
+          description: true,
+          icon: true,
+          sortOrder: true,
+        },
+      },
+
+      // ========================================
+      // SAFETY
+      // ========================================
+
+      safetyFeatures: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+
+      // ========================================
+      // TERMS
+      // ========================================
+
+      termsConditions: true,
+
+      // ========================================
+      // PARTNER DETAILS
+      // ========================================
+
+      eventPartner: {
+        select: {
+          id: true,
+          businessName: true,
+          address: true,
+          logo: true,
+        },
+      },
+    },
+  });
+
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  // ==========================================
+  // STATIC VALUES FOR NOW
+  // ==========================================
+
+  return {
+    ...event,
+
+    leftSpot: 3,
+
+    interested: 40,
+  };
+};
