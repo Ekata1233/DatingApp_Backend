@@ -4,28 +4,18 @@ import { MessageType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { ConversationFilter } from "./chat.types";
 
-export const calculateAge = (
-  birthDate: Date | null
-): number | null => {
+export const calculateAge = (birthDate: Date | null): number | null => {
   if (!birthDate) {
     return null;
   }
 
   const today = new Date();
 
-  let age =
-    today.getFullYear() -
-    birthDate.getFullYear();
+  let age = today.getFullYear() - birthDate.getFullYear();
 
-  const month =
-    today.getMonth() -
-    birthDate.getMonth();
+  const month = today.getMonth() - birthDate.getMonth();
 
-  if (
-    month < 0 ||
-    (month === 0 &&
-      today.getDate() < birthDate.getDate())
-  ) {
+  if (month < 0 || (month === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
 
@@ -36,10 +26,7 @@ export const chatRepository = {
   /**
    * Find conversation between two users.
    */
-  async findConversationBetweenUsers(
-    userId: string,
-    targetUserId: string
-  ) {
+  async findConversationBetweenUsers(userId: string, targetUserId: string) {
     return prisma.conversation.findFirst({
       where: {
         AND: [
@@ -76,10 +63,7 @@ export const chatRepository = {
   /**
    * Create a new conversation.
    */
-  async createConversation(
-    userId: string,
-    targetUserId: string
-  ) {
+  async createConversation(userId: string, targetUserId: string) {
     return prisma.conversation.create({
       data: {
         participants: {
@@ -110,10 +94,7 @@ export const chatRepository = {
   /**
    * Check whether user belongs to conversation.
    */
-  async findParticipant(
-    conversationId: string,
-    userId: string
-  ) {
+  async findParticipant(conversationId: string, userId: string) {
     return prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {
@@ -131,7 +112,7 @@ export const chatRepository = {
     userId: string,
     cursor?: string,
     limit = 20,
-    type: ConversationFilter = "all"
+    type: ConversationFilter = "all",
   ) {
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -150,11 +131,11 @@ export const chatRepository = {
 
       ...(cursor
         ? {
-          skip: 1,
-          cursor: {
-            id: cursor,
-          },
-        }
+            skip: 1,
+            cursor: {
+              id: cursor,
+            },
+          }
         : {}),
 
       include: {
@@ -206,44 +187,39 @@ export const chatRepository = {
     // Convert DB result into chat-list response
     const result = await Promise.all(
       conversations.map(async (conversation) => {
-        const currentParticipant =
-          conversation.participants.find(
-            (participant) =>
-              participant.userId === userId
-          );
+        const currentParticipant = conversation.participants.find(
+          (participant) => participant.userId === userId,
+        );
 
-        const otherParticipant =
-          conversation.participants.find(
-            (participant) =>
-              participant.userId !== userId
-          );
+        const otherParticipant = conversation.participants.find(
+          (participant) => participant.userId !== userId,
+        );
 
         if (!currentParticipant || !otherParticipant) {
           return null;
         }
 
-        const unreadCount =
-          await prisma.chatMessage.count({
-            where: {
-              conversationId: conversation.id,
+        const unreadCount = await prisma.chatMessage.count({
+          where: {
+            conversationId: conversation.id,
 
-              senderId: {
-                not: userId,
-              },
+            senderId: {
+              not: userId,
+            },
 
-              readAt: null,
-              ...(currentParticipant.lastReadAt
-                ? {
+            readAt: null,
+            ...(currentParticipant.lastReadAt
+              ? {
                   createdAt: {
                     gt: currentParticipant.lastReadAt,
                   },
                 }
-                : {}),
-            },
-          });
+              : {}),
+          },
+        });
 
         const otherUser = otherParticipant.user;
-        console.log("other user : ", otherUser)
+        console.log("other user : ", otherUser);
 
         return {
           conversationId: conversation.id,
@@ -253,8 +229,7 @@ export const chatRepository = {
             fullName: otherUser.full_name,
             age: calculateAge(otherUser.birth_date),
 
-            profilePhoto:
-              otherUser.photos[0]?.media_url ?? null,
+            profilePhoto: otherUser.photos[0]?.media_url ?? null,
 
             matchPercentage: 92,
             trustPercentage: 85,
@@ -262,14 +237,13 @@ export const chatRepository = {
             isOnline: true,
           },
 
-          lastMessage:
-            conversation.messages[0] ?? null,
+          lastMessage: conversation.messages[0] ?? null,
 
           unreadCount,
 
           updatedAt: conversation.updatedAt,
         };
-      })
+      }),
     );
 
     return result.filter(Boolean);
@@ -278,11 +252,7 @@ export const chatRepository = {
   /**
    * Get messages using cursor pagination.
    */
-  async findMessages(
-    conversationId: string,
-    cursor?: string,
-    limit = 30
-  ) {
+  async findMessages(conversationId: string, cursor?: string, limit = 30) {
     return prisma.chatMessage.findMany({
       where: {
         conversationId,
@@ -297,11 +267,11 @@ export const chatRepository = {
 
       ...(cursor
         ? {
-          skip: 1,
-          cursor: {
-            id: cursor,
-          },
-        }
+            skip: 1,
+            cursor: {
+              id: cursor,
+            },
+          }
         : {}),
 
       select: {
@@ -362,10 +332,7 @@ export const chatRepository = {
   /**
    * Mark conversation as read.
    */
-  async markConversationRead(
-    conversationId: string,
-    userId: string
-  ) {
+  async markConversationRead(conversationId: string, userId: string) {
     return prisma.conversationParticipant.update({
       where: {
         conversationId_userId: {
@@ -383,10 +350,7 @@ export const chatRepository = {
   /**
    * Mark messages as delivered.
    */
-  async markMessagesDelivered(
-    conversationId: string,
-    receiverId: string
-  ) {
+  async markMessagesDelivered(conversationId: string, receiverId: string) {
     return prisma.chatMessage.updateMany({
       where: {
         conversationId,
@@ -406,10 +370,7 @@ export const chatRepository = {
   /**
    * Mark messages as read.
    */
-  async markMessagesRead(
-    conversationId: string,
-    userId: string
-  ) {
+  async markMessagesRead(conversationId: string, userId: string) {
     return prisma.chatMessage.updateMany({
       where: {
         conversationId,
@@ -452,133 +413,114 @@ export const chatRepository = {
     });
   },
 
-  async findOtherParticipant(
-    conversationId: string,
-    userId: string
-  ) {
-    const participant =
-      await prisma.conversationParticipant.findFirst({
-        where: {
-          conversationId,
-          userId: {
-            not: userId,
-          },
+  async findOtherParticipant(conversationId: string, userId: string) {
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId,
+        userId: {
+          not: userId,
         },
-        select: {
-          userId: true,
-        },
-      });
+      },
+      select: {
+        userId: true,
+      },
+    });
 
     if (!participant) {
-      throw new Error(
-        "Other participant not found"
-      );
+      throw new Error("Other participant not found");
     }
 
     return participant.userId;
   },
 
-  async hasPreviousMessages(
-    conversationId: string
-  ) {
-    const count =
-      await prisma.chatMessage.count({
-        where: {
-          conversationId,
-        },
-      });
+  async hasPreviousMessages(conversationId: string) {
+    const count = await prisma.chatMessage.count({
+      where: {
+        conversationId,
+      },
+    });
 
     return count > 0;
   },
 
-  async findOtherParticipantDetails(
-    conversationId: string,
-    userId: string
-  ) {
-    const participant =
-      await prisma.conversationParticipant.findFirst({
-        where: {
-          conversationId,
-          userId: {
-            not: userId,
-          },
+  async findOtherParticipantDetails(conversationId: string, userId: string) {
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId,
+        userId: {
+          not: userId,
         },
-        select: {
-          userId: true,
+      },
+      select: {
+        userId: true,
 
-          user: {
-            select: {
-              id: true,
-              full_name: true,
-              birth_date: true,
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            birth_date: true,
 
-              photos: {
-                where: {
-                  is_primary: true,
-                },
-                select: {
-                  media_url: true,
-                },
-                take: 1,
+            photos: {
+              where: {
+                is_primary: true,
               },
+              select: {
+                media_url: true,
+              },
+              take: 1,
             },
           },
         },
-      });
+      },
+    });
 
     if (!participant) {
-      throw new Error(
-        "Other participant not found"
-      );
+      throw new Error("Other participant not found");
     }
 
-    return participant.user;
+    return {
+      ...participant.user,
+      age: calculateAge(participant.user.birth_date),
+    };
   },
-  
-  async getUnreadCount(
-    conversationId: string,
-    userId: string
-  ) {
-    const participant =
-      await prisma.conversationParticipant.findUnique({
-        where: {
-          conversationId_userId: {
-            conversationId,
-            userId,
-          },
+
+  async getUnreadCount(conversationId: string, userId: string) {
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
         },
-        select: {
-          lastReadAt: true,
-        },
-      });
+      },
+      select: {
+        lastReadAt: true,
+      },
+    });
 
     if (!participant) {
-      throw new Error(
-        "Conversation participant not found"
-      );
+      throw new Error("Conversation participant not found");
     }
 
-    const unreadCount =
-      await prisma.chatMessage.count({
-        where: {
-          conversationId,
+    const unreadCount = await prisma.chatMessage.count({
+      where: {
+        conversationId,
 
-          // Don't count your own messages
-          senderId: {
-            not: userId,
-          },
+        // Don't count your own messages
+        senderId: {
+          not: userId,
+        },
 
-           readAt: null,
-          // Messages after the user's last read time
-          ...(participant.lastReadAt
-            ? {
+        readAt: null,
+        // Messages after the user's last read time
+        ...(participant.lastReadAt
+          ? {
               createdAt: {
                 gt: participant.lastReadAt,
               },
             }
-            : {}),
-        },
-      });
+          : {}),
+      },
+    });
 
     return unreadCount;
   },
