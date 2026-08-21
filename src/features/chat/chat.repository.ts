@@ -508,7 +508,7 @@ export const chatRepository = {
           user: {
             select: {
               id: true,
-              name: true,
+              full_name: true,
               age: true,
 
               photos: {
