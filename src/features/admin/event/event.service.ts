@@ -1059,6 +1059,7 @@ export const getEventList = async () => {
       startTime: true,
       fullAddress: true,
       entryPrice: true,
+      heroImage: true,
     },
   });
 

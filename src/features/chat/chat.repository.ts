@@ -231,6 +231,7 @@ export const chatRepository = {
                 not: userId,
               },
 
+              readAt: null,
               ...(currentParticipant.lastReadAt
                 ? {
                   createdAt: {
@@ -533,6 +534,7 @@ export const chatRepository = {
 
     return participant.user;
   },
+  
   async getUnreadCount(
     conversationId: string,
     userId: string
@@ -566,6 +568,7 @@ export const chatRepository = {
             not: userId,
           },
 
+           readAt: null,
           // Messages after the user's last read time
           ...(participant.lastReadAt
             ? {
