@@ -509,7 +509,7 @@ export const chatRepository = {
             select: {
               id: true,
               full_name: true,
-              age: true,
+              birth_date: true,
 
               photos: {
                 where: {
