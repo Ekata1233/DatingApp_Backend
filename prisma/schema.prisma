@@ -1654,7 +1654,7 @@ model Event {
   city            String?
   eventPartnerId  String?
   eventPartner    EventPartner? @relation(fields: [eventPartnerId], references: [id])
-  officialPartner Boolean @default(false)
+  officialPartner Boolean       @default(false)
 
   //---------------------------------
   // Step 3
@@ -1728,7 +1728,7 @@ model EventGallery {
 model EventAmenity {
   id        String  @id @default(uuid()) @db.Uuid
   eventId   String  @db.Uuid
-  name      String                                                                           
+  name      String
   icon      String?
   sortOrder Int     @default(0)
   event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -1865,6 +1865,9 @@ enum MessageType {
   DATE_CONFIRMED
   DATE_CANCELLED
   SYSTEM
+  ROSE
+  GIFT
+  COMPLIMENT
 }
 
 enum NotificationType {
@@ -2280,7 +2283,7 @@ model EventPartner {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  events           Event[]
+  events Event[]
 
   @@index([businessName])
   @@index([city])

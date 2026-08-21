@@ -1,6 +1,6 @@
 // src/modules/chat/message/message.types.ts
 
-import { MessageType } from "@prisma/client";
+import { MessageType, Prisma } from "@prisma/client";
 
 export interface CreateMessageInput {
   userId: string;
@@ -8,6 +8,7 @@ export interface CreateMessageInput {
   content?: string | null;
   messageType: MessageType;
   mediaUrl?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
 }
 
 export interface GetMessagesInput {

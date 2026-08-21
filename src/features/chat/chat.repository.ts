@@ -1,6 +1,6 @@
 // src/modules/chat/chat.repository.ts
 
-import { Prisma } from "@prisma/client";
+import { MessageType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { ConversationFilter } from "./chat.types";
 
@@ -323,8 +323,9 @@ export const chatRepository = {
     conversationId: string;
     senderId: string;
     content?: string;
-    messageType: "TEXT" | "IMAGE" | "VIDEO" | "AUDIO";
+    messageType: MessageType;
     mediaUrl?: string;
+    metadata?: Prisma.InputJsonValue | null;
   }) {
     return prisma.$transaction(async (tx) => {
       const message = await tx.chatMessage.create({
@@ -333,6 +334,8 @@ export const chatRepository = {
           senderId: data.senderId,
           content: data.content ?? null,
           messageType: data.messageType,
+          mediaUrl: data.mediaUrl ?? null,
+          metadata: data.metadata ?? undefined,
         },
       });
 
