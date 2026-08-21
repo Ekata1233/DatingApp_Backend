@@ -1654,7 +1654,7 @@ model Event {
   city            String?
   eventPartnerId  String?
   eventPartner    EventPartner? @relation(fields: [eventPartnerId], references: [id])
-  officialPartner Boolean       @default(false)
+  officialPartner Boolean @default(false)
 
   //---------------------------------
   // Step 3

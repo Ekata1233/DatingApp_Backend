@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createEventController, publishEventController, updateEventExperienceController, updateEventHostController, updateEventSafetyController, updateEventTicketsController, updateEventVenueController } from "./event.controller";
+import { createEventController, getAllEventsController, getEventDetailsController, getEventListController, publishEventController, updateEventExperienceController, updateEventHostController, updateEventSafetyController, updateEventTicketsController, updateEventVenueController } from "./event.controller";
 
 const router = Router();
 
@@ -32,5 +32,17 @@ router.patch(
 router.post(
   "/events/:id/review-publish",
   publishEventController
+);
+router.get(
+  "/events/get-all",
+  getAllEventsController
+);
+router.get(
+  "/events/get",
+  getEventListController
+);
+router.get(
+  "/events/details/:id",
+  getEventDetailsController
 );
 export default router;
