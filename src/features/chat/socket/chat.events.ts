@@ -14,7 +14,13 @@ import {
 } from "./chat.socket.types";
 
 import { chatSocketService } from "./chat.socket.service";
-import { conversationJoinRateLimit, messageReadRateLimit, messageSendRateLimit, typingRateLimit } from "../../../middleware/rateLimit/socket.rateLimit";
+import {
+  conversationJoinRateLimit,
+  messageReadRateLimit,
+  messageSendRateLimit,
+  typingRateLimit,
+} from "../../../middleware/rateLimit/socket.rateLimit";
+import { chatService } from "../chat.service";
 
 /**
  * Register all chat socket events.
@@ -22,7 +28,7 @@ import { conversationJoinRateLimit, messageReadRateLimit, messageSendRateLimit, 
 export const registerChatEvents = (
   io: Server,
   socket: AuthenticatedSocket,
-  userId: string
+  userId: string,
 ) => {
   /**
    * User ID comes from socket authentication.
@@ -30,10 +36,7 @@ export const registerChatEvents = (
    * NEVER trust senderId from client.
    */
 
-
-  console.log(
-    `Registering chat events for user: ${userId}`
-  );
+  console.log(`Registering chat events for user: ${userId}`);
 
   /**
    * ==========================================
@@ -42,23 +45,16 @@ export const registerChatEvents = (
    */
   socket.on(
     "conversation:join",
-    async (
-      payload: JoinConversationSocketPayload,
-      callback?: Function
-    ) => {
-
+    async (payload: JoinConversationSocketPayload, callback?: Function) => {
       try {
-
         if (!payload?.conversationId) {
-          throw new Error(
-            "Conversation ID is required"
-          );
+          throw new Error("Conversation ID is required");
         }
 
         const result = await chatSocketService.joinConversation(
           socket,
           userId,
-          payload
+          payload,
         );
 
         const rateLimit = await conversationJoinRateLimit(userId);
@@ -67,8 +63,7 @@ export const registerChatEvents = (
           socket.emit("rate_limit:exceeded", {
             success: false,
             code: "RATE_LIMIT_EXCEEDED",
-            message:
-              "Too many conversation join requests.",
+            message: "Too many conversation join requests.",
             action: "conversation-join",
             limit: rateLimit.limit,
             remaining: rateLimit.remaining,
@@ -80,13 +75,10 @@ export const registerChatEvents = (
         /**
          * Send confirmation to current user.
          */
-        socket.emit(
-          "conversation:joined",
-          result
-        );
+        socket.emit("conversation:joined", result);
 
         console.log(
-          `User ${userId} joined conversation ${payload.conversationId}`
+          `User ${userId} joined conversation ${payload.conversationId}`,
         );
         /**
          * Optional acknowledgement callback.
@@ -98,13 +90,9 @@ export const registerChatEvents = (
           });
         }
       } catch (error) {
-        handleSocketError(
-          socket,
-          error,
-          callback
-        );
+        handleSocketError(socket, error, callback);
       }
-    }
+    },
   );
 
   /**
@@ -114,27 +102,18 @@ export const registerChatEvents = (
    */
   socket.on(
     "conversation:leave",
-    async (
-      payload: LeaveConversationSocketPayload,
-      callback?: Function
-    ) => {
+    async (payload: LeaveConversationSocketPayload, callback?: Function) => {
       try {
         if (!payload?.conversationId) {
-          throw new Error(
-            "Conversation ID is required"
-          );
+          throw new Error("Conversation ID is required");
         }
 
-        const result =
-          await chatSocketService.leaveConversation(
-            socket,
-            payload
-          );
-
-        socket.emit(
-          "conversation:left",
-          result
+        const result = await chatSocketService.leaveConversation(
+          socket,
+          payload,
         );
+
+        socket.emit("conversation:left", result);
 
         if (callback) {
           callback({
@@ -143,13 +122,9 @@ export const registerChatEvents = (
           });
         }
       } catch (error) {
-        handleSocketError(
-          socket,
-          error,
-          callback
-        );
+        handleSocketError(socket, error, callback);
       }
-    }
+    },
   );
 
   /**
@@ -159,21 +134,14 @@ export const registerChatEvents = (
    */
   socket.on(
     "message:send",
-    async (
-      payload: SendMessageSocketPayload,
-      callback?: Function
-    ) => {
+    async (payload: SendMessageSocketPayload, callback?: Function) => {
       try {
         if (!payload?.conversationId) {
-          throw new Error(
-            "Conversation ID is required"
-          );
+          throw new Error("Conversation ID is required");
         }
 
         if (!payload?.messageType) {
-          throw new Error(
-            "Message type is required"
-          );
+          throw new Error("Message type is required");
         }
 
         const rateLimit = await messageSendRateLimit(userId);
@@ -190,8 +158,7 @@ export const registerChatEvents = (
           socket.emit("rate_limit:exceeded", {
             success: false,
             code: "RATE_LIMIT_EXCEEDED",
-            message:
-              "Too many messages. Please try again later.",
+            message: "Too many messages. Please try again later.",
             action: "message-send",
             limit: rateLimit.limit,
             remaining: rateLimit.remaining,
@@ -209,12 +176,11 @@ export const registerChatEvents = (
          *
          * socket.userId
          */
-        const message =
-          await chatSocketService.sendMessage(
-            io,
-            userId,
-            payload
-          );
+        const message = await chatSocketService.sendMessage(
+          io,
+          userId,
+          payload,
+        );
 
         /**
          * Acknowledge sender.
@@ -226,13 +192,9 @@ export const registerChatEvents = (
           });
         }
       } catch (error) {
-        handleSocketError(
-          socket,
-          error,
-          callback
-        );
+        handleSocketError(socket, error, callback);
       }
-    }
+    },
   );
 
   /**
@@ -240,81 +202,107 @@ export const registerChatEvents = (
    * TYPING START
    * ==========================================
    */
-  socket.on(
-    "typing:start",
-    async (
-      payload: TypingSocketPayload
-    ) => {
-      try {
-        if (!payload?.conversationId) {
-          return;
-        }
+  // socket.on(
+  //   "typing:start",
+  //   async (
+  //     payload: TypingSocketPayload
+  //   ) => {
+  //     try {
+  //       if (!payload?.conversationId) {
+  //         return;
+  //       }
 
-        const rateLimit =
-          await typingRateLimit(userId);
+  //       const rateLimit =
+  //         await typingRateLimit(userId);
 
-        if (!rateLimit.allowed) {
-          return;
-        }
-        /**
-         * Verify user is actually part of
-         * the conversation.
-         */
-        await chatSocketService.joinConversation(
-          socket,
-          userId,
-          payload
-        );
+  //       if (!rateLimit.allowed) {
+  //         return;
+  //       }
+  //       /**
+  //        * Verify user is actually part of
+  //        * the conversation.
+  //        */
+  //       await chatSocketService.joinConversation(
+  //         socket,
+  //         userId,
+  //         payload
+  //       );
 
-        /**
-         * Broadcast typing event.
-         */
-        socket
-          .to(
-            `conversation:${payload.conversationId}`
-          )
-          .emit("typing:start", {
-            conversationId:
-              payload.conversationId,
+  //       /**
+  //        * Broadcast typing event.
+  //        */
+  //       socket
+  //         .to(
+  //           `conversation:${payload.conversationId}`
+  //         )
+  //         .emit("typing:start", {
+  //           conversationId:
+  //             payload.conversationId,
 
-            userId,
-          });
-      } catch (error) {
-        handleSocketError(socket, error);
+  //           userId,
+  //         });
+  //     } catch (error) {
+  //       handleSocketError(socket, error);
+  //     }
+  //   }
+  // );
+
+  socket.on("typing:start", async (payload: TypingSocketPayload) => {
+    try {
+      if (!payload?.conversationId) {
+        return;
       }
+
+      const rateLimit = await typingRateLimit(userId);
+
+      if (!rateLimit.allowed) {
+        return;
+      }
+
+      // Find other participants
+      const participants = await chatService.getConversationReceivers(
+        payload.conversationId,
+        userId,
+      );
+
+      // Send typing event to their personal rooms
+      for (const participant of participants) {
+        io.to(`user:${participant.userId}`).emit("typing:start", {
+          conversationId: payload.conversationId,
+          userId,
+        });
+      }
+    } catch (error) {
+      handleSocketError(socket, error);
     }
-  );
+  });
 
   /**
    * ==========================================
    * TYPING STOP
    * ==========================================
    */
-  socket.on(
-    "typing:stop",
-    async (
-      payload: TypingSocketPayload
-    ) => {
-      try {
-        if (!payload?.conversationId) {
-          return;
-        }
-
-        socket
-          .to(
-            `conversation:${payload.conversationId}`
-          )
-          .emit("typing:stop", {
-            conversationId:
-              payload.conversationId,
-
-            userId,
-          });
-      } catch (error) {
-        handleSocketError(socket, error);
+  socket.on("typing:stop", async (payload: TypingSocketPayload) => {
+    try {
+      if (!payload?.conversationId) {
+        return;
       }
+
+      const participants = await chatService.getParticipants(
+        userId,
+        payload.conversationId,
+      );
+
+      for (const participant of participants) {
+        io.to(`user:${participant.userId}`).emit("typing:stop", {
+          conversationId: payload.conversationId,
+          userId,
+        });
+      }
+    } catch (error) {
+      handleSocketError(socket, error);
     }
-  );
+  });
 
   /**
    * ==========================================
@@ -323,23 +311,17 @@ export const registerChatEvents = (
    */
   socket.on(
     "message:delivered",
-    async (
-      payload: MessageDeliveredSocketPayload,
-      callback?: Function
-    ) => {
+    async (payload: MessageDeliveredSocketPayload, callback?: Function) => {
       try {
         if (!payload?.messageId) {
-          throw new Error(
-            "Message ID is required"
-          );
+          throw new Error("Message ID is required");
         }
 
-        const message =
-          await chatSocketService.markMessageDelivered(
-            io,
-            userId,
-            payload
-          );
+        const message = await chatSocketService.markMessageDelivered(
+          io,
+          userId,
+          payload,
+        );
 
         if (callback) {
           callback({
@@ -348,13 +330,9 @@ export const registerChatEvents = (
           });
         }
       } catch (error) {
-        handleSocketError(
-          socket,
-          error,
-          callback
-        );
+        handleSocketError(socket, error, callback);
       }
-    }
+    },
   );
 
   /**
@@ -364,26 +342,19 @@ export const registerChatEvents = (
    */
   socket.on(
     "message:read",
-    async (
-      payload: MessageReadSocketPayload,
-      callback?: Function
-    ) => {
+    async (payload: MessageReadSocketPayload, callback?: Function) => {
       try {
         if (!payload?.messageId) {
-          throw new Error(
-            "Message ID is required"
-          );
+          throw new Error("Message ID is required");
         }
 
-        const rateLimit =
-          await messageReadRateLimit(userId);
+        const rateLimit = await messageReadRateLimit(userId);
 
         if (!rateLimit.allowed) {
           socket.emit("rate_limit:exceeded", {
             success: false,
             code: "RATE_LIMIT_EXCEEDED",
-            message:
-              "Too many message read requests.",
+            message: "Too many message read requests.",
             action: "message-read",
             limit: rateLimit.limit,
             remaining: rateLimit.remaining,
@@ -393,13 +364,11 @@ export const registerChatEvents = (
           return;
         }
 
-
-        const message =
-          await chatSocketService.markMessageRead(
-            io,
-            userId,
-            payload
-          );
+        const message = await chatSocketService.markMessageRead(
+          io,
+          userId,
+          payload,
+        );
 
         if (callback) {
           callback({
@@ -408,13 +377,9 @@ export const registerChatEvents = (
           });
         }
       } catch (error) {
-        handleSocketError(
-          socket,
-          error,
-          callback
-        );
+        handleSocketError(socket, error, callback);
       }
-    }
+    },
   );
 
   /**
@@ -428,21 +393,18 @@ export const registerChatEvents = (
       payload: {
         conversationId: string;
       },
-      callback?: Function
+      callback?: Function,
     ) => {
       try {
         if (!payload?.conversationId) {
-          throw new Error(
-            "Conversation ID is required"
-          );
+          throw new Error("Conversation ID is required");
         }
 
-        const result =
-          await chatSocketService.markConversationRead(
-            io,
-            userId,
-            payload.conversationId
-          );
+        const result = await chatSocketService.markConversationRead(
+          io,
+          userId,
+          payload.conversationId,
+        );
 
         if (callback) {
           callback({
@@ -451,13 +413,9 @@ export const registerChatEvents = (
           });
         }
       } catch (error) {
-        handleSocketError(
-          socket,
-          error,
-          callback
-        );
+        handleSocketError(socket, error, callback);
       }
-    }
+    },
   );
 
   /**
@@ -465,19 +423,13 @@ export const registerChatEvents = (
    * DISCONNECT
    * ==========================================
    */
-  socket.on(
-    "disconnect",
-    (reason) => {
-      console.log(
-        `Chat socket disconnected`,
-        {
-          userId,
-          socketId: socket.id,
-          reason,
-        }
-      );
-    }
-  );
+  socket.on("disconnect", (reason) => {
+    console.log(`Chat socket disconnected`, {
+      userId,
+      socketId: socket.id,
+      reason,
+    });
+  });
 };
 
 /**
@@ -486,17 +438,12 @@ export const registerChatEvents = (
 const handleSocketError = (
   socket: AuthenticatedSocket,
   error: unknown,
-  callback?: Function
+  callback?: Function,
 ) => {
   const message =
-    error instanceof Error
-      ? error.message
-      : "Socket operation failed";
+    error instanceof Error ? error.message : "Socket operation failed";
 
-  console.error(
-    `Socket error [${socket.userId}]:`,
-    error
-  );
+  console.error(`Socket error [${socket.userId}]:`, error);
 
   /**
    * Send error event.

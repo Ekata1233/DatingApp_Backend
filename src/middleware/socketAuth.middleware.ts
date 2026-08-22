@@ -11,7 +11,7 @@ export interface AuthenticatedSocket extends Socket {
 
 export const socketAuthMiddleware = (
   socket: Socket,
-  next: (err?: Error) => void
+  next: (err?: Error) => void,
 ) => {
   try {
     const token =
@@ -24,7 +24,7 @@ export const socketAuthMiddleware = (
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET as string
+      process.env.JWT_SECRET as string,
     ) as JwtPayload;
 
     if (!decoded.userId) {

@@ -524,4 +524,29 @@ export const chatRepository = {
 
     return unreadCount;
   },
+
+  async findConversationParticipants(conversationId: string, userId: string) {
+    return prisma.conversationParticipant.findMany({
+      where: {
+        conversationId,
+        userId: {
+          not: userId,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+  },
+
+  async findParticipants(conversationId: string) {
+    return prisma.conversationParticipant.findMany({
+      where: {
+        conversationId,
+      },
+      select: {
+        userId: true,
+      },
+    });
+  },
 };
