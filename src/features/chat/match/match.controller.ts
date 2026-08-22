@@ -1,31 +1,47 @@
-// import { chatService } from "../chat.service";
+// chat.controller.ts
 
-// export const getNewMatches = async (
-//   req: Request,
-//   res: Response
-// ) => {
-//   try {
-//     const userId = (req as any).user.id;
+import { Request, Response } from "express";
+import { matchService } from "./match.service";
 
-//     const matches =
-//       await chatService.getNewMatches(userId);
+export const getNewMatches = async (
+  req: Request,
+  res: Response
+) => {
 
-//     return res.status(200).json({
-//       success: true,
-//       data: matches,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "getNewMatches error:",
-//       error
-//     );
+  try {
 
-//     return res.status(400).json({
-//       success: false,
-//       message:
-//         error instanceof Error
-//           ? error.message
-//           : "Failed to get new matches",
-//     });
-//   }
-// };
+    const userId =
+      (req as any).user.id;
+
+    const matches =
+      await matchService.getNewMatches(
+        userId
+      );
+
+    return res.status(200).json({
+
+      success: true,
+
+      data: matches,
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      "getNewMatches error:",
+      error
+    );
+
+    return res.status(400).json({
+
+      success: false,
+
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get new matches",
+
+    });
+  }
+};

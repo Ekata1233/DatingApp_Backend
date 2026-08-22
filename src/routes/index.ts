@@ -55,6 +55,7 @@ import purchaseStoreRoutes from "../features/purchaseStore/purchaseStore.routes"
 import giftRoutes from "../features/gift/gift.routes"
 import chatRoutes from "../features/chat/chat.routes";
 import mediaRoutes from "../features/chat/media/media.routes"
+import newMatchesRoutes from "../features/chat/match/match.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -100,6 +101,10 @@ router.use("/user",lastActivityRoutes)
 
 //swipe routes
 router.use("/user", swipeRoutes);
+//
+
+//gift , compliment, rose NEW MATCHES
+router.use("/user", newMatchesRoutes)
 //
 
 router.use("/user", dateNowRoutes);

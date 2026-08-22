@@ -67,6 +67,19 @@ export const messageService = {
       }
     }
 
+     /**
+   * 4. Validate compliment
+   */
+  if (
+    data.messageType ===
+      MessageType.COMPLIMENT &&
+    !data.content?.trim()
+  ) {
+    throw new Error(
+      "Compliment content is required"
+    );
+  }
+
     /**
      * 4. If this is a reply,
      *    make sure replied message exists

@@ -1,25 +1,52 @@
-// import { chatRepository } from "../chat.repository";
+import { calculateAge } from "../chat.repository";
+import { matchRepository } from "./match.repository";
 
-// export const messageService = {
 
-// async getNewMatches(userId: string) {
-//   const messages =
-//     await chatRepository.findNewMatches(userId);
+export const matchService = {
+  async getNewMatches(userId: string) {
+    const messages = await matchRepository.findNewMatches(userId);
 
-//   const uniqueSenders = new Map();
+    console.log("message : ", messages)
 
-//   for (const message of messages) {
-//     if (!uniqueSenders.has(message.senderId)) {
-//       uniqueSenders.set(
-//         message.senderId,
-//         message
-//       );
-//     }
-//   }
+    /**
+     * One sender = one New Match card.
+     *
+     * Because repository returns newest first,
+     * the first message we see from a sender
+     * is their latest unread interaction.
+     */
+    const uniqueSenders = new Map<string, (typeof messages)[number]>();
 
-//   return Array.from(
-//     uniqueSenders.values()
-//   );
-// }
+    for (const message of messages) {
+      if (!uniqueSenders.has(message.senderId)) {
+        uniqueSenders.set(message.senderId, message);
+      }
+    }
 
-// }
+    return Array.from(uniqueSenders.values()).map((message) => {
+      const sender = message.sender;
+
+      return {
+        messageId: message.id,
+
+        type: message.messageType,
+
+        content: message.content,
+
+        metadata: message.metadata,
+
+        createdAt: message.createdAt,
+
+        sender: {
+          id: sender.id,
+          name: sender.full_name,
+
+          age: sender.birth_date ? calculateAge(sender.birth_date) : null,
+
+          // Add your actual profile image field
+          // photo: sender.profilePhoto,
+        },
+      };
+    });
+  },
+};

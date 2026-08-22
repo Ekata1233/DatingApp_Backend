@@ -1,9 +1,11 @@
-// import { Router } from "express";
-// import { getNewMatches } from "./match.controller";
+import { Router } from "express";
+import { getNewMatches } from "./match.controller";
 
-// const router = Router();
+const router = Router();
 
-// router.get(
-//   "/matches/new",
-//   getNewMatches
-// );
+router.get(
+  "/matches/new",
+  getNewMatches
+);
+
+export default router;
