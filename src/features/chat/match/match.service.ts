@@ -43,8 +43,7 @@ export const matchService = {
 
           age: sender.birth_date ? calculateAge(sender.birth_date) : null,
 
-          // Add your actual profile image field
-          // photo: sender.profilePhoto,
+          photo: sender.photos[0]?.media_url ?? null,
         },
       };
     });
