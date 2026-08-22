@@ -14,6 +14,7 @@ import {
   getMyDatePlanRequests,
   cancelDatePlanRequest,
   testMatchScore,
+  withdrawDatePlanRequest,
 } from "./dateNow.service";
 
 export const createDraftController = async (
@@ -298,6 +299,77 @@ export const cancelDatePlanRequestController = async (
     return res.status(400).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+export const withdrawDatePlanRequestController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { requestId } = req.params;
+
+    if (!requestId || Array.isArray(requestId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid Request ID is required",
+      });
+    }
+
+    const result = await withdrawDatePlanRequest(
+      requestId,
+      userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: {
+        requestId: result.requestId,
+      },
+    });
+  } catch (error: any) {
+    console.error(
+      "Withdraw date plan request error:",
+      error
+    );
+
+    if (
+      error.message === "Date plan request not found"
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (
+      error.message ===
+      "You are not allowed to withdraw this request"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (
+      error.message.startsWith(
+        "Cannot withdraw a request"
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
 };

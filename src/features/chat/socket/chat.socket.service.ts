@@ -15,6 +15,8 @@ import {
   TypingSocketPayload,
 } from "./chat.socket.types";
 import { MessageType } from "@prisma/client";
+import { calculateAge } from "../chat.repository";
+import { prisma } from "../../../prisma/prismaClient";
 
 export const chatSocketService = {
   /**
@@ -93,33 +95,98 @@ export const chatSocketService = {
       receiverId,
     );
 
-    let user;
+    // let user;
 
-    if (isNew) {
-      user = await chatService.getOtherParticipantDetails(
-        payload.conversationId,
-        userId,
-      );
-    }
+    // if (isNew) {
+    //   user = await chatService.getOtherParticipantDetails(
+    //     payload.conversationId,
+    //     userId,
+    //   );
+    // }
+
+    // /**
+    //  * 5. Notify receiver's conversation list.
+    //  */
+    // io.to(`user:${receiverId}`).emit("conversation:update", {
+    //   conversationId: payload.conversationId,
+    //   isNew,
+    //   ...(isNew && {
+    //     user,
+    //   }),
+    //   lastMessage: {
+    //     id: message.id,
+    //     content: message.content,
+    //     senderId: message.senderId,
+    //     createdAt: message.createdAt,
+    //   },
+
+    //   senderId: userId,
+    //   unreadCount,
+    // });
 
     /**
-     * 5. Notify receiver's conversation list.
+     * 7. Get receiver details.
+     *
+     * We need this for conversation:update,
+     * especially when the conversation is new.
      */
+    const receiver = await chatService.getUserDetails(receiverId);
+
+    if (!receiver) {
+      throw new Error("Receiver not found");
+    }
+    /**
+     * 8. Get dynamic match score.
+     *
+     * userId       = current sender
+     * receiverId   = other participant
+     */
+    const compatibility = await prisma.userCompatibility.findFirst({
+      where: {
+        userId: userId,
+        targetUserId: receiverId,
+      },
+
+      select: {
+        targetUserId: true,
+        score: true,
+        percentage: true,
+      },
+    });
+
+    /**
+     * 9. Build user object exactly like
+     *    findUserConversations()
+     */
+    const user = {
+      id: receiver.id,
+      fullName: receiver.full_name,
+      age: calculateAge(receiver.birth_date),
+      profilePhoto: receiver.photos?.[0]?.media_url ?? null,
+      matchScore: compatibility?.percentage ?? 0,
+      trustPercentage: 85,
+      isOnline: true,
+    };
+
     io.to(`user:${receiverId}`).emit("conversation:update", {
       conversationId: payload.conversationId,
       isNew,
-      ...(isNew && {
-        user,
-      }),
+      user,
+
       lastMessage: {
         id: message.id,
         content: message.content,
         senderId: message.senderId,
+        messageType: message.messageType,
+        mediaUrl: message.mediaUrl,
         createdAt: message.createdAt,
+        deliveredAt: message.deliveredAt,
+        readAt: message.readAt,
       },
 
       senderId: userId,
       unreadCount,
+      updatedAt: message.createdAt,
     });
 
     const sender = await chatService.getUserDetails(message.senderId);

@@ -184,6 +184,55 @@ export const chatRepository = {
       },
     });
 
+    // --------------------------------------------------
+  // Get all other users from conversations
+  // --------------------------------------------------
+
+  const candidateIds = conversations
+    .map((conversation) => {
+      const otherParticipant = conversation.participants.find(
+        (participant) => participant.userId !== userId,
+      );
+
+      return otherParticipant?.userId;
+    })
+    .filter((id): id is string => Boolean(id));
+
+  // --------------------------------------------------
+  // Get match scores for all conversation users
+  // ONE DB QUERY
+  // --------------------------------------------------
+
+  const matchScores = await prisma.userCompatibility.findMany({
+    where: {
+      userId: userId,
+
+      targetUserId: {
+        in: candidateIds,
+      },
+    },
+
+    select: {
+      targetUserId: true,
+      score: true,
+      percentage: true,
+    },
+  });
+
+  // --------------------------------------------------
+  // Convert match scores into Map
+  // --------------------------------------------------
+
+  const matchScoreMap = new Map(
+    matchScores.map((item) => [
+      item.targetUserId,
+      {
+        score: item.score,
+        percentage: item.percentage,
+      },
+    ]),
+  );
+
     // Convert DB result into chat-list response
     const result = await Promise.all(
       conversations.map(async (conversation) => {
@@ -219,7 +268,7 @@ export const chatRepository = {
         });
 
         const otherUser = otherParticipant.user;
-        console.log("other user : ", otherUser);
+         const compatibility = matchScoreMap.get(otherUser.id);
 
         return {
           conversationId: conversation.id,
@@ -231,7 +280,7 @@ export const chatRepository = {
 
             profilePhoto: otherUser.photos[0]?.media_url ?? null,
 
-            matchPercentage: 92,
+            matchPercentage: compatibility?.percentage ?? 0,
             trustPercentage: 85,
 
             isOnline: true,

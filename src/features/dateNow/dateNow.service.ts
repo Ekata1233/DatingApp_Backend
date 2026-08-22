@@ -980,6 +980,45 @@ export const cancelDatePlanRequest = async (
   return cancelledRequest;
 };
 
+export const withdrawDatePlanRequest = async (
+  requestId: string,
+  userId: string
+) => {
+  // Find the request
+  const request = await prisma.datePlanRequest.findUnique({
+    where: {
+      id: requestId,
+    },
+  });
+
+  if (!request) {
+    throw new Error("Date plan request not found");
+  }
+
+  // Make sure the logged-in user is the requester
+  if (request.requesterId !== userId) {
+    throw new Error("You are not allowed to withdraw this request");
+  }
+
+  // Optional: only pending requests can be withdrawn
+  if (request.status !== "PENDING") {
+    throw new Error(
+      `Cannot withdraw a request with status ${request.status}`
+    );
+  }
+
+  // Delete request
+  await prisma.datePlanRequest.delete({
+    where: {
+      id: requestId,
+    },
+  });
+
+  return {
+    requestId,
+    message: "Date plan request withdrawn successfully",
+  };
+};
 // matchScore.service.ts
 
 export const testMatchScore = async (

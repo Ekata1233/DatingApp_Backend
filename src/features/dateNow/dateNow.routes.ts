@@ -14,6 +14,7 @@ import {
   getMyDatePlanRequestsController,
   cancelDatePlanRequestController,
   testMatchScoreController,
+  withdrawDatePlanRequestController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -90,6 +91,12 @@ router.patch(
   "/date-plans/:planId/cancel-request",
   authMiddleware,
   cancelDatePlanRequestController
+);
+
+router.delete(
+  "/date-plans/withdraw/:requestId",
+  authMiddleware,
+  withdrawDatePlanRequestController
 );
 
 router.post(
