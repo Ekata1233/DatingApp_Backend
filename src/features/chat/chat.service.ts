@@ -271,4 +271,8 @@ export const chatService = {
     // Return only the other participants
     return participants.filter((participant) => participant.userId !== userId);
   },
+
+  async getUserDetails(userId: string) {
+    return chatRepository.getUserDetails(userId);
+  },
 };

@@ -1,7 +1,7 @@
 // src/modules/chat/sockets/chat.socket.types.ts
 
 import { Socket } from "socket.io";
-import { MessageType } from "@prisma/client";
+import { MessageType, Prisma } from "@prisma/client";
 
 /**
  * Authenticated Socket
@@ -9,8 +9,7 @@ import { MessageType } from "@prisma/client";
  * socketAuth middleware should attach userId
  * to the socket.
  */
-export interface AuthenticatedSocket
-  extends Socket {
+export interface AuthenticatedSocket extends Socket {
   userId: string;
 }
 
@@ -21,12 +20,10 @@ export interface AuthenticatedSocket
  */
 export interface SendMessageSocketPayload {
   conversationId: string;
-
   content?: string | null;
-
   messageType: MessageType;
-
   mediaUrl?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
 }
 
 /**

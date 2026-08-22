@@ -549,4 +549,32 @@ export const chatRepository = {
       },
     });
   },
+
+  async getUserDetails(userId: string) {
+  return prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+
+    select: {
+      id: true,
+      full_name: true,
+      birth_date: true,
+
+      photos: {
+        where: {
+          is_primary: true,
+        },
+
+        take: 1,
+
+        select: {
+          id: true,
+          media_url: true,
+          media_type: true,
+        },
+      },
+    },
+  });
+},
 };

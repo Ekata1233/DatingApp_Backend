@@ -6,370 +6,360 @@ import { chatService } from "../chat.service";
 import { messageService } from "../message/message.service";
 
 import {
-    ConversationUpdatePayload,
-    JoinConversationSocketPayload,
-    LeaveConversationSocketPayload,
-    MessageDeliveredSocketPayload,
-    MessageReadSocketPayload,
-    SendMessageSocketPayload,
-    TypingSocketPayload,
+  ConversationUpdatePayload,
+  JoinConversationSocketPayload,
+  LeaveConversationSocketPayload,
+  MessageDeliveredSocketPayload,
+  MessageReadSocketPayload,
+  SendMessageSocketPayload,
+  TypingSocketPayload,
 } from "./chat.socket.types";
+import { MessageType } from "@prisma/client";
 
 export const chatSocketService = {
-    /**
-     * Send a message.
-     *
-     * Flow:
-     *
-     * Socket
-     *   ↓
-     * messageService
-     *   ↓
-     * PostgreSQL
-     *   ↓
-     * Receiver socket
-     */
-    async sendMessage(
-        io: Server,
-        userId: string,
-        payload: SendMessageSocketPayload
-    ) {
-
-        /**
-        * 1. Verify participant
-        */
-        await chatService.verifyConversationParticipant(
-            payload.conversationId,
-            userId
-        );
-
-        /**
-   * 2. Check whether this conversation
-   *    already has messages.
+  /**
+   * Send a message.
+   *
+   * Flow:
+   *
+   * Socket
+   *   ↓
+   * messageService
+   *   ↓
+   * PostgreSQL
+   *   ↓
+   * Receiver socket
    */
-        const hasPreviousMessages =
-            await chatService.hasPreviousMessages(
-                payload.conversationId
-            );
-
-        const isNew = !hasPreviousMessages;
-        /**
-         * Save message to database.
-         */
-        const message =
-            await messageService.createMessage({
-                userId,
-
-                conversationId:
-                    payload.conversationId,
-
-                content:
-                    payload.content,
-
-                messageType:
-                    payload.messageType,
-
-                mediaUrl:
-                    payload.mediaUrl,
-            });
-
-        /**
-         * Send message to conversation room.
-         *
-         * Every participant who joined this room
-         * will receive the message.
-         *
-         * Example:
-         *
-         * conversation:123
-         */
-        io.to(
-            `conversation:${payload.conversationId}`
-        ).emit("message:receive", message);
-
-        /**
-  * 4. Find the other participant.
-  */
-        const receiverId =
-            await chatService.getOtherParticipant(
-                payload.conversationId,
-                userId
-            );
-
-        const unreadCount =
-            await chatService.getUnreadCount(
-                payload.conversationId,
-                receiverId
-            );
-
-        let user;
-
-        if (isNew) {
-            user =
-                await chatService.getOtherParticipantDetails(
-                    payload.conversationId,
-                    userId
-                );
-        }
-
-        /**
-         * 5. Notify receiver's conversation list.
-         */
-        io.to(`user:${receiverId}`).emit(
-            "conversation:update",
-            {
-                conversationId:
-                    payload.conversationId,
-                isNew,
-                ...(isNew && {
-                    user,
-                }),
-                lastMessage: {
-                    id: message.id,
-                    content: message.content,
-                    senderId: message.senderId,
-                    createdAt: message.createdAt,
-                },
-
-                senderId: userId,
-                unreadCount
-            }
-        );
-
-        /**
-         * Return saved message to event handler.
-         */
-        return message;
-    },
+  async sendMessage(
+    io: Server,
+    userId: string,
+    payload: SendMessageSocketPayload,
+  ) {
+    /**
+     * 1. Verify participant
+     */
+    await chatService.verifyConversationParticipant(
+      payload.conversationId,
+      userId,
+    );
 
     /**
-     * Join a conversation room.
+     * 2. Check whether this conversation
+     *    already has messages.
      */
-    async joinConversation(
-        socket: any,
-        userId: string,
-        payload: JoinConversationSocketPayload
-    ) {
-        /**
-         * Verify that user belongs to conversation.
-         */
-        console.log("JOIN REQUEST");
-        console.log("userId:", userId);
-        console.log("conversationId:", payload.conversationId);
+    const hasPreviousMessages = await chatService.hasPreviousMessages(
+      payload.conversationId,
+    );
 
-        await chatService.getMessages({
-            userId,
+    const isNew = !hasPreviousMessages;
+    /**
+     * Save message to database.
+     */
+    const message = await messageService.createMessage({
+      userId,
 
-            conversationId:
-                payload.conversationId,
-
-            limit: 1,
-        });
-
-        /**
-         * Join room.
-         */
-        await socket.join(
-            `conversation:${payload.conversationId}`
-        );
-
-        return {
-            conversationId:
-                payload.conversationId,
-
-            joined: true,
-        };
-    },
+      conversationId: payload.conversationId,
+      content: payload.content,
+      messageType: payload.messageType,
+      mediaUrl: payload.mediaUrl,
+      metadata: payload.metadata,
+    });
 
     /**
-     * Leave conversation room.
+     * Send message to conversation room.
+     *
+     * Every participant who joined this room
+     * will receive the message.
+     *
+     * Example:
+     *
+     * conversation:123
      */
-    async leaveConversation(
-        socket: any,
-        payload: LeaveConversationSocketPayload
-    ) {
-        await socket.leave(
-            `conversation:${payload.conversationId}`
-        );
-
-        return {
-            conversationId:
-                payload.conversationId,
-
-            left: true,
-        };
-    },
+    io.to(`conversation:${payload.conversationId}`).emit(
+      "message:receive",
+      message,
+    );
 
     /**
-     * Start typing.
+     * 4. Find the other participant.
      */
-    async startTyping(
-        io: Server,
-        userId: string,
-        payload: TypingSocketPayload,
-        socket: Socket
-    ) {
-        /**
-         * Don't need DB query for every keystroke.
-         *
-         * The socket user is already authenticated.
-         */
+    const receiverId = await chatService.getOtherParticipant(
+      payload.conversationId,
+      userId,
+    );
 
-        io.to(
-            `conversation:${payload.conversationId}`
-        )
-            .except(socket.id)
-            .emit("typing:start", {
-                conversationId:
-                    payload.conversationId,
+    const unreadCount = await chatService.getUnreadCount(
+      payload.conversationId,
+      receiverId,
+    );
 
-                userId,
-            });
+    let user;
 
-        return {
-            success: true,
-        };
-    },
+    if (isNew) {
+      user = await chatService.getOtherParticipantDetails(
+        payload.conversationId,
+        userId,
+      );
+    }
 
     /**
-     * Stop typing.
+     * 5. Notify receiver's conversation list.
      */
-    async stopTyping(
-        io: Server,
-        userId: string,
-        payload: TypingSocketPayload
+    io.to(`user:${receiverId}`).emit("conversation:update", {
+      conversationId: payload.conversationId,
+      isNew,
+      ...(isNew && {
+        user,
+      }),
+      lastMessage: {
+        id: message.id,
+        content: message.content,
+        senderId: message.senderId,
+        createdAt: message.createdAt,
+      },
+
+      senderId: userId,
+      unreadCount,
+    });
+
+    const sender = await chatService.getUserDetails(message.senderId);
+
+    // ==========================================
+    // SPECIAL INTERACTION EVENT
+    // ==========================================
+
+    if (
+      payload.messageType === MessageType.ROSE ||
+      payload.messageType === MessageType.GIFT ||
+      payload.messageType === MessageType.COMPLIMENT
     ) {
-        io.to(
-            `conversation:${payload.conversationId}`
-        ).emit("typing:stop", {
-            conversationId:
-                payload.conversationId,
+      io.to(`user:${receiverId}`).emit("newMatch:receive", {
+        id: message.id,
 
-            userId,
-        });
+        conversationId: message.conversationId,
 
-        return {
-            success: true,
-        };
-    },
+        senderId: message.senderId,
+
+        receiverId,
+
+        messageType: message.messageType,
+
+        message: message.content,
+
+        mediaUrl: message.mediaUrl,
+
+        metadata: message.metadata,
+
+        createdAt: message.createdAt,
+
+        sender,
+      });
+    }
 
     /**
-     * Mark message as delivered.
+     * Return saved message to event handler.
      */
-    async markMessageDelivered(
-        io: Server,
-        userId: string,
-        payload: MessageDeliveredSocketPayload
-    ) {
-        const message = await messageService.markDelivered({
-            userId,
-            messageId: payload.messageId,
-        });
+    return message;
+  },
 
-        console.log("✅ MESSAGE DELIVERED:", {
-            messageId: message.id,
-            senderId: message.senderId,
-            receiverUserId: userId,
-            conversationId: message.conversationId,
-            deliveredAt: message.deliveredAt,
-        });
+  /**
+   * Join a conversation room.
+   */
+  async joinConversation(
+    socket: any,
+    userId: string,
+    payload: JoinConversationSocketPayload,
+  ) {
+    /**
+     * Verify that user belongs to conversation.
+     */
+    console.log("JOIN REQUEST");
+    console.log("userId:", userId);
+    console.log("conversationId:", payload.conversationId);
 
-        const senderRoom = `user:${message.senderId}`;
+    await chatService.getMessages({
+      userId,
 
-        console.log("📡 EMITTING DELIVERY EVENT TO:", senderRoom);
+      conversationId: payload.conversationId,
 
-        const socketsInRoom = await io.in(senderRoom).fetchSockets();
-
-        console.log("👥 SOCKETS IN SENDER ROOM:", {
-            room: senderRoom,
-            count: socketsInRoom.length,
-            sockets: socketsInRoom.map((s) => s.id),
-        });
-
-        io.to(senderRoom).emit("message:delivered", {
-            messageId: message.id,
-            conversationId: message.conversationId,
-            deliveredAt: message.deliveredAt,
-        });
-
-        console.log("📡 DELIVERY EVENT EMITTED");
-
-        return message;
-    },
+      limit: 1,
+    });
 
     /**
-     * Mark message as read.
+     * Join room.
      */
-    async markMessageRead(
-        io: Server,
-        userId: string,
-        payload: MessageReadSocketPayload
-    ) {
-        const message =
-            await messageService.markRead({
-                userId,
+    await socket.join(`conversation:${payload.conversationId}`);
 
-                messageId:
-                    payload.messageId,
-            });
+    return {
+      conversationId: payload.conversationId,
 
-        /**
-         * Notify participants.
-         */
-        io.to(
-            `conversation:${message.conversationId}`
-        ).emit("message:read", {
-            messageId: message.id,
+      joined: true,
+    };
+  },
 
-            conversationId:
-                message.conversationId,
+  /**
+   * Leave conversation room.
+   */
+  async leaveConversation(
+    socket: any,
+    payload: LeaveConversationSocketPayload,
+  ) {
+    await socket.leave(`conversation:${payload.conversationId}`);
 
-            readAt:
-                message.readAt,
-        });
+    return {
+      conversationId: payload.conversationId,
 
-        return message;
-    },
+      left: true,
+    };
+  },
+
+  /**
+   * Start typing.
+   */
+  async startTyping(
+    io: Server,
+    userId: string,
+    payload: TypingSocketPayload,
+    socket: Socket,
+  ) {
+    /**
+     * Don't need DB query for every keystroke.
+     *
+     * The socket user is already authenticated.
+     */
+
+    io.to(`conversation:${payload.conversationId}`)
+      .except(socket.id)
+      .emit("typing:start", {
+        conversationId: payload.conversationId,
+
+        userId,
+      });
+
+    return {
+      success: true,
+    };
+  },
+
+  /**
+   * Stop typing.
+   */
+  async stopTyping(io: Server, userId: string, payload: TypingSocketPayload) {
+    io.to(`conversation:${payload.conversationId}`).emit("typing:stop", {
+      conversationId: payload.conversationId,
+
+      userId,
+    });
+
+    return {
+      success: true,
+    };
+  },
+
+  /**
+   * Mark message as delivered.
+   */
+  async markMessageDelivered(
+    io: Server,
+    userId: string,
+    payload: MessageDeliveredSocketPayload,
+  ) {
+    const message = await messageService.markDelivered({
+      userId,
+      messageId: payload.messageId,
+    });
+
+    console.log("✅ MESSAGE DELIVERED:", {
+      messageId: message.id,
+      senderId: message.senderId,
+      receiverUserId: userId,
+      conversationId: message.conversationId,
+      deliveredAt: message.deliveredAt,
+    });
+
+    const senderRoom = `user:${message.senderId}`;
+
+    console.log("📡 EMITTING DELIVERY EVENT TO:", senderRoom);
+
+    const socketsInRoom = await io.in(senderRoom).fetchSockets();
+
+    console.log("👥 SOCKETS IN SENDER ROOM:", {
+      room: senderRoom,
+      count: socketsInRoom.length,
+      sockets: socketsInRoom.map((s) => s.id),
+    });
+
+    io.to(senderRoom).emit("message:delivered", {
+      messageId: message.id,
+      conversationId: message.conversationId,
+      deliveredAt: message.deliveredAt,
+    });
+
+    console.log("📡 DELIVERY EVENT EMITTED");
+
+    return message;
+  },
+
+  /**
+   * Mark message as read.
+   */
+  async markMessageRead(
+    io: Server,
+    userId: string,
+    payload: MessageReadSocketPayload,
+  ) {
+    const message = await messageService.markRead({
+      userId,
+
+      messageId: payload.messageId,
+    });
 
     /**
-     * Mark complete conversation as read.
+     * Notify participants.
      */
-    async markConversationRead(
-        io: Server,
-        userId: string,
-        conversationId: string
-    ) {
-        const result =
-            await messageService.markConversationRead({
-                userId,
+    io.to(`conversation:${message.conversationId}`).emit("message:read", {
+      messageId: message.id,
 
-                conversationId,
-            });
+      conversationId: message.conversationId,
 
-        /**
-         * Notify the conversation room.
-         */
-        io.to(
-            `conversation:${conversationId}`
-        ).emit("conversation:read", {
-            conversationId,
-            userId,
-            readAt: result.readAt,
-            count: result.count,
-        });
+      readAt: message.readAt,
+    });
 
-        return result;
-    },
+    return message;
+  },
 
+  /**
+   * Mark complete conversation as read.
+   */
+  async markConversationRead(
+    io: Server,
+    userId: string,
+    conversationId: string,
+  ) {
+    const result = await messageService.markConversationRead({
+      userId,
+
+      conversationId,
+    });
+
+    /**
+     * Notify the conversation room.
+     */
+    io.to(`conversation:${conversationId}`).emit("conversation:read", {
+      conversationId,
+      userId,
+      readAt: result.readAt,
+      count: result.count,
+    });
+
+    return result;
+  },
 };
 
 export const emitConversationUpdate = (
-    io: Server,
-    userId: string,
-    payload: ConversationUpdatePayload
+  io: Server,
+  userId: string,
+  payload: ConversationUpdatePayload,
 ) => {
-    io.to(`user:${userId}`).emit(
-        "conversation:update",
-        payload
-    );
+  io.to(`user:${userId}`).emit("conversation:update", payload);
 };
