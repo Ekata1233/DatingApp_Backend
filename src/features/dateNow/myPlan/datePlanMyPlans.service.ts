@@ -14,13 +14,16 @@ interface SubmitAttendanceInput {
 
 interface GetMyPlansParams {
   userId: string;
-
   period?: "TODAY" | "TOMORROW" | "WEEKEND";
-
   activity?: string;
-
   page: number;
   limit: number;
+}
+
+interface UpdateMetUserInput {
+  userId: string;
+  planId: string;
+  metUserId: string;
 }
 
 /**
@@ -552,7 +555,6 @@ export const submitDatePlanAttendance = async ({
       throw new Error("No confirmed date found for this plan");
     }
 
-    metUserId = plan.DateConfirmed.participantId;
   }
 
   // 5. Create feedback
@@ -581,5 +583,81 @@ export const submitDatePlanAttendance = async ({
     metUser: feedback.metUser,
     status: feedback.status,
     createdAt: feedback.createdAt,
+  };
+};
+
+export const updateMetUser = async ({
+  userId,
+  planId,
+  metUserId,
+}: UpdateMetUserInput) => {
+  // 1. Check feedback belongs to logged-in user
+  const feedback = await prisma.datePlanFeedback.findUnique({
+    where: {
+      planId_reviewerId: {
+        planId,
+        reviewerId: userId,
+      },
+    },
+  });
+
+  if (!feedback) {
+    throw new Error(
+      "Attendance feedback not found. Please submit attendance first."
+    );
+  }
+
+  // 2. User must have selected "Yes, we met"
+  if (feedback.attendanceStatus !== "MET") {
+    throw new Error(
+      "You can select a person only when attendance status is MET."
+    );
+  }
+
+  // 3. Cannot select yourself
+  if (metUserId === userId) {
+    throw new Error("You cannot select yourself.");
+  }
+
+  // 4. Check selected user exists
+  const metUser = await prisma.user.findUnique({
+    where: {
+      id: metUserId,
+    },
+    select: {
+      id: true,
+      full_name: true,
+    },
+  });
+
+  if (!metUser) {
+    throw new Error("Selected user not found.");
+  }
+
+  // 5. Update feedback
+  const updatedFeedback = await prisma.datePlanFeedback.update({
+    where: {
+      id: feedback.id,
+    },
+    data: {
+      metUserId: metUserId,
+    },
+    include: {
+      metUser: {
+        select: {
+          id: true,
+          full_name: true,
+        },
+      },
+    },
+  });
+
+  return {
+    id: updatedFeedback.id,
+    planId: updatedFeedback.planId,
+    attendanceStatus: updatedFeedback.attendanceStatus,
+    metUser: updatedFeedback.metUser,
+    status: updatedFeedback.status,
+    updatedAt: updatedFeedback.updatedAt,
   };
 };

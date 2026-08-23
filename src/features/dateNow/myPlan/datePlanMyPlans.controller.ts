@@ -7,6 +7,7 @@ import { myPlansQuerySchema } from "./datePlanMyPlans.Validation";
 import {
   getMyPlansService,
   submitDatePlanAttendance,
+  updateMetUser,
 } from "./datePlanMyPlans.service";
 import { DatePlanAttendanceStatus } from "@prisma/client";
 
@@ -118,6 +119,58 @@ export const submitDatePlanAttendanceController = async (
     return res.status(400).json({
       success: false,
       message: error.message || "Failed to submit attendance",
+    });
+  }
+};
+
+export const updateMetUserController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { planId } = req.params;
+    const { metUserId } = req.body;
+
+    if (!planId || Array.isArray(planId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid planId is required",
+      });
+    }
+
+    if (!metUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "metUserId is required",
+      });
+    }
+
+    if (typeof metUserId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "metUserId must be a string",
+      });
+    }
+
+    const result = await updateMetUser({
+      userId,
+      planId,
+      metUserId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Person you met updated successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("updateMetUserController error:", error);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to update person you met",
     });
   }
 };

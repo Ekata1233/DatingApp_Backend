@@ -4,6 +4,7 @@ import { Router } from "express";
 import {
   getMyPlansController,
   submitDatePlanAttendanceController,
+  updateMetUserController,
   
 } from "./datePlanMyPlans.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
@@ -20,6 +21,12 @@ router.post(
   "/:planId/feedback/is_meet",
   authMiddleware,
   submitDatePlanAttendanceController
+);
+
+router.put(
+  "/:planId/feedback/met-user",
+  authMiddleware,
+  updateMetUserController
 );
 
 
