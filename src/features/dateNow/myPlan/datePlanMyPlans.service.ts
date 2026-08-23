@@ -252,10 +252,6 @@ if (activity) {
            * ONLY PENDING REQUESTS
            */
           requests: {
-            where: {
-              status:
-                DatePlanRequestStatus.PENDING,
-            },
 
             orderBy: {
               createdAt: "asc",

@@ -278,7 +278,34 @@ export const discoverDatePlan = async (
       lte: end,
     };
   }
+// WEEKEND
+else if (filter === "weekend") {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
 
+  const day = start.getUTCDay();
+
+  // Find coming Saturday
+  const daysUntilSaturday = day === 0 ? 6 : 6 - day;
+
+  const weekendStart = new Date(start);
+  weekendStart.setUTCDate(
+    weekendStart.getUTCDate() + daysUntilSaturday
+  );
+  weekendStart.setUTCHours(0, 0, 0, 0);
+
+  // Sunday end
+  const weekendEnd = new Date(weekendStart);
+  weekendEnd.setUTCDate(
+    weekendEnd.getUTCDate() + 1
+  );
+  weekendEnd.setUTCHours(23, 59, 59, 999);
+
+  dateFilter = {
+    gte: weekendStart,
+    lte: weekendEnd,
+  };
+}
   const plans = await prisma.datePlan.findMany({
     where: {
       status: "ACTIVE",
@@ -405,7 +432,9 @@ export const discoverDatePlan = async (
     matchScore: plan.matchScore,
     venueName: plan.venueName,
     distanceKm: plan.distanceKm,
+     // Activity
     activity: plan.activity?.label,
+    activityIcon: plan.activity?.icon,
 
     title: plan.title,
     quickTitle: plan.quickTitle?.label,
@@ -1473,8 +1502,6 @@ console.log("========== END HISTORY DEBUG ==========");
   };
   
 };
-
-
 
 export const updateDatePlanActivityService = async (
   userId: string,
