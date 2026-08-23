@@ -329,6 +329,7 @@ export const chatRepository = {
         senderId: true,
         content: true,
         messageType: true,
+        mediaUrl: true,
         createdAt: true,
         deliveredAt: true,
         readAt: true,
