@@ -15,6 +15,7 @@ import {
   cancelDatePlanRequestController,
   testMatchScoreController,
   withdrawDatePlanRequestController,
+  getDatePlanHistoryController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -103,6 +104,11 @@ router.post(
   "/test-match-score",
   authMiddleware,
   testMatchScoreController
+);
+router.get(
+  "/date-plans/history",
+  authMiddleware,
+  getDatePlanHistoryController
 );
   
 export default router;

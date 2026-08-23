@@ -15,6 +15,7 @@ import {
   cancelDatePlanRequest,
   testMatchScore,
   withdrawDatePlanRequest,
+  getDatePlanHistory,
 } from "./dateNow.service";
 
 export const createDraftController = async (
@@ -398,6 +399,45 @@ export const testMatchScoreController = async (
     return res.status(200).json({
       success: true,
       data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getDatePlanHistoryController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const result =
+      await getDatePlanHistory(
+        userId,
+        {
+          page: Number(req.query.page) || 1,
+
+          limit:
+            Number(req.query.limit) || 10,
+
+          status: req.query.status
+            ? String(req.query.status)
+            : "ALL",
+        }
+      );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Date plan history fetched successfully",
+
+      data: result.data,
+
+      pagination:
+        result.pagination,
     });
   } catch (error) {
     next(error);

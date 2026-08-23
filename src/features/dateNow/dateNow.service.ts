@@ -1,5 +1,4 @@
 // Date Now Service
-import { prisma } from "../../prisma/prismaClient";
 import {
 
   PlanStatus,
@@ -7,9 +6,11 @@ import {
   TransactionStatus,
   TransactionSource,
   Prisma,
+  PrismaClient,
 } from "@prisma/client";
 import { UpdateDatePlanInput } from "./dateNow.types";
 import { calculateMatchScore } from "../../utils/matchScore.constants";
+import { calculateAge, getHistoryMessage, getHistoryStatus, getHistoryStatusLabel, getStaticHistoryReview } from "./dateNow.history.util";
 
 export const createDraftDatePlan = async (
   userId: string,
@@ -1104,4 +1105,371 @@ export const testMatchScore = async (
 
     matchScore: score,
   };
+};
+
+
+const prisma = new PrismaClient();
+
+interface HistoryQuery {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
+export const getDatePlanHistory = async (
+  userId: string,
+  query: HistoryQuery
+) => {
+  console.log("========== DATE PLAN HISTORY DEBUG ==========");
+console.log("USER ID:", userId);
+console.log("QUERY:", query);
+
+  const page = Math.max(Number(query.page) || 1, 1);
+
+  const limit = Math.min(
+    Math.max(Number(query.limit) || 10, 1),
+    50
+  );
+
+  const skip = (page - 1) * limit;
+
+  /**
+   * History plans
+   */
+  console.log("========== DATE PLAN HISTORY DEBUG ==========");
+console.log("USER ID:", userId);
+console.log("QUERY:", query);
+
+const where = {
+  userId,
+
+  status: {
+    in: [
+      PlanStatus.ACTIVE,
+      PlanStatus.COMPLETED,
+      PlanStatus.BOOKED,
+      PlanStatus.CANCELLED,
+      PlanStatus.EXPIRED,
+    ],
+  },
+};
+
+console.log(
+  "HISTORY WHERE:",
+  JSON.stringify(where, null, 2)
+);
+
+const allUserPlans = await prisma.datePlan.findMany({
+  where: {
+    userId,
+  },
+  select: {
+    id: true,
+    userId: true,
+    status: true,
+    title: true,
+    eventDateTime: true,
+  },
+});
+
+console.log(
+  "ALL USER DATE PLANS:",
+  JSON.stringify(allUserPlans, null, 2)
+);
+
+  const [plans, total] = await prisma.$transaction([
+    
+    prisma.datePlan.findMany({
+      where,
+
+      skip,
+      take: limit,
+
+      orderBy: {
+        eventDateTime: "desc",
+      },
+
+      include: {
+        activity: true,
+
+        quickTitle: true,
+
+        whoPays: true,
+
+        requests: {
+          select: {
+            id: true,
+            requesterId: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+
+        DateConfirmed: {
+          include: {
+           participant: {
+  select: {
+    id: true,
+    full_name: true,
+    birth_date: true,
+
+    photos: {
+      where: {
+        is_primary: true,
+      },
+      select: {
+        id: true,
+        media_url: true,
+      },
+      take: 1,
+    },
+  },
+},
+
+            host: {
+              select: {
+                id: true,
+                full_name: true,
+                birth_date: true,
+              },
+            },
+          },
+        },
+
+        _count: {
+          select: {
+            requests: true,
+          },
+        },
+      },
+    }),
+
+    prisma.datePlan.count({
+      where,
+    }),
+  ]);
+console.log("HISTORY PLANS FOUND:", plans.length);
+console.log("HISTORY TOTAL:", total);
+
+console.log(
+  "HISTORY PLANS:",
+  JSON.stringify(plans, null, 2)
+);
+const data = plans.map((plan) => {
+  console.log("========== PROCESSING PLAN ==========");
+  console.log("PLAN ID:", plan.id);
+  console.log("PLAN STATUS:", plan.status);
+  console.log("PLAN TITLE:", plan.title);
+  console.log("EVENT DATE:", plan.eventDateTime);
+  console.log(
+    "CONFIRMED DATE:",
+    plan.DateConfirmed
+  );
+
+  const confirmed = plan.DateConfirmed;
+
+    /**
+     * 1. Calculate actual history status
+     */
+    const historyStatus = getHistoryStatus(
+      plan.status,
+      confirmed?.status ?? null,
+      plan.eventDateTime
+    );
+console.log(
+  "CALCULATED HISTORY STATUS:",
+  historyStatus
+);
+    /**
+     * 2. UI label
+     */
+    const statusLabel =
+      getHistoryStatusLabel(historyStatus);
+
+    /**
+     * 3. Static review
+     */
+    const review =
+      getStaticHistoryReview(
+        historyStatus
+        
+      );
+
+    /**
+     * 4. Participant
+     */
+    const participant =
+      confirmed?.participant ?? null;
+
+    /**
+     * 5. Request statistics
+     */
+    const requestStats = {
+      total: plan._count.requests,
+
+      pending: plan.requests.filter(
+        (request) =>
+          request.status === "PENDING"
+      ).length,
+
+      approved: plan.requests.filter(
+        (request) =>
+          request.status === "APPROVED"
+      ).length,
+
+      declined: plan.requests.filter(
+        (request) =>
+          request.status === "DECLINED"
+      ).length,
+
+      cancelled: plan.requests.filter(
+        (request) =>
+          request.status === "CANCELLED"
+      ).length,
+    };
+
+    return {
+      id: plan.id,
+
+      /**
+       * Status
+       */
+      status: historyStatus,
+
+      statusLabel,
+
+      /**
+       * Plan
+       */
+      title: plan.title,
+
+      photoUrl: plan.photoUrl,
+
+      activity: plan.activity,
+
+      quickTitle: plan.quickTitle,
+
+      /**
+       * Date
+       */
+      eventDateTime: plan.eventDateTime,
+
+      duration: plan.duration,
+
+      /**
+       * Venue
+       */
+      venue: {
+        name: plan.venueName,
+        address: plan.venueAddress,
+        latitude: plan.venueLat,
+        longitude: plan.venueLng,
+      },
+
+      /**
+       * Participant
+       */
+      participant: participant
+  ? {
+      id: participant.id,
+
+      name: participant.full_name,
+
+      age: participant.birth_date
+        ? calculateAge(
+            participant.birth_date
+          )
+        : null,
+
+      photoUrl:
+        participant.photos[0]?.media_url ?? null,
+    }
+  : null,
+
+      /**
+       * Requests
+       */
+      requests: requestStats,
+
+      /**
+       * Payment
+       */
+      whoPays: plan.whoPays,
+
+      /**
+       * Confirmation
+       */
+      confirmedDate: confirmed
+        ? {
+            id: confirmed.id,
+
+            status: confirmed.status,
+
+            eventDateTime:
+              confirmed.eventDateTime,
+          }
+        : null,
+
+      /**
+       * STATIC REVIEW
+       */
+      review,
+
+      /**
+       * Static/history message
+       */
+      message: getHistoryMessage(
+        historyStatus,
+        participant?.full_name,
+        requestStats.total
+      ),
+
+      createdAt: plan.createdAt,
+
+      updatedAt: plan.updatedAt,
+    };
+  });
+
+  /**
+   * Optional status filter
+   */
+  const requestedStatus =
+    query.status?.toUpperCase();
+
+  const filteredData =
+    requestedStatus &&
+    requestedStatus !== "ALL"
+      ? data.filter(
+          (item) =>
+            item.status === requestedStatus
+        )
+      : data;
+console.log(
+  "FINAL HISTORY DATA:",
+  JSON.stringify(filteredData, null, 2)
+);
+
+console.log("========== END HISTORY DEBUG ==========");
+  return {
+    
+    data: filteredData,
+
+    pagination: {
+      page,
+      limit,
+      total,
+
+      totalPages: Math.ceil(
+        total / limit
+      ),
+
+      hasNextPage:
+        page < Math.ceil(total / limit),
+
+      hasPreviousPage:
+        page > 1,
+    },
+    
+  };
+  
 };
