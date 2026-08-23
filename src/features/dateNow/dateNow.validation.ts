@@ -31,3 +31,15 @@ export const updateDraftSchema = z.object({
 
   vibeIds: z.array(z.string().uuid()).optional(),
 });
+
+
+export const updateDatePlanActivitySchema = z.object({
+  activityId: z
+    .string()
+    .uuid("Invalid activityId"),
+});
+export const planIdParamSchema = z.object({
+  planId: z
+    .string()
+    .uuid("Invalid planId"),
+});

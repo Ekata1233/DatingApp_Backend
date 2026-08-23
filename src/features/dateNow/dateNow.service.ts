@@ -8,7 +8,7 @@ import {
   Prisma,
   PrismaClient,
 } from "@prisma/client";
-import { UpdateDatePlanInput } from "./dateNow.types";
+import { UpdateDatePlanActivityDTO, UpdateDatePlanInput } from "./dateNow.types";
 import { calculateMatchScore } from "../../utils/matchScore.constants";
 import { calculateAge, getHistoryMessage, getHistoryStatus, getHistoryStatusLabel, getStaticHistoryReview } from "./dateNow.history.util";
 
@@ -1472,4 +1472,87 @@ console.log("========== END HISTORY DEBUG ==========");
     
   };
   
+};
+
+
+
+export const updateDatePlanActivityService = async (
+  userId: string,
+  planId: string,
+  data: UpdateDatePlanActivityDTO,
+) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
+
+  if (!planId) {
+    throw new Error("Plan ID is required");
+  }
+
+  if (!data.activityId) {
+    throw new Error("Activity ID is required");
+  }
+
+  // 1. Check plan belongs to logged-in user
+  const existingPlan = await prisma.datePlan.findFirst({
+    where: {
+      id: planId,
+      userId,
+    },
+    select: {
+      id: true,
+      activityId: true,
+      status: true,
+    },
+  });
+
+  if (!existingPlan) {
+    throw new Error("Date plan not found");
+  }
+
+  // 2. Check selected activity exists and is actually an ACTIVITY option
+  const activity = await prisma.datePlanOption.findFirst({
+    where: {
+      id: data.activityId,
+      type: "ACTIVITY",
+    },
+    select: {
+      id: true,
+      type: true,
+      label: true,
+      value: true,
+      icon: true,
+    },
+  });
+
+  if (!activity) {
+    throw new Error("Invalid activity selected");
+  }
+
+  // 3. Update only activityId
+  const updatedPlan = await prisma.datePlan.update({
+    where: {
+      id: planId,
+    },
+    data: {
+      activityId: data.activityId,
+    },
+    select: {
+      id: true,
+      activityId: true,
+      updatedAt: true,
+
+      activity: {
+        select: {
+          id: true,
+          type: true,
+          label: true,
+          value: true,
+          icon: true,
+        },
+      },
+    },
+  });
+
+  return updatedPlan;
 };

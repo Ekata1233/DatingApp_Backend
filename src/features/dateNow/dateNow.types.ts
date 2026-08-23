@@ -40,3 +40,20 @@ export interface UpdateDatePlanInput {
 
   status?: PlanStatus;
 }
+
+export interface UpdateDatePlanActivityDTO {
+  activityId: string;
+}
+
+export interface UpdateDatePlanActivityResponse {
+  id: string;
+  activityId: string;
+  activity: {
+    id: string;
+    type: string;
+    label: string;
+    value: string;
+    icon: string | null;
+  };
+  updatedAt: Date;
+}

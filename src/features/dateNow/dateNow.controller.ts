@@ -16,6 +16,7 @@ import {
   testMatchScore,
   withdrawDatePlanRequest,
   getDatePlanHistory,
+  updateDatePlanActivityService,
 } from "./dateNow.service";
 
 export const createDraftController = async (
@@ -441,5 +442,86 @@ export const getDatePlanHistoryController = async (
     });
   } catch (error) {
     next(error);
+  }
+};
+
+
+
+import { planIdParamSchema, updateDatePlanActivitySchema } from "./dateNow.validation";
+
+export const updateDatePlanActivityController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    // Validate params
+    const paramsResult = planIdParamSchema.safeParse(req.params);
+
+    if (!paramsResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plan ID",
+        errors: paramsResult.error.flatten(),
+      });
+    }
+
+    const { planId } = paramsResult.data;
+
+    // Validate body
+    const bodyResult = updateDatePlanActivitySchema.safeParse(req.body);
+
+    if (!bodyResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request body",
+        errors: bodyResult.error.flatten(),
+      });
+    }
+
+     const userId = (req as any).user.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const updatedPlan = await updateDatePlanActivityService(
+      userId,
+      planId,
+      bodyResult.data,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Date plan activity updated successfully",
+      data: updatedPlan,
+    });
+  } catch (error: any) {
+    console.error(
+      "Update Date Plan Activity Error:",
+      error,
+    );
+
+    if (error.message === "Date plan not found") {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message === "Invalid activity selected") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update date plan activity",
+      error: error.message,
+    });
   }
 };
