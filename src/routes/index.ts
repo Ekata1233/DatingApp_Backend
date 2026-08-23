@@ -27,6 +27,7 @@ import boostRoutes from "../features/admin/boost/boost.routes";
 import swipeRoutes from "../features/swipe/swipe.routes";
 import dateNowAdminRoutes from "../features/admin/dateNow/dateNow.routes";
 import dateNowRoutes from "../features/dateNow/dateNow.routes";
+import myPlanRoutes from "../features/dateNow/myPlan/datePlanMyPlans.route";
 import intentionRoutes from "../features/admin/onboarding/intention/intention.routes";
 import professionRoutes from "../features/admin/onboarding/profession/profession.route";
 import employmentTypeRoutes from "../features/admin/onboarding/employmentType/employmentType.route";
@@ -107,7 +108,7 @@ router.use("/user", swipeRoutes);
 router.use("/user", newMatchesRoutes)
 //
 
-router.use("/user", dateNowRoutes);
+router.use("/user", dateNowRoutes,myPlanRoutes);
 
 router.use("/user", purchaseStoreRoutes);
 
