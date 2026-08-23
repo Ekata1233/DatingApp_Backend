@@ -9,66 +9,68 @@ datasource db {
 }
 
 model User {
-  id                   String                @id @default(uuid()) @db.Uuid
-  full_name            String?               @db.VarChar(100)
-  email                String?               @unique @db.VarChar(255)
-  phone_number         String?               @unique @db.VarChar(20)
-  is_phone_verified    Boolean               @default(false)
-  google_id            String?               @unique @db.VarChar(255)
-  birth_date           DateTime?             @db.Date
-  height               Int?
-  gender               Gender?
-  gender_option        GenderOption?
-  looking_for          LookingFor?
-  intentionId          String?               @db.Uuid
-  onboarding_step      String?               @db.VarChar(20)
-  next_step            String?               @db.VarChar(20)
-  onboarding_completed Boolean               @default(false)
-  last_active_at       DateTime?
-  device_token         String?
-  referralCode         String?               @unique @db.VarChar(20)
-  badge_count          Int                   @default(0)
-  deleted_at           DateTime?
-  created_at           DateTime              @default(now())
-  updated_at           DateTime              @updatedAt
-  profile_completion   Int                   @default(0)
-  looking_for_option   LookingForOption?
-  answer               UserAnswer[]
-  matchesAsUser1       UserMatch[]           @relation("MatchUser1")
-  matchesAsUser2       UserMatch[]           @relation("MatchUser2")
-  swipesGiven          UserSwipe[]           @relation("Swiper")
-  swipesReceived       UserSwipe[]           @relation("TargetUser")
-  about                UserAbout?
-  bio                  UserBio?
-  eduWork              UserEduWork?          @relation("UserEduWork")
-  familyProfile        UserFamilyProfile?    @relation("UserFamilyProfile")
-  skills               UserSkill[]
-  photos               UserPhoto[]
-  profile              UserProfile?
-  userBoosts           UserBoost[]
-  boostUsages          BoostUsage[]
-  userPackages         UserPackage[]
-  boostEvents          BoostEvent[]          @relation("BoostedUser")
-  actorEvents          BoostEvent[]          @relation("ActorUser")
-  boostStats           UserBoostStats?
-  boostPurchases       BoostPurchase[]
-  boostTransactions    BoostTransaction[]
-  datePlan             DatePlan[]
-  datePlanRequests     DatePlanRequest[]
-  datePlanSkips        DatePlanSkip[]
-  hostedConfirmedDates DateConfirmed[]       @relation("ConfirmedDateHost")
-  joinedConfirmedDates DateConfirmed[]       @relation("ConfirmedDateParticipant")
-  wallet               Wallet?
-  datePlanStats        DatePlanUserStats?
-  datePlanPurchases    DatePlanPurchase[]
-  datePlanTransactions DatePlanTransaction[]
-  intention            IntentionOption?      @relation(fields: [intentionId], references: [id])
-  userPrompts          UserPrompt[]
-  UserPlanUsage        UserPlanUsage[]
-  waitlist             Waitlist?
-  referralsMade        UserReferral[]        @relation("Referrer")
-  referralStats        UserReferralStats?
-  receivedReferral     UserReferral?         @relation("ReferredUser")
+  id                         String                @id @default(uuid()) @db.Uuid
+  full_name                  String?               @db.VarChar(100)
+  email                      String?               @unique @db.VarChar(255)
+  phone_number               String?               @unique @db.VarChar(20)
+  is_phone_verified          Boolean               @default(false)
+  google_id                  String?               @unique @db.VarChar(255)
+  birth_date                 DateTime?             @db.Date
+  height                     Int?
+  gender                     Gender?
+  gender_option              GenderOption?
+  looking_for                LookingFor?
+  intentionId                String?               @db.Uuid
+  onboarding_step            String?               @db.VarChar(20)
+  next_step                  String?               @db.VarChar(20)
+  onboarding_completed       Boolean               @default(false)
+  last_active_at             DateTime?
+  device_token               String?
+  referralCode               String?               @unique @db.VarChar(20)
+  badge_count                Int                   @default(0)
+  deleted_at                 DateTime?
+  created_at                 DateTime              @default(now())
+  updated_at                 DateTime              @updatedAt
+  profile_completion         Int                   @default(0)
+  looking_for_option         LookingForOption?
+  answer                     UserAnswer[]
+  matchesAsUser1             UserMatch[]           @relation("MatchUser1")
+  matchesAsUser2             UserMatch[]           @relation("MatchUser2")
+  swipesGiven                UserSwipe[]           @relation("Swiper")
+  swipesReceived             UserSwipe[]           @relation("TargetUser")
+  about                      UserAbout?
+  bio                        UserBio?
+  eduWork                    UserEduWork?          @relation("UserEduWork")
+  familyProfile              UserFamilyProfile?    @relation("UserFamilyProfile")
+  skills                     UserSkill[]
+  photos                     UserPhoto[]
+  profile                    UserProfile?
+  userBoosts                 UserBoost[]
+  boostUsages                BoostUsage[]
+  userPackages               UserPackage[]
+  boostEvents                BoostEvent[]          @relation("BoostedUser")
+  actorEvents                BoostEvent[]          @relation("ActorUser")
+  boostStats                 UserBoostStats?
+  boostPurchases             BoostPurchase[]
+  boostTransactions          BoostTransaction[]
+  datePlan                   DatePlan[]
+  datePlanRequests           DatePlanRequest[]
+  datePlanSkips              DatePlanSkip[]
+  hostedConfirmedDates       DateConfirmed[]       @relation("ConfirmedDateHost")
+  joinedConfirmedDates       DateConfirmed[]       @relation("ConfirmedDateParticipant")
+  wallet                     Wallet?
+  datePlanStats              DatePlanUserStats?
+  datePlanPurchases          DatePlanPurchase[]
+  datePlanTransactions       DatePlanTransaction[]
+  datePlanFeedbackAsReviewer DatePlanFeedback[]    @relation("DatePlanFeedbackReviewer")
+  datePlanFeedbackAsMetUser  DatePlanFeedback[]    @relation("DatePlanFeedbackMetUser")
+  intention                  IntentionOption?      @relation(fields: [intentionId], references: [id])
+  userPrompts                UserPrompt[]
+  UserPlanUsage              UserPlanUsage[]
+  waitlist                   Waitlist?
+  referralsMade              UserReferral[]        @relation("Referrer")
+  referralStats              UserReferralStats?
+  receivedReferral           UserReferral?         @relation("ReferredUser")
 
   //chat
   conversationParticipants ConversationParticipant[]
@@ -89,8 +91,9 @@ model User {
   complimentTransactions ComplimentTransaction[]
 
   // Gifts
-  giftsSent     UserGift[] @relation("GiftSender")
-  giftsReceived UserGift[] @relation("GiftReceiver")
+  giftsSent           UserGift[]            @relation("GiftSender")
+  giftsReceived       UserGift[]            @relation("GiftReceiver")
+  ChatMessageDeletion ChatMessageDeletion[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -1428,7 +1431,8 @@ model DatePlan {
 
   joinRequestGender DatePlanOption? @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
 
-  visibility DatePlanOption? @relation("PlanVisibility", fields: [visibilityId], references: [id])
+  visibility DatePlanOption?    @relation("PlanVisibility", fields: [visibilityId], references: [id])
+  feedbacks  DatePlanFeedback[]
 
   vibes         DatePlanVibe[]
   requests      DatePlanRequest[]
@@ -1524,6 +1528,72 @@ enum ConfirmedDateStatus {
   NO_SHOW
 }
 
+enum DatePlanAttendanceStatus {
+  MET
+  NO_SHOW
+}
+
+enum DatePlanFeedbackStatus {
+  PENDING
+  SUBMITTED
+}
+
+enum DatePlanNoShowReason {
+  TIMING_WAS_OFF
+  VENUE_TOO_FAR
+  SHORT_NOTICE
+  APPROVED_TOO_LATE
+  NOT_SURE
+}
+
+enum DatePlanExperienceTag {
+  RESPECTFUL
+  GREAT_CONVERSATION
+  ON_TIME
+  GENUINE
+  FUN
+  WOULD_MEET_AGAIN
+}
+
+model DatePlanFeedback {
+  id               String                   @id @default(uuid()) @db.Uuid
+  planId           String                   @db.Uuid
+  reviewerId       String                   @db.Uuid
+  attendanceStatus DatePlanAttendanceStatus
+  metUserId        String?                  @db.Uuid
+  overallRating    Int?
+  personRating     Int?
+  noShowReason     DatePlanNoShowReason?
+  experienceTags   DatePlanFeedbackTag[]
+  comment          String?
+  status           DatePlanFeedbackStatus   @default(SUBMITTED)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  // Relations
+  plan     DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  reviewer User     @relation("DatePlanFeedbackReviewer", fields: [reviewerId], references: [id])
+  metUser  User?    @relation("DatePlanFeedbackMetUser", fields: [metUserId], references: [id])
+
+  @@unique([planId, reviewerId])
+  @@index([planId])
+  @@index([reviewerId])
+  @@index([metUserId])
+  @@index([attendanceStatus])
+  @@index([createdAt])
+}
+
+model DatePlanFeedbackTag {
+  id         String                @id @default(uuid()) @db.Uuid
+  feedbackId String                @db.Uuid
+  tag        DatePlanExperienceTag
+
+  feedback DatePlanFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@unique([feedbackId, tag])
+  @@index([tag])
+}
+
 model DatePlanUserStats {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @unique @db.Uuid
@@ -1600,6 +1670,7 @@ model ConversationParticipant {
   userId         String       @db.Uuid
   lastReadAt     DateTime?
   joinedAt       DateTime     @default(now())
+  deletedAt      DateTime?
   user           User         @relation(fields: [userId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -1620,12 +1691,25 @@ model ChatMessage {
   readAt         DateTime?
   deletedAt      DateTime?
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  sender User @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                  @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  deletions    ChatMessageDeletion[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model ChatMessageDeletion {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  deletedAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
 
 model Wallet {
@@ -1654,7 +1738,7 @@ model Event {
   city            String?
   eventPartnerId  String?
   eventPartner    EventPartner? @relation(fields: [eventPartnerId], references: [id])
-  officialPartner Boolean @default(false)
+  officialPartner Boolean       @default(false)
 
   //---------------------------------
   // Step 3
