@@ -87,6 +87,7 @@ export const chatService = {
 
     const messages = await chatRepository.findMessages(
       data.conversationId,
+      data.userId,
       data.cursor,
       data.limit,
     );

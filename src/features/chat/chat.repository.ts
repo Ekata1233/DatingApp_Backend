@@ -330,11 +330,17 @@ export const chatRepository = {
   /**
    * Get messages using cursor pagination.
    */
-  async findMessages(conversationId: string, cursor?: string, limit = 30) {
+  async findMessages(conversationId: string, userId: string, cursor?: string, limit = 30) {
     return prisma.chatMessage.findMany({
       where: {
         conversationId,
         deletedAt: null,
+        // Clear chat deletion for this user
+      deletions: {
+        none: {
+          userId,
+        },
+      },
       },
 
       orderBy: {

@@ -547,7 +547,7 @@ export const submitDatePlanAttendance = async ({
       reviewerId: userId,
       attendanceStatus,
       metUserId,
-      status: "SUBMITTED",
+      status: "PENDING",
     },
     include: {
       metUser: {
