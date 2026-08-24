@@ -1,5 +1,6 @@
 import {
   DatePlanAttendanceStatus,
+  DatePlanFeedbackStatus,
   DatePlanRequestStatus,
   PlanStatus,
 } from "@prisma/client";
@@ -123,12 +124,22 @@ export const getMyPlansService = async ({
    * Base filter
    */
   const where: any = {
-    userId,
+  userId,
 
-    status: {
-      in: [PlanStatus.ACTIVE, PlanStatus.BOOKED, PlanStatus.COMPLETED],
+  status: {
+    in: [PlanStatus.ACTIVE, PlanStatus.BOOKED, PlanStatus.COMPLETED],
+  },
+
+  // Exclude plans where the logged-in user
+  // has already submitted MET feedback
+  feedbacks: {
+    none: {
+      reviewerId: userId,
+      attendanceStatus: DatePlanAttendanceStatus.MET,
+      status: DatePlanFeedbackStatus.SUBMITTED,
     },
-  };
+  },
+};
 
   /**
    * Apply period only when provided
