@@ -3,7 +3,9 @@
 import { Router } from "express";
 
 import {
+  clearChat,
   createConversation,
+  deleteConversation,
   deleteMessage,
   getConversations,
   getMessages,
@@ -54,6 +56,18 @@ router.patch(
 router.delete(
   "/messages/:messageId",
   deleteMessage
+);
+
+router.delete(
+  "/conversations/:conversationId",
+  authMiddleware,
+  deleteConversation
+);
+
+router.delete(
+  "/conversations/:conversationId/clear",
+  authMiddleware,
+  clearChat
 );
 
 export default router;

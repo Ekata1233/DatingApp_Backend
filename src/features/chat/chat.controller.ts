@@ -247,3 +247,103 @@ export const deleteMessage = async (
     });
   }
 };
+
+export const deleteConversation = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { conversationId } = req.params;
+
+    if (!conversationId || Array.isArray(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid conversation ID is required",
+      });
+    }
+
+    const result =
+      await chatService.deleteConversation(
+        conversationId,
+        userId
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversation deleted successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "Delete conversation error:",
+      error
+    );
+
+    if (
+      error.message ===
+      "Conversation not found or you are not a participant"
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete conversation",
+    });
+  }
+};
+
+export const clearChat = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { conversationId } = req.params;
+
+    if (!conversationId || Array.isArray(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid conversation ID is required",
+      });
+    }
+
+    const result =
+      await chatService.clearChat(
+        conversationId,
+        userId
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Chat cleared successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "Clear chat error:",
+      error
+    );
+
+    if (
+      error.message ===
+      "Conversation not found or you are not a participant"
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to clear chat",
+    });
+  }
+};

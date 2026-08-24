@@ -131,15 +131,19 @@ export const chatRepository = {
 
       ...(cursor
         ? {
-            skip: 1,
-            cursor: {
-              id: cursor,
-            },
-          }
+          skip: 1,
+          cursor: {
+            id: cursor,
+          },
+        }
         : {}),
 
       include: {
         participants: {
+          where: {
+            deletedAt: null,
+          },
+
           include: {
             user: {
               select: {
@@ -151,7 +155,9 @@ export const chatRepository = {
                   where: {
                     is_primary: true,
                   },
+
                   take: 1,
+
                   select: {
                     id: true,
                     media_url: true,
@@ -185,90 +191,105 @@ export const chatRepository = {
     });
 
     // --------------------------------------------------
-  // Get all other users from conversations
-  // --------------------------------------------------
+    // Get all other users from conversations
+    // --------------------------------------------------
 
-  const candidateIds = conversations
-    .map((conversation) => {
-      const otherParticipant = conversation.participants.find(
-        (participant) => participant.userId !== userId,
-      );
-
-      return otherParticipant?.userId;
-    })
-    .filter((id): id is string => Boolean(id));
-
-  // --------------------------------------------------
-  // Get match scores for all conversation users
-  // ONE DB QUERY
-  // --------------------------------------------------
-
-  const matchScores = await prisma.userCompatibility.findMany({
-    where: {
-      userId: userId,
-
-      targetUserId: {
-        in: candidateIds,
-      },
-    },
-
-    select: {
-      targetUserId: true,
-      score: true,
-      percentage: true,
-    },
-  });
-
-  // --------------------------------------------------
-  // Convert match scores into Map
-  // --------------------------------------------------
-
-  const matchScoreMap = new Map(
-    matchScores.map((item) => [
-      item.targetUserId,
-      {
-        score: item.score,
-        percentage: item.percentage,
-      },
-    ]),
-  );
-
-    // Convert DB result into chat-list response
-    const result = await Promise.all(
-      conversations.map(async (conversation) => {
-        const currentParticipant = conversation.participants.find(
-          (participant) => participant.userId === userId,
-        );
-
+    const candidateIds = conversations
+      .map((conversation) => {
         const otherParticipant = conversation.participants.find(
           (participant) => participant.userId !== userId,
         );
+
+        return otherParticipant?.userId;
+      })
+      .filter((id): id is string => Boolean(id));
+
+    // --------------------------------------------------
+    // Get match scores
+    // --------------------------------------------------
+
+    const matchScores = await prisma.userCompatibility.findMany({
+      where: {
+        userId,
+
+        targetUserId: {
+          in: candidateIds,
+        },
+      },
+
+      select: {
+        targetUserId: true,
+        score: true,
+        percentage: true,
+      },
+    });
+
+    // --------------------------------------------------
+    // Convert match scores into Map
+    // --------------------------------------------------
+
+    const matchScoreMap = new Map(
+      matchScores.map((item) => [
+        item.targetUserId,
+        {
+          score: item.score,
+          percentage: item.percentage,
+        },
+      ]),
+    );
+
+    // --------------------------------------------------
+    // Convert DB result into chat-list response
+    // --------------------------------------------------
+
+    const result = await Promise.all(
+      conversations.map(async (conversation) => {
+        const currentParticipant =
+          conversation.participants.find(
+            (participant) =>
+              participant.userId === userId,
+          );
+
+        const otherParticipant =
+          conversation.participants.find(
+            (participant) =>
+              participant.userId !== userId,
+          );
 
         if (!currentParticipant || !otherParticipant) {
           return null;
         }
 
-        const unreadCount = await prisma.chatMessage.count({
-          where: {
-            conversationId: conversation.id,
+        // --------------------------------------------------
+        // Unread messages
+        // --------------------------------------------------
 
-            senderId: {
-              not: userId,
-            },
+        const unreadCount =
+          await prisma.chatMessage.count({
+            where: {
+              conversationId: conversation.id,
 
-            readAt: null,
-            ...(currentParticipant.lastReadAt
-              ? {
+              senderId: {
+                not: userId,
+              },
+
+              readAt: null,
+
+              ...(currentParticipant.lastReadAt
+                ? {
                   createdAt: {
                     gt: currentParticipant.lastReadAt,
                   },
                 }
-              : {}),
-          },
-        });
+                : {}),
+            },
+          });
 
-        const otherUser = otherParticipant.user;
-         const compatibility = matchScoreMap.get(otherUser.id);
+        const otherUser =
+          otherParticipant.user;
+
+        const compatibility =
+          matchScoreMap.get(otherUser.id);
 
         return {
           conversationId: conversation.id,
@@ -276,17 +297,25 @@ export const chatRepository = {
           user: {
             id: otherUser.id,
             fullName: otherUser.full_name,
-            age: calculateAge(otherUser.birth_date),
 
-            profilePhoto: otherUser.photos[0]?.media_url ?? null,
+            age: calculateAge(
+              otherUser.birth_date,
+            ),
 
-            matchPercentage: compatibility?.percentage ?? 0,
+            profilePhoto:
+              otherUser.photos[0]?.media_url ??
+              null,
+
+            matchPercentage:
+              compatibility?.percentage ?? 0,
+
             trustPercentage: 85,
 
             isOnline: true,
           },
 
-          lastMessage: conversation.messages[0] ?? null,
+          lastMessage:
+            conversation.messages[0] ?? null,
 
           unreadCount,
 
@@ -316,11 +345,11 @@ export const chatRepository = {
 
       ...(cursor
         ? {
-            skip: 1,
-            cursor: {
-              id: cursor,
-            },
-          }
+          skip: 1,
+          cursor: {
+            id: cursor,
+          },
+        }
         : {}),
 
       select: {
@@ -564,10 +593,10 @@ export const chatRepository = {
         // Messages after the user's last read time
         ...(participant.lastReadAt
           ? {
-              createdAt: {
-                gt: participant.lastReadAt,
-              },
-            }
+            createdAt: {
+              gt: participant.lastReadAt,
+            },
+          }
           : {}),
       },
     });
@@ -601,30 +630,78 @@ export const chatRepository = {
   },
 
   async getUserDetails(userId: string) {
-  return prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
+    return prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
 
-    select: {
-      id: true,
-      full_name: true,
-      birth_date: true,
+      select: {
+        id: true,
+        full_name: true,
+        birth_date: true,
 
-      photos: {
-        where: {
-          is_primary: true,
-        },
+        photos: {
+          where: {
+            is_primary: true,
+          },
 
-        take: 1,
+          take: 1,
 
-        select: {
-          id: true,
-          media_url: true,
-          media_type: true,
+          select: {
+            id: true,
+            media_url: true,
+            media_type: true,
+          },
         },
       },
-    },
-  });
-},
+    });
+  },
+
+  //DELETE CONVERSATION 
+  async deleteConversationForUser(
+    conversationId: string,
+    userId: string
+  ) {
+    return prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+  },
+
+  //CLEAR ALL CHAT
+  async clearChat(
+    conversationId: string,
+    userId: string
+  ) {
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (messages.length === 0) {
+      return 0;
+    }
+
+    await prisma.chatMessageDeletion.createMany({
+      data: messages.map((message) => ({
+        messageId: message.id,
+        userId,
+      })),
+      skipDuplicates: true,
+    });
+
+    return messages.length;
+  },
+
 };

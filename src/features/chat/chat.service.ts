@@ -275,4 +275,71 @@ export const chatService = {
   async getUserDetails(userId: string) {
     return chatRepository.getUserDetails(userId);
   },
+
+  //DELETE CONVERSATION
+  async deleteConversation(
+    conversationId: string,
+    userId: string
+  ) {
+    // Check whether user belongs to conversation
+    const participant =
+      await chatRepository.findParticipant(
+        conversationId,
+        userId
+      );
+
+    if (!participant) {
+      throw new Error(
+        "Conversation not found or you are not a participant"
+      );
+    }
+
+    // Already deleted
+    if (participant.deletedAt) {
+      return {
+        conversationId,
+        deletedAt: participant.deletedAt,
+      };
+    }
+
+    const deletedParticipant =
+      await chatRepository.deleteConversationForUser(
+        conversationId,
+        userId
+      );
+
+    return {
+      conversationId: deletedParticipant.conversationId,
+      deletedAt: deletedParticipant.deletedAt,
+    };
+  },
+
+  //CLEAR ALL CHAT
+  async clearChat(
+    conversationId: string,
+    userId: string
+  ) {
+    const participant =
+      await chatRepository.findParticipant(
+        conversationId,
+        userId
+      );
+
+    if (!participant) {
+      throw new Error(
+        "Conversation not found or you are not a participant"
+      );
+    }
+
+    const deletedCount =
+      await chatRepository.clearChat(
+        conversationId,
+        userId
+      );
+
+    return {
+      conversationId,
+      deletedMessages: deletedCount,
+    };
+  },
 };
