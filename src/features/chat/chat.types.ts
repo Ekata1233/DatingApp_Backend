@@ -37,7 +37,7 @@ export type ConversationFilter =
   | "unread"
   | "online"
   | "nearby"
-  | "date"
+  | "date_invite"
   | "gift";
 
 export interface MarkConversationReadInput {

@@ -89,7 +89,7 @@ export const getConversationsSchema = z.object({
       "unread",
       "online",
       "nearby",
-      "date",
+      "date_invite",
       "gift",
     ])
     .default("all"),
