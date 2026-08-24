@@ -18,6 +18,7 @@ import {
   getDatePlanHistoryController,
   updateDatePlanActivityController,
   cancelDatePlanController,
+  getDatePlanHistoryDetailsController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -112,7 +113,11 @@ router.get(
   authMiddleware,
   getDatePlanHistoryController
 );
-
+router.get(
+  "/history/details/:planId",
+  authMiddleware,
+  getDatePlanHistoryDetailsController,
+);
 router.patch(
   "/date-plans/:planId/activity",
   authMiddleware,

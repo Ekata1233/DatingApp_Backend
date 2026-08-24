@@ -18,6 +18,7 @@ import {
   getDatePlanHistory,
   updateDatePlanActivityService,
   cancelDatePlanService,
+  getDatePlanHistoryDetails,
 } from "./dateNow.service";
 import { planIdParamSchema, updateDatePlanActivitySchema } from "./dateNow.validation";
 
@@ -446,7 +447,30 @@ export const getDatePlanHistoryController = async (
     next(error);
   }
 };
+export const getDatePlanHistoryDetailsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = (req as any).user.id;
 
+    const planId = req.params.planId as string;
+
+    const result = await getDatePlanHistoryDetails(
+      userId,
+      planId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Date plan history details fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 

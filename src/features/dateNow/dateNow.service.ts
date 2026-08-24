@@ -1166,14 +1166,33 @@ export const getDatePlanHistory = async (
             metUserId: true,
           },
         },
-        requests: {
+      requests: {
+  select: {
+    id: true,
+    requesterId: true,
+    status: true,
+    createdAt: true,
+
+    requester: {
+      select: {
+        id: true,
+        full_name: true,
+        birth_date: true,
+
+        photos: {
+          where: {
+            is_primary: true,
+          },
           select: {
             id: true,
-            requesterId: true,
-            status: true,
-            createdAt: true,
+            media_url: true,
           },
+          take: 1,
         },
+      },
+    },
+  },
+},
 
         DateConfirmed: {
           include: {
@@ -1341,7 +1360,28 @@ export const getDatePlanHistory = async (
       /**
        * Requests
        */
-      requests: requestStats,
+      requests: {
+  total: requestStats.total,
+  pending: requestStats.pending,
+  approved: requestStats.approved,
+  declined: requestStats.declined,
+  cancelled: requestStats.cancelled,
+
+  users: plan.requests.map((request) => ({
+    id: request.requester.id,
+
+    name: request.requester.full_name,
+
+    age: request.requester.birth_date
+      ? calculateAge(request.requester.birth_date)
+      : null,
+
+    photoUrl:
+      request.requester.photos[0]?.media_url ?? null,
+
+    status: request.status,
+  })),
+},
 
       /**
        * Payment
@@ -1407,6 +1447,342 @@ export const getDatePlanHistory = async (
 
       hasPreviousPage: page > 1,
     },
+  };
+};
+
+export const getDatePlanHistoryDetails = async (
+  userId: string,
+  planId: string,
+) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
+
+  if (!planId) {
+    throw new Error("Plan ID is required");
+  }
+
+  const plan = await prisma.datePlan.findFirst({
+    where: {
+      id: planId,
+      userId,
+    },
+
+    include: {
+      activity: true,
+
+      quickTitle: true,
+
+      whoPays: true,
+
+     requests: {
+  select: {
+    id: true,
+    requesterId: true,
+    status: true,
+    createdAt: true,
+
+    requester: {
+      select: {
+        id: true,
+        full_name: true,
+        birth_date: true,
+
+        photos: {
+          where: {
+            is_primary: true,
+          },
+          select: {
+            id: true,
+            media_url: true,
+          },
+          take: 1,
+        },
+      },
+    },
+  },
+},
+
+      feedbacks: {
+        where: {
+          reviewerId: userId,
+        },
+        take: 1,
+        select: {
+          id: true,
+          attendanceStatus: true,
+          status: true,
+          metUserId: true,
+          overallRating: true,
+          personRating: true,
+          noShowReason: true,
+          experienceTags: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
+
+      DateConfirmed: {
+        include: {
+          participant: {
+            select: {
+              id: true,
+              full_name: true,
+              birth_date: true,
+
+              photos: {
+                where: {
+                  is_primary: true,
+                },
+                select: {
+                  id: true,
+                  media_url: true,
+                },
+                take: 1,
+              },
+            },
+          },
+
+          host: {
+            select: {
+              id: true,
+              full_name: true,
+              birth_date: true,
+            },
+          },
+        },
+      },
+
+      _count: {
+        select: {
+          requests: true,
+        },
+      },
+    },
+  });
+
+  if (!plan) {
+    throw new Error("Date plan history not found");
+  }
+
+  const confirmed = plan.DateConfirmed;
+
+  const feedback = plan.feedbacks?.[0] ?? null;
+
+  /**
+   * History status
+   *
+   * MET + SUBMITTED feedback has highest priority.
+   */
+  const historyStatus =
+    feedback?.attendanceStatus === "MET" &&
+    feedback?.status === "SUBMITTED"
+      ? "COMPLETED"
+      : getHistoryStatus(
+          plan.status,
+          confirmed?.status ?? null,
+          plan.eventDateTime,
+        );
+
+  const statusLabel = getHistoryStatusLabel(historyStatus);
+
+  /**
+   * Participant
+   */
+  const participant = confirmed?.participant ?? null;
+
+  /**
+   * Request statistics
+   */
+  const requestStats = {
+    total: plan._count.requests,
+
+    pending: plan.requests.filter(
+      (request) => request.status === "PENDING",
+    ).length,
+
+    approved: plan.requests.filter(
+      (request) => request.status === "APPROVED",
+    ).length,
+
+    declined: plan.requests.filter(
+      (request) => request.status === "DECLINED",
+    ).length,
+
+    cancelled: plan.requests.filter(
+      (request) => request.status === "CANCELLED",
+    ).length,
+  };
+
+  return {
+    id: plan.id,
+
+    /**
+     * Status
+     */
+    status: historyStatus,
+    statusLabel,
+
+    /**
+     * Plan details
+     */
+    title: plan.title,
+
+    quickTitle: plan.quickTitle
+      ? {
+          id: plan.quickTitle.id,
+          label: plan.quickTitle.label,
+          value: plan.quickTitle.value,
+          icon: plan.quickTitle.icon,
+        }
+      : null,
+
+    activity: plan.activity,
+
+    /**
+     * Date
+     */
+    eventDateTime: plan.eventDateTime,
+
+    duration: plan.duration,
+
+    /**
+     * Venue
+     */
+    venue: {
+      name: plan.venueName,
+      address: plan.venueAddress,
+      latitude: plan.venueLat,
+      longitude: plan.venueLng,
+    },
+
+    /**
+     * Participant
+     */
+    participant: participant
+      ? {
+          id: participant.id,
+
+          name: participant.full_name,
+
+          age: participant.birth_date
+            ? calculateAge(participant.birth_date)
+            : null,
+
+          photoUrl:
+            participant.photos[0]?.media_url ?? null,
+        }
+      : null,
+
+    /**
+     * Feedback
+     */
+    feedback: feedback
+      ? {
+          id: feedback.id,
+          attendanceStatus: feedback.attendanceStatus,
+          status: feedback.status,
+          metUserId: feedback.metUserId,
+          overallRating: feedback.overallRating,
+          personRating: feedback.personRating,
+          noShowReason: feedback.noShowReason,
+          experienceTags: feedback.experienceTags,
+          comment: feedback.comment,
+          createdAt: feedback.createdAt,
+        }
+      : null,
+
+    /**
+     * Payment / Plan settings
+     */
+    whoPays: plan.whoPays,
+
+    participantLimit: plan.participantLimit,
+
+    /**
+     * Static cost information
+     */
+    boost: {
+      enabled: true,
+      label: "Yes",
+      duration: "3h",
+    },
+
+    planCost: {
+      amount: 100,
+      currency: "INR",
+      label: "₹100",
+    },
+
+    /**
+     * Requests
+     */
+  requests: {
+  total: requestStats.total,
+  pending: requestStats.pending,
+  approved: requestStats.approved,
+  declined: requestStats.declined,
+  cancelled: requestStats.cancelled,
+
+  users: plan.requests.map((request) => ({
+    id: request.requester.id,
+
+    name: request.requester.full_name,
+
+    age: request.requester.birth_date
+      ? calculateAge(request.requester.birth_date)
+      : null,
+
+    photoUrl:
+      request.requester.photos[0]?.media_url ?? null,
+
+    status: request.status,
+  })),
+},
+    /**
+     * Confirmed date
+     */
+    confirmedDate: confirmed
+      ? {
+          id: confirmed.id,
+
+          status: confirmed.status,
+
+          eventDateTime: confirmed.eventDateTime,
+
+          participant: confirmed.participant
+            ? {
+                id: confirmed.participant.id,
+                name: confirmed.participant.full_name,
+                age: confirmed.participant.birth_date
+                  ? calculateAge(
+                      confirmed.participant.birth_date,
+                    )
+                  : null,
+                photoUrl:
+                  confirmed.participant.photos[0]?.media_url ??
+                  null,
+              }
+            : null,
+        }
+      : null,
+
+    /**
+     * Review
+     */
+    review: getStaticHistoryReview(historyStatus),
+
+    /**
+     * Message
+     */
+    message: getHistoryMessage(
+      historyStatus,
+      participant?.full_name,
+      requestStats.total,
+    ),
+
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt,
   };
 };
 
