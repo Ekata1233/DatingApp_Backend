@@ -1583,3 +1583,45 @@ export const updateDatePlanActivityService = async (
 
   return updatedPlan;
 };
+
+export const cancelDatePlanService = async (
+  userId: string,
+  planId: string
+) => {
+  // Check if the date plan exists
+  const datePlan = await prisma.datePlan.findUnique({
+    where: {
+      id: planId,
+    },
+  });
+
+  if (!datePlan) {
+    throw new Error("Date plan not found");
+  }
+
+  // Check ownership
+  if (datePlan.userId !== userId) {
+    throw new Error("You are not authorized to cancel this date plan");
+  }
+
+  // Check whether plan can be cancelled
+  if (
+    datePlan.status !== "BOOKED"
+  ) {
+    throw new Error(
+      `Date plan cannot be cancelled because its current status is ${datePlan.status}`
+    );
+  }
+
+  // Cancel the date plan
+  const cancelledPlan = await prisma.datePlan.update({
+    where: {
+      id: planId,
+    },
+    data: {
+      status: "CANCELLED",
+    },
+  });
+
+  return cancelledPlan;
+};

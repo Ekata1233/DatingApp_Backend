@@ -17,6 +17,7 @@ import {
   withdrawDatePlanRequest,
   getDatePlanHistory,
   updateDatePlanActivityService,
+  cancelDatePlanService,
 } from "./dateNow.service";
 
 export const createDraftController = async (
@@ -478,7 +479,7 @@ export const updateDatePlanActivityController = async (
       });
     }
 
-     const userId = (req as any).user.id;
+    const userId = (req as any).user.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -522,6 +523,38 @@ export const updateDatePlanActivityController = async (
       success: false,
       message: "Failed to update date plan activity",
       error: error.message,
+    });
+  }
+};
+
+export const cancelDatePlanController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const { planId } = req.params;
+
+    if (!planId || Array.isArray(planId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Plan ID is required",
+      });
+    }
+
+    const result = await cancelDatePlanService(userId, planId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Date plan cancelled successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Cancel date plan error:", error);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to cancel date plan",
     });
   }
 };
