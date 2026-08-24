@@ -1224,7 +1224,20 @@ console.log(
         quickTitle: true,
 
         whoPays: true,
-
+        feedbacks: {
+  where: {
+    reviewerId: userId,
+    attendanceStatus: "MET",
+    status: "SUBMITTED",
+  },
+  take: 1,
+  select: {
+    id: true,
+    attendanceStatus: true,
+    status: true,
+    metUserId: true,
+  },
+},
         requests: {
           select: {
             id: true,
@@ -1300,15 +1313,20 @@ const data = plans.map((plan) => {
     /**
      * 1. Calculate actual history status
      */
-    const historyStatus = getHistoryStatus(
-      plan.status,
-      confirmed?.status ?? null,
-      plan.eventDateTime
-    );
-console.log(
-  "CALCULATED HISTORY STATUS:",
-  historyStatus
-);
+const feedback = (plan.feedbacks?.[0] ?? null) as {
+  attendanceStatus: string;
+  status: string;
+} | null;
+
+const historyStatus =
+  feedback?.attendanceStatus === "MET" &&
+  feedback?.status === "SUBMITTED"
+    ? "COMPLETED"
+    : getHistoryStatus(
+        plan.status,
+        confirmed?.status ?? null,
+        plan.eventDateTime
+      );
     /**
      * 2. UI label
      */
