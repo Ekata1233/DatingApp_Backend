@@ -58,3 +58,4 @@ export interface SubmitDatePlanReportInput {
     | "FAKE_PROFILE"
     | "SAFETY_CONCERN";
   comment?: string;
+}

@@ -6,9 +6,14 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "../../../prisma/prismaClient";
-import { GetMyPlansParams, SubmitAttendanceInput, SubmitDatePlanReportInput, SubmitExperienceFeedbackInput, SubmitNoShowFeedbackInput, UpdateMetUserInput } from "./datePlanMyPlans.types";
-
-
+import {
+  GetMyPlansParams,
+  SubmitAttendanceInput,
+  SubmitDatePlanReportInput,
+  SubmitExperienceFeedbackInput,
+  SubmitNoShowFeedbackInput,
+  UpdateMetUserInput,
+} from "./datePlanMyPlans.types";
 
 /**
  * Calculate user's age
@@ -121,22 +126,22 @@ export const getMyPlansService = async ({
   }
 
   const where: any = {
-  userId,
+    userId,
 
-  status: {
-    in: [PlanStatus.ACTIVE, PlanStatus.BOOKED, PlanStatus.COMPLETED],
-  },
-
-  // Exclude plans where the logged-in user
-  // has already submitted MET feedback
-  feedbacks: {
-    none: {
-      reviewerId: userId,
-      attendanceStatus: DatePlanAttendanceStatus.MET,
-      status: DatePlanFeedbackStatus.SUBMITTED,
+    status: {
+      in: [PlanStatus.ACTIVE, PlanStatus.BOOKED, PlanStatus.COMPLETED],
     },
-  },
-};
+
+    // Exclude plans where the logged-in user
+    // has already submitted MET feedback
+    feedbacks: {
+      none: {
+        reviewerId: userId,
+        attendanceStatus: DatePlanAttendanceStatus.MET,
+        status: DatePlanFeedbackStatus.SUBMITTED,
+      },
+    },
+  };
 
   /**
    * Apply period only when provided
@@ -216,6 +221,11 @@ export const getMyPlansService = async ({
          * ONLY PENDING REQUESTS
          */
         requests: {
+          where: {
+            status: {
+              not: "CANCELLED",
+            },
+          },
           orderBy: {
             createdAt: "asc",
           },
@@ -545,7 +555,6 @@ export const submitDatePlanAttendance = async ({
     if (!plan.DateConfirmed) {
       throw new Error("No confirmed date found for this plan");
     }
-
   }
 
   // 5. Create feedback
@@ -594,14 +603,14 @@ export const updateMetUser = async ({
 
   if (!feedback) {
     throw new Error(
-      "Attendance feedback not found. Please submit attendance first."
+      "Attendance feedback not found. Please submit attendance first.",
     );
   }
 
   // 2. User must have selected "Yes, we met"
   if (feedback.attendanceStatus !== "MET") {
     throw new Error(
-      "You can select a person only when attendance status is MET."
+      "You can select a person only when attendance status is MET.",
     );
   }
 
@@ -690,21 +699,21 @@ export const submitExperienceFeedback = async ({
 
   if (!feedback) {
     throw new Error(
-      "Attendance feedback not found. Please submit attendance first."
+      "Attendance feedback not found. Please submit attendance first.",
     );
   }
 
   // 2. User must have selected "Yes, we met"
   if (feedback.attendanceStatus !== "MET") {
     throw new Error(
-      "Experience feedback can only be submitted when attendance status is MET."
+      "Experience feedback can only be submitted when attendance status is MET.",
     );
   }
 
   // 3. User must have selected the person they met
   if (!feedback.metUserId) {
     throw new Error(
-      "Please select the person you met before submitting experience feedback."
+      "Please select the person you met before submitting experience feedback.",
     );
   }
 
@@ -723,11 +732,7 @@ export const submitExperienceFeedback = async ({
   }
 
   // 6. Validate person rating
-  if (
-    !Number.isInteger(personRating) ||
-    personRating < 1 ||
-    personRating > 5
-  ) {
+  if (!Number.isInteger(personRating) || personRating < 1 || personRating > 5) {
     throw new Error("Person rating must be between 1 and 5.");
   }
 
@@ -813,9 +818,7 @@ export const submitExperienceFeedback = async ({
 
     metUser: updatedFeedback.metUser,
 
-    experienceTags: updatedFeedback.experienceTags.map(
-      (item) => item.tag
-    ),
+    experienceTags: updatedFeedback.experienceTags.map((item) => item.tag),
 
     comment: updatedFeedback.comment,
 
@@ -845,29 +848,25 @@ export const submitNoShowFeedback = async ({
 
   if (!feedback) {
     throw new Error(
-      "Attendance feedback not found. Please submit attendance first."
+      "Attendance feedback not found. Please submit attendance first.",
     );
   }
 
   // 2. User must have selected "No one showed up"
   if (feedback.attendanceStatus !== "NO_SHOW") {
     throw new Error(
-      "No-show feedback can only be submitted when attendance status is NO_SHOW."
+      "No-show feedback can only be submitted when attendance status is NO_SHOW.",
     );
   }
 
   // 3. metUserId must not exist for NO_SHOW
   if (feedback.metUserId) {
-    throw new Error(
-      "A user cannot be selected when nobody showed up."
-    );
+    throw new Error("A user cannot be selected when nobody showed up.");
   }
 
   // 4. Prevent duplicate submission
   if (feedback.status === "SUBMITTED") {
-    throw new Error(
-      "Feedback has already been submitted."
-    );
+    throw new Error("Feedback has already been submitted.");
   }
 
   // 5. Validate overall rating
@@ -876,9 +875,7 @@ export const submitNoShowFeedback = async ({
     overallRating < 1 ||
     overallRating > 5
   ) {
-    throw new Error(
-      "Overall rating must be between 1 and 5."
-    );
+    throw new Error("Overall rating must be between 1 and 5.");
   }
 
   // 6. Validate no-show reason
@@ -890,42 +887,36 @@ export const submitNoShowFeedback = async ({
     "NOT_SURE",
   ] as const;
 
-  if (
-    noShowReason &&
-    !validReasons.includes(noShowReason)
-  ) {
-    throw new Error(
-      `Invalid no-show reason: ${noShowReason}`
-    );
+  if (noShowReason && !validReasons.includes(noShowReason)) {
+    throw new Error(`Invalid no-show reason: ${noShowReason}`);
   }
 
   // 7. Update feedback
-  const updatedFeedback =
-    await prisma.datePlanFeedback.update({
-      where: {
-        id: feedback.id,
-      },
+  const updatedFeedback = await prisma.datePlanFeedback.update({
+    where: {
+      id: feedback.id,
+    },
 
-      data: {
-        overallRating,
-        noShowReason: noShowReason ?? null,
-        status: "SUBMITTED",
-      },
+    data: {
+      overallRating,
+      noShowReason: noShowReason ?? null,
+      status: "SUBMITTED",
+    },
 
-      select: {
-        id: true,
-        planId: true,
-        reviewerId: true,
-        attendanceStatus: true,
-        overallRating: true,
-        personRating: true,
-        noShowReason: true,
-        metUserId: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    select: {
+      id: true,
+      planId: true,
+      reviewerId: true,
+      attendanceStatus: true,
+      overallRating: true,
+      personRating: true,
+      noShowReason: true,
+      metUserId: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   return updatedFeedback;
 };
@@ -957,29 +948,25 @@ export const submitDatePlanReport = async ({
 
   if (!feedback) {
     throw new Error(
-      "Feedback not found. Please complete the attendance step first."
+      "Feedback not found. Please complete the attendance step first.",
     );
   }
 
   // 2. User must have met someone
   if (feedback.attendanceStatus !== "MET") {
     throw new Error(
-      "You can report a person only after selecting that you met them."
+      "You can report a person only after selecting that you met them.",
     );
   }
 
   // 3. Make sure the person they met exists
   if (!feedback.metUserId) {
-    throw new Error(
-      "The person you met could not be identified."
-    );
+    throw new Error("The person you met could not be identified.");
   }
 
   // 4. Prevent reporting yourself
   if (feedback.metUserId === userId) {
-    throw new Error(
-      "You cannot report yourself."
-    );
+    throw new Error("You cannot report yourself.");
   }
 
   // 5. Validate report reason
@@ -992,9 +979,7 @@ export const submitDatePlanReport = async ({
   ] as const;
 
   if (!validReasons.includes(reason)) {
-    throw new Error(
-      `Invalid report reason: ${reason}`
-    );
+    throw new Error(`Invalid report reason: ${reason}`);
   }
 
   // 6. Check whether the same user already reported this person
@@ -1008,7 +993,7 @@ export const submitDatePlanReport = async ({
 
   if (existingReport) {
     throw new Error(
-      "You have already reported this person for this date plan."
+      "You have already reported this person for this date plan.",
     );
   }
 
