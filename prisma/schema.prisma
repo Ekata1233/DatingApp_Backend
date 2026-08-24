@@ -64,13 +64,16 @@ model User {
   datePlanTransactions       DatePlanTransaction[]
   datePlanFeedbackAsReviewer DatePlanFeedback[]    @relation("DatePlanFeedbackReviewer")
   datePlanFeedbackAsMetUser  DatePlanFeedback[]    @relation("DatePlanFeedbackMetUser")
-  intention                  IntentionOption?      @relation(fields: [intentionId], references: [id])
-  userPrompts                UserPrompt[]
-  UserPlanUsage              UserPlanUsage[]
-  waitlist                   Waitlist?
-  referralsMade              UserReferral[]        @relation("Referrer")
-  referralStats              UserReferralStats?
-  receivedReferral           UserReferral?         @relation("ReferredUser")
+  datePlanReportsMade        DatePlanReport[]      @relation("DatePlanReportReporter")
+  datePlanReportsReceived    DatePlanReport[]      @relation("DatePlanReportedUser")
+
+  intention        IntentionOption?   @relation(fields: [intentionId], references: [id])
+  userPrompts      UserPrompt[]
+  UserPlanUsage    UserPlanUsage[]
+  waitlist         Waitlist?
+  referralsMade    UserReferral[]     @relation("Referrer")
+  referralStats    UserReferralStats?
+  receivedReferral UserReferral?      @relation("ReferredUser")
 
   //chat
   conversationParticipants ConversationParticipant[]
@@ -1421,18 +1424,14 @@ model DatePlan {
 
   // Relations
 
-  user User @relation(fields: [userId], references: [id])
-
-  activity DatePlanOption @relation("PlanActivity", fields: [activityId], references: [id])
-
-  quickTitle DatePlanOption? @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
-
-  whoPays DatePlanOption? @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
-
-  joinRequestGender DatePlanOption? @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
-
-  visibility DatePlanOption?    @relation("PlanVisibility", fields: [visibilityId], references: [id])
-  feedbacks  DatePlanFeedback[]
+  user              User               @relation(fields: [userId], references: [id])
+  activity          DatePlanOption     @relation("PlanActivity", fields: [activityId], references: [id])
+  quickTitle        DatePlanOption?    @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
+  whoPays           DatePlanOption?    @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
+  joinRequestGender DatePlanOption?    @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
+  visibility        DatePlanOption?    @relation("PlanVisibility", fields: [visibilityId], references: [id])
+  feedbacks         DatePlanFeedback[]
+  reports           DatePlanReport[]
 
   vibes         DatePlanVibe[]
   requests      DatePlanRequest[]
@@ -1587,11 +1586,48 @@ model DatePlanFeedbackTag {
   id         String                @id @default(uuid()) @db.Uuid
   feedbackId String                @db.Uuid
   tag        DatePlanExperienceTag
-
-  feedback DatePlanFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  feedback   DatePlanFeedback      @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
 
   @@unique([feedbackId, tag])
   @@index([tag])
+}
+
+enum DatePlanReportReason {
+  DID_NOT_SHOW_AS_DESCRIBED
+  MADE_ME_UNCOMFORTABLE
+  INAPPROPRIATE_BEHAVIOUR
+  FAKE_PROFILE
+  SAFETY_CONCERN
+}
+
+enum DatePlanReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+model DatePlanReport {
+  id             String               @id @default(uuid()) @db.Uuid
+  planId         String               @db.Uuid
+  reporterId     String               @db.Uuid
+  reportedUserId String               @db.Uuid
+  reason         DatePlanReportReason
+  comment        String?
+  status         DatePlanReportStatus @default(PENDING)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  // Relations
+  plan           DatePlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  reporter       User                 @relation("DatePlanReportReporter", fields: [reporterId], references: [id])
+  reportedUser   User                 @relation("DatePlanReportedUser", fields: [reportedUserId], references: [id])
+
+  @@index([planId])
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([reason])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model DatePlanUserStats {

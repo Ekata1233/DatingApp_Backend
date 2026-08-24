@@ -120,9 +120,6 @@ export const getMyPlansService = async ({
     throw new Error("User ID is required");
   }
 
-  /**
-   * Base filter
-   */
   const where: any = {
   userId,
 
