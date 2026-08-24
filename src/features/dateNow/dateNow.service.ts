@@ -1,6 +1,5 @@
 // Date Now Service
 import {
-
   PlanStatus,
   TransactionType,
   TransactionStatus,
@@ -8,19 +7,26 @@ import {
   Prisma,
   PrismaClient,
 } from "@prisma/client";
-import { UpdateDatePlanActivityDTO, UpdateDatePlanInput } from "./dateNow.types";
+import {
+  UpdateDatePlanActivityDTO,
+  UpdateDatePlanInput,
+} from "./dateNow.types";
 import { calculateMatchScore } from "../../utils/matchScore.constants";
-import { calculateAge, getHistoryMessage, getHistoryStatus, getHistoryStatusLabel, getStaticHistoryReview } from "./dateNow.history.util";
+import {
+  calculateAge,
+  getHistoryMessage,
+  getHistoryStatus,
+  getHistoryStatusLabel,
+  getStaticHistoryReview,
+} from "./dateNow.history.util";
 
 export const createDraftDatePlan = async (
   userId: string,
-  activityId: string
+  activityId: string,
 ) => {
-
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
-
 
   if (!user) {
     throw new Error("User not found");
@@ -44,11 +50,10 @@ export const createDraftDatePlan = async (
   return draftPlan;
 };
 
-export const 
-updateDraftDatePlan = async (
+export const updateDraftDatePlan = async (
   planId: string,
   userId: string,
-  payload: UpdateDatePlanInput
+  payload: UpdateDatePlanInput,
 ) => {
   const plan = await prisma.datePlan.findFirst({
     where: {
@@ -61,13 +66,7 @@ updateDraftDatePlan = async (
     throw new Error("Plan not found");
   }
 
-  const {
-    vibeIds,
-    eventDate,
-    eventTime,
-    activityId,
-    ...planData
-  } = payload;
+  const { vibeIds, eventDate, eventTime, activityId, ...planData } = payload;
   let eventDateTime: Date | undefined;
 
   if (eventDate && eventTime) {
@@ -113,10 +112,7 @@ updateDraftDatePlan = async (
   return updatedPlan;
 };
 
-export const publishDatePlan = async (
-  planId: string,
-  userId: string
-) => {
+export const publishDatePlan = async (planId: string, userId: string) => {
   return prisma.$transaction(async (tx) => {
     const plan = await tx.datePlan.findFirst({
       where: {
@@ -189,7 +185,7 @@ const calculateDistanceKm = (
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number
+  lon2: number,
 ) => {
   const R = 6371;
 
@@ -199,17 +195,14 @@ const calculateDistanceKm = (
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
 
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
 
-export const discoverDatePlan = async (
-  userId: string,
-  filter?: string
-) => {
+export const discoverDatePlan = async (userId: string, filter?: string) => {
   const me = await prisma.user.findUnique({
     where: {
       id: userId,
@@ -278,34 +271,30 @@ export const discoverDatePlan = async (
       lte: end,
     };
   }
-// WEEKEND
-else if (filter === "weekend") {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
+  // WEEKEND
+  else if (filter === "weekend") {
+    const start = new Date();
+    start.setUTCHours(0, 0, 0, 0);
 
-  const day = start.getUTCDay();
+    const day = start.getUTCDay();
 
-  // Find coming Saturday
-  const daysUntilSaturday = day === 0 ? 6 : 6 - day;
+    // Find coming Saturday
+    const daysUntilSaturday = day === 0 ? 6 : 6 - day;
 
-  const weekendStart = new Date(start);
-  weekendStart.setUTCDate(
-    weekendStart.getUTCDate() + daysUntilSaturday
-  );
-  weekendStart.setUTCHours(0, 0, 0, 0);
+    const weekendStart = new Date(start);
+    weekendStart.setUTCDate(weekendStart.getUTCDate() + daysUntilSaturday);
+    weekendStart.setUTCHours(0, 0, 0, 0);
 
-  // Sunday end
-  const weekendEnd = new Date(weekendStart);
-  weekendEnd.setUTCDate(
-    weekendEnd.getUTCDate() + 1
-  );
-  weekendEnd.setUTCHours(23, 59, 59, 999);
+    // Sunday end
+    const weekendEnd = new Date(weekendStart);
+    weekendEnd.setUTCDate(weekendEnd.getUTCDate() + 1);
+    weekendEnd.setUTCHours(23, 59, 59, 999);
 
-  dateFilter = {
-    gte: weekendStart,
-    lte: weekendEnd,
-  };
-}
+    dateFilter = {
+      gte: weekendStart,
+      lte: weekendEnd,
+    };
+  }
   const plans = await prisma.datePlan.findMany({
     where: {
       status: "ACTIVE",
@@ -372,10 +361,7 @@ else if (filter === "weekend") {
   if (hasLocation) {
     ranked = plans
       .map((plan) => {
-        const matchScore = calculateMatchScore(
-          me,
-          plan.user
-        );
+        const matchScore = calculateMatchScore(me, plan.user);
         let distanceKm = null;
 
         if (plan.venueLat != null && plan.venueLng != null) {
@@ -383,26 +369,21 @@ else if (filter === "weekend") {
             Number(profile!.latitude),
             Number(profile!.longitude),
             plan.venueLat,
-            plan.venueLng
+            plan.venueLng,
           );
         }
 
         const hoursAway =
-          ((plan.eventDateTime?.getTime() || now.getTime()) -
-            now.getTime()) /
+          ((plan.eventDateTime?.getTime() || now.getTime()) - now.getTime()) /
           (1000 * 60 * 60);
 
         return {
           ...plan,
           matchScore,
           distanceKm:
-            distanceKm !== null
-              ? Number(distanceKm.toFixed(1))
-              : null,
+            distanceKm !== null ? Number(distanceKm.toFixed(1)) : null,
 
-          score:
-            (distanceKm ?? 999) * 5 +
-            Math.max(hoursAway, 0),
+          score: (distanceKm ?? 999) * 5 + Math.max(hoursAway, 0),
         };
       })
       .sort((a, b) => a.score - b.score);
@@ -422,17 +403,17 @@ else if (filter === "weekend") {
 
   const eventTime = plan.eventDateTime
     ? plan.eventDateTime.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    })
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
     : null;
   return {
     id: plan.id,
     matchScore: plan.matchScore,
     venueName: plan.venueName,
     distanceKm: plan.distanceKm,
-     // Activity
+    // Activity
     activity: plan.activity?.label,
     activityIcon: plan.activity?.icon,
 
@@ -449,24 +430,18 @@ else if (filter === "weekend") {
       id: plan.user.id,
       name: plan.user.full_name,
       profilePhoto:
-        plan.user.photos.length > 0
-          ? plan.user.photos[0].media_url
-          : null,
+        plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
       age: plan.user.birth_date
         ? Math.floor(
-          (Date.now() -
-            new Date(plan.user.birth_date).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000)
-        )
+            (Date.now() - new Date(plan.user.birth_date).getTime()) /
+              (365.25 * 24 * 60 * 60 * 1000),
+          )
         : null,
     },
   };
 };
 
-export const skipDatePlan = async (
-  userId: string,
-  planId: string
-) => {
+export const skipDatePlan = async (userId: string, planId: string) => {
   await prisma.datePlanSkip.create({
     data: {
       userId,
@@ -482,7 +457,7 @@ export const skipDatePlan = async (
 export const requestToJoinDatePlan = async (
   userId: string,
   planId: string,
-  message?: string
+  message?: string,
 ) => {
   const plan = await prisma.datePlan.findUnique({
     where: {
@@ -523,10 +498,7 @@ export const requestToJoinDatePlan = async (
   });
 };
 
-export const getDatePlanRequests = async (
-  userId: string,
-  planId: string
-) => {
+export const getDatePlanRequests = async (userId: string, planId: string) => {
   const plan = await prisma.datePlan.findFirst({
     where: {
       id: planId,
@@ -560,11 +532,7 @@ export const getDatePlanRequests = async (
     plan: {
       id: plan.id,
 
-
-      title:
-        plan.title ||
-        plan.quickTitle?.label ||
-        plan.activity.label,
+      title: plan.title || plan.quickTitle?.label || plan.activity.label,
 
       activity: plan.activity.label,
 
@@ -584,9 +552,7 @@ export const getDatePlanRequests = async (
 
       status: request.status,
 
-      compatibility: Math.floor(
-        Math.random() * (95 - 75 + 1) + 75
-      ),
+      compatibility: Math.floor(Math.random() * (95 - 75 + 1) + 75),
 
       message: request.message,
 
@@ -597,17 +563,12 @@ export const getDatePlanRequests = async (
 
         age: request.requester.birth_date
           ? Math.floor(
-            (Date.now() -
-              new Date(
-                request.requester.birth_date
-              ).getTime()) /
-            (365.25 * 24 * 60 * 60 * 1000)
-          )
+              (Date.now() - new Date(request.requester.birth_date).getTime()) /
+                (365.25 * 24 * 60 * 60 * 1000),
+            )
           : null,
 
-        photo:
-          request.requester.photos?.[0]?.media_url ??
-          null,
+        photo: request.requester.photos?.[0]?.media_url ?? null,
       },
     })),
   };
@@ -615,7 +576,7 @@ export const getDatePlanRequests = async (
 
 export const approveDatePlanRequest = async (
   userId: string,
-  requestId: string
+  requestId: string,
 ) => {
   const request = await prisma.datePlanRequest.findUnique({
     where: {
@@ -640,15 +601,14 @@ export const approveDatePlanRequest = async (
   }
 
   return prisma.$transaction(async (tx) => {
-    const approvedRequest =
-      await tx.datePlanRequest.update({
-        where: {
-          id: requestId,
-        },
-        data: {
-          status: "APPROVED",
-        },
-      });
+    const approvedRequest = await tx.datePlanRequest.update({
+      where: {
+        id: requestId,
+      },
+      data: {
+        status: "APPROVED",
+      },
+    });
 
     await tx.datePlanRequest.updateMany({
       where: {
@@ -675,31 +635,25 @@ export const approveDatePlanRequest = async (
     });
 
     // Create Confirmed Date
-    const confirmedDate =
-      await tx.dateConfirmed.create({
-        data: {
-          planId: request.plan.id,
+    const confirmedDate = await tx.dateConfirmed.create({
+      data: {
+        planId: request.plan.id,
 
-          hostUserId: request.plan.userId,
+        hostUserId: request.plan.userId,
 
-          participantId:
-            request.requesterId,
+        participantId: request.requesterId,
 
-          title:
-            request.plan.title,
+        title: request.plan.title,
 
-          venueName:
-            request.plan.venueName,
+        venueName: request.plan.venueName,
 
-          venueAddress:
-            request.plan.venueAddress,
+        venueAddress: request.plan.venueAddress,
 
-          eventDateTime:
-            request.plan.eventDateTime!,
+        eventDateTime: request.plan.eventDateTime!,
 
-          status: "UPCOMING",
-        },
-      });
+        status: "UPCOMING",
+      },
+    });
 
     // Find existing conversation
     let conversation = await tx.conversation.findFirst({
@@ -707,10 +661,7 @@ export const approveDatePlanRequest = async (
         participants: {
           every: {
             userId: {
-              in: [
-                request.plan.userId,
-                request.requesterId,
-              ],
+              in: [request.plan.userId, request.requesterId],
             },
           },
         },
@@ -762,7 +713,7 @@ export const approveDatePlanRequest = async (
 
 export const declineDatePlanRequest = async (
   userId: string,
-  requestId: string
+  requestId: string,
 ) => {
   const request = await prisma.datePlanRequest.findUnique({
     where: {
@@ -793,7 +744,7 @@ export const declineDatePlanRequest = async (
 
 export const topUpDatePlanPackage = async (
   userId: string,
-  packageId: string
+  packageId: string,
 ) => {
   return prisma.$transaction(async (tx) => {
     const planPackage = await tx.datePlanPackage.findFirst({
@@ -971,10 +922,7 @@ export const getMyDatePlanRequests = async (userId: string) => {
   }));
 };
 
-export const cancelDatePlanRequest = async (
-  userId: string,
-  planId: string
-) => {
+export const cancelDatePlanRequest = async (userId: string, planId: string) => {
   const request = await prisma.datePlanRequest.findFirst({
     where: {
       planId,
@@ -1012,7 +960,7 @@ export const cancelDatePlanRequest = async (
 
 export const withdrawDatePlanRequest = async (
   requestId: string,
-  userId: string
+  userId: string,
 ) => {
   // Find the request
   const request = await prisma.datePlanRequest.findUnique({
@@ -1032,9 +980,7 @@ export const withdrawDatePlanRequest = async (
 
   // Optional: only pending requests can be withdrawn
   if (request.status !== "PENDING") {
-    throw new Error(
-      `Cannot withdraw a request with status ${request.status}`
-    );
+    throw new Error(`Cannot withdraw a request with status ${request.status}`);
   }
 
   // Delete request
@@ -1051,10 +997,7 @@ export const withdrawDatePlanRequest = async (
 };
 // matchScore.service.ts
 
-export const testMatchScore = async (
-  userId: string,
-  targetUserId: string
-) => {
+export const testMatchScore = async (userId: string, targetUserId: string) => {
   const [currentUser, targetUser] = await Promise.all([
     prisma.user.findUnique({
       where: {
@@ -1115,11 +1058,7 @@ export const testMatchScore = async (
     throw new Error("Target user not found");
   }
 
-
-  const score = calculateMatchScore(
-    currentUser,
-    targetUser
-  );
+  const score = calculateMatchScore(currentUser, targetUser);
 
   return {
     currentUser: {
@@ -1136,7 +1075,6 @@ export const testMatchScore = async (
   };
 };
 
-
 const prisma = new PrismaClient();
 
 interface HistoryQuery {
@@ -1147,18 +1085,15 @@ interface HistoryQuery {
 
 export const getDatePlanHistory = async (
   userId: string,
-  query: HistoryQuery
+  query: HistoryQuery,
 ) => {
   console.log("========== DATE PLAN HISTORY DEBUG ==========");
-console.log("USER ID:", userId);
-console.log("QUERY:", query);
+  console.log("USER ID:", userId);
+  console.log("QUERY:", query);
 
   const page = Math.max(Number(query.page) || 1, 1);
 
-  const limit = Math.min(
-    Math.max(Number(query.limit) || 10, 1),
-    50
-  );
+  const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
   const skip = (page - 1) * limit;
 
@@ -1166,48 +1101,41 @@ console.log("QUERY:", query);
    * History plans
    */
   console.log("========== DATE PLAN HISTORY DEBUG ==========");
-console.log("USER ID:", userId);
-console.log("QUERY:", query);
+  console.log("USER ID:", userId);
+  console.log("QUERY:", query);
 
-const where = {
-  userId,
-
-  status: {
-    in: [
-      PlanStatus.ACTIVE,
-      PlanStatus.COMPLETED,
-      PlanStatus.BOOKED,
-      PlanStatus.CANCELLED,
-      PlanStatus.EXPIRED,
-    ],
-  },
-};
-
-console.log(
-  "HISTORY WHERE:",
-  JSON.stringify(where, null, 2)
-);
-
-const allUserPlans = await prisma.datePlan.findMany({
-  where: {
+  const where = {
     userId,
-  },
-  select: {
-    id: true,
-    userId: true,
-    status: true,
-    title: true,
-    eventDateTime: true,
-  },
-});
 
-console.log(
-  "ALL USER DATE PLANS:",
-  JSON.stringify(allUserPlans, null, 2)
-);
+    status: {
+      in: [
+        PlanStatus.ACTIVE,
+        PlanStatus.COMPLETED,
+        PlanStatus.BOOKED,
+        PlanStatus.CANCELLED,
+        PlanStatus.EXPIRED,
+      ],
+    },
+  };
+
+  console.log("HISTORY WHERE:", JSON.stringify(where, null, 2));
+
+  const allUserPlans = await prisma.datePlan.findMany({
+    where: {
+      userId,
+    },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      title: true,
+      eventDateTime: true,
+    },
+  });
+
+  console.log("ALL USER DATE PLANS:", JSON.stringify(allUserPlans, null, 2));
 
   const [plans, total] = await prisma.$transaction([
-    
     prisma.datePlan.findMany({
       where,
 
@@ -1225,19 +1153,19 @@ console.log(
 
         whoPays: true,
         feedbacks: {
-  where: {
-    reviewerId: userId,
-    attendanceStatus: "MET",
-    status: "SUBMITTED",
-  },
-  take: 1,
-  select: {
-    id: true,
-    attendanceStatus: true,
-    status: true,
-    metUserId: true,
-  },
-},
+          where: {
+            reviewerId: userId,
+            attendanceStatus: "MET",
+            status: "SUBMITTED",
+          },
+          take: 1,
+          select: {
+            id: true,
+            attendanceStatus: true,
+            status: true,
+            metUserId: true,
+          },
+        },
         requests: {
           select: {
             id: true,
@@ -1249,24 +1177,24 @@ console.log(
 
         DateConfirmed: {
           include: {
-           participant: {
-  select: {
-    id: true,
-    full_name: true,
-    birth_date: true,
+            participant: {
+              select: {
+                id: true,
+                full_name: true,
+                birth_date: true,
 
-    photos: {
-      where: {
-        is_primary: true,
-      },
-      select: {
-        id: true,
-        media_url: true,
-      },
-      take: 1,
-    },
-  },
-},
+                photos: {
+                  where: {
+                    is_primary: true,
+                  },
+                  select: {
+                    id: true,
+                    media_url: true,
+                  },
+                  take: 1,
+                },
+              },
+            },
 
             host: {
               select: {
@@ -1290,63 +1218,50 @@ console.log(
       where,
     }),
   ]);
-console.log("HISTORY PLANS FOUND:", plans.length);
-console.log("HISTORY TOTAL:", total);
+  console.log("HISTORY PLANS FOUND:", plans.length);
+  console.log("HISTORY TOTAL:", total);
 
-console.log(
-  "HISTORY PLANS:",
-  JSON.stringify(plans, null, 2)
-);
-const data = plans.map((plan) => {
-  console.log("========== PROCESSING PLAN ==========");
-  console.log("PLAN ID:", plan.id);
-  console.log("PLAN STATUS:", plan.status);
-  console.log("PLAN TITLE:", plan.title);
-  console.log("EVENT DATE:", plan.eventDateTime);
-  console.log(
-    "CONFIRMED DATE:",
-    plan.DateConfirmed
-  );
+  console.log("HISTORY PLANS:", JSON.stringify(plans, null, 2));
+  const data = plans.map((plan) => {
+    console.log("========== PROCESSING PLAN ==========");
+    console.log("PLAN ID:", plan.id);
+    console.log("PLAN STATUS:", plan.status);
+    console.log("PLAN TITLE:", plan.title);
+    console.log("EVENT DATE:", plan.eventDateTime);
+    console.log("CONFIRMED DATE:", plan.DateConfirmed);
 
-  const confirmed = plan.DateConfirmed;
+    const confirmed = plan.DateConfirmed;
 
     /**
      * 1. Calculate actual history status
      */
-const feedback = (plan.feedbacks?.[0] ?? null) as {
-  attendanceStatus: string;
-  status: string;
-} | null;
+    const feedback = (plan.feedbacks?.[0] ?? null) as {
+      attendanceStatus: string;
+      status: string;
+    } | null;
 
-const historyStatus =
-  feedback?.attendanceStatus === "MET" &&
-  feedback?.status === "SUBMITTED"
-    ? "COMPLETED"
-    : getHistoryStatus(
-        plan.status,
-        confirmed?.status ?? null,
-        plan.eventDateTime
-      );
+    const historyStatus =
+      feedback?.attendanceStatus === "MET" && feedback?.status === "SUBMITTED"
+        ? "COMPLETED"
+        : getHistoryStatus(
+            plan.status,
+            confirmed?.status ?? null,
+            plan.eventDateTime,
+          );
     /**
      * 2. UI label
      */
-    const statusLabel =
-      getHistoryStatusLabel(historyStatus);
+    const statusLabel = getHistoryStatusLabel(historyStatus);
 
     /**
      * 3. Static review
      */
-    const review =
-      getStaticHistoryReview(
-        historyStatus
-        
-      );
+    const review = getStaticHistoryReview(historyStatus);
 
     /**
      * 4. Participant
      */
-    const participant =
-      confirmed?.participant ?? null;
+    const participant = confirmed?.participant ?? null;
 
     /**
      * 5. Request statistics
@@ -1354,24 +1269,17 @@ const historyStatus =
     const requestStats = {
       total: plan._count.requests,
 
-      pending: plan.requests.filter(
-        (request) =>
-          request.status === "PENDING"
-      ).length,
+      pending: plan.requests.filter((request) => request.status === "PENDING")
+        .length,
 
-      approved: plan.requests.filter(
-        (request) =>
-          request.status === "APPROVED"
-      ).length,
+      approved: plan.requests.filter((request) => request.status === "APPROVED")
+        .length,
 
-      declined: plan.requests.filter(
-        (request) =>
-          request.status === "DECLINED"
-      ).length,
+      declined: plan.requests.filter((request) => request.status === "DECLINED")
+        .length,
 
       cancelled: plan.requests.filter(
-        (request) =>
-          request.status === "CANCELLED"
+        (request) => request.status === "CANCELLED",
       ).length,
     };
 
@@ -1417,21 +1325,18 @@ const historyStatus =
        * Participant
        */
       participant: participant
-  ? {
-      id: participant.id,
+        ? {
+            id: participant.id,
 
-      name: participant.full_name,
+            name: participant.full_name,
 
-      age: participant.birth_date
-        ? calculateAge(
-            participant.birth_date
-          )
+            age: participant.birth_date
+              ? calculateAge(participant.birth_date)
+              : null,
+
+            photoUrl: participant.photos[0]?.media_url ?? null,
+          }
         : null,
-
-      photoUrl:
-        participant.photos[0]?.media_url ?? null,
-    }
-  : null,
 
       /**
        * Requests
@@ -1452,8 +1357,7 @@ const historyStatus =
 
             status: confirmed.status,
 
-            eventDateTime:
-              confirmed.eventDateTime,
+            eventDateTime: confirmed.eventDateTime,
           }
         : null,
 
@@ -1468,7 +1372,7 @@ const historyStatus =
       message: getHistoryMessage(
         historyStatus,
         participant?.full_name,
-        requestStats.total
+        requestStats.total,
       ),
 
       createdAt: plan.createdAt,
@@ -1480,25 +1384,16 @@ const historyStatus =
   /**
    * Optional status filter
    */
-  const requestedStatus =
-    query.status?.toUpperCase();
+  const requestedStatus = query.status?.toUpperCase();
 
   const filteredData =
-    requestedStatus &&
-    requestedStatus !== "ALL"
-      ? data.filter(
-          (item) =>
-            item.status === requestedStatus
-        )
+    requestedStatus && requestedStatus !== "ALL"
+      ? data.filter((item) => item.status === requestedStatus)
       : data;
-console.log(
-  "FINAL HISTORY DATA:",
-  JSON.stringify(filteredData, null, 2)
-);
+  console.log("FINAL HISTORY DATA:", JSON.stringify(filteredData, null, 2));
 
-console.log("========== END HISTORY DEBUG ==========");
+  console.log("========== END HISTORY DEBUG ==========");
   return {
-    
     data: filteredData,
 
     pagination: {
@@ -1506,19 +1401,13 @@ console.log("========== END HISTORY DEBUG ==========");
       limit,
       total,
 
-      totalPages: Math.ceil(
-        total / limit
-      ),
+      totalPages: Math.ceil(total / limit),
 
-      hasNextPage:
-        page < Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
 
-      hasPreviousPage:
-        page > 1,
+      hasPreviousPage: page > 1,
     },
-    
   };
-  
 };
 
 export const updateDatePlanActivityService = async (
@@ -1602,10 +1491,7 @@ export const updateDatePlanActivityService = async (
   return updatedPlan;
 };
 
-export const cancelDatePlanService = async (
-  userId: string,
-  planId: string
-) => {
+export const cancelDatePlanService = async (userId: string, planId: string) => {
   // Check if the date plan exists
   const datePlan = await prisma.datePlan.findUnique({
     where: {
@@ -1623,11 +1509,9 @@ export const cancelDatePlanService = async (
   }
 
   // Check whether plan can be cancelled
-  if (
-    datePlan.status !== "BOOKED"
-  ) {
+  if (datePlan.status !== "BOOKED" && datePlan.status !== "ACTIVE") {
     throw new Error(
-      `Date plan cannot be cancelled because its current status is ${datePlan.status}`
+      `Date plan cannot be cancelled because its current status is ${datePlan.status}`,
     );
   }
 

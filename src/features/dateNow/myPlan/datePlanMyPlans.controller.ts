@@ -7,6 +7,7 @@ import { myPlansQuerySchema } from "./datePlanMyPlans.Validation";
 import {
   getMyPlansService,
   submitDatePlanAttendance,
+  submitDatePlanReport,
   submitExperienceFeedback,
   submitNoShowFeedback,
   updateMetUser,
