@@ -6,7 +6,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "../../../prisma/prismaClient";
-import { GetMyPlansParams, SubmitAttendanceInput, SubmitExperienceFeedbackInput, SubmitNoShowFeedbackInput, UpdateMetUserInput } from "./datePlanMyPlans.types";
+import { GetMyPlansParams, SubmitAttendanceInput, SubmitDatePlanReportInput, SubmitExperienceFeedbackInput, SubmitNoShowFeedbackInput, UpdateMetUserInput } from "./datePlanMyPlans.types";
 
 
 
@@ -931,4 +931,112 @@ export const submitNoShowFeedback = async ({
     });
 
   return updatedFeedback;
+};
+
+//REPOST ISSUE
+export const submitDatePlanReport = async ({
+  userId,
+  planId,
+  reason,
+  comment,
+}: SubmitDatePlanReportInput) => {
+  // 1. Find feedback submitted by logged-in user
+  const feedback = await prisma.datePlanFeedback.findUnique({
+    where: {
+      planId_reviewerId: {
+        planId,
+        reviewerId: userId,
+      },
+    },
+
+    select: {
+      id: true,
+      planId: true,
+      reviewerId: true,
+      attendanceStatus: true,
+      metUserId: true,
+    },
+  });
+
+  if (!feedback) {
+    throw new Error(
+      "Feedback not found. Please complete the attendance step first."
+    );
+  }
+
+  // 2. User must have met someone
+  if (feedback.attendanceStatus !== "MET") {
+    throw new Error(
+      "You can report a person only after selecting that you met them."
+    );
+  }
+
+  // 3. Make sure the person they met exists
+  if (!feedback.metUserId) {
+    throw new Error(
+      "The person you met could not be identified."
+    );
+  }
+
+  // 4. Prevent reporting yourself
+  if (feedback.metUserId === userId) {
+    throw new Error(
+      "You cannot report yourself."
+    );
+  }
+
+  // 5. Validate report reason
+  const validReasons = [
+    "DID_NOT_SHOW_AS_DESCRIBED",
+    "MADE_ME_UNCOMFORTABLE",
+    "INAPPROPRIATE_BEHAVIOUR",
+    "FAKE_PROFILE",
+    "SAFETY_CONCERN",
+  ] as const;
+
+  if (!validReasons.includes(reason)) {
+    throw new Error(
+      `Invalid report reason: ${reason}`
+    );
+  }
+
+  // 6. Check whether the same user already reported this person
+  const existingReport = await prisma.datePlanReport.findFirst({
+    where: {
+      planId,
+      reporterId: userId,
+      reportedUserId: feedback.metUserId,
+    },
+  });
+
+  if (existingReport) {
+    throw new Error(
+      "You have already reported this person for this date plan."
+    );
+  }
+
+  // 7. Create report
+  const report = await prisma.datePlanReport.create({
+    data: {
+      planId,
+      reporterId: userId,
+      reportedUserId: feedback.metUserId,
+      reason,
+      comment: comment?.trim() || null,
+      status: "PENDING",
+    },
+
+    select: {
+      id: true,
+      planId: true,
+      reporterId: true,
+      reportedUserId: true,
+      reason: true,
+      comment: true,
+      status: true,
+      createdAt: true,
+    },
+  });
+
+  return report;
 };

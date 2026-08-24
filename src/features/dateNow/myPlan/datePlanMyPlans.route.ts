@@ -4,6 +4,7 @@ import { Router } from "express";
 import {
   getMyPlansController,
   submitDatePlanAttendanceController,
+  submitDatePlanReportController,
   submitExperienceFeedbackController,
   submitNoShowFeedbackController,
   updateMetUserController,
@@ -43,5 +44,10 @@ router.post(
   submitNoShowFeedbackController
 );
 
+router.post(
+  "/date-plans/:planId/report",
+  authMiddleware,
+  submitDatePlanReportController
+);
 
 export default router;

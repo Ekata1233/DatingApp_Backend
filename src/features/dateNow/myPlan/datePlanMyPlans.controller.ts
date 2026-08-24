@@ -321,3 +321,62 @@ export const submitNoShowFeedbackController = async (
     });
   }
 };
+
+//REPOST ISSUE
+export const submitDatePlanReportController = async (
+  req: Request<{ planId: string }>,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { planId } = req.params;
+
+    const {
+      reason,
+      comment,
+    } = req.body;
+
+    // 1. Validate planId
+    if (!planId) {
+      return res.status(400).json({
+        success: false,
+        message: "Plan ID is required.",
+      });
+    }
+
+    // 2. Validate reason
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Report reason is required.",
+      });
+    }
+
+    // 3. Submit report
+    const result = await submitDatePlanReport({
+      userId,
+      planId,
+      reason,
+      comment,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Report submitted successfully.",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "submitDatePlanReportController error:",
+      error
+    );
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to submit report.",
+    });
+  }
+};

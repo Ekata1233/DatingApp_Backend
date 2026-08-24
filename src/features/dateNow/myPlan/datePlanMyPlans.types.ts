@@ -47,3 +47,14 @@ export interface SubmitNoShowFeedbackInput {
     | "APPROVED_TOO_LATE"
     | "NOT_SURE";
 }
+
+export interface SubmitDatePlanReportInput {
+  userId: string;
+  planId: string;
+  reason:
+    | "DID_NOT_SHOW_AS_DESCRIBED"
+    | "MADE_ME_UNCOMFORTABLE"
+    | "INAPPROPRIATE_BEHAVIOUR"
+    | "FAKE_PROFILE"
+    | "SAFETY_CONCERN";
+  comment?: string;
