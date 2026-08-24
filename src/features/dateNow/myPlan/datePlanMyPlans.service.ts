@@ -5,26 +5,9 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "../../../prisma/prismaClient";
+import { GetMyPlansParams, SubmitAttendanceInput, SubmitExperienceFeedbackInput, SubmitNoShowFeedbackInput, UpdateMetUserInput } from "./datePlanMyPlans.types";
 
-interface SubmitAttendanceInput {
-  userId: string;
-  planId: string;
-  attendanceStatus: DatePlanAttendanceStatus;
-}
 
-interface GetMyPlansParams {
-  userId: string;
-  period?: "TODAY" | "TOMORROW" | "WEEKEND";
-  activity?: string;
-  page: number;
-  limit: number;
-}
-
-interface UpdateMetUserInput {
-  userId: string;
-  planId: string;
-  metUserId: string;
-}
 
 /**
  * Calculate user's age
@@ -660,4 +643,281 @@ export const updateMetUser = async ({
     status: updatedFeedback.status,
     updatedAt: updatedFeedback.updatedAt,
   };
+};
+
+export const submitExperienceFeedback = async ({
+  userId,
+  planId,
+  overallRating,
+  personRating,
+  experienceTags = [],
+  comment,
+}: SubmitExperienceFeedbackInput) => {
+  // 1. Find feedback belonging to logged-in user
+  const feedback = await prisma.datePlanFeedback.findUnique({
+    where: {
+      planId_reviewerId: {
+        planId,
+        reviewerId: userId,
+      },
+    },
+
+    include: {
+      metUser: {
+        select: {
+          id: true,
+          full_name: true,
+        },
+      },
+      plan: {
+        select: {
+          id: true,
+          title: true,
+          venueName: true,
+          eventDateTime: true,
+        },
+      },
+    },
+  });
+
+  if (!feedback) {
+    throw new Error(
+      "Attendance feedback not found. Please submit attendance first."
+    );
+  }
+
+  // 2. User must have selected "Yes, we met"
+  if (feedback.attendanceStatus !== "MET") {
+    throw new Error(
+      "Experience feedback can only be submitted when attendance status is MET."
+    );
+  }
+
+  // 3. User must have selected the person they met
+  if (!feedback.metUserId) {
+    throw new Error(
+      "Please select the person you met before submitting experience feedback."
+    );
+  }
+
+  // 4. Prevent submitting feedback multiple times
+  if (feedback.status === "SUBMITTED") {
+    throw new Error("Experience feedback has already been submitted.");
+  }
+
+  // 5. Validate overall rating
+  if (
+    !Number.isInteger(overallRating) ||
+    overallRating < 1 ||
+    overallRating > 5
+  ) {
+    throw new Error("Overall rating must be between 1 and 5.");
+  }
+
+  // 6. Validate person rating
+  if (
+    !Number.isInteger(personRating) ||
+    personRating < 1 ||
+    personRating > 5
+  ) {
+    throw new Error("Person rating must be between 1 and 5.");
+  }
+
+  // 7. Validate experience tags
+  const validTags = [
+    "RESPECTFUL",
+    "GREAT_CONVERSATION",
+    "ON_TIME",
+    "GENUINE",
+    "FUN",
+    "WOULD_MEET_AGAIN",
+  ] as const;
+
+  for (const tag of experienceTags) {
+    if (!validTags.includes(tag)) {
+      throw new Error(`Invalid experience tag: ${tag}`);
+    }
+  }
+
+  // 8. Update feedback + create tags in transaction
+  const updatedFeedback = await prisma.$transaction(async (tx) => {
+    // Delete existing tags in case this endpoint is later changed
+    // to support editing feedback.
+    await tx.datePlanFeedbackTag.deleteMany({
+      where: {
+        feedbackId: feedback.id,
+      },
+    });
+
+    const updated = await tx.datePlanFeedback.update({
+      where: {
+        id: feedback.id,
+      },
+
+      data: {
+        overallRating,
+        personRating,
+        comment: comment?.trim() || null,
+        status: "SUBMITTED",
+
+        experienceTags: {
+          create: experienceTags.map((tag) => ({
+            tag,
+          })),
+        },
+      },
+
+      include: {
+        metUser: {
+          select: {
+            id: true,
+            full_name: true,
+          },
+        },
+
+        experienceTags: {
+          select: {
+            id: true,
+            tag: true,
+          },
+        },
+
+        plan: {
+          select: {
+            id: true,
+            title: true,
+            venueName: true,
+            eventDateTime: true,
+          },
+        },
+      },
+    });
+
+    return updated;
+  });
+
+  return {
+    id: updatedFeedback.id,
+    planId: updatedFeedback.planId,
+
+    overallRating: updatedFeedback.overallRating,
+    personRating: updatedFeedback.personRating,
+
+    metUser: updatedFeedback.metUser,
+
+    experienceTags: updatedFeedback.experienceTags.map(
+      (item) => item.tag
+    ),
+
+    comment: updatedFeedback.comment,
+
+    status: updatedFeedback.status,
+
+    plan: updatedFeedback.plan,
+
+    updatedAt: updatedFeedback.updatedAt,
+  };
+};
+
+export const submitNoShowFeedback = async ({
+  userId,
+  planId,
+  overallRating,
+  noShowReason,
+}: SubmitNoShowFeedbackInput) => {
+  // 1. Find feedback belonging to logged-in user
+  const feedback = await prisma.datePlanFeedback.findUnique({
+    where: {
+      planId_reviewerId: {
+        planId,
+        reviewerId: userId,
+      },
+    },
+  });
+
+  if (!feedback) {
+    throw new Error(
+      "Attendance feedback not found. Please submit attendance first."
+    );
+  }
+
+  // 2. User must have selected "No one showed up"
+  if (feedback.attendanceStatus !== "NO_SHOW") {
+    throw new Error(
+      "No-show feedback can only be submitted when attendance status is NO_SHOW."
+    );
+  }
+
+  // 3. metUserId must not exist for NO_SHOW
+  if (feedback.metUserId) {
+    throw new Error(
+      "A user cannot be selected when nobody showed up."
+    );
+  }
+
+  // 4. Prevent duplicate submission
+  if (feedback.status === "SUBMITTED") {
+    throw new Error(
+      "Feedback has already been submitted."
+    );
+  }
+
+  // 5. Validate overall rating
+  if (
+    !Number.isInteger(overallRating) ||
+    overallRating < 1 ||
+    overallRating > 5
+  ) {
+    throw new Error(
+      "Overall rating must be between 1 and 5."
+    );
+  }
+
+  // 6. Validate no-show reason
+  const validReasons = [
+    "TIMING_WAS_OFF",
+    "VENUE_TOO_FAR",
+    "SHORT_NOTICE",
+    "APPROVED_TOO_LATE",
+    "NOT_SURE",
+  ] as const;
+
+  if (
+    noShowReason &&
+    !validReasons.includes(noShowReason)
+  ) {
+    throw new Error(
+      `Invalid no-show reason: ${noShowReason}`
+    );
+  }
+
+  // 7. Update feedback
+  const updatedFeedback =
+    await prisma.datePlanFeedback.update({
+      where: {
+        id: feedback.id,
+      },
+
+      data: {
+        overallRating,
+        noShowReason: noShowReason ?? null,
+        status: "SUBMITTED",
+      },
+
+      select: {
+        id: true,
+        planId: true,
+        reviewerId: true,
+        attendanceStatus: true,
+        overallRating: true,
+        personRating: true,
+        noShowReason: true,
+        metUserId: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+  return updatedFeedback;
 };

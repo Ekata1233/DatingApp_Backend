@@ -7,6 +7,8 @@ import { myPlansQuerySchema } from "./datePlanMyPlans.Validation";
 import {
   getMyPlansService,
   submitDatePlanAttendance,
+  submitExperienceFeedback,
+  submitNoShowFeedback,
   updateMetUser,
 } from "./datePlanMyPlans.service";
 import { DatePlanAttendanceStatus } from "@prisma/client";
@@ -171,6 +173,151 @@ export const updateMetUserController = async (
     return res.status(400).json({
       success: false,
       message: error.message || "Failed to update person you met",
+    });
+  }
+};
+
+export const submitExperienceFeedbackController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { planId } = req.params;
+
+    const {
+      overallRating,
+      personRating,
+      experienceTags,
+      comment,
+    } = req.body;
+
+    // Validate planId
+    if (!planId || Array.isArray(planId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid Plan ID is required.",
+      });
+    }
+
+    // Validate overall rating
+    if (
+      overallRating === undefined ||
+      overallRating === null
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Overall rating is required.",
+      });
+    }
+
+    // Validate person rating
+    if (
+      personRating === undefined ||
+      personRating === null
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Person rating is required.",
+      });
+    }
+
+    // Validate tags
+    if (
+      experienceTags !== undefined &&
+      !Array.isArray(experienceTags)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Experience tags must be an array.",
+      });
+    }
+
+    const result = await submitExperienceFeedback({
+      userId,
+      planId,
+      overallRating: Number(overallRating),
+      personRating: Number(personRating),
+      experienceTags: experienceTags ?? [],
+      comment,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Experience feedback submitted successfully.",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "submitExperienceFeedbackController error:",
+      error
+    );
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to submit experience feedback.",
+    });
+  }
+};
+
+export const submitNoShowFeedbackController = async (
+  req: Request<{ planId: string }>,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const { planId } = req.params;
+
+    const {
+      overallRating,
+      noShowReason,
+    } = req.body;
+
+    // 1. Validate planId
+    if (!planId) {
+      return res.status(400).json({
+        success: false,
+        message: "Plan ID is required.",
+      });
+    }
+
+    // 2. Validate overall rating
+    if (
+      overallRating === undefined ||
+      overallRating === null
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Overall rating is required.",
+      });
+    }
+
+    // 3. Submit feedback
+    const result = await submitNoShowFeedback({
+      userId,
+      planId,
+      overallRating: Number(overallRating),
+      noShowReason,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "No-show feedback submitted successfully.",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "submitNoShowFeedbackController error:",
+      error
+    );
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to submit no-show feedback.",
     });
   }
 };

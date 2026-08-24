@@ -4,6 +4,8 @@ import { Router } from "express";
 import {
   getMyPlansController,
   submitDatePlanAttendanceController,
+  submitExperienceFeedbackController,
+  submitNoShowFeedbackController,
   updateMetUserController,
   
 } from "./datePlanMyPlans.controller";
@@ -27,6 +29,18 @@ router.put(
   "/:planId/feedback/met-user",
   authMiddleware,
   updateMetUserController
+);
+
+router.post(
+  "/date-plans/:planId/feedback/experience",
+  authMiddleware,
+  submitExperienceFeedbackController
+);
+
+router.post(
+  "/date-plans/:planId/feedback/no-show",
+  authMiddleware,
+  submitNoShowFeedbackController
 );
 
 
