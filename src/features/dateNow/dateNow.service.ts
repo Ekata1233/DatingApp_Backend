@@ -1152,20 +1152,19 @@ export const getDatePlanHistory = async (
         quickTitle: true,
 
         whoPays: true,
-        feedbacks: {
-          where: {
-            reviewerId: userId,
-            attendanceStatus: "MET",
-            status: "SUBMITTED",
-          },
-          take: 1,
-          select: {
-            id: true,
-            attendanceStatus: true,
-            status: true,
-            metUserId: true,
-          },
-        },
+      feedbacks: {
+  where: {
+    reviewerId: userId,
+    status: "SUBMITTED",
+  },
+  take: 1,
+  select: {
+    id: true,
+    attendanceStatus: true,
+    status: true,
+    metUserId: true,
+  },
+},
       requests: {
   select: {
     id: true,
@@ -1254,19 +1253,30 @@ export const getDatePlanHistory = async (
     /**
      * 1. Calculate actual history status
      */
-    const feedback = (plan.feedbacks?.[0] ?? null) as {
-      attendanceStatus: string;
-      status: string;
-    } | null;
+  const feedback = (plan.feedbacks?.[0] ?? null) as {
+  attendanceStatus: string;
+  status: string;
+} | null;
 
-    const historyStatus =
-      feedback?.attendanceStatus === "MET" && feedback?.status === "SUBMITTED"
-        ? "COMPLETED"
-        : getHistoryStatus(
-            plan.status,
-            confirmed?.status ?? null,
-            plan.eventDateTime,
-          );
+let historyStatus: string;
+
+if (
+  feedback?.attendanceStatus === "NO_SHOW" &&
+  feedback?.status === "SUBMITTED"
+) {
+  historyStatus = "NO_SHOW";
+} else if (
+  feedback?.attendanceStatus === "MET" &&
+  feedback?.status === "SUBMITTED"
+) {
+  historyStatus = "COMPLETED";
+} else {
+  historyStatus = getHistoryStatus(
+    plan.status,
+    confirmed?.status ?? null,
+    plan.eventDateTime,
+  );
+}
     /**
      * 2. UI label
      */
