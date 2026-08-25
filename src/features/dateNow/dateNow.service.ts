@@ -899,7 +899,12 @@ export const getMyDatePlanRequests = async (userId: string) => {
       duration: request.plan.duration,
       photoUrl: request.plan.photoUrl,
 
-      activity: request.plan.activity?.label,
+      activity: request.plan.activity
+  ? {
+      name: request.plan.activity.label,
+      icon: request.plan.activity.icon,
+    }
+  : null,
       quickTitle: request.plan.quickTitle?.label,
       whoPays: request.plan.whoPays?.label,
       visibility: request.plan.visibility?.label,
