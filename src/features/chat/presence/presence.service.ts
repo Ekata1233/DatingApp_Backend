@@ -42,23 +42,40 @@ export const presenceService = {
    * Called when Socket.IO connection succeeds.
    */
   async setOnline(
-    userId: string
+    userId: string,
+    socketId: string
   ): Promise<PresenceEvent> {
     const key = getPresenceKey(userId);
 
-    const now = new Date();
+    const data = await redis.get<string>(key);
 
-    const presence: UserPresence = {
-      userId,
+    let presence: UserPresence;
 
-      status: "ONLINE",
+    if (data) {
+      presence =
+        typeof data === "string"
+          ? JSON.parse(data)
+          : data;
 
-      lastSeenAt: null,
-    };
+      if (!presence.socketIds) {
+        presence.socketIds = [];
+      }
 
-    /**
-     * Store presence in Redis.
-     */
+      if (!presence.socketIds.includes(socketId)) {
+        presence.socketIds.push(socketId);
+      }
+
+      presence.status = "ONLINE";
+      presence.lastSeenAt = null;
+    } else {
+      presence = {
+        userId,
+        status: "ONLINE",
+        lastSeenAt: null,
+        socketIds: [socketId],
+      };
+    }
+
     await redis.set(
       key,
       JSON.stringify(presence),
@@ -69,9 +86,7 @@ export const presenceService = {
 
     return {
       userId,
-
       status: "ONLINE",
-
       lastSeenAt: null,
     };
   },
@@ -82,28 +97,65 @@ export const presenceService = {
    * Called when Socket.IO disconnects.
    */
   async setOffline(
-    userId: string
-  ): Promise<PresenceEvent> {
+    userId: string,
+    socketId: string
+  ): Promise<PresenceEvent | null> {
     const key = getPresenceKey(userId);
 
-    const now = new Date();
+    const data = await redis.get<string>(key);
 
-    const presence: UserPresence = {
-      userId,
+    if (!data) {
+      return null;
+    }
 
-      status: "OFFLINE",
+    const presence: UserPresence =
+      typeof data === "string"
+        ? JSON.parse(data)
+        : data;
 
-      lastSeenAt: now,
-    };
+    if (!presence.socketIds) {
+      return null;
+    }
 
     /**
-     * Keep offline information for a longer time.
-     *
-     * 30 days = 2592000 seconds.
+     * Remove only the disconnected socket.
      */
+    presence.socketIds =
+      presence.socketIds.filter(
+        (id) => id !== socketId
+      );
+
+    /**
+     * Other sockets still connected.
+     */
+    if (presence.socketIds.length > 0) {
+      await redis.set(
+        key,
+        JSON.stringify(presence),
+        {
+          ex: PRESENCE_TTL,
+        }
+      );
+
+      return null;
+    }
+
+    /**
+     * No sockets remaining.
+     * User is now offline.
+     */
+    const now = new Date();
+
+    const offlinePresence: UserPresence = {
+      userId,
+      status: "OFFLINE",
+      lastSeenAt: now,
+      socketIds: [],
+    };
+
     await redis.set(
       key,
-      JSON.stringify(presence),
+      JSON.stringify(offlinePresence),
       {
         ex: 60 * 60 * 24 * 30,
       }
@@ -111,9 +163,7 @@ export const presenceService = {
 
     return {
       userId,
-
       status: "OFFLINE",
-
       lastSeenAt: now,
     };
   },
@@ -160,8 +210,8 @@ export const presenceService = {
       lastSeenAt:
         presence.lastSeenAt
           ? new Date(
-              presence.lastSeenAt
-            )
+            presence.lastSeenAt
+          )
           : null,
     };
   },
@@ -213,7 +263,8 @@ export const presenceService = {
    * Useful for long-running connections.
    */
   async heartbeat(
-    userId: string
+    userId: string,
+    socketId: string
   ): Promise<void> {
     const key = getPresenceKey(userId);
 
@@ -226,7 +277,7 @@ export const presenceService = {
        *
        * Re-create it as online.
        */
-      await this.setOnline(userId);
+      await this.setOnline(userId, socketId)
 
       return;
     }
