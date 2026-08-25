@@ -3,6 +3,7 @@
 import { MessageType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { ConversationFilter } from "./chat.types";
+import { presenceService } from "./presence/presence.service";
 
 export const calculateAge = (birthDate: Date | null): number | null => {
   if (!birthDate) {
@@ -329,40 +330,40 @@ export const chatRepository = {
 
 
   async findUserConversations(
-  userId: string,
-  cursor?: string,
-  limit = 20,
-  type: ConversationFilter = "all",
-) {
-  // --------------------------------------------------
-  // 1. Get current user's location
-  // --------------------------------------------------
+    userId: string,
+    cursor?: string,
+    limit = 20,
+    type: ConversationFilter = "all",
+  ) {
+    // --------------------------------------------------
+    // 1. Get current user's location
+    // --------------------------------------------------
 
-  let nearbyUserIds: string[] = [];
+    let nearbyUserIds: string[] = [];
 
-  if (type === "nearby") {
-    const currentUserProfile =
-      await prisma.userProfile.findUnique({
-        where: {
-          user_id: userId,
-        },
-        select: {
-          latitude: true,
-          longitude: true,
-        },
-      });
+    if (type === "nearby") {
+      const currentUserProfile =
+        await prisma.userProfile.findUnique({
+          where: {
+            user_id: userId,
+          },
+          select: {
+            latitude: true,
+            longitude: true,
+          },
+        });
 
-    if (
-      currentUserProfile?.latitude == null ||
-      currentUserProfile?.longitude == null
-    ) {
-      return [];
-    }
+      if (
+        currentUserProfile?.latitude == null ||
+        currentUserProfile?.longitude == null
+      ) {
+        return [];
+      }
 
-    // 10 KM radius
-    const nearbyUsers = await prisma.$queryRaw<
-      { user_id: string }[]
-    >`
+      // 10 KM radius
+      const nearbyUsers = await prisma.$queryRaw<
+        { user_id: string }[]
+      >`
       SELECT up.user_id
       FROM user_profiles up
       WHERE
@@ -381,200 +382,224 @@ export const chatRepository = {
         )
     `;
 
-    nearbyUserIds = nearbyUsers.map(
-      (user) => user.user_id,
-    );
+      nearbyUserIds = nearbyUsers.map(
+        (user) => user.user_id,
+      );
 
-    if (nearbyUserIds.length === 0) {
-      return [];
+      if (nearbyUserIds.length === 0) {
+        return [];
+      }
     }
-  }
 
-  // --------------------------------------------------
-  // 2. Build conversation WHERE condition
-  // --------------------------------------------------
+    // --------------------------------------------------
+    // 2. Build conversation WHERE condition
+    // --------------------------------------------------
 
-  const where: Prisma.ConversationWhereInput = {
-    participants: {
-      some: {
-        userId,
-        deletedAt: null,
-      },
-    },
-  };
-
-  // --------------------------------------------------
-  // 3. Nearby filter
-  // --------------------------------------------------
-
-  if (type === "nearby") {
-    where.participants = {
-      some: {
-        userId: {
-          in: nearbyUserIds,
+    const where: Prisma.ConversationWhereInput = {
+      participants: {
+        some: {
+          userId,
+          deletedAt: null,
         },
-        deletedAt: null,
       },
     };
-  }
 
-  // --------------------------------------------------
-  // 4. Date Invite filter
-  // --------------------------------------------------
+    // --------------------------------------------------
+    // 3. Nearby filter
+    // --------------------------------------------------
 
-  if (type === "date_invite") {
-    where.messages = {
-      some: {
-        messageType: MessageType.DATE_CONFIRMED,
-        deletedAt: null,
-      },
-    };
-  }
-
-  // --------------------------------------------------
-  // 5. Gift filter
-  // --------------------------------------------------
-
-  if (type === "gift") {
-    where.messages = {
-      some: {
-        messageType: MessageType.GIFT,
-        deletedAt: null,
-      },
-    };
-  }
-
-  // --------------------------------------------------
-  // 6. Unread filter
-  // --------------------------------------------------
-
-  if (type === "unread") {
-    where.messages = {
-      some: {
-        senderId: {
-          not: userId,
+    if (type === "nearby") {
+      where.participants = {
+        some: {
+          userId: {
+            in: nearbyUserIds,
+          },
+          deletedAt: null,
         },
-        readAt: null,
-        deletedAt: null,
-      },
-    };
-  }
+      };
+    }
 
-  // --------------------------------------------------
-  // 7. Get conversations
-  // --------------------------------------------------
+    // --------------------------------------------------
+    // 4. Date Invite filter
+    // --------------------------------------------------
 
-  const conversations =
-    await prisma.conversation.findMany({
-      where,
+    if (type === "date_invite") {
+      where.messages = {
+        some: {
+          messageType: MessageType.DATE_CONFIRMED,
+          deletedAt: null,
+        },
+      };
+    }
 
-      orderBy: {
-        updatedAt: "desc",
-      },
+    // --------------------------------------------------
+    // 5. Gift filter
+    // --------------------------------------------------
 
-      // IMPORTANT:
-      // Service will handle pagination.
-      // Repository returns limit + 1.
-      take: limit + 1,
+    if (type === "gift") {
+      where.messages = {
+        some: {
+          messageType: MessageType.GIFT,
+          deletedAt: null,
+        },
+      };
+    }
 
-      ...(cursor
-        ? {
+    // --------------------------------------------------
+    // 6. Unread filter
+    // --------------------------------------------------
+
+    if (type === "unread") {
+      where.messages = {
+        some: {
+          senderId: {
+            not: userId,
+          },
+          readAt: null,
+          deletedAt: null,
+        },
+      };
+    }
+
+    // --------------------------------------------------
+    // 7. Get conversations
+    // --------------------------------------------------
+
+    const conversations =
+      await prisma.conversation.findMany({
+        where,
+
+        orderBy: {
+          updatedAt: "desc",
+        },
+
+        // IMPORTANT:
+        // Service will handle pagination.
+        // Repository returns limit + 1.
+        take: limit + 1,
+
+        ...(cursor
+          ? {
             skip: 1,
             cursor: {
               id: cursor,
             },
           }
-        : {}),
+          : {}),
 
-      include: {
-        // --------------------------------------------------
-        // Participants
-        // --------------------------------------------------
+        include: {
+          // --------------------------------------------------
+          // Participants
+          // --------------------------------------------------
 
-        participants: {
-          where: {
-            deletedAt: null,
-          },
+          participants: {
+            where: {
+              deletedAt: null,
+            },
 
-          include: {
-            user: {
-              select: {
-                id: true,
-                full_name: true,
-                birth_date: true,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  full_name: true,
+                  birth_date: true,
 
-                photos: {
-                  where: {
-                    is_primary: true,
-                  },
+                  photos: {
+                    where: {
+                      is_primary: true,
+                    },
 
-                  take: 1,
+                    take: 1,
 
-                  select: {
-                    id: true,
-                    media_url: true,
-                    media_type: true,
+                    select: {
+                      id: true,
+                      media_url: true,
+                      media_type: true,
+                    },
                   },
                 },
               },
             },
           },
+
+          // --------------------------------------------------
+          // Latest message
+          // --------------------------------------------------
+
+          messages: {
+            where: {
+              deletedAt: null,
+            },
+
+            orderBy: {
+              createdAt: "desc",
+            },
+
+            take: 1,
+
+            select: {
+              id: true,
+              senderId: true,
+              content: true,
+              messageType: true,
+              mediaUrl: true,
+              createdAt: true,
+              deliveredAt: true,
+              readAt: true,
+            },
+          },
         },
+      });
 
-        // --------------------------------------------------
-        // Latest message
-        // --------------------------------------------------
+    // --------------------------------------------------
+    // 8. Get other participant IDs
+    // --------------------------------------------------
 
-        messages: {
-          where: {
-            deletedAt: null,
-          },
+    const candidateIds = conversations
+      .map((conversation) => {
+        const otherParticipant =
+          conversation.participants.find(
+            (participant) =>
+              participant.userId !== userId,
+          );
 
-          orderBy: {
-            createdAt: "desc",
-          },
+        return otherParticipant?.userId;
+      })
+      .filter(
+        (id): id is string => Boolean(id),
+      );
 
-          take: 1,
+    // --------------------------------------------------
+    // 8.1 Get presence from Redis
+    // --------------------------------------------------
 
-          select: {
-            id: true,
-            senderId: true,
-            content: true,
-            messageType: true,
-            mediaUrl: true,
-            createdAt: true,
-            deliveredAt: true,
-            readAt: true,
-          },
+    const userPresence =
+      candidateIds.length > 0
+        ? await presenceService.getUsersPresence({
+          userIds: candidateIds,
+        })
+        : [];
+
+    // --------------------------------------------------
+    // 8.2 Convert presence into Map
+    // --------------------------------------------------
+
+    const presenceMap = new Map(
+      userPresence.map((item) => [
+        item.userId,
+        {
+          isOnline: item.isOnline,
+          lastSeenAt: item.lastSeenAt,
         },
-      },
-    });
-
-  // --------------------------------------------------
-  // 8. Get other participant IDs
-  // --------------------------------------------------
-
-  const candidateIds = conversations
-    .map((conversation) => {
-      const otherParticipant =
-        conversation.participants.find(
-          (participant) =>
-            participant.userId !== userId,
-        );
-
-      return otherParticipant?.userId;
-    })
-    .filter(
-      (id): id is string => Boolean(id),
+      ]),
     );
+    // --------------------------------------------------
+    // 9. Get compatibility scores
+    // --------------------------------------------------
 
-  // --------------------------------------------------
-  // 9. Get compatibility scores
-  // --------------------------------------------------
-
-  const matchScores =
-    candidateIds.length > 0
-      ? await prisma.userCompatibility.findMany({
+    const matchScores =
+      candidateIds.length > 0
+        ? await prisma.userCompatibility.findMany({
           where: {
             userId,
 
@@ -589,141 +614,148 @@ export const chatRepository = {
             percentage: true,
           },
         })
-      : [];
+        : [];
 
-  // --------------------------------------------------
-  // 10. Convert scores into Map
-  // --------------------------------------------------
+    // --------------------------------------------------
+    // 10. Convert scores into Map
+    // --------------------------------------------------
 
-  const matchScoreMap = new Map(
-    matchScores.map((item) => [
-      item.targetUserId,
-      {
-        score: item.score,
-        percentage: item.percentage,
-      },
-    ]),
-  );
+    const matchScoreMap = new Map(
+      matchScores.map((item) => [
+        item.targetUserId,
+        {
+          score: item.score,
+          percentage: item.percentage,
+        },
+      ]),
+    );
 
-  // --------------------------------------------------
-  // 11. Convert conversations
-  // --------------------------------------------------
+    // --------------------------------------------------
+    // 11. Convert conversations
+    // --------------------------------------------------
 
-  const result = await Promise.all(
-    conversations.map(
-      async (conversation) => {
-        const currentParticipant =
-          conversation.participants.find(
-            (participant) =>
-              participant.userId === userId,
-          );
+    const result = await Promise.all(
+      conversations.map(
+        async (conversation) => {
+          const currentParticipant =
+            conversation.participants.find(
+              (participant) =>
+                participant.userId === userId,
+            );
 
-        const otherParticipant =
-          conversation.participants.find(
-            (participant) =>
-              participant.userId !== userId,
-          );
+          const otherParticipant =
+            conversation.participants.find(
+              (participant) =>
+                participant.userId !== userId,
+            );
 
-        if (
-          !currentParticipant ||
-          !otherParticipant
-        ) {
-          return null;
-        }
+          if (
+            !currentParticipant ||
+            !otherParticipant
+          ) {
+            return null;
+          }
 
-        // --------------------------------------------------
-        // 12. Unread count
-        // --------------------------------------------------
+          // --------------------------------------------------
+          // 12. Unread count
+          // --------------------------------------------------
 
-        const unreadCount =
-          await prisma.chatMessage.count({
-            where: {
-              conversationId:
-                conversation.id,
+          const unreadCount =
+            await prisma.chatMessage.count({
+              where: {
+                conversationId:
+                  conversation.id,
 
-              senderId: {
-                not: userId,
-              },
+                senderId: {
+                  not: userId,
+                },
 
-              readAt: null,
+                readAt: null,
 
-              deletedAt: null,
+                deletedAt: null,
 
-              ...(currentParticipant.lastReadAt
-                ? {
+                ...(currentParticipant.lastReadAt
+                  ? {
                     createdAt: {
                       gt: currentParticipant.lastReadAt,
                     },
                   }
-                : {}),
+                  : {}),
+              },
+            });
+
+          // --------------------------------------------------
+          // 13. Other user
+          // --------------------------------------------------
+
+          const otherUser =
+            otherParticipant.user;
+
+          const compatibility =
+            matchScoreMap.get(
+              otherUser.id,
+            );
+
+          // --------------------------------------------------
+          // 14. Final response
+          // --------------------------------------------------
+
+          const presence =
+            presenceMap.get(otherUser.id);
+
+          return {
+            conversationId:
+              conversation.id,
+
+            user: {
+              id: otherUser.id,
+
+              fullName:
+                otherUser.full_name,
+
+              age: calculateAge(
+                otherUser.birth_date,
+              ),
+
+              profilePhoto:
+                otherUser.photos[0]
+                  ?.media_url ?? null,
+
+              matchPercentage:
+                compatibility?.percentage ??
+                0,
+
+              trustPercentage: 85,
+
+              isOnline:
+                presence?.isOnline ?? false,
+
+              lastSeenAt:
+                presence?.lastSeenAt ?? null,
             },
-          });
 
-        // --------------------------------------------------
-        // 13. Other user
-        // --------------------------------------------------
+            lastMessage:
+              conversation.messages[0] ??
+              null,
 
-        const otherUser =
-          otherParticipant.user;
+            unreadCount,
 
-        const compatibility =
-          matchScoreMap.get(
-            otherUser.id,
-          );
+            updatedAt:
+              conversation.updatedAt,
+          };
+        },
+      ),
+    );
 
-        // --------------------------------------------------
-        // 14. Final response
-        // --------------------------------------------------
+    // --------------------------------------------------
+    // 15. Return plain array
+    // --------------------------------------------------
 
-        return {
-          conversationId:
-            conversation.id,
-
-          user: {
-            id: otherUser.id,
-
-            fullName:
-              otherUser.full_name,
-
-            age: calculateAge(
-              otherUser.birth_date,
-            ),
-
-            profilePhoto:
-              otherUser.photos[0]
-                ?.media_url ?? null,
-
-            matchPercentage:
-              compatibility?.percentage ??
-              0,
-
-            trustPercentage: 85,
-
-            isOnline: true,
-          },
-
-          lastMessage:
-            conversation.messages[0] ??
-            null,
-
-          unreadCount,
-
-          updatedAt:
-            conversation.updatedAt,
-        };
-      },
-    ),
-  );
-
-  // --------------------------------------------------
-  // 15. Return plain array
-  // --------------------------------------------------
-
-  return result.filter(
-    (item): item is NonNullable<typeof item> =>
-      item !== null,
-  );
-},
+    return result.filter(
+      (item): item is NonNullable<typeof item> =>
+        item !== null,
+    );
+  },
   /**
    * Get messages using cursor pagination.
    */
@@ -733,11 +765,11 @@ export const chatRepository = {
         conversationId,
         deletedAt: null,
         // Clear chat deletion for this user
-      deletions: {
-        none: {
-          userId,
+        deletions: {
+          none: {
+            userId,
+          },
         },
-      },
       },
 
       orderBy: {

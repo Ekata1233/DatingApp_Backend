@@ -1,7 +1,8 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
-import { socketAuthMiddleware } from "../middleware/socketAuth.middleware";
+import { AuthenticatedSocket, socketAuthMiddleware } from "../middleware/socketAuth.middleware";
 import { registerChatSocket } from "../features/chat/socket/chat.socket";
+import { presenceService } from "../features/chat/presence/presence.service";
 
 
 let io: SocketIOServer;
@@ -35,19 +36,110 @@ export const initializeSocket = (server: HttpServer): SocketIOServer => {
    */
   registerChatSocket(io);
 
-  io.on("connection", (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+  io.on("connection", async (socket) => {
+    const userId = (socket as AuthenticatedSocket).userId;
+
+    console.log(
+      `Socket connected: ${socket.id}, User: ${userId}`
+    );
+
+
+    /**
+     * ==============================
+     * USER ONLINE
+     * ==============================
+     */
+    const onlineEvent =
+      await presenceService.setOnline(
+        userId,
+        socket.id
+      );
+
+
+    /**
+     * Notify other connected users.
+     */
+    socket.broadcast.emit(
+      "user:online",
+      onlineEvent
+    );
+
+    /**
+   * HEARTBEAT
+   */
+    socket.on(
+      "presence:heartbeat",
+      async () => {
+        try {
+          await presenceService.heartbeat(
+            userId,
+            socket.id
+          );
+        } catch (error) {
+          console.error(
+            "Presence heartbeat error:",
+            error
+          );
+        }
+      }
+    );
 
     socket.onAny((event, ...args) => {
-    console.log("🔥 SOCKET EVENT RECEIVED:", event);
-    console.log("🔥 SOCKET EVENT PAYLOAD:", args);
-  });
-
-    socket.on("disconnect", (reason) => {
-      console.log(
-        `Socket disconnected: ${socket.id}, reason: ${reason}`
-      );
+      console.log("🔥 SOCKET EVENT RECEIVED:", event);
+      console.log("🔥 SOCKET EVENT PAYLOAD:", args);
     });
+
+    /**
+    * ==============================
+    * USER DISCONNECTED
+    * ==============================
+    */
+    socket.on(
+      "disconnect",
+      async (reason) => {
+
+        console.log(
+          `Socket disconnected: ${socket.id}, reason: ${reason}`
+        );
+
+
+        /**
+         * Remove this socket from
+         * user's active socket list.
+         */
+        const offlineEvent =
+          await presenceService.setOffline(
+            userId,
+            socket.id
+          );
+
+
+        /**
+         * If null:
+         *
+         * Another socket is still connected.
+         *
+         * Therefore user remains ONLINE.
+         */
+        if (!offlineEvent) {
+          return;
+        }
+
+
+        /**
+         * This was the user's LAST socket.
+         *
+         * Notify other users that
+         * the user is now offline.
+         */
+        socket.broadcast.emit(
+          "user:offline",
+          offlineEvent
+        );
+
+      }
+    );
+
   });
 
   console.log("✅ Socket.IO initialized");

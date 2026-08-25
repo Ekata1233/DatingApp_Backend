@@ -146,6 +146,11 @@ export const presenceService = {
      */
     const now = new Date();
 
+    await redis.set(
+      `lastseen:${userId}`,
+      now.toISOString()
+    );
+
     const offlinePresence: UserPresence = {
       userId,
       status: "OFFLINE",
@@ -160,6 +165,7 @@ export const presenceService = {
         ex: 60 * 60 * 24 * 30,
       }
     );
+
 
     return {
       userId,
@@ -184,12 +190,17 @@ export const presenceService = {
      * consider user offline.
      */
     if (!data) {
+      const lastSeen =
+        await redis.get<string>(
+          `lastseen:${userId}`
+        );
+
       return {
         userId,
-
         isOnline: false,
-
-        lastSeenAt: null,
+        lastSeenAt: lastSeen
+          ? new Date(lastSeen)
+          : null,
       };
     }
 
@@ -267,18 +278,12 @@ export const presenceService = {
     socketId: string
   ): Promise<void> {
     const key = getPresenceKey(userId);
-
+    const lastSeenKey = `lastseen:${userId}`;
     const data =
       await redis.get<string>(key);
 
     if (!data) {
-      /**
-       * Presence expired.
-       *
-       * Re-create it as online.
-       */
       await this.setOnline(userId, socketId)
-
       return;
     }
 
@@ -294,6 +299,33 @@ export const presenceService = {
       return;
     }
 
+    const now = new Date();
+
+    // Store latest heartbeat as last seen
+    await redis.set(
+      lastSeenKey,
+      now.toISOString()
+    );
+    /**
+     * Make sure this socket is registered.
+     */
+    if (!presence.socketIds.includes(socketId)) {
+      presence.socketIds.push(socketId);
+
+      await redis.set(
+        key,
+        JSON.stringify(presence),
+        {
+          ex: PRESENCE_TTL,
+        }
+      );
+
+      return;
+    }
+
+    /**
+     * Refresh TTL.
+     */
     await redis.expire(
       key,
       PRESENCE_TTL
