@@ -54,3 +54,7 @@ export interface ChatPagination {
   nextCursor: string | null;
   hasMore: boolean;
 }
+
+export interface UserPresenceParams {
+  userId: string;
+}

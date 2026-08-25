@@ -9,6 +9,7 @@ import {
   deleteMessage,
   getConversations,
   getMessages,
+  getUserPresenceController,
   markConversationRead,
   sendMessage,
 } from "./chat.controller";
@@ -68,6 +69,12 @@ router.delete(
   "/conversations/:conversationId/clear",
   authMiddleware,
   clearChat
+);
+
+router.get(
+  "/presence/:userId",
+  authMiddleware,
+  getUserPresenceController
 );
 
 export default router;

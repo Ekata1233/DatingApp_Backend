@@ -177,24 +177,80 @@ export const presenceService = {
   /**
    * Get one user's presence.
    */
+  // async getPresence(
+  //   userId: string
+  // ): Promise<PresenceResponse> {
+  //   const key = getPresenceKey(userId);
+
+  //   const data =
+  //     await redis.get<string>(key);
+
+  //   /**
+  //    * If Redis has no record,
+  //    * consider user offline.
+  //    */
+  //   if (!data) {
+  //     const lastSeen =
+  //       await redis.get<string>(
+  //         `lastseen:${userId}`
+  //       );
+
+  //     return {
+  //       userId,
+  //       isOnline: false,
+  //       lastSeenAt: lastSeen
+  //         ? new Date(lastSeen)
+  //         : null,
+  //     };
+  //   }
+
+  //   const presence =
+  //     typeof data === "string"
+  //       ? JSON.parse(data) as UserPresence
+  //       : data as UserPresence;
+
+  //   /**
+  //    * Check current status.
+  //    */
+  //   return {
+  //     userId,
+
+  //     isOnline:
+  //       presence.status === "ONLINE",
+
+  //     lastSeenAt:
+  //       presence.lastSeenAt
+  //         ? new Date(
+  //           presence.lastSeenAt
+  //         )
+  //         : null,
+  //   };
+  // },
+
   async getPresence(
     userId: string
   ): Promise<PresenceResponse> {
-    const key = getPresenceKey(userId);
+
+    const presenceKey =
+      getPresenceKey(userId);
+
+    const lastSeenKey =
+      `lastseen:${userId}`;
+
+    console.log("USER ID:", userId);
+    console.log("PRESENCE KEY:", presenceKey);
+    console.log("LAST SEEN KEY:", lastSeenKey);
 
     const data =
-      await redis.get<string>(key);
+      await redis.get<string>(presenceKey);
 
-    /**
-     * If Redis has no record,
-     * consider user offline.
-     */
+    const lastSeen =
+      await redis.get<string>(lastSeenKey);
+
+    console.log("PRESENCE DATA:", data);
+    console.log("LAST SEEN DATA:", lastSeen);
+
     if (!data) {
-      const lastSeen =
-        await redis.get<string>(
-          `lastseen:${userId}`
-        );
-
       return {
         userId,
         isOnline: false,
@@ -209,20 +265,21 @@ export const presenceService = {
         ? JSON.parse(data) as UserPresence
         : data as UserPresence;
 
-    /**
-     * Check current status.
-     */
+    if (presence.status === "ONLINE") {
+      return {
+        userId,
+        isOnline: true,
+        lastSeenAt: null,
+      };
+    }
+
     return {
       userId,
-
-      isOnline:
-        presence.status === "ONLINE",
-
-      lastSeenAt:
-        presence.lastSeenAt
-          ? new Date(
-            presence.lastSeenAt
-          )
+      isOnline: false,
+      lastSeenAt: lastSeen
+        ? new Date(lastSeen)
+        : presence.lastSeenAt
+          ? new Date(presence.lastSeenAt)
           : null,
     };
   },

@@ -12,6 +12,8 @@ import {
 } from "./chat.validation";
 
 import { chatService } from "./chat.service";
+import { presenceService } from "./presence/presence.service";
+import { UserPresenceParams } from "./chat.types";
 
 export const createConversation = async (
   req: Request,
@@ -344,6 +346,40 @@ export const clearChat = async (
     return res.status(500).json({
       success: false,
       message: "Failed to clear chat",
+    });
+  }
+};
+
+export const getUserPresenceController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = req.params.userId;
+
+    if (!userId || Array.isArray(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid User ID is required",
+      });
+    }
+
+    const presence =
+      await presenceService.getPresence(userId);
+
+    return res.status(200).json({
+      success: true,
+      data: presence,
+    });
+  } catch (error) {
+    console.error(
+      "Get user presence error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get user presence",
     });
   }
 };
