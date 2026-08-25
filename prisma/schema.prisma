@@ -1904,8 +1904,8 @@ model EventBooking {
   status         EventBookingStatus @default(PENDING)
   ticketId       String             @unique @db.VarChar(50)
   qrCodeUrl      String?            @db.Text
-  paymentId      String?            @unique
-  payment        Payment?           @relation(fields: [paymentId], references: [payment_id])
+  paymentId      String?            @unique @db.Uuid
+  payment        Payment?           @relation(fields: [paymentId], references: [id])
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
