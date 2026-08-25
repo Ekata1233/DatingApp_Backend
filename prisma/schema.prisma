@@ -1296,7 +1296,7 @@ model Payment {
   RosePurchase       RosePurchase[]
   ComplimentPurchase ComplimentPurchase[]
   DatePlanPurchase   DatePlanPurchase[]
-  EventBooking       EventBooking?
+  eventbooking       EventBooking?
 }
 
 model Notification {
