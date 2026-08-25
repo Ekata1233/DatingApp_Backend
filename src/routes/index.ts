@@ -57,6 +57,7 @@ import giftRoutes from "../features/gift/gift.routes"
 import chatRoutes from "../features/chat/chat.routes";
 import mediaRoutes from "../features/chat/media/media.routes"
 import newMatchesRoutes from "../features/chat/match/match.routes"
+import userRoutes from "../features/user/management/user.route"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -79,7 +80,7 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 
 router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute,eventPartnerRoutes);
-router.use("/user",waitlistRoutes,)
+router.use("/user",waitlistRoutes,userRoutes)
 
 
 // router.use("/users",usersRoutes)

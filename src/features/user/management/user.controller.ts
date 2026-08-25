@@ -40,12 +40,15 @@ export const getAllUsersController = async (req: Request, res: Response) => {
 };
 
 
-//FETCH SINGLE USER
-export const getSingleUserController = async (req: Request, res: Response) => {
+// FETCH SINGLE USER
+export const getSingleUserController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const { id } = req.params;
 
-    if (Array.isArray(id)) {
+    if (Array.isArray(id) || !id) {
       return res.status(400).json({
         success: false,
         message: "Invalid user id",
@@ -53,13 +56,23 @@ export const getSingleUserController = async (req: Request, res: Response) => {
     }
 
     const user = await userService.getSingleUser(id);
-    res.status(200).json({
+
+    return res.status(200).json({
       success: true,
       message: "User fetched successfully",
       data: user,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Get single user error:", error);
+
+    if (error instanceof Error && error.message === "User not found") {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(500).json({
       success: false,
       message: "Something went wrong",
     });
