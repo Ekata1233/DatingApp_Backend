@@ -144,9 +144,9 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
 //aboutme
 export const updateBioService = async (userId: string, bio: string) => {
   const updatedBio = await upsertUserBio(userId, bio);
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
   return updatedBio;
