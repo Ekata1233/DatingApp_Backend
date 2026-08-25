@@ -934,10 +934,6 @@ export const cancelDatePlanRequest = async (userId: string, planId: string) => {
     throw new Error("Request not found");
   }
 
-  if (request.status === "APPROVED") {
-    throw new Error("Approved request cannot be cancelled");
-  }
-
   if (request.status === "DECLINED") {
     throw new Error("Request has already been declined");
   }
