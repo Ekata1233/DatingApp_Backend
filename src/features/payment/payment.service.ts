@@ -1,8 +1,13 @@
-
-
 import axios from "axios";
 import { prisma } from "../../prisma/prismaClient";
-import { PaymentPurpose, PaymentStatus, PurchasePaymentMethod, StoreItemType } from "@prisma/client";
+import {
+  EventBookingStatus,
+  EventStatus,
+  PaymentPurpose,
+  PaymentStatus,
+  PurchasePaymentMethod,
+  StoreItemType,
+} from "@prisma/client";
 import { getAccessToken } from "./payment.utils";
 import { randomUUID } from "node:crypto";
 import { activatePackage } from "./handlers/package.handler";
@@ -13,6 +18,7 @@ import { creditRoseHandler } from "../purchaseStore/handlers/creditRose.handler"
 import { creditBoostHandler } from "../purchaseStore/handlers/creditBoost.handler";
 import { creditComplimentHandler } from "../purchaseStore/handlers/creditCompliment.handler";
 import { creditDatePlanHandler } from "../purchaseStore/handlers/creditDatePlan.handler";
+import { confirmEventBooking } from "./handlers/event.handler";
 
 //CREATE PAYMENT LINK
 export async function createPaymentLink(userId: string, body: any) {
@@ -45,10 +51,10 @@ export async function createPaymentLink(userId: string, body: any) {
     case PaymentPurpose.PACKAGE: {
       // ✅ FIXED: Find package by slug and billing cycle
       const pkg = await prisma.package.findUnique({
-        where: { slug: body.packageSlug },  // User sends slug like "premium"
+        where: { slug: body.packageSlug }, // User sends slug like "premium"
       });
 
-      console.log("pkg : ", pkg)
+      console.log("pkg : ", pkg);
 
       if (!pkg || !pkg.active) {
         throw new Error("Package not found or inactive");
@@ -59,20 +65,19 @@ export async function createPaymentLink(userId: string, body: any) {
         where: {
           packageId_billingCycle: {
             packageId: pkg.id,
-            billingCycle: body.billingCycle,  // User sends billing cycle
+            billingCycle: body.billingCycle, // User sends billing cycle
           },
         },
       });
 
-      console.log("package_price : ", package_price)
-
+      console.log("package_price : ", package_price);
 
       if (!package_price || !package_price.active) {
         throw new Error("Price not available for this billing cycle");
       }
 
       amount = Number(package_price.price);
-      priceId = package_price.id;  // Store priceId for payment creation
+      priceId = package_price.id; // Store priceId for payment creation
       break;
     }
 
@@ -89,7 +94,6 @@ export async function createPaymentLink(userId: string, body: any) {
     }
 
     case PaymentPurpose.PURCHASE_STORE: {
-
       const storePack = await prisma.storePack.findUnique({
         where: {
           id: body.storePackId,
@@ -108,7 +112,100 @@ export async function createPaymentLink(userId: string, body: any) {
       priceId = storePack.id;
       break;
     }
+    // ==========================================
+    // EVENT BOOKING
+    // ==========================================
 
+  case PaymentPurpose.EVENT_BOOKING: {
+  console.log("EVENT BOOKING BODY:", body);
+  console.log("EVENT ID:", body.eventId);
+
+  const event = await prisma.event.findUnique({
+    where: {
+      id: body.eventId,
+    },
+    select: {
+      id: true,
+      entryPrice: true,
+      status: true,
+    },
+  });
+
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  if (!event.entryPrice) {
+    throw new Error("Event price not available");
+  }
+
+  if (event.status !== EventStatus.LIVE) {
+    throw new Error("Event is not live");
+  }
+
+  const ticketCount = Number(body.ticketCount) || 1;
+  const ticketAmount = Number(event.entryPrice);
+  const totalAmount = ticketAmount * ticketCount;
+
+  // Find existing pending booking
+  let booking = await prisma.eventBooking.findFirst({
+    where: {
+      eventId: event.id,
+      userId,
+      status: {
+        in: [
+          EventBookingStatus.PENDING,
+          EventBookingStatus.PAYMENT_PENDING,
+        ],
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  // Create booking if it does not exist
+  if (!booking) {
+    const bookingNumber = `EVT_${Date.now()}_${randomUUID()
+      .replace(/-/g, "")
+      .slice(0, 8)}`;
+
+    const ticketId = `TKT_${Date.now()}_${randomUUID()
+      .replace(/-/g, "")
+      .slice(0, 8)}`;
+
+    booking = await prisma.eventBooking.create({
+      data: {
+        userId,
+        eventId: event.id,
+
+        bookingNumber,
+        ticketId,
+
+        ticketCount,
+        ticketAmount,
+        totalAmount,
+        paidAmount: 0,
+
+        status: EventBookingStatus.PENDING,
+      },
+    });
+
+    console.log("EVENT BOOKING CREATED:", booking.id);
+  }
+
+  const remainingAmount =
+    Number(booking.totalAmount) -
+    Number(booking.paidAmount);
+
+  if (remainingAmount <= 0) {
+    throw new Error("Event booking is already fully paid");
+  }
+
+  amount = remainingAmount;
+
+  break;
+}
     default:
       throw new Error("Invalid payment purpose");
   }
@@ -123,7 +220,6 @@ export async function createPaymentLink(userId: string, body: any) {
     },
   });
 
-
   if (!user) {
     throw new Error("User not found");
   }
@@ -137,9 +233,10 @@ export async function createPaymentLink(userId: string, body: any) {
     source: "API",
     order_id: orderId,
 
-    successURL: "https://dating-app-backend-plum.vercel.app/api/payments/return",
-    failureURL: "https://dating-app-backend-plum.vercel.app/api/payments/return",
-
+    successURL:
+      "https://dating-app-backend-plum.vercel.app/api/payments/return",
+    failureURL:
+      "https://dating-app-backend-plum.vercel.app/api/payments/return",
 
     customer: {
       customerId: userId,
@@ -154,7 +251,7 @@ export async function createPaymentLink(userId: string, body: any) {
     },
   };
 
-  console.log("payload : ", payload)
+  console.log("payload : ", payload);
 
   const { data } = await axios.post(
     "https://uatoneapi.payu.in/payment-links/",
@@ -164,7 +261,7 @@ export async function createPaymentLink(userId: string, body: any) {
         Authorization: `Bearer ${accessToken}`,
         merchantId: process.env.PAYU_MERCHANT_ID!,
       },
-    }
+    },
   );
 
   await prisma.payment.create({
@@ -176,6 +273,7 @@ export async function createPaymentLink(userId: string, body: any) {
       status: PaymentStatus.PENDING,
       purpose: body.purpose,
       packagePriceId: priceId,
+
       gatewayResponse: data,
     },
   });
@@ -183,126 +281,135 @@ export async function createPaymentLink(userId: string, body: any) {
   return data;
 }
 
-
 export async function paymentWebhookService(payload: any) {
   const payment_id = payload.txnid;
   const status = payload.status;
 
   // Use transaction with optimistic locking to prevent race conditions
-  const result = await prisma.$transaction(async (tx) => {
-    // Lock the payment row for update
-    const payment = await tx.payment.findUnique({
-      where: { payment_id },
-    });
+  const result = await prisma.$transaction(
+    async (tx) => {
+      // Lock the payment row for update
+      const payment = await tx.payment.findUnique({
+        where: { payment_id },
+      });
 
-    if (!payment) {
-      throw new Error("Payment not found");
-    }
+      if (!payment) {
+        throw new Error("Payment not found");
+      }
 
-    // Check idempotency with status check AND version/updatedAt check
-    if (payment.status === PaymentStatus.COMPLETED) {
-      console.log(`Payment ${payment_id} already processed`);
-      return { success: true, alreadyProcessed: true };
-    }
+      // Check idempotency with status check AND version/updatedAt check
+      if (payment.status === PaymentStatus.COMPLETED) {
+        console.log(`Payment ${payment_id} already processed`);
+        return { success: true, alreadyProcessed: true };
+      }
 
-    // Update payment status with optimistic locking
-    const updatedPayment = await tx.payment.update({
-      where: {
-        id: payment.id,
-        status: { not: PaymentStatus.COMPLETED },
-      },
-      data: {
-        status: status === "success" ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
-        paidAt: new Date(),
-        gatewayResponse: payload,
-      },
-    });
+      // Update payment status with optimistic locking
+      const updatedPayment = await tx.payment.update({
+        where: {
+          id: payment.id,
+          status: { not: PaymentStatus.COMPLETED },
+        },
+        data: {
+          status:
+            status === "success"
+              ? PaymentStatus.COMPLETED
+              : PaymentStatus.FAILED,
 
-    if (updatedPayment.status !== PaymentStatus.COMPLETED) {
-      return { success: false, reason: 'payment_failed' };
-    }
+          paidAt: status === "success" ? new Date() : null,
 
-    // Process based on purpose
-    switch (updatedPayment.purpose) {
-      case PaymentPurpose.WAITLIST:
-        await createWaitlist(tx, updatedPayment);
-        break;
-      case PaymentPurpose.PACKAGE:
-        await activatePackage(tx, updatedPayment);
-        break;
-      case PaymentPurpose.BOOST:
-        await creditBoost(tx, updatedPayment);
-        break;
-      case PaymentPurpose.WALLET:
-        await creditWallet(tx, updatedPayment);
-        break;
-      case PaymentPurpose.PURCHASE_STORE:
+          gatewayResponse: payload,
+        },
+      });
 
-      console.log("into the hte purchase store webhook")
-        const storePack = await tx.storePack.findUnique({
-          where: {
-            id: payment.packagePriceId!,
-          },
-        });
+      if (updatedPayment.status !== PaymentStatus.COMPLETED) {
+        return { success: false, reason: "payment_failed" };
+      }
 
-        if (!storePack) {
-          throw new Error("Store pack not found");
-        }
+      // Process based on purpose
+      switch (updatedPayment.purpose) {
+        case PaymentPurpose.WAITLIST:
+          await createWaitlist(tx, updatedPayment);
+          break;
+        case PaymentPurpose.PACKAGE:
+          await activatePackage(tx, updatedPayment);
+          break;
+        case PaymentPurpose.BOOST:
+          await creditBoost(tx, updatedPayment);
+          break;
+        case PaymentPurpose.WALLET:
+          await creditWallet(tx, updatedPayment);
+          break;
+        case PaymentPurpose.PURCHASE_STORE:
+          console.log("into the hte purchase store webhook");
+          const storePack = await tx.storePack.findUnique({
+            where: {
+              id: payment.packagePriceId!,
+            },
+          });
 
-        switch (storePack.itemType) {
+          if (!storePack) {
+            throw new Error("Store pack not found");
+          }
 
-          case StoreItemType.ROSE:
-            await creditRoseHandler({
-              tx,
-              userId: updatedPayment.userId,
-              storePack,
-              paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
-              walletTransactionId: undefined,
-              paymentId: updatedPayment.id,
-            });
-            break;
+          switch (storePack.itemType) {
+            case StoreItemType.ROSE:
+              await creditRoseHandler({
+                tx,
+                userId: updatedPayment.userId,
+                storePack,
+                paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
+                walletTransactionId: undefined,
+                paymentId: updatedPayment.id,
+              });
+              break;
 
-          case StoreItemType.BOOST:
-            await creditBoostHandler({
-              tx,
-              userId: updatedPayment.userId,
-              storePack,
-              paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
-              walletTransactionId: undefined,
-              paymentId: updatedPayment.id,
-            });
-            break;
+            case StoreItemType.BOOST:
+              await creditBoostHandler({
+                tx,
+                userId: updatedPayment.userId,
+                storePack,
+                paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
+                walletTransactionId: undefined,
+                paymentId: updatedPayment.id,
+              });
+              break;
 
-          case StoreItemType.COMPLIMENT:
-            await creditComplimentHandler({
-              tx,
-              userId: updatedPayment.userId,
-              storePack,
-              paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
-              walletTransactionId: undefined,
-              paymentId: updatedPayment.id,
-            });
-            break;
+            case StoreItemType.COMPLIMENT:
+              await creditComplimentHandler({
+                tx,
+                userId: updatedPayment.userId,
+                storePack,
+                paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
+                walletTransactionId: undefined,
+                paymentId: updatedPayment.id,
+              });
+              break;
 
-          case StoreItemType.DATE_PLAN:
-            await creditDatePlanHandler({
-              tx,
-              userId: updatedPayment.userId,
-              storePack,
-              paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
-              walletTransactionId: undefined,
-              paymentId: updatedPayment.id,
-            });
-            break;
-        }
-    }
+            case StoreItemType.DATE_PLAN:
+              await creditDatePlanHandler({
+                tx,
+                userId: updatedPayment.userId,
+                storePack,
+                paymentMethod: PurchasePaymentMethod.PAYMENT_GATEWAY,
+                walletTransactionId: undefined,
+                paymentId: updatedPayment.id,
+              });
+              break;
+          }
+          break;
+        case PaymentPurpose.EVENT_BOOKING:
+          await confirmEventBooking(tx, updatedPayment);
+          break;
+      }
 
-    return { success: true, alreadyProcessed: false };
-  }, {
-    maxWait: 10000,
-    timeout: 30000,
-    isolationLevel: 'Serializable', // Add serializable isolation for extra safety
-  });
+      return { success: true, alreadyProcessed: false };
+    },
+    {
+      maxWait: 10000,
+      timeout: 30000,
+      isolationLevel: "Serializable", // Add serializable isolation for extra safety
+    },
+  );
 
   return result;
 }

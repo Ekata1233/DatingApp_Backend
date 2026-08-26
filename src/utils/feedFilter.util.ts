@@ -544,24 +544,22 @@ if (filters.sleep && filters.sleep.length > 0) {
 // -------------------------
 // LANGUAGES FILTER
 // -------------------------
-if (filters.languages && filters.languages.length > 0) {
-  userWhere.AND = [
-    ...(userWhere.AND || []),
-    ...filters.languages.map((group) => ({
-      answer: {
-        some: {
-          option: {
-            value: {
-              in: group.values.map((v: string) => v.toLowerCase()),
-            },
-            question: {
-              key: group.key, // e.g. "languages"
-            },
-          },
+if (filters.languages?.length) {
+  const languageIds = filters.languages.flatMap((group) =>
+    group.values
+      .map((value) => Number(value))
+      .filter((id) => !Number.isNaN(id))
+  );
+
+  if (languageIds.length > 0) {
+    profileWhere.languages = {
+      some: {
+        languageId: {
+          in: languageIds,
         },
       },
-    })),
-  ];
+    };
+  }
 }
 
 // -------------------------

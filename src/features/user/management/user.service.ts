@@ -10,14 +10,11 @@ export const getAllUsers = async () => {
 
 //SERVICE LAYER FOR FETCHING SINGLE USER
 
-
 // SERVICE LAYER FOR FETCHING SINGLE USER WITH FULL DETAILS
 
- // use your actual paths
+// use your actual paths
 
-const formatBirthDate = (
-  date: Date | string | null
-): string | null => {
+const formatBirthDate = (date: Date | string | null): string | null => {
   if (!date) return null;
 
   const d = new Date(date);
@@ -33,10 +30,7 @@ const formatBirthDate = (
   return `${day}-${month}-${year}`;
 };
 
-export const getSingleUser = async (
-  id: string,
-  currentUserId?: string
-) => {
+export const getSingleUser = async (id: string, currentUserId?: string) => {
   const user = await prisma.user.findUnique({
     where: {
       id,
@@ -178,12 +172,9 @@ export const getSingleUser = async (
     if (presence) {
       isOnline = presence.isOnline || false;
 
-      presenceLastActiveAt =
-        presence.lastActiveAt || null;
+      presenceLastActiveAt = presence.lastActiveAt || null;
 
-      lastSeen = formatLastSeen(
-        presence.lastActiveAt
-      );
+      lastSeen = formatLastSeen(presence.lastActiveAt);
     }
   }
 
@@ -216,25 +207,22 @@ export const getSingleUser = async (
   // ==========================================================
 
   if (currentUserId) {
-    const compatibility =
-      await prisma.userCompatibility.findFirst({
-        where: {
-          userId: currentUserId,
-          targetUserId: user.id,
-        },
+    const compatibility = await prisma.userCompatibility.findFirst({
+      where: {
+        userId: currentUserId,
+        targetUserId: user.id,
+      },
 
-        select: {
-          score: true,
-          percentage: true,
-        },
-      });
+      select: {
+        score: true,
+        percentage: true,
+      },
+    });
 
     if (compatibility) {
-      matchScore =
-        compatibility.percentage || 0;
+      matchScore = compatibility.percentage || 0;
 
-      compatibilityScore =
-        compatibility.score || 0;
+      compatibilityScore = compatibility.score || 0;
     }
   }
 
@@ -266,10 +254,7 @@ export const getSingleUser = async (
       currentUser?.profile?.latitude != null &&
       currentUser?.profile?.longitude != null
     ) {
-      const result =
-        await prisma.$queryRaw<
-          { distance: number }[]
-        >`
+      const result = await prisma.$queryRaw<{ distance: number }[]>`
           SELECT
             ST_Distance(
               a.location::geography,
@@ -283,9 +268,7 @@ export const getSingleUser = async (
 
       if (result.length > 0) {
         distanceKm =
-          Math.round(
-            (Number(result[0].distance) / 1000) * 100
-          ) / 100;
+          Math.round((Number(result[0].distance) / 1000) * 100) / 100;
       }
     }
   }
@@ -308,13 +291,9 @@ export const getSingleUser = async (
     id: user.id,
     full_name: user.full_name,
 
-    birth_date: formatBirthDate(
-      user.birth_date
-    ),
+    birth_date: formatBirthDate(user.birth_date),
 
-    age: calculateAge(
-      user.birth_date
-    ),
+    age: calculateAge(user.birth_date),
 
     height: user.height,
 
@@ -340,10 +319,10 @@ export const getSingleUser = async (
     // ============================================
     // ABOUT
     // ============================================
-   about: {
-  ...user.about,
-  relationshipTag: "Serious Relationship",
-},
+    about: {
+      ...user.about,
+      relationshipTag: "Serious Relationship",
+    },
 
     // ============================================
     // EDUCATION / WORK
