@@ -1,5 +1,5 @@
 // rose.repository.ts
-import { PrismaClient, Prisma, RoseTransactionType } from '@prisma/client';
+import { PrismaClient, Prisma, RoseTransactionType, TargetType } from '@prisma/client';
 import { ROSE_CONSTANTS } from './rose.constants';
 import { RoseHistoryQuery } from './rose.types';
 
@@ -95,7 +95,7 @@ export const deductRose = async (
       transactionType: RoseTransactionType.PURCHASE_SEND,
     };
   }
-   throw new Error("No roses available");
+  throw new Error("No roses available");
 };
 
 export const createRoseLedger = async (
@@ -116,6 +116,10 @@ export const createRoseTransaction = async (
   data: {
     senderId: string;
     receiverId: string;
+    targetType?: TargetType | null;
+    targetId?: string | null;
+    requiredMessages: number;
+    expiresAt: Date;
   },
   prisma: PrismaClient | Prisma.TransactionClient
 ) => {
@@ -123,6 +127,14 @@ export const createRoseTransaction = async (
     data: {
       senderId: data.senderId,
       receiverId: data.receiverId,
+      targetType: data.targetType ?? null,
+      targetId: data.targetId ?? null,
+
+      requiredMessages: data.requiredMessages,
+      messagesSent: 0,
+
+      isUnlocked: false,
+      expiresAt: data.expiresAt,
     },
   });
 };

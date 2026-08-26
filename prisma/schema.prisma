@@ -1098,17 +1098,24 @@ model UserPlanUsage {
 }
 
 model UserRose {
-  id         String   @id @default(uuid()) @db.Uuid
-  senderId   String   @db.Uuid
-  receiverId String   @db.Uuid
-  createdAt  DateTime @default(now())
-  sender     User     @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  id               String      @id @default(uuid()) @db.Uuid
+  senderId         String      @db.Uuid
+  receiverId       String      @db.Uuid
+  targetType       TargetType?
+  targetId         String?     @db.Uuid
+  requiredMessages Int         @default(1)
+  messagesSent     Int         @default(0)
+  isUnlocked       Boolean     @default(false)
+  unlockedAt       DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime    @default(now())
+  sender           User        @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver         User        @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([senderId])
   @@index([receiverId])
   @@index([senderId, receiverId])
-  @@index([createdAt])
+  @@index([receiverId, senderId, isUnlocked, expiresAt])
 }
 
 model UserRoseBalance {
@@ -1173,6 +1180,8 @@ model UserCompliment {
   id         String           @id @default(uuid()) @db.Uuid
   senderId   String           @db.Uuid
   receiverId String           @db.Uuid
+  targetType TargetType?
+  targetId   String?          @db.Uuid
   ideaId     String?
   idea       ComplimentIdea?  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   message    String?          @db.VarChar(140)
@@ -1257,8 +1266,15 @@ model UserGift {
   giftName            String
   pricePaid           Int
   message             String?            @db.VarChar(150)
+  targetType          TargetType?
+  targetId            String?            @db.Uuid
   walletTransactionId String?            @unique @db.Uuid
   walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
+  requiredMessages    Int                @default(1)
+  messagesSent        Int                @default(0)
+  isUnlocked          Boolean            @default(false)
+  unlockedAt          DateTime?
+  expiresAt           DateTime
   createdAt           DateTime           @default(now())
   sender              User               @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver            User               @relation("GiftReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
@@ -1267,6 +1283,7 @@ model UserGift {
   @@index([receiverId])
   @@index([senderId])
   @@index([giftId])
+  @@index([receiverId, senderId, isUnlocked, expiresAt])
 }
 
 enum ComplimentStatus {
@@ -1274,6 +1291,18 @@ enum ComplimentStatus {
   READ
   ACCEPTED
   DECLINED
+}
+
+enum TargetType {
+  ABOUT
+  BASIC
+  VIDEO
+  PROMPT
+  PHOTO
+  CAREER
+  INTEREST
+  LIFESTYLE
+  FAMILY
 }
 
 model Payment {

@@ -1,7 +1,11 @@
 // rose.types.ts
 
+import { TargetType } from "@prisma/client";
+
 export interface SendRoseDTO {
   receiverId: string;
+  targetType?: TargetType | null;
+  targetId?: string | null;
 }
 
 export interface RoseResponse {

@@ -11,7 +11,22 @@ export const sendComplimentSchema = z.object({
 
   ideaId: z.string().min(1, {
     message: "Compliment idea is required",
-  }),
+  }).optional(),
+
+   targetType: z
+    .enum([
+      "ABOUT",
+      "BASIC",
+      "VIDEO",
+      "PROMPT",
+      "PHOTO",
+      "CAREER",
+      "INTEREST",
+      "LIFESTYLE",
+      "FAMILY",
+    ])
+    .nullable()
+    .optional(),
 
   message: z
     .string()
@@ -22,6 +37,8 @@ export const sendComplimentSchema = z.object({
     .nullable()
     .optional()
     .default(null),
+
+     targetId: z.string().uuid().nullable().optional(),
 });
 
 /* -------------------------------------------------------------------------- */

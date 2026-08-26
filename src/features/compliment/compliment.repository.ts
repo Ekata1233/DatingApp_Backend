@@ -1,4 +1,4 @@
-import { ComplimentTransactionType, Prisma, PrismaClient } from "@prisma/client";
+import { ComplimentTransactionType, Prisma, PrismaClient, TargetType } from "@prisma/client";
 import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
 import { ComplimentHistoryQuery } from "./compliment.types";
 
@@ -67,14 +67,28 @@ export async function findComplimentIdea(
 /*                           User Compliment                                  */
 /* -------------------------------------------------------------------------- */
 
-export async function createUserCompliment(
-  data: Prisma.UserComplimentUncheckedCreateInput,
+export const createUserCompliment = async (
+  data: {
+    senderId: string;
+    receiverId: string;
+    ideaId: string | null;
+    message?: string | null;
+    targetType?: TargetType | null;
+    targetId?: string | null;
+  },
   tx: Prisma.TransactionClient = prisma
-) {
+) => {
   return tx.userCompliment.create({
-    data,
+    data: {
+      senderId: data.senderId,
+      receiverId: data.receiverId,
+      ideaId: data.ideaId ?? null,
+      message: data.message ?? null,
+      targetType: data.targetType ?? null,
+      targetId: data.targetId ?? null,
+    },
   });
-}
+};
 
 /* -------------------------------------------------------------------------- */
 /*                        Compliment Transaction                              */

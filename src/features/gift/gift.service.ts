@@ -8,12 +8,14 @@ import { prisma } from "../../prisma/prismaClient";
 import { AppError } from "../rose/AppError";
 import { GiftRepository } from "./gift.repository";
 import { SendGiftDTO } from "./gift.validation";
+import { getOrCreateConversation } from "../chat/chat.helper";
+import { createGiftChatMessage } from "./gift.helper";
 
 export const sendGiftService = async (
   senderId: string,
   payload: SendGiftDTO,
 ) => {
-  const { receiverId, giftId, message } = payload;
+  const { receiverId, giftId, message, targetType = null, targetId = null, } = payload;
 
   if (senderId === receiverId) {
     throw new AppError(400, "You cannot send a gift to yourself.");
@@ -32,6 +34,46 @@ export const sendGiftService = async (
   if (!gift) {
     throw new AppError(404, "Gift not found.");
   }
+
+  //CALCULATE REQUIRED MSG FOR UNLOCK GIFT
+  const previousGift = await prisma.userGift.count({
+    where: {
+      senderId,
+      receiverId,
+    },
+  });
+
+  let requiredMessages = 1;
+
+  if (previousGift === 0) {
+    requiredMessages = 25;
+  } else if (previousGift === 1) {
+    requiredMessages = 5;
+  } else {
+    requiredMessages = 1;
+  }
+
+  // EXPIRY TIME
+  const expiresAt = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000
+  );
+
+  if (
+    (targetType === "PHOTO" || targetType === "PROMPT") &&
+    !targetId
+  ) {
+    throw new AppError(400, "TARGET_ID_REQUIRED");
+  }
+
+  // targetId should not be accepted for other target types
+  if (
+    targetId &&
+    targetType !== "PHOTO" &&
+    targetType !== "PROMPT"
+  ) {
+    throw new AppError(400, "TARGET_ID_NOT_ALLOWED");
+  }
+
 
   return prisma.$transaction(async (tx) => {
     // Wallet
@@ -91,6 +133,10 @@ export const sendGiftService = async (
         pricePaid: gift.coinCost,
         message,
         walletTransactionId: walletTransaction.id,
+        targetType,
+        targetId,
+        requiredMessages,
+        expiresAt,
       },
       include: {
         gift: true,
@@ -112,6 +158,36 @@ export const sendGiftService = async (
       },
     });
 
+    const conversation = await getOrCreateConversation(
+      senderId,
+      receiverId,
+      tx
+    );
+
+    // 5. Create GIFT chat message
+    const chatMessage = await createGiftChatMessage(
+      {
+        conversationId: conversation.id,
+        senderId,
+        giftId: userGift.giftId,
+        targetType: userGift.targetType,
+        targetId: userGift.targetId,
+        requiredMessages: userGift.requiredMessages,
+        expiresAt: userGift.expiresAt,
+      },
+      tx
+    );
+
+    // 6. Update conversation
+    await tx.conversation.update({
+      where: {
+        id: conversation.id,
+      },
+      data: {
+        updatedAt: new Date(),
+      },
+    });
+
     return {
       walletBalance: updatedWallet.balance,
       gift: {
@@ -123,5 +199,6 @@ export const sendGiftService = async (
         },
       },
     };
+
   });
 };

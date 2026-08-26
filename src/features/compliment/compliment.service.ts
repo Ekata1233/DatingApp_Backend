@@ -1,7 +1,9 @@
 import { prisma } from "../../prisma/prismaClient";
+import { getOrCreateConversation } from "../chat/chat.helper";
 import { AppError } from "../rose/AppError";
 import { checkBlockedStatus, checkMatch } from "../rose/rose.repository";
 import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
+import { createComplimentChatMessage } from "./compliment.helper";
 import { createComplimentLedger, createUserCompliment, deductCompliment, getComplimentBalance, getComplimentBalanceByUserId, getComplimentDashboard, getComplimentHistory } from "./compliment.repository";
 import { ComplimentBalancebyIdResponse, ComplimentBalanceResponse, ComplimentHistoryQuery, SendComplimentDto, SendComplimentResponse } from "./compliment.types";
 
@@ -10,7 +12,7 @@ export const sendComplimentService = async (
     senderId: string,
     data: SendComplimentDto
 ): Promise<SendComplimentResponse> => {
-    const { receiverId, ideaId, message } = data;
+    const { receiverId, targetType = null, targetId = null, ideaId, message } = data;
 
     /* -------------------------------------------------------------------------- */
     /*                              Self Validation                               */
@@ -76,9 +78,55 @@ export const sendComplimentService = async (
         );
     }
 
+    if (
+        (targetType === "PHOTO" || targetType === "PROMPT") &&
+        !targetId
+    ) {
+        throw new AppError(400, "TARGET_ID_REQUIRED");
+    }
+
+    // targetId should not be accepted for other target types
+    if (
+        targetId &&
+        targetType !== "PHOTO" &&
+        targetType !== "PROMPT"
+    ) {
+        throw new AppError(400, "TARGET_ID_NOT_ALLOWED");
+    }
+
     /* -------------------------------------------------------------------------- */
     /*                             Execute Transaction                            */
     /* -------------------------------------------------------------------------- */
+
+    if (!ideaId && !message) {
+        throw new AppError(
+            400,
+            "Either ideaId or message is required"
+        );
+    }
+
+    let complimentIdeaText: string | null = null;
+
+    if (ideaId) {
+        const idea = await prisma.complimentIdea.findUnique({
+            where: {
+                id: ideaId,
+            },
+            select: {
+                id: true,
+                text: true,
+            },
+        });
+
+        if (!idea) {
+            throw new AppError(
+                404,
+                COMPLIMENT_CONSTANTS.ERRORS.INVALID_COMPLIMENT_TYPE
+            );
+        }
+
+        complimentIdeaText = idea.text;
+    }
 
     return prisma.$transaction(async (tx) => {
         const deduction = await deductCompliment(senderId, tx);
@@ -87,8 +135,10 @@ export const sendComplimentService = async (
             {
                 senderId,
                 receiverId,
-                ideaId,
+                ideaId: ideaId ?? null,
                 message,
+                targetType,
+                targetId
             },
             tx
         );
@@ -103,6 +153,43 @@ export const sendComplimentService = async (
             },
             tx
         );
+
+        const conversation = await getOrCreateConversation(
+            senderId,
+            receiverId,
+            tx
+        );
+
+        const chatContent = message ?? complimentIdeaText;
+        if (!chatContent) {
+            throw new AppError(
+                400,
+                "Compliment message content is required."
+            );
+        }
+
+        // 5. Create ROSE chat message
+        const chatMessage = await createComplimentChatMessage(
+            {
+                conversationId: conversation.id,
+                senderId,
+                complimentId: compliment.id,
+                targetType: compliment.targetType,
+                targetId: compliment.targetId,
+                content: chatContent,
+            },
+            tx
+        );
+
+        // 6. Update conversation
+        await tx.conversation.update({
+            where: {
+                id: conversation.id,
+            },
+            data: {
+                updatedAt: new Date(),
+            },
+        });
 
         const updatedBalance = await getComplimentBalance(senderId, tx);
 
@@ -143,7 +230,7 @@ export const sendComplimentService = async (
 
             sender: {
                 id: sender.id,
-                full_name: sender.full_name?? " ",
+                full_name: sender.full_name ?? " ",
                 photos: sender.photos.map((photo) => photo.media_url),
             },
         };
@@ -166,26 +253,26 @@ export const sendComplimentService = async (
 };
 
 export async function getComplimentBalanceService(
-  userId: string
+    userId: string
 ): Promise<ComplimentBalancebyIdResponse> {
-  const balance = await getComplimentBalanceByUserId(userId);
+    const balance = await getComplimentBalanceByUserId(userId);
 
-  if (!balance) {
-    throw new Error("Compliment balance not found.");
-  }
+    if (!balance) {
+        throw new Error("Compliment balance not found.");
+    }
 
-  return balance;
+    return balance;
 }
 
 export const getComplimentHistoryService = async (
-  userId: string,
-  query: ComplimentHistoryQuery
+    userId: string,
+    query: ComplimentHistoryQuery
 ) => {
-  return getComplimentHistory(userId, query, prisma);
+    return getComplimentHistory(userId, query, prisma);
 };
 
 export const getComplimentDashboardService = async (
-  userId: string
+    userId: string
 ) => {
-  return getComplimentDashboard(userId, prisma);
+    return getComplimentDashboard(userId, prisma);
 };

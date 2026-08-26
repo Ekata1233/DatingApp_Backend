@@ -12,6 +12,21 @@ export const sendRoseSchema = z.object({
     message: "Invalid receiver ID format",
   }),
 
+   targetType: z
+    .enum([
+      "ABOUT",
+      "BASIC",
+      "VIDEO",
+      "PROMPT",
+      "PHOTO",
+      "CAREER",
+      "INTEREST",
+      "LIFESTYLE",
+      "FAMILY",
+    ])
+    .nullable()
+    .optional(),
+    
   message: z
     .string()
     .trim()
