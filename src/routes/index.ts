@@ -57,6 +57,9 @@ import giftRoutes from "../features/gift/gift.routes"
 import chatRoutes from "../features/chat/chat.routes";
 import mediaRoutes from "../features/chat/media/media.routes"
 import newMatchesRoutes from "../features/chat/match/match.routes"
+import eventsRoutes from "../features/event/event.routes"
+
+
 import userRoutes from "../features/user/management/user.route"
 const router = Router();
 
@@ -87,7 +90,7 @@ router.use("/user",waitlistRoutes,userRoutes)
 
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes,eventsRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)
