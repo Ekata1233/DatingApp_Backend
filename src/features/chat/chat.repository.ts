@@ -812,6 +812,7 @@ export const chatRepository = {
         id: true,
         conversationId: true,
         senderId: true,
+        metadata: true,
         content: true,
         messageType: true,
         mediaUrl: true,
