@@ -1802,21 +1802,20 @@ model Event {
   //---------------------------------
   // Step 2
   //---------------------------------
-  city            String?
-  eventPartnerId  String?
-  eventPartner    EventPartner? @relation(fields: [eventPartnerId], references: [id])
-  officialPartner Boolean       @default(false)
-
+  city           String?
+  eventPartnerId String?
+  eventPartner   EventPartner? @relation(fields: [eventPartnerId], references: [id])
+  eventTag       EventTag?
   //---------------------------------
   // Step 3
   //---------------------------------
-  eventDate   DateTime?
-  startTime   String?
-  endTime     String?
-  venueName   String?
-  fullAddress String?   @db.Text
-  latitude    Float?
-  longitude   Float?
+  eventDate      DateTime?
+  startTime      String?
+  endTime        String?
+  venueName      String?
+  fullAddress    String?       @db.Text
+  latitude       Float?
+  longitude      Float?
 
   //---------------------------------
   // Step 4
@@ -1866,6 +1865,12 @@ model Event {
   @@index([eventDate])
   @@index([currentStep])
   @@index([eventPartnerId])
+}
+
+enum EventTag {
+  BRAND
+  PROMOTED
+  FEATURED
 }
 
 model EventGallery {
