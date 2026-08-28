@@ -43,9 +43,13 @@ export const updateEventHostSchema = z.object({
       .string()
       .uuid("Invalid event partner ID"),
 
-    officialPartner: z
-      .boolean()
-      .default(false),
+   eventTag: z
+  .enum([
+    "BRAND",
+    "PROMOTED",
+    "FEATURED",
+  ])
+  .optional(),
   }),
 });
 

@@ -1,11 +1,15 @@
-
 import { prisma } from "../../../prisma/prismaClient";
-import { CreateEventInput, UpdateEventExperienceInput, UpdateEventHostInput, UpdateEventSafetyInput, UpdateEventTicketsInput, UpdateEventVenueInput } from "./event.types";
+import {
+  CreateEventInput,
+  UpdateEventExperienceInput,
+  UpdateEventHostInput,
+  UpdateEventSafetyInput,
+  UpdateEventTicketsInput,
+  UpdateEventVenueInput,
+} from "./event.types";
 
 //firsr step - basic
-export const createEvent = async (
-  payload: CreateEventInput
-) => {
+export const createEvent = async (payload: CreateEventInput) => {
   const event = await prisma.event.create({
     data: {
       eventType: payload.eventType,
@@ -34,7 +38,7 @@ export const createEvent = async (
 // second step-host
 export const updateEventHost = async (
   eventId: string,
-  payload: UpdateEventHostInput
+  payload: UpdateEventHostInput,
 ) => {
   // 1. Check event
   const existingEvent = await prisma.event.findUnique({
@@ -68,9 +72,7 @@ export const updateEventHost = async (
   });
 
   if (!eventPartner) {
-    throw new Error(
-      "Event partner not found or inactive"
-    );
+    throw new Error("Event partner not found or inactive");
   }
 
   // 4. Update Event
@@ -84,8 +86,7 @@ export const updateEventHost = async (
 
       eventPartnerId: payload.eventPartnerId,
 
-      officialPartner:
-        payload.officialPartner ?? false,
+      eventTag: payload.eventTag,
 
       hostDone: true,
       currentStep: 2,
@@ -95,7 +96,7 @@ export const updateEventHost = async (
       id: true,
       city: true,
       eventPartnerId: true,
-      officialPartner: true,
+      eventTag: true,
       currentStep: true,
       hostDone: true,
 
@@ -124,7 +125,7 @@ export const updateEventHost = async (
 //third step- venue
 export const updateEventVenue = async (
   eventId: string,
-  payload: UpdateEventVenueInput
+  payload: UpdateEventVenueInput,
 ) => {
   // 1. Check event
   const existingEvent = await prisma.event.findUnique({
@@ -151,9 +152,7 @@ export const updateEventVenue = async (
 
   // 4. Validate time
   if (payload.startTime >= payload.endTime) {
-    throw new Error(
-      "End time must be greater than start time"
-    );
+    throw new Error("End time must be greater than start time");
   }
 
   // 5. Update event
@@ -199,7 +198,7 @@ export const updateEventVenue = async (
 
 export const updateEventTickets = async (
   eventId: string,
-  payload: UpdateEventTicketsInput
+  payload: UpdateEventTicketsInput,
 ) => {
   // 1. Check event exists
   const existingEvent = await prisma.event.findUnique({
@@ -214,9 +213,7 @@ export const updateEventTickets = async (
 
   // 2. Don't allow editing LIVE event
   if (existingEvent.status === "LIVE") {
-    throw new Error(
-      "Published event cannot be edited"
-    );
+    throw new Error("Published event cannot be edited");
   }
 
   // 3. Update ticket details
@@ -259,7 +256,7 @@ export const updateEventTickets = async (
 //fifth step-experience
 export const updateEventExperience = async (
   eventId: string,
-  payload: UpdateEventExperienceInput
+  payload: UpdateEventExperienceInput,
 ) => {
   // ==========================================
   // 1. CHECK EVENT EXISTS
@@ -280,214 +277,197 @@ export const updateEventExperience = async (
   // ==========================================
 
   if (existingEvent.status === "LIVE") {
-    throw new Error(
-      "Published event cannot be edited"
-    );
+    throw new Error("Published event cannot be edited");
   }
 
   // ==========================================
   // 3. UPDATE EVERYTHING IN ONE TRANSACTION
   // ==========================================
 
-  const event = await prisma.$transaction(
-    async (tx) => {
-      // ----------------------------------------
-      // UPDATE MAIN EVENT
-      // ----------------------------------------
+  const event = await prisma.$transaction(async (tx) => {
+    // ----------------------------------------
+    // UPDATE MAIN EVENT
+    // ----------------------------------------
 
-      const updatedEvent = await tx.event.update({
-        where: {
-          id: eventId,
-        },
+    const updatedEvent = await tx.event.update({
+      where: {
+        id: eventId,
+      },
 
-        data: {
-          // Only update heroImage if a new image
-          // was uploaded
-          ...(payload.heroImage !== undefined && {
-            heroImage: payload.heroImage,
-          }),
+      data: {
+        // Only update heroImage if a new image
+        // was uploaded
+        ...(payload.heroImage !== undefined && {
+          heroImage: payload.heroImage,
+        }),
 
-          aboutEvent: payload.aboutEvent,
+        aboutEvent: payload.aboutEvent,
 
-          experienceDone: true,
+        experienceDone: true,
 
-          currentStep: 5,
-        },
+        currentStep: 5,
+      },
 
-        select: {
-          id: true,
-          heroImage: true,
-          aboutEvent: true,
-          experienceDone: true,
-          currentStep: true,
-        },
-      });
+      select: {
+        id: true,
+        heroImage: true,
+        aboutEvent: true,
+        experienceDone: true,
+        currentStep: true,
+      },
+    });
 
-      // ----------------------------------------
-      // GALLERY IMAGES
-      // ----------------------------------------
+    // ----------------------------------------
+    // GALLERY IMAGES
+    // ----------------------------------------
 
-      await tx.eventGallery.deleteMany({
-        where: {
+    await tx.eventGallery.deleteMany({
+      where: {
+        eventId,
+      },
+    });
+
+    if (payload.galleryImages.length > 0) {
+      await tx.eventGallery.createMany({
+        data: payload.galleryImages.map((image) => ({
           eventId,
-        },
-      });
-
-     if (payload.galleryImages.length > 0) {
-  await tx.eventGallery.createMany({
-    data: payload.galleryImages.map((image) => ({
-      eventId,
-      imageUrl: image.imageUrl,
-      sortOrder: image.sortOrder,
-    })),
-  });
-}
-
-      // ----------------------------------------
-      // AMENITIES
-      // ----------------------------------------
-
-      await tx.eventAmenity.deleteMany({
-        where: {
-          eventId,
-        },
-      });
-
-      if (payload.amenities.length > 0) {
-        await tx.eventAmenity.createMany({
-          data: payload.amenities.map(
-            (amenity, index) => ({
-              eventId,
-
-              name: amenity.name,
-
-              icon: amenity.icon,
-
-              sortOrder:
-                amenity.sortOrder ?? index,
-            })
-          ),
-        });
-      }
-
-      // ----------------------------------------
-      // ITINERARY
-      // ----------------------------------------
-
-      await tx.eventItinerary.deleteMany({
-        where: {
-          eventId,
-        },
-      });
-
-      if (payload.itinerary.length > 0) {
-        await tx.eventItinerary.createMany({
-          data: payload.itinerary.map(
-            (item, index) => ({
-              eventId,
-
-              time: item.time,
-
-              title: item.title,
-
-              description:
-                item.description,
-
-              icon: item.icon,
-
-              sortOrder:
-                item.sortOrder ?? index,
-            })
-          ),
-        });
-      }
-
-      // ----------------------------------------
-      // WHY SHOULD COME
-      // ----------------------------------------
-
-      await tx.eventWhyCome.deleteMany({
-        where: {
-          eventId,
-        },
-      });
-
-      if (payload.whyShouldCome.length > 0) {
-        await tx.eventWhyCome.createMany({
-          data: payload.whyShouldCome.map(
-            (item, index) => ({
-              eventId,
-
-              title: item.title,
-
-              description:
-                item.description,
-
-              icon: item.icon,
-
-              sortOrder:
-                item.sortOrder ?? index,
-            })
-          ),
-        });
-      }
-
-      // ----------------------------------------
-      // GET FINAL EVENT
-      // ----------------------------------------
-
-      return tx.event.findUnique({
-        where: {
-          id: eventId,
-        },
-
-        select: {
-          id: true,
-
-          heroImage: true,
-
-          aboutEvent: true,
-
-          experienceDone: true,
-
-          currentStep: true,
-
-          galleryImages: {
-            orderBy: {
-              sortOrder: "asc",
-            },
-          },
-
-          amenities: {
-            orderBy: {
-              sortOrder: "asc",
-            },
-          },
-
-          itinerary: {
-            orderBy: {
-              sortOrder: "asc",
-            },
-          },
-
-          whyShouldCome: {
-            orderBy: {
-              sortOrder: "asc",
-            },
-          },
-        },
+          imageUrl: image.imageUrl,
+          sortOrder: image.sortOrder,
+        })),
       });
     }
-  );
+
+    // ----------------------------------------
+    // AMENITIES
+    // ----------------------------------------
+
+    await tx.eventAmenity.deleteMany({
+      where: {
+        eventId,
+      },
+    });
+
+    if (payload.amenities.length > 0) {
+      await tx.eventAmenity.createMany({
+        data: payload.amenities.map((amenity, index) => ({
+          eventId,
+
+          name: amenity.name,
+
+          icon: amenity.icon,
+
+          sortOrder: amenity.sortOrder ?? index,
+        })),
+      });
+    }
+
+    // ----------------------------------------
+    // ITINERARY
+    // ----------------------------------------
+
+    await tx.eventItinerary.deleteMany({
+      where: {
+        eventId,
+      },
+    });
+
+    if (payload.itinerary.length > 0) {
+      await tx.eventItinerary.createMany({
+        data: payload.itinerary.map((item, index) => ({
+          eventId,
+
+          time: item.time,
+
+          title: item.title,
+
+          description: item.description,
+
+          icon: item.icon,
+
+          sortOrder: item.sortOrder ?? index,
+        })),
+      });
+    }
+
+    // ----------------------------------------
+    // WHY SHOULD COME
+    // ----------------------------------------
+
+    await tx.eventWhyCome.deleteMany({
+      where: {
+        eventId,
+      },
+    });
+
+    if (payload.whyShouldCome.length > 0) {
+      await tx.eventWhyCome.createMany({
+        data: payload.whyShouldCome.map((item, index) => ({
+          eventId,
+
+          title: item.title,
+
+          description: item.description,
+
+          icon: item.icon,
+
+          sortOrder: item.sortOrder ?? index,
+        })),
+      });
+    }
+
+    // ----------------------------------------
+    // GET FINAL EVENT
+    // ----------------------------------------
+
+    return tx.event.findUnique({
+      where: {
+        id: eventId,
+      },
+
+      select: {
+        id: true,
+
+        heroImage: true,
+
+        aboutEvent: true,
+
+        experienceDone: true,
+
+        currentStep: true,
+
+        galleryImages: {
+          orderBy: {
+            sortOrder: "asc",
+          },
+        },
+
+        amenities: {
+          orderBy: {
+            sortOrder: "asc",
+          },
+        },
+
+        itinerary: {
+          orderBy: {
+            sortOrder: "asc",
+          },
+        },
+
+        whyShouldCome: {
+          orderBy: {
+            sortOrder: "asc",
+          },
+        },
+      },
+    });
+  });
 
   // ==========================================
   // 4. SAFETY CHECK
   // ==========================================
 
   if (!event) {
-    throw new Error(
-      "Failed to update event experience"
-    );
+    throw new Error("Failed to update event experience");
   }
 
   // ==========================================
@@ -503,7 +483,7 @@ export const updateEventExperience = async (
 //sixth step- safety
 export const updateEventSafety = async (
   eventId: string,
-  payload: UpdateEventSafetyInput
+  payload: UpdateEventSafetyInput,
 ) => {
   // ==========================================
   // 1. CHECK EVENT
@@ -524,103 +504,92 @@ export const updateEventSafety = async (
   // ==========================================
 
   if (existingEvent.status === "LIVE") {
-    throw new Error(
-      "Published event cannot be edited"
-    );
+    throw new Error("Published event cannot be edited");
   }
 
   // ==========================================
   // 3. TRANSACTION
   // ==========================================
 
-  const event = await prisma.$transaction(
-    async (tx) => {
-      // ----------------------------------------
-      // UPDATE MAIN EVENT
-      // ----------------------------------------
+  const event = await prisma.$transaction(async (tx) => {
+    // ----------------------------------------
+    // UPDATE MAIN EVENT
+    // ----------------------------------------
 
-      await tx.event.update({
-        where: {
-          id: eventId,
-        },
+    await tx.event.update({
+      where: {
+        id: eventId,
+      },
 
-        data: {
-          dressCode: payload.dressCode,
+      data: {
+        dressCode: payload.dressCode,
 
-          refundWindow: payload.refundWindow,
+        refundWindow: payload.refundWindow,
 
-          termsConditions:
-            payload.termsConditions,
+        termsConditions: payload.termsConditions,
 
-          safetyDone: true,
+        safetyDone: true,
 
-          currentStep: 6,
-        },
-      });
+        currentStep: 6,
+      },
+    });
 
-      // ----------------------------------------
-      // DELETE OLD SAFETY FEATURES
-      // ----------------------------------------
+    // ----------------------------------------
+    // DELETE OLD SAFETY FEATURES
+    // ----------------------------------------
 
-      await tx.eventSafety.deleteMany({
-        where: {
+    await tx.eventSafety.deleteMany({
+      where: {
+        eventId,
+      },
+    });
+
+    // ----------------------------------------
+    // CREATE NEW SAFETY FEATURES
+    // ----------------------------------------
+
+    if (payload.safetyFeatures.length > 0) {
+      await tx.eventSafety.createMany({
+        data: payload.safetyFeatures.map((safety) => ({
           eventId,
-        },
-      });
-
-      // ----------------------------------------
-      // CREATE NEW SAFETY FEATURES
-      // ----------------------------------------
-
-      if (
-        payload.safetyFeatures.length > 0
-      ) {
-        await tx.eventSafety.createMany({
-          data: payload.safetyFeatures.map(
-            (safety) => ({
-              eventId,
-              title: safety.title,
-            })
-          ),
-        });
-      }
-
-      // ----------------------------------------
-      // GET UPDATED EVENT
-      // ----------------------------------------
-
-      return tx.event.findUnique({
-        where: {
-          id: eventId,
-        },
-
-        select: {
-          id: true,
-
-          dressCode: true,
-
-          refundWindow: true,
-
-          termsConditions: true,
-
-          safetyDone: true,
-
-          currentStep: true,
-
-          safetyFeatures: true,
-        },
+          title: safety.title,
+        })),
       });
     }
-  );
+
+    // ----------------------------------------
+    // GET UPDATED EVENT
+    // ----------------------------------------
+
+    return tx.event.findUnique({
+      where: {
+        id: eventId,
+      },
+
+      select: {
+        id: true,
+
+        dressCode: true,
+
+        refundWindow: true,
+
+        termsConditions: true,
+
+        safetyDone: true,
+
+        currentStep: true,
+
+        safetyFeatures: true,
+      },
+    });
+  });
 
   // ==========================================
   // 4. CHECK RESULT
   // ==========================================
 
   if (!event) {
-    throw new Error(
-      "Failed to update event safety"
-    );
+    throw new Error("Failed to update event safety");
   }
 
   // ==========================================
@@ -825,9 +794,7 @@ export const publishEvent = async (eventId: string) => {
 
   if (missingFields.length > 0) {
     throw new Error(
-      `Event cannot be published. Missing: ${missingFields.join(
-        ", "
-      )}`
+      `Event cannot be published. Missing: ${missingFields.join(", ")}`,
     );
   }
 
@@ -835,63 +802,62 @@ export const publishEvent = async (eventId: string) => {
   // 12. PUBLISH EVENT
   // ==========================================
 
-  const publishedEvent =
-    await prisma.event.update({
-      where: {
-        id: eventId,
-      },
+  const publishedEvent = await prisma.event.update({
+    where: {
+      id: eventId,
+    },
 
-      data: {
-        status: "LIVE",
+    data: {
+      status: "LIVE",
 
-        publishedAt: new Date(),
+      publishedAt: new Date(),
 
-        currentStep: 7,
-      },
+      currentStep: 7,
+    },
 
-      select: {
-        id: true,
-        eventType: true,
-        title: true,
-        status: true,
+    select: {
+      id: true,
+      eventType: true,
+      title: true,
+      status: true,
+      eventTag: true,
+      city: true,
+      eventPartner: true,
 
-        city: true,
-        eventPartner: true,
+      eventDate: true,
+      startTime: true,
+      endTime: true,
+      venueName: true,
+      fullAddress: true,
 
-        eventDate: true,
-        startTime: true,
-        endTime: true,
-        venueName: true,
-        fullAddress: true,
+      entryPrice: true,
+      capacity: true,
+      minAge: true,
+      maxAge: true,
+      genderMix: true,
+      eventIntent: true,
 
-        entryPrice: true,
-        capacity: true,
-        minAge: true,
-        maxAge: true,
-        genderMix: true,
-        eventIntent: true,
+      heroImage: true,
+      aboutEvent: true,
 
-        heroImage: true,
-        aboutEvent: true,
+      dressCode: true,
+      refundWindow: true,
+      termsConditions: true,
 
-        dressCode: true,
-        refundWindow: true,
-        termsConditions: true,
+      currentStep: true,
 
-        currentStep: true,
+      basicsDone: true,
+      hostDone: true,
+      venueDone: true,
+      ticketDone: true,
+      experienceDone: true,
+      safetyDone: true,
 
-        basicsDone: true,
-        hostDone: true,
-        venueDone: true,
-        ticketDone: true,
-        experienceDone: true,
-        safetyDone: true,
-
-        publishedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+      publishedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   // ==========================================
   // 13. RETURN
@@ -1060,6 +1026,7 @@ export const getEventList = async () => {
       fullAddress: true,
       entryPrice: true,
       heroImage: true,
+      eventTag: true,
     },
   });
 
@@ -1072,10 +1039,8 @@ export const getEventList = async () => {
   }));
 };
 
-//get details 
-export const getEventDetails = async (
-  eventId: string
-) => {
+//get details
+export const getEventDetails = async (eventId: string) => {
   const event = await prisma.event.findUnique({
     where: {
       id: eventId,
@@ -1096,7 +1061,7 @@ export const getEventDetails = async (
 
       eventPartnerId: true,
 
-      officialPartner: true,
+      eventTag: true,
 
       // ========================================
       // DATE / TIME
