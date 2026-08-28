@@ -282,9 +282,12 @@ export async function createPaymentLink(userId: string, body: any) {
 }
 
 export async function paymentWebhookService(payload: any) {
+  
   const payment_id = payload.txnid;
   const status = payload.status;
-
+ console.log("========== PAYMENT WEBHOOK DEBUG ==========");
+  console.log("PayU txnid:", payment_id);
+  console.log("PayU status:", status);
   // Use transaction with optimistic locking to prevent race conditions
   const result = await prisma.$transaction(
     async (tx) => {
@@ -292,7 +295,12 @@ export async function paymentWebhookService(payload: any) {
       const payment = await tx.payment.findUnique({
         where: { payment_id },
       });
-
+ console.log("========== PAYMENT FOUND ==========");
+      console.log("Payment:", payment);
+      console.log("Payment DB ID:", payment?.id);
+      console.log("Payment payment_id:", payment?.payment_id);
+      console.log("Payment transactionId:", payment?.transactionId);
+      console.log("Payment purpose:", payment?.purpose);
       if (!payment) {
         throw new Error("Payment not found");
       }
@@ -320,7 +328,15 @@ export async function paymentWebhookService(payload: any) {
           gatewayResponse: payload,
         },
       });
-
+   console.log("========== PAYMENT UPDATED ==========");
+      console.log("Updated Payment ID:", updatedPayment.id);
+      console.log("Updated Payment payment_id:", updatedPayment.payment_id);
+      console.log(
+        "Updated Payment transactionId:",
+        updatedPayment.transactionId,
+      );
+      console.log("Updated Payment status:", updatedPayment.status);
+      console.log("Updated Payment purpose:", updatedPayment.purpose);
       if (updatedPayment.status !== PaymentStatus.COMPLETED) {
         return { success: false, reason: "payment_failed" };
       }
@@ -398,7 +414,35 @@ export async function paymentWebhookService(payload: any) {
           }
           break;
         case PaymentPurpose.EVENT_BOOKING:
-          await confirmEventBooking(tx, updatedPayment);
+
+          console.log(
+            "========== EVENT BOOKING PAYMENT DEBUG ==========",
+          );
+
+          console.log(
+            "Payment ID being sent to confirmEventBooking:",
+            updatedPayment.id,
+          );
+
+          console.log(
+            "Payment User ID:",
+            updatedPayment.userId,
+          );
+
+          console.log(
+            "Payment Amount:",
+            updatedPayment.amount,
+          );
+
+          await confirmEventBooking(
+            tx,
+            updatedPayment,
+          );
+
+          console.log(
+            "confirmEventBooking FINISHED",
+          );
+
           break;
       }
 
