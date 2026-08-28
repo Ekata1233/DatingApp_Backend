@@ -734,9 +734,30 @@ export const chatRepository = {
                 presence?.lastSeenAt ?? null,
             },
 
-            lastMessage:
-              conversation.messages[0] ??
-              null,
+            lastMessage: (() => {
+              const message = conversation.messages[0];
+
+              if (!message) {
+                return null;
+              }
+
+              let displayContent = message.content;
+
+              if (message.messageType === "IMAGE") {
+                displayContent = message.content
+                  ? `📷 ${message.content}`
+                  : "📷Photo";
+              } else if (message.messageType === "VIDEO") {
+                displayContent = message.content
+                  ? `🎥 ${message.content}`
+                  : "🎥Video";
+              }
+
+              return {
+                ...message,
+                content: displayContent,
+              };
+            })(),
 
             unreadCount,
 
@@ -791,6 +812,7 @@ export const chatRepository = {
         id: true,
         conversationId: true,
         senderId: true,
+        metadata: true,
         content: true,
         messageType: true,
         mediaUrl: true,

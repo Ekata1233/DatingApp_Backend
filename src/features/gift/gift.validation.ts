@@ -14,6 +14,23 @@ export const sendGiftSchema = z.object({
     .trim()
     .max(150, "Message cannot exceed 150 characters")
     .optional(),
+
+  targetType: z
+    .enum([
+      "ABOUT",
+      "BASIC",
+      "VIDEO",
+      "PROMPT",
+      "PHOTO",
+      "CAREER",
+      "INTEREST",
+      "LIFESTYLE",
+      "FAMILY",
+    ])
+    .nullable()
+    .optional(),
+
+     targetId: z.string().uuid().nullable().optional(),
 });
 
 export type SendGiftDTO = z.infer<typeof sendGiftSchema>;

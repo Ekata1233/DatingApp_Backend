@@ -1,4 +1,4 @@
-import { ComplimentStatus } from "@prisma/client";
+import { ComplimentStatus, TargetType } from "@prisma/client";
 
 /* -------------------------------------------------------------------------- */
 /*                                  Requests                                  */
@@ -35,8 +35,10 @@ export interface SendComplimentResponse {
 
 export interface SendComplimentDto {
   receiverId: string;
-  ideaId?: string;
+  ideaId?: string|null;
   message?: string;
+  targetType?: TargetType | null;
+  targetId?: string | null;
 }
 
 export interface PurchaseComplimentDto {

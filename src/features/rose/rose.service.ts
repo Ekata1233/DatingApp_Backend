@@ -22,12 +22,14 @@ import {
   PaginatedRoseHistory,
 } from './rose.types';
 import { AppError } from './AppError';
+import { getOrCreateConversation } from "../chat/chat.helper";
+import { createRoseChatMessage } from "./rose.helper";
 
 export const sendRoseService = async (
   senderId: string,
   data: SendRoseDTO
 ): Promise<SendRoseResponse> => {
-  const { receiverId } = data;
+  const { receiverId, targetType = null, targetId = null, } = data;
 
   // Validate not sending to self
   if (senderId === receiverId) {
@@ -72,6 +74,29 @@ export const sendRoseService = async (
     throw new AppError(429, ROSE_CONSTANTS.ERRORS.COOLDOWN_ACTIVE);
   }
 
+  //CALCULATE REQUIRED MSG FOR UNLOCK GIFT
+  const previousRoses = await prisma.userRose.count({
+    where: {
+      senderId,
+      receiverId,
+    },
+  });
+
+  let requiredMessages = 1;
+
+  if (previousRoses === 0) {
+    requiredMessages = 25;
+  } else if (previousRoses === 1) {
+    requiredMessages = 5;
+  } else {
+    requiredMessages = 1;
+  }
+
+  // EXPIRY TIME
+  const expiresAt = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000
+  );
+
   // Get user balance
   const balance = await getOrCreateBalance(senderId, prisma);
 
@@ -82,6 +107,22 @@ export const sendRoseService = async (
     );
   }
 
+  if (
+    (targetType === "PHOTO" || targetType === "PROMPT") &&
+    !targetId
+  ) {
+    throw new AppError(400, "TARGET_ID_REQUIRED");
+  }
+
+  // targetId should not be accepted for other target types
+  if (
+    targetId &&
+    targetType !== "PHOTO" &&
+    targetType !== "PROMPT"
+  ) {
+    throw new AppError(400, "TARGET_ID_NOT_ALLOWED");
+  }
+  
   // Execute transaction
   return prisma.$transaction(async (tx) => {
     // Deduct rose from balance
@@ -92,6 +133,10 @@ export const sendRoseService = async (
       {
         senderId,
         receiverId,
+        targetType,
+        targetId,
+        requiredMessages,
+        expiresAt,
       },
       tx
     );
@@ -105,6 +150,36 @@ export const sendRoseService = async (
       },
       tx
     );
+
+    const conversation = await getOrCreateConversation(
+      senderId,
+      receiverId,
+      tx
+    );
+
+    // 5. Create ROSE chat message
+    const chatMessage = await createRoseChatMessage(
+      {
+        conversationId: conversation.id,
+        senderId,
+        roseId: rose.id,
+        targetType: rose.targetType,
+        targetId: rose.targetId,
+        requiredMessages: rose.requiredMessages,
+        expiresAt: rose.expiresAt,
+      },
+      tx
+    );
+
+    // 6. Update conversation
+    await tx.conversation.update({
+      where: {
+        id: conversation.id,
+      },
+      data: {
+        updatedAt: new Date(),
+      },
+    });
 
     // Get updated balance
     const updatedBalance = await getOrCreateBalance(senderId, tx as any);
