@@ -58,6 +58,7 @@ import chatRoutes from "../features/chat/chat.routes";
 import mediaRoutes from "../features/chat/media/media.routes"
 import newMatchesRoutes from "../features/chat/match/match.routes"
 import eventsRoutes from "../features/event/event.routes"
+import admirersRoutes from "../features/admirer/admirer.routes"
 
 
 import userRoutes from "../features/user/management/user.route"
@@ -127,5 +128,9 @@ router.use('/revenue', giftsRoutes,complimentRoutes);
 router.use("/user/chat", chatRoutes);
 
 router.use("/chat/media", mediaRoutes);
+
+//ADMIRERS
+router.use("/user", admirersRoutes);
+//
 
 export default router;
