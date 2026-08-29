@@ -122,7 +122,7 @@ export const sendRoseService = async (
   ) {
     throw new AppError(400, "TARGET_ID_NOT_ALLOWED");
   }
-  
+
   // Execute transaction
   return prisma.$transaction(async (tx) => {
     // Deduct rose from balance
@@ -165,8 +165,6 @@ export const sendRoseService = async (
         roseId: rose.id,
         targetType: rose.targetType,
         targetId: rose.targetId,
-        requiredMessages: rose.requiredMessages,
-        expiresAt: rose.expiresAt,
       },
       tx
     );

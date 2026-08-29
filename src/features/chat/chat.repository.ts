@@ -809,17 +809,76 @@ export const chatRepository = {
         : {}),
 
       select: {
-        id: true,
-        conversationId: true,
-        senderId: true,
-        metadata: true,
-        content: true,
-        messageType: true,
-        mediaUrl: true,
-        createdAt: true,
-        deliveredAt: true,
-        readAt: true,
+ id: true,
+      conversationId: true,
+      senderId: true,
+
+      content: true,
+      messageType: true,
+      mediaUrl: true,
+      metadata: true,
+
+      createdAt: true,
+      deliveredAt: true,
+      readAt: true,
+
+      // Special interaction IDs
+      roseId: true,
+      complimentId: true,
+      giftId: true,
+
+      // Current Rose state
+      rose: {
+        select: {
+          id: true,
+          senderId: true,
+          receiverId: true,
+          targetType: true,
+          targetId: true,
+          requiredMessages: true,
+          messagesSent: true,
+          isUnlocked: true,
+          unlockedAt: true,
+          expiresAt: true,
+        },
       },
+
+      // Current Gift state
+      gift: {
+        select: {
+          id: true,
+          senderId: true,
+          receiverId: true,
+          giftId: true,
+          giftName: true,
+          pricePaid: true,
+          message: true,
+          targetType: true,
+          targetId: true,
+          requiredMessages: true,
+          messagesSent: true,
+          isUnlocked: true,
+          unlockedAt: true,
+          expiresAt: true,
+        },
+      },
+
+      // Compliment
+      compliment: {
+        select: {
+          id: true,
+          senderId: true,
+          receiverId: true,
+          targetType: true,
+          targetId: true,
+          ideaId: true,
+          message: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
     });
   },
 

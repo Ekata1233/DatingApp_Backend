@@ -18,11 +18,9 @@ export const createComplimentChatMessage = async (
     data: {
       conversationId: data.conversationId,
       senderId: data.senderId,
-
       content: data.content,
-
       messageType: MessageType.COMPLIMENT,
-
+      complimentId: data.complimentId,
       metadata: {
         complimentId: data.complimentId,
         targetType: data.targetType ?? null,
