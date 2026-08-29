@@ -1,5 +1,99 @@
-import { prisma } from "../../prisma/prismaClient";
+// import { prisma } from "../../prisma/prismaClient";
 
+
+// export const incrementRoseAndGiftMessages = async (
+//   senderId: string,
+//   receiverId: string,
+// ) => {
+//   const now = new Date();
+
+//   // ==========================================
+//   // ROSE
+//   // ==========================================
+
+//   const pendingRose = await prisma.userRose.findFirst({
+//     where: {
+//       senderId: receiverId,
+//       receiverId: senderId,
+//       isUnlocked: false,
+//       expiresAt: {
+//         gt: now,
+//       },
+//     },
+//     orderBy: {
+//       createdAt: "asc",
+//     },
+//   });
+
+//   let rose = null;
+
+//   if (pendingRose) {
+//     const newMessagesSent = pendingRose.messagesSent + 1;
+
+//     rose = await prisma.userRose.update({
+//       where: {
+//         id: pendingRose.id,
+//       },
+//       data: {
+//         messagesSent: newMessagesSent,
+
+//         ...(newMessagesSent >= pendingRose.requiredMessages
+//           ? {
+//               isUnlocked: true,
+//               unlockedAt: now,
+//             }
+//           : {}),
+//       },
+//     });
+//   }
+
+//   // ==========================================
+//   // GIFT
+//   // ==========================================
+
+//   const pendingGift = await prisma.userGift.findFirst({
+//     where: {
+//       senderId: receiverId,
+//       receiverId: senderId,
+//       isUnlocked: false,
+//       expiresAt: {
+//         gt: now,
+//       },
+//     },
+//     orderBy: {
+//       createdAt: "asc",
+//     },
+//   });
+
+//   let gift = null;
+
+//   if (pendingGift) {
+//     const newMessagesSent = pendingGift.messagesSent + 1;
+
+//     gift = await prisma.userGift.update({
+//       where: {
+//         id: pendingGift.id,
+//       },
+//       data: {
+//         messagesSent: newMessagesSent,
+
+//         ...(newMessagesSent >= pendingGift.requiredMessages
+//           ? {
+//               isUnlocked: true,
+//               unlockedAt: now,
+//             }
+//           : {}),
+//       },
+//     });
+//   }
+
+//   return {
+//     rose,
+//     gift,
+//   };
+// };
+
+import { prisma } from "../../prisma/prismaClient";
 
 export const incrementRoseAndGiftMessages = async (
   senderId: string,
@@ -8,7 +102,7 @@ export const incrementRoseAndGiftMessages = async (
   const now = new Date();
 
   // ==========================================
-  // ROSE
+  // Get pending ROSE
   // ==========================================
 
   const pendingRose = await prisma.userRose.findFirst({
@@ -25,30 +119,8 @@ export const incrementRoseAndGiftMessages = async (
     },
   });
 
-  let rose = null;
-
-  if (pendingRose) {
-    const newMessagesSent = pendingRose.messagesSent + 1;
-
-    rose = await prisma.userRose.update({
-      where: {
-        id: pendingRose.id,
-      },
-      data: {
-        messagesSent: newMessagesSent,
-
-        ...(newMessagesSent >= pendingRose.requiredMessages
-          ? {
-              isUnlocked: true,
-              unlockedAt: now,
-            }
-          : {}),
-      },
-    });
-  }
-
   // ==========================================
-  // GIFT
+  // Get pending GIFT
   // ==========================================
 
   const pendingGift = await prisma.userGift.findFirst({
@@ -65,19 +137,46 @@ export const incrementRoseAndGiftMessages = async (
     },
   });
 
-  let gift = null;
+  // Nothing pending
+  if (!pendingRose && !pendingGift) {
+    return {
+      rose: null,
+      gift: null,
+    };
+  }
 
-  if (pendingGift) {
-    const newMessagesSent = pendingGift.messagesSent + 1;
+  // ==========================================
+  // Decide which reward comes FIRST
+  // ==========================================
 
-    gift = await prisma.userGift.update({
+  let rewardType: "rose" | "gift";
+
+  if (!pendingRose) {
+    rewardType = "gift";
+  } else if (!pendingGift) {
+    rewardType = "rose";
+  } else {
+    rewardType =
+      pendingGift.createdAt <= pendingRose.createdAt
+        ? "gift"
+        : "rose";
+  }
+
+  // ==========================================
+  // INCREMENT ONLY ONE REWARD
+  // ==========================================
+
+  if (rewardType === "gift") {
+    const newMessagesSent = pendingGift!.messagesSent + 1;
+
+    const gift = await prisma.userGift.update({
       where: {
-        id: pendingGift.id,
+        id: pendingGift!.id,
       },
       data: {
         messagesSent: newMessagesSent,
 
-        ...(newMessagesSent >= pendingGift.requiredMessages
+        ...(newMessagesSent >= pendingGift!.requiredMessages
           ? {
               isUnlocked: true,
               unlockedAt: now,
@@ -85,10 +184,37 @@ export const incrementRoseAndGiftMessages = async (
           : {}),
       },
     });
+
+    return {
+      rose: null,
+      gift,
+    };
   }
+
+  // ==========================================
+  // ROSE
+  // ==========================================
+
+  const newMessagesSent = pendingRose!.messagesSent + 1;
+
+  const rose = await prisma.userRose.update({
+    where: {
+      id: pendingRose!.id,
+    },
+    data: {
+      messagesSent: newMessagesSent,
+
+      ...(newMessagesSent >= pendingRose!.requiredMessages
+        ? {
+            isUnlocked: true,
+            unlockedAt: now,
+          }
+        : {}),
+    },
+  });
 
   return {
     rose,
-    gift,
+    gift: null,
   };
 };

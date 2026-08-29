@@ -593,6 +593,8 @@ export const chatRepository = {
         },
       ]),
     );
+
+
     // --------------------------------------------------
     // 9. Get compatibility scores
     // --------------------------------------------------
@@ -630,8 +632,341 @@ export const chatRepository = {
       ]),
     );
 
+    // ==================================================
+    // 13. GET GIFT / ROSE PROGRESS
+    // ==================================================
+
+    const conversationIds =
+      conversations.map(
+        (conversation) => conversation.id,
+      );
+
     // --------------------------------------------------
-    // 11. Convert conversations
+    // 13.1 Get all active gifts
+    // --------------------------------------------------
+
+    const giftProgress =
+      candidateIds.length > 0
+        ? await prisma.userGift.findMany({
+          where: {
+            // Gift sent by current user OR
+            // received by current user
+            OR: [
+              {
+                senderId: userId,
+                receiverId: {
+                  in: candidateIds,
+                },
+              },
+              {
+                receiverId: userId,
+                senderId: {
+                  in: candidateIds,
+                },
+              },
+            ],
+
+            // Only pending gifts
+            isUnlocked: false,
+
+            // Only non-expired gifts
+            expiresAt: {
+              gt: new Date(),
+            },
+          },
+
+          // VERY IMPORTANT
+          // Oldest gift first
+          orderBy: {
+            createdAt: "asc",
+          },
+
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            giftName: true,
+            requiredMessages: true,
+            messagesSent: true,
+            isUnlocked: true,
+            expiresAt: true,
+            createdAt: true,
+
+            chatMessage: {
+              select: {
+                conversationId: true,
+              },
+            },
+          },
+        })
+        : [];
+
+    console.log("gift progress : ", giftProgress)
+    // --------------------------------------------------
+    // 13.2 Get active locked roses
+    // --------------------------------------------------
+
+    const roseProgress =
+      candidateIds.length > 0
+        ? await prisma.userRose.findMany({
+          where: {
+            // Rose sent by current user OR received by current user
+            OR: [
+              {
+                senderId: userId,
+                receiverId: {
+                  in: candidateIds,
+                },
+              },
+              {
+                receiverId: userId,
+                senderId: {
+                  in: candidateIds,
+                },
+              },
+            ],
+
+            // Only pending roses
+            isUnlocked: false,
+
+            // Only non-expired roses (combine with the first OR using AND)
+            AND: [
+              {
+                OR: [
+                  {
+                    expiresAt: null,
+                  },
+                  {
+                    expiresAt: {
+                      gt: new Date(),
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+
+          // Oldest Rose first
+          orderBy: {
+            createdAt: "asc",
+          },
+
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            requiredMessages: true,
+            messagesSent: true,
+            isUnlocked: true,
+            expiresAt: true,
+            createdAt: true,
+
+            chatMessage: {
+              select: {
+                conversationId: true,
+              },
+            },
+          },
+        })
+        : [];
+
+    console.log("rose progress : ", roseProgress);
+    // ==================================================
+    // 14. BUILD PROGRESS MAP
+    // ==================================================
+
+    const progressMap = new Map<
+      string,
+      {
+        current: number;
+        target: number;
+        percentage: number;
+        label: string;
+        type: "GIFT" | "ROSE";
+        giftName: string | null;
+        expiresAt: Date | null;
+      }
+    >();
+
+    // --------------------------------------------------
+    // Sequential Gift progress
+    // --------------------------------------------------
+
+    for (const gift of giftProgress) {
+      // ------------------------------------------------
+      // Gift must have a ChatMessage / conversation
+      // ------------------------------------------------
+
+      const conversationId =
+        gift.chatMessage?.conversationId;
+
+      if (!conversationId) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // If this conversation already has a pending gift,
+      // skip newer gifts.
+      //
+      // Because giftProgress is ordered by
+      // UserGift.createdAt ASC, the first one is
+      // always the oldest pending gift.
+      // ------------------------------------------------
+
+      if (progressMap.has(conversationId)) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // Safety check
+      // ------------------------------------------------
+
+      if (gift.isUnlocked) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // Safety check for completed gift
+      //
+      // If messagesSent has already reached target,
+      // this gift should be unlocked by your message
+      // sending logic.
+      // ------------------------------------------------
+
+      if (
+        gift.messagesSent >=
+        gift.requiredMessages
+      ) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // Calculate progress
+      // ------------------------------------------------
+
+      const current = Math.min(
+        gift.messagesSent,
+        gift.requiredMessages,
+      );
+
+      const target =
+        gift.requiredMessages;
+
+      const percentage =
+        target > 0
+          ? Math.min(
+            100,
+            Math.round(
+              (current / target) * 100,
+            ),
+          )
+          : 0;
+
+      // ------------------------------------------------
+      // Set active progress
+      // ------------------------------------------------
+
+      progressMap.set(
+        conversationId,
+        {
+          current,
+          target,
+          percentage,
+          label: `${current}/${target} for ${gift.giftName}`,
+          type: "GIFT",
+          giftName: gift.giftName,
+          expiresAt: gift.expiresAt,
+        },
+      );
+    }
+
+    // --------------------------------------------------
+    // 14.2 Add Rose progress
+    // --------------------------------------------------
+
+    for (const rose of roseProgress) {
+      // ------------------------------------------------
+      // Rose must have a ChatMessage / conversation
+      // ------------------------------------------------
+
+      const conversationId =
+        rose.chatMessage?.conversationId;
+
+      if (!conversationId) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // If this conversation already has a Gift progress,
+      // keep Gift progress.
+      // ------------------------------------------------
+
+      if (progressMap.has(conversationId)) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // Safety check
+      // ------------------------------------------------
+
+      if (rose.isUnlocked) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // If completed, it should be unlocked
+      // by message sending logic.
+      // ------------------------------------------------
+
+      if (
+        rose.messagesSent >=
+        rose.requiredMessages
+      ) {
+        continue;
+      }
+
+      // ------------------------------------------------
+      // Calculate progress
+      // ------------------------------------------------
+
+      const current = Math.min(
+        rose.messagesSent,
+        rose.requiredMessages,
+      );
+
+      const target =
+        rose.requiredMessages;
+
+      const percentage =
+        target > 0
+          ? Math.min(
+            100,
+            Math.round(
+              (current / target) * 100,
+            ),
+          )
+          : 0;
+
+      // ------------------------------------------------
+      // Set Rose progress
+      // ------------------------------------------------
+
+      progressMap.set(
+        conversationId,
+        {
+          current,
+          target,
+          percentage,
+          label: `${current}/${target} for Rose`,
+          type: "ROSE",
+          giftName: null,
+          expiresAt: rose.expiresAt,
+        },
+      );
+    }
+
+    // --------------------------------------------------
+    // 15. Convert conversations
     // --------------------------------------------------
 
     const result = await Promise.all(
@@ -685,11 +1020,10 @@ export const chatRepository = {
             });
 
           // --------------------------------------------------
-          // 13. Other user
+          // 16. Other user
           // --------------------------------------------------
 
-          const otherUser =
-            otherParticipant.user;
+          const otherUser = otherParticipant.user;
 
           const compatibility =
             matchScoreMap.get(
@@ -697,72 +1031,81 @@ export const chatRepository = {
             );
 
           // --------------------------------------------------
-          // 14. Final response
+          // 17. Final response
           // --------------------------------------------------
 
           const presence =
             presenceMap.get(otherUser.id);
 
-          return {
-            conversationId:
+          // --------------------------------------------------
+          // Progress
+          // --------------------------------------------------
+
+          const progress =
+            progressMap.get(
               conversation.id,
+            ) ?? null;
 
-            user: {
-              id: otherUser.id,
+          // --------------------------------------------------
+          // Latest message
+          // --------------------------------------------------
 
-              fullName:
-                otherUser.full_name,
-
-              age: calculateAge(
-                otherUser.birth_date,
-              ),
-
-              profilePhoto:
-                otherUser.photos[0]
-                  ?.media_url ?? null,
-
-              matchPercentage:
-                compatibility?.percentage ??
-                0,
-
-              trustPercentage: 85,
-
-              isOnline:
-                presence?.isOnline ?? false,
-
-              lastSeenAt:
-                presence?.lastSeenAt ?? null,
-            },
-
-            lastMessage: (() => {
-              const message = conversation.messages[0];
+          const lastMessage =
+            (() => {
+              const message =
+                conversation.messages[0];
 
               if (!message) {
                 return null;
               }
 
-              let displayContent = message.content;
+              let displayContent =
+                message.content;
 
-              if (message.messageType === "IMAGE") {
-                displayContent = message.content
-                  ? `📷 ${message.content}`
-                  : "📷Photo";
-              } else if (message.messageType === "VIDEO") {
-                displayContent = message.content
-                  ? `🎥 ${message.content}`
-                  : "🎥Video";
+              if (
+                message.messageType ===
+                "IMAGE"
+              ) {
+                displayContent =
+                  message.content
+                    ? `📷 ${message.content}`
+                    : "📷Photo";
+              } else if (
+                message.messageType ===
+                "VIDEO"
+              ) {
+                displayContent =
+                  message.content
+                    ? `🎥 ${message.content}`
+                    : "🎥Video";
               }
 
               return {
                 ...message,
                 content: displayContent,
               };
-            })(),
+            })();
 
+          // --------------------------------------------------
+          // Final response
+          // --------------------------------------------------
+
+          return {
+            conversationId: conversation.id,
+            user: {
+              id: otherUser.id,
+              fullName: otherUser.full_name,
+              age: calculateAge(otherUser.birth_date,),
+              profilePhoto: otherUser.photos[0]?.media_url ?? null,
+              matchPercentage: compatibility?.percentage ?? 0,
+              trustPercentage: 85,
+              isOnline: presence?.isOnline ?? false,
+              lastSeenAt: presence?.lastSeenAt ?? null,
+            },
+            lastMessage,
             unreadCount,
-
-            updatedAt:
-              conversation.updatedAt,
+            progress,
+            updatedAt: conversation.updatedAt,
           };
         },
       ),
@@ -809,76 +1152,76 @@ export const chatRepository = {
         : {}),
 
       select: {
- id: true,
-      conversationId: true,
-      senderId: true,
+        id: true,
+        conversationId: true,
+        senderId: true,
 
-      content: true,
-      messageType: true,
-      mediaUrl: true,
-      metadata: true,
+        content: true,
+        messageType: true,
+        mediaUrl: true,
+        metadata: true,
 
-      createdAt: true,
-      deliveredAt: true,
-      readAt: true,
+        createdAt: true,
+        deliveredAt: true,
+        readAt: true,
 
-      // Special interaction IDs
-      roseId: true,
-      complimentId: true,
-      giftId: true,
+        // Special interaction IDs
+        roseId: true,
+        complimentId: true,
+        giftId: true,
 
-      // Current Rose state
-      rose: {
-        select: {
-          id: true,
-          senderId: true,
-          receiverId: true,
-          targetType: true,
-          targetId: true,
-          requiredMessages: true,
-          messagesSent: true,
-          isUnlocked: true,
-          unlockedAt: true,
-          expiresAt: true,
+        // Current Rose state
+        rose: {
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            targetType: true,
+            targetId: true,
+            requiredMessages: true,
+            messagesSent: true,
+            isUnlocked: true,
+            unlockedAt: true,
+            expiresAt: true,
+          },
+        },
+
+        // Current Gift state
+        gift: {
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            giftId: true,
+            giftName: true,
+            pricePaid: true,
+            message: true,
+            targetType: true,
+            targetId: true,
+            requiredMessages: true,
+            messagesSent: true,
+            isUnlocked: true,
+            unlockedAt: true,
+            expiresAt: true,
+          },
+        },
+
+        // Compliment
+        compliment: {
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            targetType: true,
+            targetId: true,
+            ideaId: true,
+            message: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         },
       },
-
-      // Current Gift state
-      gift: {
-        select: {
-          id: true,
-          senderId: true,
-          receiverId: true,
-          giftId: true,
-          giftName: true,
-          pricePaid: true,
-          message: true,
-          targetType: true,
-          targetId: true,
-          requiredMessages: true,
-          messagesSent: true,
-          isUnlocked: true,
-          unlockedAt: true,
-          expiresAt: true,
-        },
-      },
-
-      // Compliment
-      compliment: {
-        select: {
-          id: true,
-          senderId: true,
-          receiverId: true,
-          targetType: true,
-          targetId: true,
-          ideaId: true,
-          message: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      },
-    },
     });
   },
 
