@@ -23,6 +23,24 @@ export const createEventSchema = z.object({
       "SOLD_OUT",
       "CANCELLED",
     ]),
+
+    featureTags: z
+      .array(
+        z.object({
+          label: z
+            .string()
+            .trim()
+            .min(1, "Feature tag is required")
+            .max(100, "Feature tag cannot exceed 100 characters"),
+
+          displayOrder: z
+            .number()
+            .int()
+            .min(0)
+            .optional(),
+        })
+      )
+      .optional(),
   }),
 });
 
@@ -110,14 +128,42 @@ export const updateEventTicketsSchema = z.object({
 
   body: z
     .object({
-      entryPrice: z
+      totalCapacity: z
         .number()
-        .min(0, "Entry price cannot be negative"),
+        .int("Total capacity must be an integer")
+        .min(1, "Total capacity must be at least 1"),
 
-      capacity: z
+      menCapacity: z
         .number()
-        .int("Capacity must be an integer")
-        .min(1, "Capacity must be at least 1"),
+        .int("Men capacity must be an integer")
+        .min(0, "Men capacity cannot be negative"),
+
+      womenCapacity: z
+        .number()
+        .int("Women capacity must be an integer")
+        .min(0, "Women capacity cannot be negative"),
+
+      otherCapacity: z
+        .number()
+        .int("Other capacity must be an integer")
+        .min(0, "Other capacity cannot be negative"),
+
+      menEntryPrice: z
+        .number()
+        .min(0, "Men entry price cannot be negative"),
+
+      womenEntryPrice: z
+        .number()
+        .min(0, "Women entry price cannot be negative"),
+
+      otherEntryPrice: z
+        .number()
+        .min(0, "Other entry price cannot be negative"),
+
+      discountPercentage: z
+        .number()
+        .min(0)
+        .max(100),
 
       minAge: z
         .number()
@@ -131,19 +177,24 @@ export const updateEventTicketsSchema = z.object({
         .min(18)
         .max(100),
 
-      genderMix: z.enum([
-        "FIFTY_FIFTY",
-        "WOMEN_LED",
-        "MEN_LED",
-        "OPEN",
-      ]),
-
       eventIntent: z.enum([
         "MIXED",
         "SERIOUS",
         "CASUAL",
       ]),
     })
+    .refine(
+      (data) =>
+        data.menCapacity +
+          data.womenCapacity +
+          data.otherCapacity ===
+        data.totalCapacity,
+      {
+        message:
+          "Total capacity must equal men capacity + women capacity + other capacity",
+        path: ["totalCapacity"],
+      }
+    )
     .refine(
       (data) => data.maxAge >= data.minAge,
       {
@@ -184,31 +235,78 @@ export const updateEventExperienceSchema = z.object({
       })
     ),
 
-    itinerary: z.array(
-      z.object({
-        time: z.string().min(1, "Time is required"),
+   itinerary: z.array(
+  z.object({
+    date: z
+      .string()
+      .trim()
+      .max(50)
+      .optional(),
 
-        title: z
-          .string()
-          .trim()
-          .min(1, "Title is required")
-          .max(200),
+    dayNumber: z
+      .number()
+      .int("Day number must be an integer")
+      .min(1)
+      .optional(),
 
-        description: z
-          .string()
-          .trim()
-          .max(1000)
-          .optional(),
+    time: z
+      .string()
+      .min(1, "Time is required"),
 
-        icon: z.string().max(100).optional(),
+    title: z
+      .string()
+      .trim()
+      .min(1, "Title is required")
+      .max(200),
 
-        sortOrder: z
-          .number()
-          .int()
-          .min(0)
-          .optional(),
-      })
-    ),
+    description: z
+      .string()
+      .trim()
+      .max(1000)
+      .optional(),
+
+    icon: z
+      .string()
+      .max(100)
+      .optional(),
+
+    location: z
+      .string()
+      .trim()
+      .max(300)
+      .optional(),
+
+    elevation: z
+      .string()
+      .trim()
+      .max(100)
+      .optional(),
+
+    distance: z
+      .string()
+      .trim()
+      .max(100)
+      .optional(),
+
+    accommodation: z
+      .string()
+      .trim()
+      .max(200)
+      .optional(),
+
+    meals: z
+      .string()
+      .trim()
+      .max(200)
+      .optional(),
+
+    sortOrder: z
+      .number()
+      .int()
+      .min(0)
+      .optional(),
+  })
+),
 
     whyShouldCome: z.array(
       z.object({
@@ -233,6 +331,7 @@ export const updateEventExperienceSchema = z.object({
           .optional(),
       })
     ),
+    
   }),
 });
 
@@ -279,6 +378,29 @@ export const updateEventSafetySchema = z.object({
         "Terms and conditions cannot exceed 10000 characters"
       )
       .optional(),
+      faqs: z
+  .array(
+    z.object({
+      question: z
+        .string()
+        .trim()
+        .min(1, "FAQ question is required")
+        .max(500, "FAQ question cannot exceed 500 characters"),
+
+      answer: z
+        .string()
+        .trim()
+        .min(1, "FAQ answer is required")
+        .max(5000, "FAQ answer cannot exceed 5000 characters"),
+
+      displayOrder: z
+        .number()
+        .int()
+        .min(0)
+        .optional(),
+    })
+  )
+  .optional(),
   }),
 });
 

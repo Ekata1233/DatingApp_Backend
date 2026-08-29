@@ -116,9 +116,14 @@ export async function createPaymentLink(userId: string, body: any) {
     // EVENT BOOKING
     // ==========================================
 
-  case PaymentPurpose.EVENT_BOOKING: {
+   case PaymentPurpose.EVENT_BOOKING: {
+  console.log("========== EVENT BOOKING DEBUG ==========");
   console.log("EVENT BOOKING BODY:", body);
   console.log("EVENT ID:", body.eventId);
+
+  // ==========================================
+  // 1. GET EVENT
+  // ==========================================
 
   const event = await prisma.event.findUnique({
     where: {
@@ -126,8 +131,23 @@ export async function createPaymentLink(userId: string, body: any) {
     },
     select: {
       id: true,
-      entryPrice: true,
       status: true,
+
+      totalCapacity: true,
+
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
+
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
+
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
+
+      discountPercentage: true,
     },
   });
 
@@ -135,74 +155,300 @@ export async function createPaymentLink(userId: string, body: any) {
     throw new Error("Event not found");
   }
 
-  if (!event.entryPrice) {
-    throw new Error("Event price not available");
-  }
+  // ==========================================
+  // 2. EVENT MUST BE LIVE
+  // ==========================================
 
   if (event.status !== EventStatus.LIVE) {
     throw new Error("Event is not live");
   }
 
-  const ticketCount = Number(body.ticketCount) || 1;
-  const ticketAmount = Number(event.entryPrice);
-  const totalAmount = ticketAmount * ticketCount;
+  // ==========================================
+  // 3. GET USER TICKET TYPE
+  // ==========================================
+  //
+  // IMPORTANT:
+  // Your request does not send ticketType.
+  // So backend determines it from user's profile.
+  //
+  // Change `gender` below if your UserProfile field
+  // has a different name.
+  // ==========================================
 
-  // Find existing pending booking
-  let booking = await prisma.eventBooking.findFirst({
-    where: {
-      eventId: event.id,
-      userId,
-      status: {
-        in: [
-          EventBookingStatus.PENDING,
-          EventBookingStatus.PAYMENT_PENDING,
-        ],
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const userProfile = await prisma.userProfile.findUnique({
+  where: {
+    user_id: userId,
+  },
+  select: {
+    interested_in: true,
+  },
+});
 
-  // Create booking if it does not exist
-  if (!booking) {
-    const bookingNumber = `EVT_${Date.now()}_${randomUUID()
-      .replace(/-/g, "")
-      .slice(0, 8)}`;
+if (!userProfile) {
+  throw new Error("User profile not found");
+}
 
-    const ticketId = `TKT_${Date.now()}_${randomUUID()
-      .replace(/-/g, "")
-      .slice(0, 8)}`;
+  if (!userProfile) {
+    throw new Error("User profile not found");
+  }
 
-    booking = await prisma.eventBooking.create({
-      data: {
-        userId,
+  let ticketType: "MEN" | "WOMEN" | "OTHER";
+
+  const gender = String(userProfile.interested_in || "")
+  .trim()
+  .toUpperCase();
+
+  if (["MALE", "MAN", "MEN"].includes(gender)) {
+    ticketType = "MEN";
+  } else if (["FEMALE", "WOMAN", "WOMEN"].includes(gender)) {
+    ticketType = "WOMEN";
+  } else {
+    ticketType = "OTHER";
+  }
+
+  console.log("User Gender:", gender);
+  console.log("Ticket Type:", ticketType);
+
+  // ==========================================
+  // 4. TICKET COUNT
+  // ==========================================
+  //
+  // Your Postman body doesn't send ticketCount.
+  // Therefore default = 1.
+  // ==========================================
+
+  const ticketCount = 1;
+
+  // ==========================================
+  // 5. GET CAPACITY + PRICES
+  // ==========================================
+
+  let capacity: number | null = null;
+  let entryPrice: number | null = null;
+  let discountedPrice: number | null = null;
+
+  switch (ticketType) {
+    case "MEN":
+      capacity = event.menCapacity;
+
+      entryPrice =
+        event.menEntryPrice !== null
+          ? Number(event.menEntryPrice)
+          : null;
+
+      discountedPrice =
+        event.menDiscountedPrice !== null
+          ? Number(event.menDiscountedPrice)
+          : null;
+
+      break;
+
+    case "WOMEN":
+      capacity = event.womenCapacity;
+
+      entryPrice =
+        event.womenEntryPrice !== null
+          ? Number(event.womenEntryPrice)
+          : null;
+
+      discountedPrice =
+        event.womenDiscountedPrice !== null
+          ? Number(event.womenDiscountedPrice)
+          : null;
+
+      break;
+
+    case "OTHER":
+      capacity = event.otherCapacity;
+
+      entryPrice =
+        event.otherEntryPrice !== null
+          ? Number(event.otherEntryPrice)
+          : null;
+
+      discountedPrice =
+        event.otherDiscountedPrice !== null
+          ? Number(event.otherDiscountedPrice)
+          : null;
+
+      break;
+  }
+
+  // ==========================================
+  // 6. VALIDATE PRICE
+  // ==========================================
+
+  if (entryPrice === null) {
+    throw new Error(
+      `${ticketType} ticket entry price is not available`,
+    );
+  }
+
+  // Use discounted price when available.
+  // Otherwise use normal entry price.
+  const ticketPrice =
+    discountedPrice !== null
+      ? discountedPrice
+      : entryPrice;
+
+  // ==========================================
+  // 7. VALIDATE CAPACITY
+  // ==========================================
+
+  if (capacity === null || capacity <= 0) {
+    throw new Error(
+      `${ticketType} ticket capacity is not available`,
+    );
+  }
+
+  // ==========================================
+  // 8. CHECK CONFIRMED BOOKINGS
+  // ==========================================
+  //
+  // IMPORTANT:
+  // Only CONFIRMED bookings reduce available capacity.
+  //
+  // Sum ticketCount, don't count booking rows.
+  // ==========================================
+
+  const confirmedBookings =
+    await prisma.eventBooking.aggregate({
+      where: {
         eventId: event.id,
+        ticketType,
+        status: EventBookingStatus.CONFIRMED,
+      },
 
-        bookingNumber,
-        ticketId,
-
-        ticketCount,
-        ticketAmount,
-        totalAmount,
-        paidAmount: 0,
-
-        status: EventBookingStatus.PENDING,
+      _sum: {
+        ticketCount: true,
       },
     });
 
-    console.log("EVENT BOOKING CREATED:", booking.id);
+  const bookedTickets =
+    confirmedBookings._sum.ticketCount ?? 0;
+
+  const remainingCapacity = Math.max(
+    capacity - bookedTickets,
+    0,
+  );
+
+  console.log("========== CAPACITY CHECK ==========");
+  console.log("Ticket Type:", ticketType);
+  console.log("Capacity:", capacity);
+  console.log("Confirmed Booked Tickets:", bookedTickets);
+  console.log("Remaining Capacity:", remainingCapacity);
+
+  if (ticketCount > remainingCapacity) {
+    throw new Error(
+      `Only ${remainingCapacity} ${ticketType} ticket(s) available`,
+    );
   }
+
+  // ==========================================
+  // 9. PRICE CALCULATION
+  // ==========================================
+
+  const ticketAmount = ticketPrice;
+
+  const totalAmount =
+    ticketAmount * ticketCount;
+
+  console.log("========== PRICE CALCULATION ==========");
+  console.log("Entry Price:", entryPrice);
+  console.log("Discounted Price:", discountedPrice);
+  console.log("Final Ticket Price:", ticketPrice);
+  console.log("Ticket Count:", ticketCount);
+  console.log("Total Amount:", totalAmount);
+
+  // ==========================================
+  // 10. FIND EXISTING PENDING BOOKING
+  // ==========================================
+
+  let booking =
+    await prisma.eventBooking.findFirst({
+      where: {
+        eventId: event.id,
+        userId,
+
+        ticketType,
+
+        status: {
+          in: [
+            EventBookingStatus.PENDING,
+            EventBookingStatus.PAYMENT_PENDING,
+          ],
+        },
+      },
+
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+  // ==========================================
+  // 11. CREATE BOOKING
+  // ==========================================
+
+  if (!booking) {
+    const bookingNumber =
+      `EVT_${Date.now()}_${randomUUID()
+        .replace(/-/g, "")
+        .slice(0, 8)}`;
+
+    const ticketId =
+      `TKT_${Date.now()}_${randomUUID()
+        .replace(/-/g, "")
+        .slice(0, 8)}`;
+
+    booking =
+      await prisma.eventBooking.create({
+        data: {
+          userId,
+          eventId: event.id,
+
+          bookingNumber,
+          ticketId,
+
+          ticketType,
+          ticketCount,
+
+          // Final price actually charged
+          ticketAmount,
+
+          totalAmount,
+
+          paidAmount: 0,
+
+          status: EventBookingStatus.PENDING,
+        },
+      });
+
+    console.log(
+      "EVENT BOOKING CREATED:",
+      booking.id,
+    );
+  }
+
+  // ==========================================
+  // 12. GET REMAINING PAYMENT
+  // ==========================================
 
   const remainingAmount =
     Number(booking.totalAmount) -
     Number(booking.paidAmount);
 
   if (remainingAmount <= 0) {
-    throw new Error("Event booking is already fully paid");
+    throw new Error(
+      "Event booking is already fully paid",
+    );
   }
 
   amount = remainingAmount;
+
+  console.log(
+    "Final Payment Amount:",
+    amount,
+  );
 
   break;
 }
@@ -282,10 +528,9 @@ export async function createPaymentLink(userId: string, body: any) {
 }
 
 export async function paymentWebhookService(payload: any) {
-  
   const payment_id = payload.txnid;
   const status = payload.status;
- console.log("========== PAYMENT WEBHOOK DEBUG ==========");
+  console.log("========== PAYMENT WEBHOOK DEBUG ==========");
   console.log("PayU txnid:", payment_id);
   console.log("PayU status:", status);
   // Use transaction with optimistic locking to prevent race conditions
@@ -295,7 +540,7 @@ export async function paymentWebhookService(payload: any) {
       const payment = await tx.payment.findUnique({
         where: { payment_id },
       });
- console.log("========== PAYMENT FOUND ==========");
+      console.log("========== PAYMENT FOUND ==========");
       console.log("Payment:", payment);
       console.log("Payment DB ID:", payment?.id);
       console.log("Payment payment_id:", payment?.payment_id);
@@ -328,7 +573,7 @@ export async function paymentWebhookService(payload: any) {
           gatewayResponse: payload,
         },
       });
-   console.log("========== PAYMENT UPDATED ==========");
+      console.log("========== PAYMENT UPDATED ==========");
       console.log("Updated Payment ID:", updatedPayment.id);
       console.log("Updated Payment payment_id:", updatedPayment.payment_id);
       console.log(
@@ -414,34 +659,20 @@ export async function paymentWebhookService(payload: any) {
           }
           break;
         case PaymentPurpose.EVENT_BOOKING:
-
-          console.log(
-            "========== EVENT BOOKING PAYMENT DEBUG ==========",
-          );
+          console.log("========== EVENT BOOKING PAYMENT DEBUG ==========");
 
           console.log(
             "Payment ID being sent to confirmEventBooking:",
             updatedPayment.id,
           );
 
-          console.log(
-            "Payment User ID:",
-            updatedPayment.userId,
-          );
+          console.log("Payment User ID:", updatedPayment.userId);
 
-          console.log(
-            "Payment Amount:",
-            updatedPayment.amount,
-          );
+          console.log("Payment Amount:", updatedPayment.amount);
 
-          await confirmEventBooking(
-            tx,
-            updatedPayment,
-          );
+          await confirmEventBooking(tx, updatedPayment);
 
-          console.log(
-            "confirmEventBooking FINISHED",
-          );
+          console.log("confirmEventBooking FINISHED");
 
           break;
       }

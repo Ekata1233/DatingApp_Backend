@@ -1,9 +1,16 @@
 import { EventStatus, Type } from "@prisma/client";
 
+
+export interface EventFeatureTagInput {
+  label: string;
+  displayOrder?: number;
+}
+
 export interface CreateEventInput {
   eventType: Type;
   title: string;
   status: EventStatus;
+  featureTags?: EventFeatureTagInput[];
 }
 export interface UpdateEventHostInput {
   city: string;
@@ -20,11 +27,21 @@ export interface UpdateEventVenueInput {
   longitude: number;
 }
 export interface UpdateEventTicketsInput {
-  entryPrice: number;
-  capacity: number;
+  totalCapacity: number;
+
+  menCapacity: number;
+  womenCapacity: number;
+  otherCapacity: number;
+
+  menEntryPrice: number;
+  womenEntryPrice: number;
+  otherEntryPrice: number;
+
+  discountPercentage: number;
+
   minAge: number;
   maxAge: number;
-  genderMix: "FIFTY_FIFTY" | "WOMEN_LED" | "MEN_LED" | "OPEN";
+
   eventIntent: "MIXED" | "SERIOUS" | "CASUAL";
 }
 
@@ -40,10 +57,21 @@ export interface EventAmenityInput {
 }
 
 export interface EventItineraryInput {
+  date?: string;
+  dayNumber?: number;
+
   time: string;
   title: string;
   description?: string;
   icon?: string;
+
+  location?: string;
+  elevation?: string;
+  distance?: string;
+
+  accommodation?: string;
+  meals?: string;
+
   sortOrder?: number;
 }
 
@@ -70,9 +98,16 @@ export interface EventSafetyInput {
   title: string;
 }
 
+export interface EventFAQInput {
+  question: string;
+  answer: string;
+  displayOrder?: number;
+}
+
 export interface UpdateEventSafetyInput {
   safetyFeatures: EventSafetyInput[];
-  dressCode?: 
+
+  dressCode?:
     | "CASUAL"
     | "SMART_CASUAL"
     | "SEMI_FORMAL"
@@ -81,6 +116,7 @@ export interface UpdateEventSafetyInput {
     | "TRADITIONAL";
 
   refundWindow?: number;
-
   termsConditions?: string;
+
+  faqs?: EventFAQInput[];
 }
