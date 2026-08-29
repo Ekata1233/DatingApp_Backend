@@ -92,6 +92,48 @@ export const getAdmirers = async ({
     const skip = (page - 1) * limit;
 
     // ==========================================
+    // CHECK ACTIVE PACKAGE
+    // ==========================================
+
+    const now = new Date();
+
+    const activePackage = await prisma.userPackage.findFirst({
+        where: {
+            user_id: userId,
+
+            status: "ACTIVE",
+
+            startDate: {
+                lte: now,
+            },
+
+            OR: [
+                {
+                    endDate: null,
+                },
+                {
+                    endDate: {
+                        gte: now,
+                    },
+                },
+            ],
+        },
+
+        select: {
+            id: true,
+            packageId: true,
+            startDate: true,
+            endDate: true,
+            status: true,
+        },
+
+        orderBy: {
+            endDate: "desc",
+        },
+    });
+
+    const hasActivePackage = !!activePackage;
+    // ==========================================
     // CURRENT USER LOCATION
     // ==========================================
 
@@ -175,6 +217,34 @@ export const getAdmirers = async ({
                     },
                 }),
         };
+
+        // ==========================================
+        // RECEIVED LIKES LOCK
+        // ==========================================
+
+        if (direction === "RECEIVED" && !hasActivePackage) {
+            const total = await prisma.userSwipe.count({
+                where,
+            });
+
+            return {
+                receivedLikesCount,
+                receivedRosesCount,
+
+                isPackageActive: false,
+
+                isLocked: true,
+
+                data: [],
+
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    hasNext: page * limit < total,
+                },
+            };
+        }
 
         const [swipes, total] = await Promise.all([
             prisma.userSwipe.findMany({
@@ -387,6 +457,8 @@ export const getAdmirers = async ({
         return {
             receivedLikesCount,
             receivedRosesCount,
+            isPackageActive: hasActivePackage,
+            isLocked: false,
             data,
             pagination: {
                 page,

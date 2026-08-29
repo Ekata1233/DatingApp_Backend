@@ -17,6 +17,7 @@ import {
 import { MessageType } from "@prisma/client";
 import { calculateAge } from "../chat.repository";
 import { prisma } from "../../../prisma/prismaClient";
+import { incrementRoseAndGiftMessages } from "../../unlockRoseGift/unlockRoseGift.service";
 
 export const chatSocketService = {
   /**
@@ -88,6 +89,11 @@ export const chatSocketService = {
     const receiverId = await chatService.getOtherParticipant(
       payload.conversationId,
       userId,
+    );
+
+    const interactionResult = await incrementRoseAndGiftMessages(
+      userId,
+      receiverId,
     );
 
     const unreadCount = await chatService.getUnreadCount(
