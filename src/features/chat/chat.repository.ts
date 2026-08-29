@@ -2,7 +2,7 @@
 
 import { MessageType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
-import { ConversationFilter } from "./chat.types";
+import { ConversationFilter, MessageFilterType } from "./chat.types";
 import { presenceService } from "./presence/presence.service";
 
 export const calculateAge = (birthDate: Date | null): number | null => {
@@ -1123,7 +1123,22 @@ export const chatRepository = {
   /**
    * Get messages using cursor pagination.
    */
-  async findMessages(conversationId: string, userId: string, cursor?: string, limit = 30) {
+  async findMessages(conversationId: string, userId: string, cursor?: string, limit = 30, type: MessageFilterType = "all",) {
+    const messageTypeFilter =
+    type === "all"
+      ? {}
+      : type === "date"
+        ? {
+            messageType: {
+              in: [
+                MessageType.DATE_CONFIRMED,
+                MessageType.DATE_CANCELLED,
+              ],
+            },
+          }
+        : {
+            messageType: type.toUpperCase() as MessageType,
+          };
     return prisma.chatMessage.findMany({
       where: {
         conversationId,
@@ -1134,6 +1149,8 @@ export const chatRepository = {
             userId,
           },
         },
+        // Message type filter
+      ...messageTypeFilter,
       },
 
       orderBy: {

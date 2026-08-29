@@ -1,6 +1,7 @@
 // src/modules/chat/message/message.types.ts
 
 import { MessageType, Prisma } from "@prisma/client";
+import { MessageFilterType } from "../chat.types";
 
 export interface CreateMessageInput {
   userId: string;
@@ -16,6 +17,7 @@ export interface GetMessagesInput {
   conversationId: string;
   cursor?: string;
   limit: number;
+  type?: MessageFilterType;
 }
 
 export interface GetMessageInput {

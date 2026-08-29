@@ -72,6 +72,16 @@ export const getMessagesSchema = z.object({
     .min(1)
     .max(100)
     .default(30),
+type: z
+    .enum([
+      "all",
+      "rose",
+      "gift",
+      "compliment",
+      "date",
+    ])
+    .default("all"),
+    
 });
 
 export const getConversationsSchema = z.object({

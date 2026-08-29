@@ -100,6 +100,7 @@ export const getMessages = async (
       cursor: req.query.cursor,
 
       limit: req.query.limit,
+      type: req.query.type,
     });
 
     const result =
@@ -108,6 +109,7 @@ export const getMessages = async (
         conversationId: data.conversationId,
         cursor: data.cursor,
         limit: data.limit,
+        type: data.type
       });
 
     return res.status(200).json({

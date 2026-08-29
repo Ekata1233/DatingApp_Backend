@@ -90,6 +90,7 @@ export const chatService = {
       data.userId,
       data.cursor,
       data.limit,
+      data.type ?? "all",
     );
 
     const hasMore = messages.length > data.limit;

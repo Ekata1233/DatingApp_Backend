@@ -24,6 +24,7 @@ export interface GetMessagesInput {
   conversationId: string;
   cursor?: string;
   limit: number;
+  type?: MessageFilterType;
 }
 
 export interface GetConversationsInput {
@@ -58,3 +59,10 @@ export interface ChatPagination {
 export interface UserPresenceParams {
   userId: string;
 }
+
+export type MessageFilterType =
+  | "all"
+  | "rose"
+  | "gift"
+  | "compliment"
+  | "date";
