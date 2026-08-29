@@ -1098,19 +1098,20 @@ model UserPlanUsage {
 }
 
 model UserRose {
-  id               String      @id @default(uuid()) @db.Uuid
-  senderId         String      @db.Uuid
-  receiverId       String      @db.Uuid
+  id               String       @id @default(uuid()) @db.Uuid
+  senderId         String       @db.Uuid
+  receiverId       String       @db.Uuid
   targetType       TargetType?
-  targetId         String?     @db.Uuid
-  requiredMessages Int         @default(1)
-  messagesSent     Int         @default(0)
-  isUnlocked       Boolean     @default(false)
+  targetId         String?      @db.Uuid
+  requiredMessages Int          @default(1)
+  messagesSent     Int          @default(0)
+  isUnlocked       Boolean      @default(false)
   unlockedAt       DateTime?
   expiresAt        DateTime?
-  createdAt        DateTime    @default(now())
-  sender           User        @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver         User        @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt        DateTime     @default(now())
+  sender           User         @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver         User         @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  chatMessage      ChatMessage?
 
   @@index([senderId])
   @@index([receiverId])
@@ -1177,19 +1178,20 @@ enum RoseTransactionType {
 }
 
 model UserCompliment {
-  id         String           @id @default(uuid()) @db.Uuid
-  senderId   String           @db.Uuid
-  receiverId String           @db.Uuid
-  targetType TargetType?
-  targetId   String?          @db.Uuid
-  ideaId     String?
-  idea       ComplimentIdea?  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
-  message    String?          @db.VarChar(140)
-  status     ComplimentStatus @default(PENDING)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  sender     User             @relation("ComplimentSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User             @relation("ComplimentReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  id          String           @id @default(uuid()) @db.Uuid
+  senderId    String           @db.Uuid
+  receiverId  String           @db.Uuid
+  targetType  TargetType?
+  targetId    String?          @db.Uuid
+  ideaId      String?
+  idea        ComplimentIdea?  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  message     String?          @db.VarChar(140)
+  status      ComplimentStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  sender      User             @relation("ComplimentSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User             @relation("ComplimentReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  chatMessage ChatMessage?
 
   @@index([senderId])
   @@index([receiverId, status])
@@ -1279,6 +1281,7 @@ model UserGift {
   sender              User               @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver            User               @relation("GiftReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   gift                Gift               @relation(fields: [giftId], references: [id])
+  chatMessage         ChatMessage?
 
   @@index([receiverId])
   @@index([senderId])
@@ -1746,17 +1749,23 @@ model ConversationParticipant {
 }
 
 model ChatMessage {
-  id             String      @id @default(uuid()) @db.Uuid
-  conversationId String      @db.Uuid
-  senderId       String      @db.Uuid
+  id             String          @id @default(uuid()) @db.Uuid
+  conversationId String          @db.Uuid
+  senderId       String          @db.Uuid
   content        String?
-  messageType    MessageType @default(TEXT)
+  messageType    MessageType     @default(TEXT)
   mediaUrl       String?
   metadata       Json?
-  createdAt      DateTime    @default(now())
+  createdAt      DateTime        @default(now())
   deliveredAt    DateTime?
   readAt         DateTime?
   deletedAt      DateTime?
+  roseId         String?         @unique @db.Uuid
+  rose           UserRose?       @relation(fields: [roseId], references: [id], onDelete: SetNull)
+  complimentId   String?         @unique @db.Uuid
+  compliment     UserCompliment? @relation(fields: [complimentId], references: [id], onDelete: SetNull)
+  giftId         String?         @unique @db.Uuid
+  gift           UserGift?       @relation(fields: [giftId], references: [id], onDelete: SetNull)
 
   conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User                  @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -1791,7 +1800,8 @@ model Wallet {
 }
 
 model Event {
-  id        String      @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+
   //---------------------------------
   // Step 1
   //---------------------------------
@@ -1799,34 +1809,53 @@ model Event {
   title     String?
   status    EventStatus @default(DRAFT)
 
+  // New event-specific tags
+  featureTags EventFeatureTag[]
+
   //---------------------------------
   // Step 2
   //---------------------------------
   city           String?
   eventPartnerId String?
   eventPartner   EventPartner? @relation(fields: [eventPartnerId], references: [id])
-  eventTag       EventTag?
+
+  // Existing EventTag - KEEP THIS
+  eventTag EventTag?
+
   //---------------------------------
   // Step 3
   //---------------------------------
-  eventDate      DateTime?
-  startTime      String?
-  endTime        String?
-  venueName      String?
-  fullAddress    String?       @db.Text
-  latitude       Float?
-  longitude      Float?
+  eventDate   DateTime?
+  startTime   String?
+  endTime     String?
+  venueName   String?
+  fullAddress String?   @db.Text
+  latitude    Float?
+  longitude   Float?
 
   //---------------------------------
-  // Step 4
-  //--------------------------------
-  entryPrice  Decimal?     @db.Decimal(10, 2)
-  capacity    Int?
-  minAge      Int?
-  maxAge      Int?
-  genderMix   GenderMix?
-  eventIntent EventIntent?
+  // Step 4 - Tickets & Capacity
+  //---------------------------------
 
+  totalCapacity Int?
+
+  menCapacity   Int?
+  womenCapacity Int?
+  otherCapacity Int?
+
+  menEntryPrice   Decimal? @db.Decimal(10, 2)
+  womenEntryPrice Decimal? @db.Decimal(10, 2)
+  otherEntryPrice Decimal? @db.Decimal(10, 2)
+
+  discountPercentage Decimal? @db.Decimal(5, 2)
+
+  menDiscountedPrice   Decimal? @db.Decimal(10, 2)
+  womenDiscountedPrice Decimal? @db.Decimal(10, 2)
+  otherDiscountedPrice Decimal? @db.Decimal(10, 2)
+
+  minAge        Int?
+  maxAge        Int?
+  eventIntent   EventIntent?
   //---------------------------------
   // Step 5
   //---------------------------------
@@ -1845,20 +1874,24 @@ model Event {
   refundWindow    Int?
   termsConditions String?       @db.Text
 
+  faqs EventFAQ[]
+
   //---------------------------------
-  // Step Progress
-  //--------------------------------
-  currentStep    Int            @default(1)
-  basicsDone     Boolean        @default(false)
-  hostDone       Boolean        @default(false)
-  venueDone      Boolean        @default(false)
-  ticketDone     Boolean        @default(false)
-  experienceDone Boolean        @default(false)
-  safetyDone     Boolean        @default(false)
-  publishedAt    DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  EventBooking   EventBooking[]
+  // Progress
+  //---------------------------------
+  currentStep    Int     @default(1)
+  basicsDone     Boolean @default(false)
+  hostDone       Boolean @default(false)
+  venueDone      Boolean @default(false)
+  ticketDone     Boolean @default(false)
+  experienceDone Boolean @default(false)
+  safetyDone     Boolean @default(false)
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  EventBooking EventBooking[]
 
   @@index([status])
   @@index([city])
@@ -1892,14 +1925,23 @@ model EventAmenity {
 }
 
 model EventItinerary {
-  id          String  @id @default(uuid()) @db.Uuid
-  eventId     String  @db.Uuid
-  time        String
-  title       String
-  description String?
-  icon        String?
-  sortOrder   Int     @default(0)
-  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id            String  @id @default(uuid()) @db.Uuid
+  eventId       String  @db.Uuid
+  // Existing fields - DO NOT CHANGE
+  time          String
+  title         String
+  description   String?
+  icon          String?
+  sortOrder     Int     @default(0)
+  // New fields
+  date          String?
+  dayNumber     Int?
+  location      String?
+  elevation     String?
+  distance      String?
+  accommodation String?
+  meals         String?
+  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
 model EventWhyCome {
@@ -1917,6 +1959,31 @@ model EventSafety {
   eventId String @db.Uuid
   title   String
   event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventFAQ {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String   @db.Uuid
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  question     String   @db.Text
+  answer       String   @db.Text
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([eventId])
+}
+
+model EventFeatureTag {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String   @db.Uuid
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label        String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([eventId])
 }
 
 model EventBooking {
@@ -2079,8 +2146,10 @@ enum Gender {
   MEN
   WOMEN
   NON_BINARY
+  TRANS_MAN
+  TRANS_WOMAN
+  OTHER
   PREFER_NOT_TO_SAY
-  EVERYONE
 }
 
 enum GenderOption {
