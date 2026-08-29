@@ -3,13 +3,10 @@ import { MessageType, Prisma } from "@prisma/client";
 interface CreateGiftMessageData {
   conversationId: string;
   senderId: string;
-  giftId: number;
-  coinCost: number;
+  giftId: string;
   targetType: string | null;
   targetId: string | null;
-  requiredMessages: number;
   mediaUrl: string | null;
-  expiresAt: Date | null;
 }
 
 export const createGiftChatMessage = async (
@@ -23,15 +20,10 @@ export const createGiftChatMessage = async (
       content: null,
       messageType: MessageType.GIFT,
       mediaUrl: data.mediaUrl,
+      giftId: data.giftId,
       metadata: {
-        giftId: data.giftId,
-        coinCost: data.coinCost,
         targetType: data.targetType,
         targetId: data.targetId,
-        requiredMessages: data.requiredMessages,
-        messagesSent: 0,
-        isUnlocked: false,
-        expiresAt: data.expiresAt?.toISOString() ?? null,
       },
     },
   });

@@ -1,13 +1,11 @@
-import { MessageType, Prisma } from "@prisma/client";
+import { MessageType, Prisma, TargetType } from "@prisma/client";
 
 interface CreateRoseMessageData {
   conversationId: string;
   senderId: string;
   roseId: string;
-  targetType: string | null;
-  targetId: string | null;
-  requiredMessages: number;
-  expiresAt: Date | null;
+  targetType?: TargetType | null;
+  targetId?: string | null;
 }
 
 export const createRoseChatMessage = async (
@@ -18,19 +16,12 @@ export const createRoseChatMessage = async (
     data: {
       conversationId: data.conversationId,
       senderId: data.senderId,
-
       content: null,
-
       messageType: MessageType.ROSE,
-
+      roseId: data.roseId,
       metadata: {
-        roseId: data.roseId,
         targetType: data.targetType,
         targetId: data.targetId,
-        requiredMessages: data.requiredMessages,
-        messagesSent: 0,
-        isUnlocked: false,
-        expiresAt: data.expiresAt?.toISOString() ?? null,
       },
     },
   });
