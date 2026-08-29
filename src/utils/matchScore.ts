@@ -346,9 +346,9 @@ function isInterestedIn(
   if (!interestedIn || !targetGender) return false;
 
   // EVERYONE means interested in all genders
-  if (interestedIn === Gender.EVERYONE) {
-    return true;
-  }
+if ((interestedIn as string) === "EVERYONE") {
+  return true;
+}
 
   return interestedIn === targetGender;
 }
