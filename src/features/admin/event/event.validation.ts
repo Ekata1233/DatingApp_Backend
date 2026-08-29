@@ -409,3 +409,20 @@ export const publishEventSchema = z.object({
     id: z.string().uuid("Invalid event ID"),
   }),
 });
+
+export const getEventListSchema = z.object({
+  query: z.object({
+    eventType: z
+      .enum([
+        "ALL",
+        "SIGNATURE_MIXER",
+        "SPEED_DATING",
+        "WINE_TASTING",
+        "SUPPER_CLUB",
+        "BRUNCH_SOCIAL",
+        "ROOFTOP_MIXER",
+      ])
+      .optional()
+      .default("ALL"),
+  }),
+});

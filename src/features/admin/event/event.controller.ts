@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as EventService from "./event.service";
 import { UpdateEventExperienceInput } from "./event.types";
 import imagekit from "../../../utils/imagekit";
+import { Type } from "@prisma/client";
 interface EventParams {
   id: string;
 }
@@ -426,7 +427,13 @@ export const getEventListController = async (
   next: NextFunction
 ) => {
   try {
-    const events = await EventService.getEventList();
+    const eventType = req.query.eventType as string | undefined;
+
+    const events = await EventService.getEventList(
+      eventType && eventType !== "ALL"
+        ? (eventType as Type)
+        : undefined
+    );
 
     return res.status(200).json({
       success: true,

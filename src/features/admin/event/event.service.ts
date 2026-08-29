@@ -1,3 +1,4 @@
+import { Type } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import {
   CreateEventInput,
@@ -1292,10 +1293,18 @@ export const getAllEvents = async () => {
 // GET EVENT LIST - MOBILE
 // ========================================
 
-export const getEventList = async () => {
+
+
+export const getEventList = async (eventType?: Type) => {
   const events = await prisma.event.findMany({
     where: {
       status: "LIVE",
+
+      ...(eventType
+        ? {
+            eventType: eventType,
+          }
+        : {}),
     },
 
     orderBy: {
@@ -1313,7 +1322,6 @@ export const getEventList = async () => {
 
       fullAddress: true,
 
-      // NEW TICKET FIELDS
       totalCapacity: true,
 
       menCapacity: true,
@@ -1335,15 +1343,12 @@ export const getEventList = async () => {
       eventIntent: true,
 
       heroImage: true,
-
       eventTag: true,
 
-      // NEW FEATURE TAGS
       featureTags: {
         orderBy: {
           displayOrder: "asc",
         },
-
         select: {
           id: true,
           label: true,
@@ -1355,18 +1360,16 @@ export const getEventList = async () => {
 
   const eventsWithBookingStats = await Promise.all(
     events.map(async (event) => {
-      const bookingStats =
-        await getEventBookingStats(
-          event.id,
-          event.totalCapacity,
-        );
+      const bookingStats = await getEventBookingStats(
+        event.id,
+        event.totalCapacity
+      );
 
       return {
         ...event,
-
-       
+        ...bookingStats,
       };
-    }),
+    })
   );
 
   return eventsWithBookingStats;
