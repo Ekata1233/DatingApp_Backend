@@ -18,14 +18,23 @@ export const createEvent = async (payload: CreateEventInput) => {
 
       currentStep: 1,
       basicsDone: true,
+
+      featureTags: payload.featureTags?.length
+        ? {
+            create: payload.featureTags.map((tag, index) => ({
+              label: tag.label,
+              displayOrder: tag.displayOrder ?? index,
+            })),
+          }
+        : undefined,
     },
 
-    select: {
-      id: true,
-      eventType: true,
-      title: true,
-      status: true,
-      currentStep: true,
+    include: {
+      featureTags: {
+        orderBy: {
+          displayOrder: "asc",
+        },
+      },
     },
   });
 
@@ -200,7 +209,6 @@ export const updateEventTickets = async (
   eventId: string,
   payload: UpdateEventTicketsInput,
 ) => {
-  // 1. Check event exists
   const existingEvent = await prisma.event.findUnique({
     where: {
       id: eventId,
@@ -211,23 +219,47 @@ export const updateEventTickets = async (
     throw new Error("Event not found");
   }
 
-  // 2. Don't allow editing LIVE event
   if (existingEvent.status === "LIVE") {
     throw new Error("Published event cannot be edited");
   }
 
-  // 3. Update ticket details
+  // Calculate discounted prices
+  const discountMultiplier =
+    1 - payload.discountPercentage / 100;
+
+  const menDiscountedPrice =
+    payload.menEntryPrice * discountMultiplier;
+
+  const womenDiscountedPrice =
+    payload.womenEntryPrice * discountMultiplier;
+
+  const otherDiscountedPrice =
+    payload.otherEntryPrice * discountMultiplier;
+
   const event = await prisma.event.update({
     where: {
       id: eventId,
     },
 
     data: {
-      entryPrice: payload.entryPrice,
-      capacity: payload.capacity,
+      totalCapacity: payload.totalCapacity,
+
+      menCapacity: payload.menCapacity,
+      womenCapacity: payload.womenCapacity,
+      otherCapacity: payload.otherCapacity,
+
+      menEntryPrice: payload.menEntryPrice,
+      womenEntryPrice: payload.womenEntryPrice,
+      otherEntryPrice: payload.otherEntryPrice,
+
+      discountPercentage: payload.discountPercentage,
+
+      menDiscountedPrice,
+      womenDiscountedPrice,
+      otherDiscountedPrice,
+
       minAge: payload.minAge,
       maxAge: payload.maxAge,
-      genderMix: payload.genderMix,
       eventIntent: payload.eventIntent,
 
       ticketDone: true,
@@ -236,12 +268,27 @@ export const updateEventTickets = async (
 
     select: {
       id: true,
-      entryPrice: true,
-      capacity: true,
+
+      totalCapacity: true,
+
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
+
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
+
+      discountPercentage: true,
+
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
+
       minAge: true,
       maxAge: true,
-      genderMix: true,
       eventIntent: true,
+
       ticketDone: true,
       currentStep: true,
     },
@@ -371,23 +418,30 @@ export const updateEventExperience = async (
       },
     });
 
-    if (payload.itinerary.length > 0) {
-      await tx.eventItinerary.createMany({
-        data: payload.itinerary.map((item, index) => ({
-          eventId,
+   if (payload.itinerary.length > 0) {
+  await tx.eventItinerary.createMany({
+    data: payload.itinerary.map((item, index) => ({
+      eventId,
 
-          time: item.time,
+      date: item.date,
+      dayNumber: item.dayNumber,
 
-          title: item.title,
+      time: item.time,
+      title: item.title,
+      description: item.description,
+      icon: item.icon,
 
-          description: item.description,
+      location: item.location,
+      elevation: item.elevation,
+      distance: item.distance,
 
-          icon: item.icon,
+      accommodation: item.accommodation,
+      meals: item.meals,
 
-          sortOrder: item.sortOrder ?? index,
-        })),
-      });
-    }
+      sortOrder: item.sortOrder ?? index,
+    })),
+  });
+}
 
     // ----------------------------------------
     // WHY SHOULD COME
@@ -558,6 +612,30 @@ export const updateEventSafety = async (
     }
 
     // ----------------------------------------
+// DELETE OLD FAQs
+// ----------------------------------------
+
+await tx.eventFAQ.deleteMany({
+  where: {
+    eventId,
+  },
+});
+
+// ----------------------------------------
+// CREATE NEW FAQs
+// ----------------------------------------
+
+if (payload.faqs && payload.faqs.length > 0) {
+  await tx.eventFAQ.createMany({
+    data: payload.faqs.map((faq, index) => ({
+      eventId,
+      question: faq.question,
+      answer: faq.answer,
+      displayOrder: faq.displayOrder ?? index,
+    })),
+  });
+}
+    // ----------------------------------------
     // GET UPDATED EVENT
     // ----------------------------------------
 
@@ -580,6 +658,11 @@ export const updateEventSafety = async (
         currentStep: true,
 
         safetyFeatures: true,
+        faqs: {
+      orderBy: {
+        displayOrder: "asc",
+      },
+    },
       },
     });
   });
@@ -692,13 +775,61 @@ export const publishEvent = async (eventId: string) => {
   // 7. CHECK TICKET DETAILS
   // ==========================================
 
-  if (event.entryPrice === null) {
-    missingFields.push("entryPrice");
-  }
+ if (event.totalCapacity === null) {
+  missingFields.push("totalCapacity");
+}
 
-  if (event.capacity === null) {
-    missingFields.push("capacity");
-  }
+if (event.menCapacity === null) {
+  missingFields.push("menCapacity");
+}
+
+if (event.womenCapacity === null) {
+  missingFields.push("womenCapacity");
+}
+
+if (event.otherCapacity === null) {
+  missingFields.push("otherCapacity");
+}
+
+if (event.menEntryPrice === null) {
+  missingFields.push("menEntryPrice");
+}
+
+if (event.womenEntryPrice === null) {
+  missingFields.push("womenEntryPrice");
+}
+
+if (event.otherEntryPrice === null) {
+  missingFields.push("otherEntryPrice");
+}
+
+if (event.discountPercentage === null) {
+  missingFields.push("discountPercentage");
+}
+
+if (event.menDiscountedPrice === null) {
+  missingFields.push("menDiscountedPrice");
+}
+
+if (event.womenDiscountedPrice === null) {
+  missingFields.push("womenDiscountedPrice");
+}
+
+if (event.otherDiscountedPrice === null) {
+  missingFields.push("otherDiscountedPrice");
+}
+
+if (event.minAge === null) {
+  missingFields.push("minAge");
+}
+
+if (event.maxAge === null) {
+  missingFields.push("maxAge");
+}
+
+if (!event.eventIntent) {
+  missingFields.push("eventIntent");
+}
 
   if (event.minAge === null) {
     missingFields.push("minAge");
@@ -708,9 +839,7 @@ export const publishEvent = async (eventId: string) => {
     missingFields.push("maxAge");
   }
 
-  if (!event.genderMix) {
-    missingFields.push("genderMix");
-  }
+  
 
   if (!event.eventIntent) {
     missingFields.push("eventIntent");
@@ -830,12 +959,29 @@ export const publishEvent = async (eventId: string) => {
       venueName: true,
       fullAddress: true,
 
-      entryPrice: true,
-      capacity: true,
-      minAge: true,
-      maxAge: true,
-      genderMix: true,
-      eventIntent: true,
+      // ========================================
+// TICKETS
+// ========================================
+
+totalCapacity: true,
+
+menCapacity: true,
+womenCapacity: true,
+otherCapacity: true,
+
+menEntryPrice: true,
+womenEntryPrice: true,
+otherEntryPrice: true,
+
+discountPercentage: true,
+
+menDiscountedPrice: true,
+womenDiscountedPrice: true,
+otherDiscountedPrice: true,
+
+minAge: true,
+maxAge: true,
+eventIntent: true,
 
       heroImage: true,
       aboutEvent: true,
@@ -868,7 +1014,126 @@ export const publishEvent = async (eventId: string) => {
     nextStep: null,
   };
 };
+const getEventBookingStats = async (
+  eventId: string,
+  totalCapacity: number | null,
+) => {
+  if (!totalCapacity || totalCapacity <= 0) {
+    return {
+      totalCapacity: 0,
+      bookedCount: 0,
+      spotsLeft: 0,
+      bookedLast24Hours: 0,
+      bookingPercentage: 0,
+      fillingFast: false,
+      fillingFastText: null,
+      bookingSummary: "0 of 0 spots booked",
+      last24HoursText: "0 people booked in the last 24 hours",
+    };
+  }
 
+  const now = new Date();
+
+  const last24Hours = new Date(
+    now.getTime() - 24 * 60 * 60 * 1000,
+  );
+
+  // ========================================
+  // CONFIRMED BOOKED TICKETS
+  // ========================================
+
+  const confirmedBookings =
+    await prisma.eventBooking.aggregate({
+      where: {
+        eventId,
+        status: "CONFIRMED",
+      },
+
+      _sum: {
+        ticketCount: true,
+      },
+    });
+
+  const bookedCount =
+    confirmedBookings._sum.ticketCount ?? 0;
+
+  // ========================================
+  // CONFIRMED TICKETS BOOKED IN LAST 24 HOURS
+  // ========================================
+
+  const confirmedLast24Hours =
+    await prisma.eventBooking.aggregate({
+      where: {
+        eventId,
+        status: "CONFIRMED",
+        createdAt: {
+          gte: last24Hours,
+        },
+      },
+
+      _sum: {
+        ticketCount: true,
+      },
+    });
+
+  const bookedLast24Hours =
+    confirmedLast24Hours._sum.ticketCount ?? 0;
+
+  // ========================================
+  // SPOTS LEFT
+  // ========================================
+
+  const spotsLeft = Math.max(
+    totalCapacity - bookedCount,
+    0,
+  );
+
+  // ========================================
+  // BOOKING PERCENTAGE
+  // ========================================
+
+  const bookingPercentage = Math.min(
+    Math.round(
+      (bookedCount / totalCapacity) * 100,
+    ),
+    100,
+  );
+
+  // ========================================
+  // FILLING FAST
+  // ========================================
+
+  const fillingFast =
+    spotsLeft <= Math.ceil(totalCapacity * 0.15);
+
+  // ========================================
+  // RESPONSE
+  // ========================================
+
+  return {
+    totalCapacity,
+
+    bookedCount,
+
+    spotsLeft,
+
+    bookedLast24Hours,
+
+    bookingPercentage,
+
+    fillingFast,
+
+    fillingFastText: fillingFast
+      ? `Only ${spotsLeft} spots left`
+      : null,
+
+    bookingSummary:
+      `${bookedCount} of ${totalCapacity} spots booked`,
+
+    last24HoursText:
+      `${bookedLast24Hours} people booked in the last 24 hours`,
+  };
+};
 //get apis
 //get all
 export const getAllEvents = async () => {
@@ -958,19 +1223,36 @@ export const getAllEvents = async () => {
       // ========================================
 
       itinerary: {
-        orderBy: {
-          sortOrder: "asc",
-        },
+  orderBy: [
+    {
+      dayNumber: "asc",
+    },
+    {
+      sortOrder: "asc",
+    },
+  ],
 
-        select: {
-          id: true,
-          time: true,
-          title: true,
-          description: true,
-          icon: true,
-          sortOrder: true,
-        },
-      },
+  select: {
+    id: true,
+
+    date: true,
+    dayNumber: true,
+
+    time: true,
+    title: true,
+    description: true,
+    icon: true,
+
+    location: true,
+    elevation: true,
+    distance: true,
+
+    accommodation: true,
+    meals: true,
+
+    sortOrder: true,
+  },
+},
 
       // ========================================
       // STEP 5 - WHY SHOULD COME
@@ -1006,7 +1288,10 @@ export const getAllEvents = async () => {
   return events;
 };
 
-//get for mobile card
+// ========================================
+// GET EVENT LIST - MOBILE
+// ========================================
+
 export const getEventList = async () => {
   const events = await prisma.event.findMany({
     where: {
@@ -1021,22 +1306,70 @@ export const getEventList = async () => {
       id: true,
       eventType: true,
       title: true,
+
       eventDate: true,
       startTime: true,
+      endTime: true,
+
       fullAddress: true,
-      entryPrice: true,
+
+      // NEW TICKET FIELDS
+      totalCapacity: true,
+
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
+
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
+
+      discountPercentage: true,
+
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
+
+      minAge: true,
+      maxAge: true,
+      eventIntent: true,
+
       heroImage: true,
+
       eventTag: true,
+
+      // NEW FEATURE TAGS
+      featureTags: {
+        orderBy: {
+          displayOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          label: true,
+          displayOrder: true,
+        },
+      },
     },
   });
 
-  return events.map((event) => ({
-    ...event,
+  const eventsWithBookingStats = await Promise.all(
+    events.map(async (event) => {
+      const bookingStats =
+        await getEventBookingStats(
+          event.id,
+          event.totalCapacity,
+        );
 
-    // Static values for now
-    leftSpot: 3,
-    interested: 40,
-  }));
+      return {
+        ...event,
+
+       
+      };
+    }),
+  );
+
+  return eventsWithBookingStats;
 };
 
 //get details
@@ -1075,8 +1408,21 @@ export const getEventDetails = async (eventId: string) => {
       // TICKETS
       // ========================================
 
-      capacity: true,
-      entryPrice: true,
+      totalCapacity: true,
+
+menCapacity: true,
+womenCapacity: true,
+otherCapacity: true,
+
+menEntryPrice: true,
+womenEntryPrice: true,
+otherEntryPrice: true,
+
+discountPercentage: true,
+
+menDiscountedPrice: true,
+womenDiscountedPrice: true,
+otherDiscountedPrice: true,
 
       // ========================================
       // LOCATION
@@ -1129,19 +1475,37 @@ export const getEventDetails = async (eventId: string) => {
         },
       },
 
-      itinerary: {
-        orderBy: {
-          sortOrder: "asc",
-        },
-        select: {
-          id: true,
-          time: true,
-          title: true,
-          description: true,
-          icon: true,
-          sortOrder: true,
-        },
-      },
+     itinerary: {
+  orderBy: [
+    {
+      dayNumber: "asc",
+    },
+    {
+      sortOrder: "asc",
+    },
+  ],
+
+  select: {
+    id: true,
+
+    date: true,
+    dayNumber: true,
+
+    time: true,
+    title: true,
+    description: true,
+    icon: true,
+
+    location: true,
+    elevation: true,
+    distance: true,
+
+    accommodation: true,
+    meals: true,
+
+    sortOrder: true,
+  },
+},
 
       // ========================================
       // SAFETY
@@ -1183,11 +1547,15 @@ export const getEventDetails = async (eventId: string) => {
   // STATIC VALUES FOR NOW
   // ==========================================
 
-  return {
-    ...event,
+  const bookingStats =
+  await getEventBookingStats(
+    event.id,
+    event.totalCapacity,
+  );
 
-    leftSpot: 3,
+return {
+  ...event,
 
-    interested: 40,
-  };
+  bookingStats,
+};
 };
