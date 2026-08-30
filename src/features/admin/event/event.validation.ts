@@ -22,7 +22,9 @@ export const createEventSchema = z.object({
       "LIVE",
       "SOLD_OUT",
       "CANCELLED",
-    ]),
+    ])
+    .nullable()
+    .optional(),
 
     featureTags: z
       .array(
@@ -67,6 +69,7 @@ export const updateEventHostSchema = z.object({
     "PROMOTED",
     "FEATURED",
   ])
+  .nullable()
   .optional(),
   }),
 });
@@ -415,14 +418,30 @@ export const getEventListSchema = z.object({
     eventType: z
       .enum([
         "ALL",
-        "SIGNATURE_MIXER",
-        "SPEED_DATING",
-        "WINE_TASTING",
-        "SUPPER_CLUB",
-        "BRUNCH_SOCIAL",
-        "ROOFTOP_MIXER",
+        "SINGLES_MIXER",
+        "SPEED_DATES",
+        "SINGLES_NIGHT",
+        "DINNER_DATES",
+        "LEARN_AND_MATCH",
+        "PLAY_AND_MATCH",
+        "FIT_DATES",
+        "TREK_DATES",
+        "THE_RESERVE",
+        "PROFESSIONALS_MEET",
+        "MATCHED_FOR_YOU",
       ])
-      .optional()
-      .default("ALL"),
+      .optional(),
+
+    dateFilter: z
+      .enum([
+        "TODAY",
+        "THIS_WEEKEND",
+        "THIS_MONTH",
+      ])
+      .optional(),
+
+    freeOnly: z
+      .enum(["true", "false"])
+      .optional(),
   }),
 });

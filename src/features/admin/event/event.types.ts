@@ -15,7 +15,7 @@ export interface CreateEventInput {
 export interface UpdateEventHostInput {
   city: string;
   eventPartnerId: string;
-  eventTag?: "BRAND" | "PROMOTED" | "FEATURED";
+  eventTag?: "BRAND" | "PROMOTED" | "FEATURED"| null;
 }
 export interface UpdateEventVenueInput {
   eventDate: string;

@@ -429,10 +429,20 @@ export const getEventListController = async (
   try {
     const eventType = req.query.eventType as string | undefined;
 
+    const dateFilter = req.query.dateFilter as
+      | "TODAY"
+      | "THIS_WEEKEND"
+      | "THIS_MONTH"
+      | undefined;
+
+    const freeOnly = req.query.freeOnly === "true";
+
     const events = await EventService.getEventList(
       eventType && eventType !== "ALL"
         ? (eventType as Type)
-        : undefined
+        : undefined,
+      dateFilter,
+      freeOnly
     );
 
     return res.status(200).json({
@@ -444,7 +454,6 @@ export const getEventListController = async (
     next(error);
   }
 };
-
 //get details
 export const getEventDetailsController = async (
   req: Request<EventParams>,

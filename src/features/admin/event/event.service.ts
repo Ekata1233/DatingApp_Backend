@@ -61,10 +61,8 @@ export const updateEventHost = async (
     throw new Error("Event not found");
   }
 
-  // 2. Don't allow editing LIVE event
-  if (existingEvent.status === "LIVE") {
-    throw new Error("Published event cannot be edited");
-  }
+
+ 
 
   // 3. Check Event Partner
   const eventPartner = await prisma.eventPartner.findFirst({
@@ -148,10 +146,7 @@ export const updateEventVenue = async (
     throw new Error("Event not found");
   }
 
-  // 2. Don't allow editing LIVE event
-  if (existingEvent.status === "LIVE") {
-    throw new Error("Published event cannot be edited");
-  }
+
 
   // 3. Validate event date
   const eventDate = new Date(payload.eventDate);
@@ -220,9 +215,6 @@ export const updateEventTickets = async (
     throw new Error("Event not found");
   }
 
-  if (existingEvent.status === "LIVE") {
-    throw new Error("Published event cannot be edited");
-  }
 
   // Calculate discounted prices
   const discountMultiplier =
@@ -324,9 +316,6 @@ export const updateEventExperience = async (
   // 2. DON'T ALLOW LIVE EVENT EDIT
   // ==========================================
 
-  if (existingEvent.status === "LIVE") {
-    throw new Error("Published event cannot be edited");
-  }
 
   // ==========================================
   // 3. UPDATE EVERYTHING IN ONE TRANSACTION
@@ -558,9 +547,7 @@ export const updateEventSafety = async (
   // 2. DON'T ALLOW LIVE EVENT EDIT
   // ==========================================
 
-  if (existingEvent.status === "LIVE") {
-    throw new Error("Published event cannot be edited");
-  }
+ 
 
   // ==========================================
   // 3. TRANSACTION
@@ -1295,16 +1282,91 @@ export const getAllEvents = async () => {
 
 
 
-export const getEventList = async (eventType?: Type) => {
+export const getEventList = async (
+  eventType?: Type,
+  dateFilter?: "TODAY" | "THIS_WEEKEND" | "THIS_MONTH",
+  freeOnly?: boolean
+) => {
+  const now = new Date();
+
+  let dateFrom: Date | undefined;
+  let dateTo: Date | undefined;
+
+  // TODAY
+  if (dateFilter === "TODAY") {
+    dateFrom = new Date(now);
+    dateFrom.setHours(0, 0, 0, 0);
+
+    dateTo = new Date(now);
+    dateTo.setHours(23, 59, 59, 999);
+  }
+
+  // THIS WEEKEND
+  if (dateFilter === "THIS_WEEKEND") {
+    const day = now.getDay();
+
+    // Saturday
+    const saturday = new Date(now);
+    saturday.setDate(now.getDate() + (6 - day));
+    saturday.setHours(0, 0, 0, 0);
+
+    // Sunday
+    const sunday = new Date(saturday);
+    sunday.setDate(saturday.getDate() + 1);
+    sunday.setHours(23, 59, 59, 999);
+
+    dateFrom = saturday;
+    dateTo = sunday;
+  }
+
+  // THIS MONTH
+  if (dateFilter === "THIS_MONTH") {
+    dateFrom = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      0,
+      0,
+      0,
+      0
+    );
+
+    dateTo = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+  }
+
   const events = await prisma.event.findMany({
     where: {
+      // EXISTING LOGIC
       status: "LIVE",
 
-      ...(eventType
-        ? {
-            eventType: eventType,
-          }
-        : {}),
+      // EVENT TYPE FILTER
+      ...(eventType && {
+        eventType: eventType,
+      }),
+
+      // DATE FILTER
+      ...(dateFrom &&
+        dateTo && {
+          eventDate: {
+            gte: dateFrom,
+            lte: dateTo,
+          },
+        }),
+
+      // FREE EVENT FILTER
+      ...(freeOnly && {
+        menDiscountedPrice: 0,
+        womenDiscountedPrice: 0,
+        otherDiscountedPrice: 0,
+      }),
     },
 
     orderBy: {
@@ -1343,12 +1405,14 @@ export const getEventList = async (eventType?: Type) => {
       eventIntent: true,
 
       heroImage: true,
+
       eventTag: true,
 
       featureTags: {
         orderBy: {
           displayOrder: "asc",
         },
+
         select: {
           id: true,
           label: true,
