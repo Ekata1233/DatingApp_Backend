@@ -1,4 +1,4 @@
-import { Type } from "@prisma/client";
+import { Gender, Type } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import {
   CreateEventInput,
@@ -1285,7 +1285,8 @@ export const getAllEvents = async () => {
 export const getEventList = async (
   eventType?: Type,
   dateFilter?: "TODAY" | "THIS_WEEKEND" | "THIS_MONTH",
-  freeOnly?: boolean
+  freeOnly?: boolean,
+  userGender?: Gender
 ) => {
   const now = new Date();
 
@@ -1341,7 +1342,33 @@ export const getEventList = async (
       999
     );
   }
+  let genderCapacityFilter = {};
 
+  if (userGender === "MEN") {
+    genderCapacityFilter = {
+      menCapacity: {
+        gt: 0,
+      },
+    };
+  } else if (userGender === "WOMEN") {
+    genderCapacityFilter = {
+      womenCapacity: {
+        gt: 0,
+      },
+    };
+  } else if (
+    userGender === "NON_BINARY" ||
+    userGender === "TRANS_MAN" ||
+    userGender === "TRANS_WOMAN" ||
+    userGender === "OTHER" ||
+    userGender === "PREFER_NOT_TO_SAY"
+  ) {
+    genderCapacityFilter = {
+      otherCapacity: {
+        gt: 0,
+      },
+    };
+  }
   const events = await prisma.event.findMany({
     where: {
       // EXISTING LOGIC
@@ -1367,6 +1394,7 @@ export const getEventList = async (
         womenDiscountedPrice: 0,
         otherDiscountedPrice: 0,
       }),
+      ...genderCapacityFilter,
     },
 
     orderBy: {
@@ -1584,7 +1612,17 @@ otherDiscountedPrice: true,
           title: true,
         },
       },
-
+faqs: {
+  orderBy: {
+    
+  },
+  select: {
+    id: true,
+    question: true,
+    answer: true,
+   
+  },
+},
       // ========================================
       // TERMS
       // ========================================

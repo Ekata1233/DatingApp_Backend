@@ -3,6 +3,7 @@ import * as EventService from "./event.service";
 import { UpdateEventExperienceInput } from "./event.types";
 import imagekit from "../../../utils/imagekit";
 import { Type } from "@prisma/client";
+import { prisma } from "../../../prisma/prismaClient";
 interface EventParams {
   id: string;
 }
@@ -437,12 +438,41 @@ export const getEventListController = async (
 
     const freeOnly = req.query.freeOnly === "true";
 
+    // Get logged-in user from token
+    const userId = (req as any).user?.id;
+  
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    // Get user's gender
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        gender: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     const events = await EventService.getEventList(
       eventType && eventType !== "ALL"
         ? (eventType as Type)
         : undefined,
       dateFilter,
-      freeOnly
+      freeOnly,
+      user.gender ?? undefined
     );
 
     return res.status(200).json({
