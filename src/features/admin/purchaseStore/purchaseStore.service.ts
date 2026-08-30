@@ -1,5 +1,5 @@
 import { StoreItemType } from "@prisma/client";
-import { createStoreFeatureRepo, createStoreInfoRepo, createStorePackRepo, deleteStoreInfoRepo, deleteStorePackRepo, findFeatureByType, findPackByQuantity, findStoreInfoById, findStoreInfoByTitle, findStorePackById, getStoreDataRepository, updateStoreFeatureRepo, updateStoreInfoRepo,  updateStorePackRepo } from "./purchaseStore.repository";
+import { createStoreFeatureRepo, createStoreInfoRepo, createStorePackRepo, deleteStoreInfoRepo, deleteStorePackRepo, findFeatureByType, findPackByQuantity, findStoreInfoById, findStoreInfoByTitle, findStorePackById, getStoreDataRepository, getUserRoseBalanceRepo, updateStoreFeatureRepo, updateStoreInfoRepo,  updateStorePackRepo } from "./purchaseStore.repository";
 import { CreateStoreFeatureDTO, CreateStoreInfoDTO, CreateStorePackDTO ,UpdateStoreInfoDTO, UpdateStorePackDTO,} from "./purchaseStore.types";
 
 
@@ -75,12 +75,20 @@ export const deleteStorePackService = async (
 };
 
 export const getStoreService = async (
-  itemType: StoreItemType
+  itemType: StoreItemType,
+   userId?: string
 ) => {
   const store = await getStoreDataRepository(itemType);
+    let availableRoses = 0;
+  // Only fetch rose balance for ROSE store
+  if (itemType === StoreItemType.ROSE && userId) {
+    const roseBalance = await getUserRoseBalanceRepo(userId);
 
+    availableRoses = roseBalance?.totalRoses ?? 0;
+  }
   return {
     itemType,
+    availableRoses,
     features: store.features,
     packs: store.packs,
     info: store.info,

@@ -11,6 +11,7 @@ import {
   updateStoreInfoController,
   updateStorePackController,
 } from "./purchaseStore.controller";
+import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.post("/purchase-store/info", createStoreInfoController);
 router.get("/purchase-store/roses", getRoseStoreController);
 
 router.get("/purchase-store/compliments", getComplimentStoreController);
-router.get("/purchase-store/all-data/:itemType", getStoreController);
+router.get("/purchase-store/all-data/:itemType",authMiddleware, getStoreController);
 router.patch("/purchase-store/info/:id", updateStoreInfoController);
 
 router.delete( "/purchase-store/info/:id", 

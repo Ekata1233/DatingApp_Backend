@@ -77,6 +77,16 @@ export const deleteStorePackRepo = (
     },
   });
 };
+export const getUserRoseBalanceRepo = (userId: string) => {
+  return prisma.userRoseBalance.findUnique({
+    where: {
+      userId,
+    },
+    select: {
+      totalRoses: true,
+    },
+  });
+};
 export const getStoreDataRepository = async (
   itemType: StoreItemType
 ) => {

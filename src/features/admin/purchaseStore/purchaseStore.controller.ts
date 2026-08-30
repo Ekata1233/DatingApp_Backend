@@ -159,13 +159,17 @@ export const deleteStorePackController = async (
 
 export const getStoreController = async (
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const { itemType } = req.params;
 
+    const userId = (req as any).user.id;
+
     const data = await getStoreService(
-      itemType as StoreItemType
+      itemType as StoreItemType,
+      userId
     );
 
     return res.status(200).json({
@@ -173,11 +177,8 @@ export const getStoreController = async (
       message: "Store data fetched successfully",
       data,
     });
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error) {
+    next(error);
   }
 };
 export const updateStoreInfoController = async (
