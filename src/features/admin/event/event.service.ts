@@ -1634,13 +1634,15 @@ faqs: {
       // ========================================
 
       eventPartner: {
-        select: {
-          id: true,
-          businessName: true,
-          address: true,
-          logo: true,
-        },
-      },
+  select: {
+    id: true,
+    businessName: true,
+    businessType: true,
+    contactPerson: true,
+    logo: true,
+    city: true,
+  },
+},
     },
   });
 
