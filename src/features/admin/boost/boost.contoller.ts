@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { boostFeaturesSchema, boostInfoSchema, createBoostSchema } from "./boost.validation";
-import { createBoostService, createOrUpdateBoostFeaturesService, createOrUpdateBoostInfoService, deleteBoostInfoService, getBoostFeaturesService, getBoostInfoService, getBoostsService, resetBoostFeaturesService } from "./boost.service";
+import { createBoostService, createOrUpdateBoostFeaturesService, createOrUpdateBoostInfoService, deleteBoostInfoService, getAllBoostsService, getBoostFeaturesService, getBoostInfoService, getBoostsService, resetBoostFeaturesService } from "./boost.service";
 import { BoostType } from "@prisma/client";
 
 
@@ -36,9 +36,9 @@ export const createBoostController = async (req: Request, res: Response) => {
 
 
 // ✅ GET ALL BOOSTS
-export const getBoostsController = async (req: Request, res: Response) => {
+export const getAllBoostsController = async (req: Request, res: Response) => {
   try {
-    const result = await getBoostsService(); // ✅ FIXED
+    const result = await getAllBoostsService(); // ✅ FIXED
 
     return res.status(200).json({
       success: true,
@@ -53,7 +53,29 @@ export const getBoostsController = async (req: Request, res: Response) => {
     });
   }
 };
+export const getBoostsController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user.id;
 
+    const result = await getBoostsService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Boosts fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
 // ============================================================
 // CREATE / UPDATE BOOST INFO
 // ============================================================

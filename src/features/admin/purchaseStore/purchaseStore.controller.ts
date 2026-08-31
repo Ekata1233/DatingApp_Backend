@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { createStoreFeatureService, createStoreInfoService, createStorePackService, deleteStoreInfoService, deleteStorePackService, getComplimentStoreService, getRoseStoreService, getStoreService, updateStoreInfoService, updateStorePackService } from "./purchaseStore.service";
+import { createStoreFeatureService, createStoreInfoService, createStorePackService, deleteStoreInfoService, deleteStorePackService, getComplimentStoreService, getRoseStoreService, getStoreAllService, getStoreService, updateStoreInfoService, updateStorePackService } from "./purchaseStore.service";
 import { createStoreInfoSchema, updateStoreInfoSchema, updateStorePackSchema } from "./purchaseStore.validation";
 import { StoreItemType } from "@prisma/client";
 
@@ -157,6 +157,29 @@ export const deleteStorePackController = async (
   }
 };
 
+export const getStoreAllController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { itemType } = req.params;
+
+
+    const data = await getStoreAllService(
+      itemType as StoreItemType,
+     
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Store data fetched successfully",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 export const getStoreController = async (
   req: Request,
   res: Response,

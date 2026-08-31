@@ -87,6 +87,20 @@ export const getUserRoseBalanceRepo = (userId: string) => {
     },
   });
 };
+
+
+export const getUserComplimentBalanceRepo = (userId: string) => {
+  return prisma.userComplimentBalance.findUnique({
+    where: {
+      userId,
+    },
+    select: {
+      totalCompliments: true,
+    },
+  });
+};
+
+
 export const getStoreDataRepository = async (
   itemType: StoreItemType
 ) => {

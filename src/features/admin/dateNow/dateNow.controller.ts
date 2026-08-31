@@ -13,6 +13,7 @@ import {
   createDatePlanPackageFeaturesService,
   getDatePlanPackageFeaturesService,
   getAllDatePlanPackageDataService,
+  getDatePlanPackageDataService,
 } from "./dateNow.service";
 import { datePlanPackageFeaturesSchema, datePlanPackageInfoSchema, upsertDatePlanOptionsSchema } from "./dateNow.Validation";
 import imagekit from "../../../utils/imagekit";
@@ -577,6 +578,34 @@ export const getAllDatePlanPackageDataController = async (
 ): Promise<void> => {
   try {
     const result = await getAllDatePlanPackageDataService();
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "Get All Date Plan Package Data Error:",
+      error,
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get date plan package data",
+    });
+  }
+};
+
+export const getDatePlanPackageDataController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const result = await getDatePlanPackageDataService(userId);
 
     res.status(200).json({
       success: true,

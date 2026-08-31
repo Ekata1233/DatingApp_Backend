@@ -1,5 +1,6 @@
 import express from "express";
-import { createBoostController, createOrUpdateBoostFeaturesController, createOrUpdateBoostInfoController, deleteBoostInfoController, getBoostFeaturesController, getBoostInfoController, getBoostsController, resetBoostFeaturesController } from "./boost.contoller";
+import { createBoostController, createOrUpdateBoostFeaturesController, createOrUpdateBoostInfoController, deleteBoostInfoController, getAllBoostsController, getBoostFeaturesController, getBoostInfoController, getBoostsController, resetBoostFeaturesController } from "./boost.contoller";
+import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
 // ============================================================
@@ -7,6 +8,8 @@ const router = express.Router();
 // ============================================================
 router.post("/create", createBoostController);
 router.get("/get-all", getBoostsController); 
+router.get("/boost/get", getAllBoostsController); 
+router.get("/boost/get-all", authMiddleware,getBoostsController); 
 
 // ============================================================
 // BOOST INFO APIs
