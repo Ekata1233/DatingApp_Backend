@@ -72,92 +72,128 @@
 import { z } from "zod";
 
 export const sendEngagementSchema = z
-    .object({
-        receiverId: z.string().uuid(),
+  .object({
+    receiverId: z.string().uuid(),
 
-        /**
-         * What this engagement is targeting.
-         *
-         * null = whole profile
-         * PHOTO = specific photo
-         * PROMPT = specific prompt/about section
-         */
-        targetType: z
-            .enum(["PHOTO", "PROMPT"])
-            .nullable()
-            .optional(),
-
-        targetId: z
-            .string()
-            .uuid()
-            .nullable()
-            .optional(),
-
-        rose: z
-            .object({})
-            .optional(),
-
-        compliment: z
-            .object({
-                message: z.string().min(1).max(500).optional(),
-                ideaId: z.string().uuid().optional(),
-            })
-            .optional(),
-
-        gift: z
-            .object({
-                giftId: z
-                    .coerce
-                    .number()
-                    .int("Gift ID must be an integer")
-                    .positive("Gift ID must be greater than 0"),
-                message: z.string().min(1).max(500),
-            })
-            .optional(),
-    })
     /**
-     * At least one engagement is required.
+     * Engagement target.
+     *
+     * No targetType = whole profile
+     *
+     * PHOTO / PROMPT:
+     *   targetId is required
+     *
+     * Other target types:
+     *   targetId is not required
      */
-    .refine(
-        (data) =>
-            data.rose ||
-            data.compliment ||
-            data.gift,
-        {
-            message: "At least one engagement is required",
-        }
-    )
+    targetType: z
+      .enum([
+        "ABOUT",
+        "BASIC",
+        "VIDEO",
+        "PROMPT",
+        "PHOTO",
+        "CAREER",
+        "INTEREST",
+        "LIFESTYLE",
+        "FAMILY",
+      ])
+      .nullable()
+      .optional(),
+
     /**
-     * Validate targetType + targetId combination.
+     * Required only when:
+     * targetType = PHOTO or PROMPT
      */
-    .refine(
-        (data) => {
-            const targetType = data.targetType ?? null;
-            const targetId = data.targetId ?? null;
+    targetId: z
+      .string()
+      .uuid()
+      .nullable()
+      .optional(),
 
-            // No target = whole profile
-            if (!targetType && !targetId) {
-                return true;
-            }
+    rose: z
+      .object({})
+      .optional(),
 
-            // Target type requires target ID
-            if (targetType && !targetId) {
-                return false;
-            }
+    compliment: z
+      .object({
+        message: z
+          .string()
+          .min(1)
+          .max(500)
+          .optional(),
 
-            // Target ID requires target type
-            if (targetId && !targetType) {
-                return false;
-            }
+        ideaId: z
+          .string()
+          .uuid()
+          .optional(),
+      })
+      .optional(),
 
-            return true;
-        },
-        {
-            message: "Invalid target: targetType and targetId must be provided together",
-            path: ["targetType"],
-        }
-    );
+    gift: z
+      .object({
+        giftId: z
+          .coerce
+          .number()
+          .int("Gift ID must be an integer")
+          .positive("Gift ID must be greater than 0"),
+
+        message: z
+          .string()
+          .min(1)
+          .max(500),
+      })
+      .optional(),
+  })
+
+  /**
+   * At least one engagement is required.
+   */
+  .refine(
+    (data) =>
+      !!data.rose ||
+      !!data.compliment ||
+      !!data.gift,
+    {
+      message: "At least one engagement is required",
+    }
+  )
+
+  /**
+   * Target validation.
+   *
+   * PHOTO/PROMPT  -> targetId REQUIRED
+   * Other types   -> targetId NOT allowed/required
+   * No targetType -> targetId NOT allowed
+   */
+  .refine(
+    (data) => {
+      const targetType = data.targetType ?? null;
+      const targetId = data.targetId ?? null;
+
+      // No target = whole profile
+      if (!targetType) {
+        return !targetId;
+      }
+
+      // PHOTO and PROMPT require targetId
+      if (
+        targetType === "PHOTO" ||
+        targetType === "PROMPT"
+      ) {
+        return !!targetId;
+      }
+
+      // All other target types must NOT have targetId
+      return !targetId;
+    },
+    {
+      message:
+        "targetId is required only for PHOTO or PROMPT target types",
+      path: ["targetId"],
+    }
+  );
 
 export type SendEngagementDTO = z.infer<
-    typeof sendEngagementSchema
+  typeof sendEngagementSchema
 >;

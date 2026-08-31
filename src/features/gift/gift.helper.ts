@@ -37,13 +37,13 @@ export const createBundleGift = async (
   senderId: string,
   receiverId: string,
   data: NonNullable<SendEngagementDTO["gift"]>,
+  targetType: SendEngagementDTO["targetType"],
+  targetId: SendEngagementDTO["targetId"],
   tx: Prisma.TransactionClient,
 ) => {
   const {
     giftId,
     message,
-    targetType = null,
-    targetId = null,
   } = data;
 
   /* -------------------------------------------------------------------------- */

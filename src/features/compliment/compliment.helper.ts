@@ -40,13 +40,13 @@ export const createBundleCompliment = async (
   senderId: string,
   receiverId: string,
   data: NonNullable<SendEngagementDTO["compliment"]>,
+  targetType: SendEngagementDTO["targetType"],
+  targetId: SendEngagementDTO["targetId"],
   tx: Prisma.TransactionClient
 ) => {
   const {
     ideaId,
     message,
-    targetType = null,
-    targetId = null,
   } = data;
 
   /* -------------------------------------------------------------------------- */

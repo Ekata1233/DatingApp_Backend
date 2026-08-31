@@ -109,17 +109,17 @@ export const createBundleRose = async (
   senderId: string,
   receiverId: string,
   data: NonNullable<SendEngagementDTO["rose"]>,
+  targetType: SendEngagementDTO["targetType"],
+  targetId: SendEngagementDTO["targetId"],
   tx: Prisma.TransactionClient
 ) => {
 
   const {
-    targetType = null,
-    targetId = null,
   } = data;
 
   // Daily limit
   const todayRoses =
-    await countTodayRoses(senderId, tx);
+    await countTodayRoses(senderId, prisma);
 
   if (
     todayRoses >=
@@ -136,7 +136,7 @@ export const createBundleRose = async (
     await countTodayRosesToUser(
       senderId,
       receiverId,
-      tx
+      prisma
     );
 
   if (
@@ -160,7 +160,7 @@ export const createBundleRose = async (
       senderId,
       receiverId,
       cooldownTime,
-      tx
+      prisma
     );
 
   if (lastRose) {
@@ -197,7 +197,7 @@ export const createBundleRose = async (
   const balance =
     await getOrCreateBalance(
       senderId,
-      tx
+      prisma
     );
 
   if (balance.totalRoses <= 0) {

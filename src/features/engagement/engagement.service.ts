@@ -16,6 +16,8 @@ export const sendEngagementService = async (
 ): Promise<SendEngagementResponse> => {
     const {
         receiverId,
+        targetType,
+        targetId,
         rose: roseData,
         compliment: complimentData,
         gift: giftData,
@@ -93,6 +95,8 @@ export const sendEngagementService = async (
                         senderId,
                         receiverId,
                         roseData,
+                        targetType,
+                        targetId,
                         tx
                     );
 
@@ -112,6 +116,8 @@ export const sendEngagementService = async (
                         senderId,
                         receiverId,
                         complimentData,
+                        targetType,
+                        targetId,
                         tx
                     );
 
@@ -132,6 +138,8 @@ export const sendEngagementService = async (
                         senderId,
                         receiverId,
                         giftData,
+                        targetType,
+                        targetId,
                         tx
                     );
 

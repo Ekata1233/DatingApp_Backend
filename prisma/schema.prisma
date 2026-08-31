@@ -2133,6 +2133,7 @@ enum MessageType {
   VIDEO
   AUDIO
   FILE
+  DATE_INVITE
   DATE_CONFIRMED
   DATE_CANCELLED
   SYSTEM
@@ -2141,6 +2142,8 @@ enum MessageType {
   COMPLIMENT
   ENGAGEMENT
   EVENT_INVITE
+  EVENT_CONFIRM
+  EVENT_CANCEL
 }
 
 enum NotificationType {
