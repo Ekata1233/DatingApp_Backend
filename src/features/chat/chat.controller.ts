@@ -386,48 +386,48 @@ export const getUserPresenceController = async (
   }
 };
 
-export const inviteToEvent = async (
-  req: Request,
-  res: Response,
-) => {
-  try {
-    const senderId = (req as any).user.id;
+// export const inviteToEvent = async (
+//   req: Request,
+//   res: Response,
+// ) => {
+//   try {
+//     const senderId = (req as any).user.id;
 
-    const { eventId } = req.params;
-    const { receiverId } = req.body;
+//     const { eventId } = req.params;
+//     const { receiverId } = req.body;
 
-    if (typeof eventId !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid event ID",
-      });
-    }
+//     if (typeof eventId !== "string") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid event ID",
+//       });
+//     }
 
-    const result = await chatService.inviteToEvent(
-      senderId,
-      receiverId,
-      eventId,
-    );
+//     const result = await chatService.inviteToEvent(
+//       senderId,
+//       receiverId,
+//       eventId,
+//     );
 
-    // Send message to receiver in real time
-    req.io
-      .to(`user:${receiverId}`)
-      .emit("message:send", result.message);
+//     // Send message to receiver in real time
+//     req.io
+//       .to(`user:${receiverId}`)
+//       .emit("message:send", result.message);
 
-    return res.status(201).json({
-      success: true,
-      message: "Event invitation sent successfully",
-      data: result.message,
-    });
-  } catch (error) {
-    console.error("inviteToEvent error:", error);
+//     return res.status(201).json({
+//       success: true,
+//       message: "Event invitation sent successfully",
+//       data: result.message,
+//     });
+//   } catch (error) {
+//     console.error("inviteToEvent error:", error);
 
-    return res.status(400).json({
-      success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Failed to send event invitation",
-    });
-  }
-};
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         error instanceof Error
+//           ? error.message
+//           : "Failed to send event invitation",
+//     });
+//   }
+// };
