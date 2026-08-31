@@ -78,10 +78,9 @@ router.use("/workDetails", workDetailsRoutes);
 router.use("/interestHobbies", interestHobbiesRoutes);
 router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
-router.use("/boost",boostRoutes)
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes,boostRoutes);
 
 
 
@@ -118,11 +117,13 @@ router.use("/user", newMatchesRoutes)
 router.use("/user", dateNowRoutes,myPlanRoutes);
 
 router.use("/user", purchaseStoreRoutes);
+router.use("/user",boostRoutes);
 
 router.use(
   "/admin/date-now",
   dateNowAdminRoutes
 );
+router.use("/user/date-now", dateNowAdminRoutes);
 
 router.use('/payments', paymentRoutes);
 router.use('/revenue', giftsRoutes,complimentRoutes);

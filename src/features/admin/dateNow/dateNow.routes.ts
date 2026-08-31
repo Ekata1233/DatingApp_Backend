@@ -13,8 +13,10 @@ import {
   getDatePlanPackageInfoController,
   createDatePlanPackageFeaturesController,
   getDatePlanPackageFeaturesController,
-  getAllDatePlanPackageDataController
+  getAllDatePlanPackageDataController,
+  getDatePlanPackageDataController
 } from "./dateNow.controller";
+import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -77,5 +79,10 @@ router.get(
 router.get(
   "/date-plan-packages/all",
   getAllDatePlanPackageDataController,
+);
+router.get(
+  "/date-plan-packages/get-all",
+   authMiddleware,
+  getDatePlanPackageDataController,
 );
 export default router;

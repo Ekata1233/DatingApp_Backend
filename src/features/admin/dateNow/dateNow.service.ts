@@ -608,3 +608,39 @@ export const getAllDatePlanPackageDataService = async () => {
     features,
   };
 };
+
+export const getDatePlanPackageDataService = async (
+   userId: string
+) => {
+  
+  const [packages, info, features,userStats] = await Promise.all([
+    prisma.datePlanPackage.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        sortOrder: "asc",
+      },
+    }),
+
+    prisma.datePlanPackageInfo.findFirst(),
+
+    prisma.datePlanPackageFeatures.findFirst(),
+     prisma.datePlanUserStats.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        totalDatePlan: true,
+      },
+    }),
+  ]);
+
+  return {
+    availableDatePlan: userStats?.totalDatePlan ?? 0,
+    packages,
+    info,
+    
+     
+  };
+};

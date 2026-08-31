@@ -158,7 +158,7 @@ export const createBoostService = async (data: CreateBoostInput) => {
 };
 
 // ✅ GET API
-export const getBoostsService = async () => {
+export const getAllBoostsService = async () => {
   const boosts = await prisma.boost.findMany({
     include: {
       options: {
@@ -197,7 +197,66 @@ export const getBoostsService = async () => {
   }));
 };
 
+// ✅ GET API for mob
+export const getBoostsService = async (userId: string) => {
+  const [boosts, userBoosts] = await Promise.all([
+    prisma.boost.findMany({
+      include: {
+        options: {
+          where: {
+            is_active: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+    }),
 
+    prisma.userBoost.findMany({
+      where: {
+        user_id: userId,
+        is_active: true,
+      },
+      select: {
+        total_boosts: true,
+      },
+    }),
+  ]);
+
+  const availableBoost = userBoosts.reduce(
+    (total, boost) => total + boost.total_boosts,
+    0
+  );
+
+  return {
+    availableBoost,
+
+    boosts: boosts.map((boost) => ({
+      // Basic Boost Data
+      id: boost.id,
+      name: boost.name,
+      title: boost.title,
+      description: boost.description,
+      is_active: boost.is_active,
+
+      // 1. FEATURES
+      boostDuration: boost.boostDuration,
+      singleBoostWalletPrice: boost.singleBoostWalletPrice,
+      visibilityMultiplier: boost.visibilityMultiplier,
+
+      // 2. OPTIONS
+      options: boost.options,
+
+      // 3. INFO
+      whyBoostWorks: boost.whyBoostWorks,
+      boostVsSuperBoost: boost.boostVsSuperBoost,
+
+      created_at: boost.created_at,
+      updated_at: boost.updated_at,
+    })),
+  };
+};
 // ============================================================
 // BOOST INFO CREATE / UPDATE
 // ============================================================

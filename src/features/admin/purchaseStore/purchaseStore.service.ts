@@ -1,5 +1,5 @@
 import { StoreItemType } from "@prisma/client";
-import { createStoreFeatureRepo, createStoreInfoRepo, createStorePackRepo, deleteStoreInfoRepo, deleteStorePackRepo, findFeatureByType, findPackByQuantity, findStoreInfoById, findStoreInfoByTitle, findStorePackById, getStoreDataRepository, getUserRoseBalanceRepo, updateStoreFeatureRepo, updateStoreInfoRepo,  updateStorePackRepo } from "./purchaseStore.repository";
+import { createStoreFeatureRepo, createStoreInfoRepo, createStorePackRepo, deleteStoreInfoRepo, deleteStorePackRepo, findFeatureByType, findPackByQuantity, findStoreInfoById, findStoreInfoByTitle, findStorePackById, getStoreDataRepository,  getUserComplimentBalanceRepo,  getUserRoseBalanceRepo, updateStoreFeatureRepo, updateStoreInfoRepo,  updateStorePackRepo } from "./purchaseStore.repository";
 import { CreateStoreFeatureDTO, CreateStoreInfoDTO, CreateStorePackDTO ,UpdateStoreInfoDTO, UpdateStorePackDTO,} from "./purchaseStore.types";
 
 
@@ -74,27 +74,53 @@ export const deleteStorePackService = async (
   return await deleteStorePackRepo(id);
 };
 
-export const getStoreService = async (
+export const getStoreAllService = async (
   itemType: StoreItemType,
-   userId?: string
+  
 ) => {
   const store = await getStoreDataRepository(itemType);
-    let availableRoses = 0;
-  // Only fetch rose balance for ROSE store
-  if (itemType === StoreItemType.ROSE && userId) {
-    const roseBalance = await getUserRoseBalanceRepo(userId);
-
-    availableRoses = roseBalance?.totalRoses ?? 0;
-  }
+  
   return {
     itemType,
-    availableRoses,
+    
     features: store.features,
     packs: store.packs,
     info: store.info,
   };
 };
+export const getStoreService = async (
+  itemType: StoreItemType,
+  userId?: string
+) => {
+  const store = await getStoreDataRepository(itemType);
 
+  const data: any = {
+    itemType,
+   
+  };
+
+  if (userId) {
+    // ROSE
+    if (itemType === StoreItemType.ROSE) {
+      const roseBalance = await getUserRoseBalanceRepo(userId);
+
+      data.availableRoses = roseBalance?.totalRoses ?? 0;
+    }
+
+    // COMPLIMENT
+    if (itemType === StoreItemType.COMPLIMENT) {
+      const complimentBalance =
+        await getUserComplimentBalanceRepo(userId);
+
+      data.availableCompliments =
+        complimentBalance?.totalCompliments ?? 0;
+    }
+  }
+ data.packs = store.packs;
+  data.info = store.info;
+  
+  return data;
+};
 export const getRoseStoreService = () => {
   return getStoreService(StoreItemType.ROSE);
 };
