@@ -422,13 +422,13 @@ export const getEventListSchema = z.object({
         "SPEED_DATES",
         "SINGLES_NIGHT",
         "DINNER_DATES",
-        "LEARN_AND_MATCH",
+        "ACTIVITY_MATCH",
         "PLAY_AND_MATCH",
-        "FIT_DATES",
+        "TRAVEL_DATES",
         "TREK_DATES",
         "THE_RESERVE",
         "PROFESSIONALS_MEET",
-        "MATCHED_FOR_YOU",
+        "OTHER_DATES",
       ])
       .optional(),
 
