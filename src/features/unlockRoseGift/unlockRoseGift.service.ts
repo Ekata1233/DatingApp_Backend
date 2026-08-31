@@ -145,6 +145,109 @@ export const incrementRoseAndGiftMessages = async (
     };
   }
 
+   // =========================================================
+  // 3. Check whether BOTH belong to the same ENGAGEMENT bundle
+  // =========================================================
+  //
+  // Bundle message contains:
+  //
+  // {
+  //   messageType: "ENGAGEMENT",
+  //   metadata: {
+  //     isBundle: true
+  //   },
+  //   roseId: "...",
+  //   giftId: "..."
+  // }
+  //
+  // Therefore, if the pending Rose ID and Gift ID are linked
+  // through the same bundle, increment BOTH.
+  //
+  // =========================================================
+
+  let isBundle = false;
+
+  if (pendingRose && pendingGift) {
+    const bundleMessage = await prisma.chatMessage.findFirst({
+      where: {
+        messageType: "ENGAGEMENT",
+        roseId: pendingRose.id,
+        giftId: pendingGift.id,
+        metadata: {
+          path: ["isBundle"],
+          equals: true,
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    isBundle = !!bundleMessage;
+  }
+
+  // =========================================================
+  // 4. BUNDLE
+  // =========================================================
+  //
+  // One normal message should increase:
+  //
+  // Rose  0 -> 1
+  // Gift  0 -> 1
+  //
+  // If requiredMessages = 25:
+  //
+  // 1st message => 1 / 25 both
+  // 2nd message => 2 / 25 both
+  // ...
+  // 25th message => unlocked both
+  //
+  // =========================================================
+
+  if (isBundle && pendingRose && pendingGift) {
+    const newRoseMessagesSent = pendingRose.messagesSent + 1;
+    const newGiftMessagesSent = pendingGift.messagesSent + 1;
+
+    const [rose, gift] = await prisma.$transaction([
+      prisma.userRose.update({
+        where: {
+          id: pendingRose.id,
+        },
+        data: {
+          messagesSent: newRoseMessagesSent,
+
+          ...(newRoseMessagesSent >= pendingRose.requiredMessages
+            ? {
+                isUnlocked: true,
+                unlockedAt: now,
+              }
+            : {}),
+        },
+      }),
+
+      prisma.userGift.update({
+        where: {
+          id: pendingGift.id,
+        },
+        data: {
+          messagesSent: newGiftMessagesSent,
+
+          ...(newGiftMessagesSent >= pendingGift.requiredMessages
+            ? {
+                isUnlocked: true,
+                unlockedAt: now,
+              }
+            : {}),
+        },
+      }),
+    ]);
+
+    return {
+      rose,
+      gift,
+    };
+  }
+
   // ==========================================
   // Decide which reward comes FIRST
   // ==========================================
