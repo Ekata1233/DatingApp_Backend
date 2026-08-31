@@ -1125,10 +1125,10 @@ export const chatRepository = {
    */
   async findMessages(conversationId: string, userId: string, cursor?: string, limit = 30, type: MessageFilterType = "all",) {
     const messageTypeFilter =
-    type === "all"
-      ? {}
-      : type === "date"
-        ? {
+      type === "all"
+        ? {}
+        : type === "date"
+          ? {
             messageType: {
               in: [
                 MessageType.DATE_CONFIRMED,
@@ -1136,7 +1136,7 @@ export const chatRepository = {
               ],
             },
           }
-        : {
+          : {
             messageType: type.toUpperCase() as MessageType,
           };
     return prisma.chatMessage.findMany({
@@ -1150,7 +1150,7 @@ export const chatRepository = {
           },
         },
         // Message type filter
-      ...messageTypeFilter,
+        ...messageTypeFilter,
       },
 
       orderBy: {

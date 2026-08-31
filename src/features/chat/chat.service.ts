@@ -10,6 +10,7 @@ import {
 } from "./chat.types";
 
 import { chatRepository } from "./chat.repository";
+import { buildMessageProgress } from "./chat.helper";
 
 export const chatService = {
   /**
@@ -97,10 +98,12 @@ export const chatService = {
 
     const items = hasMore ? messages.slice(0, data.limit) : messages;
 
+    /** * Add progress information for Gift/Rose/Engagement messages. */ const itemsWithProgress = items.map((message) => { const progress = buildMessageProgress(message); return { ...message, progress, }; });
+
     const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return {
-      items,
+      items: itemsWithProgress,
       pagination: {
         hasMore,
         nextCursor,

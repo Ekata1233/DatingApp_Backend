@@ -59,9 +59,11 @@ import mediaRoutes from "../features/chat/media/media.routes"
 import newMatchesRoutes from "../features/chat/match/match.routes"
 import eventsRoutes from "../features/event/event.routes"
 import admirersRoutes from "../features/admirer/admirer.routes"
-
-
 import userRoutes from "../features/user/management/user.route"
+import engagementtRoutes from "../features/engagement/engagement.route"
+
+
+
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -132,6 +134,10 @@ router.use("/chat/media", mediaRoutes);
 
 //ADMIRERS
 router.use("/user", admirersRoutes);
+//
+
+//ENGAGEMENT
+router.use("/user", engagementtRoutes);
 //
 
 export default router;
