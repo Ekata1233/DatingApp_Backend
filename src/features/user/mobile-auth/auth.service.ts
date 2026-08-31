@@ -25,8 +25,6 @@ export const sendOtp = async (phoneNumber: string) => {
   return verification;
 };
 
-
-
 // Define user selection object once
 const userSelect = {
   id: true,

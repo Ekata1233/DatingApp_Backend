@@ -91,10 +91,20 @@ export const chatSocketService = {
       userId,
     );
 
-    const interactionResult = await incrementRoseAndGiftMessages(
-      userId,
-      receiverId,
-    );
+    let interactionResult = null;
+
+    if (
+      payload.messageType === MessageType.TEXT ||
+      payload.messageType === MessageType.IMAGE ||
+      payload.messageType === MessageType.VIDEO ||
+      payload.messageType === MessageType.AUDIO ||
+      payload.messageType === MessageType.FILE
+    ) {
+      interactionResult = await incrementRoseAndGiftMessages(
+        userId,
+        receiverId,
+      );
+    }
 
     const unreadCount = await chatService.getUnreadCount(
       payload.conversationId,

@@ -2139,6 +2139,8 @@ enum MessageType {
   ROSE
   GIFT
   COMPLIMENT
+  ENGAGEMENT
+  EVENT_INVITE
 }
 
 enum NotificationType {
