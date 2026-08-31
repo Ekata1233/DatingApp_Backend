@@ -347,4 +347,50 @@ export const chatService = {
       deletedMessages: deletedCount,
     };
   },
+
+  async inviteToEvent(
+    senderId: string,
+    receiverId: string,
+    eventId: string,
+  ) {
+    // 1. Cannot invite yourself
+    if (senderId === receiverId) {
+      throw new Error("You cannot invite yourself to an event");
+    }
+
+    // 2. Check event
+    const event = await chatRepository.findEventById(eventId);
+
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    // 3. Find existing conversation
+    let conversation =
+      await chatRepository.findConversationBetweenUsers(
+        senderId,
+        receiverId,
+      );
+
+    // 4. Create conversation if it doesn't exist
+    if (!conversation) {
+      conversation = await chatRepository.createConversation(
+        senderId,
+        receiverId,
+      );
+    }
+
+    // 5. Create EVENT_INVITE message
+    const message =
+      await chatRepository.createEventInviteMessage(
+        conversation.id,
+        senderId,
+        eventId,
+      );
+
+    return {
+      conversation,
+      message,
+    };
+  },
 };

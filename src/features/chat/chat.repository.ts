@@ -1580,4 +1580,36 @@ export const chatRepository = {
     return messages.length;
   },
 
+  async findEventById(eventId: string) {
+    return prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+    });
+  },
+
+  async createEventInviteMessage(
+    conversationId: string,
+    senderId: string,
+    eventId: string,
+  ) {
+    return prisma.chatMessage.create({
+      data: {
+        conversationId,
+        senderId,
+        messageType: "EVENT_INVITE",
+        eventId,
+      },
+      include: {
+        event: true,
+        sender: {
+          select: {
+            id: true,
+            firstName: true,
+          },
+        },
+      },
+    });
+  },
+
 };

@@ -1766,6 +1766,8 @@ model ChatMessage {
   compliment     UserCompliment? @relation(fields: [complimentId], references: [id], onDelete: SetNull)
   giftId         String?         @unique @db.Uuid
   gift           UserGift?       @relation(fields: [giftId], references: [id], onDelete: SetNull)
+  eventId        String?         @db.Uuid
+  event          Event?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User                  @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -1874,7 +1876,8 @@ model Event {
   refundWindow    Int?
   termsConditions String?       @db.Text
 
-  faqs EventFAQ[]
+  faqs         EventFAQ[]
+  chatMessages ChatMessage[]
 
   //---------------------------------
   // Progress
@@ -2040,13 +2043,13 @@ enum Type {
   SPEED_DATES
   SINGLES_NIGHT
   DINNER_DATES
-  LEARN_AND_MATCH
+  ACTIVITY_MATCH
   PLAY_AND_MATCH
-  FIT_DATES
+  TRAVEL_DATES
   TREK_DATES
   THE_RESERVE
   PROFESSIONALS_MEET
-  MATCHED_FOR_YOU
+  OTHER_DATES
 }
 
 enum GenderMix {

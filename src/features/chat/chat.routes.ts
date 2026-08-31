@@ -10,6 +10,7 @@ import {
   getConversations,
   getMessages,
   getUserPresenceController,
+  inviteToEvent,
   markConversationRead,
   sendMessage,
 } from "./chat.controller";
@@ -75,6 +76,12 @@ router.get(
   "/presence/:userId",
   authMiddleware,
   getUserPresenceController
+);
+
+router.post(
+  "/event/:eventId/invite",
+  authMiddleware,
+  inviteToEvent,
 );
 
 export default router;
