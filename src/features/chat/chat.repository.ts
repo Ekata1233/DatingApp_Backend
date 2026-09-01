@@ -1588,28 +1588,28 @@ export const chatRepository = {
     });
   },
 
-  // async createEventInviteMessage(
-  //   conversationId: string,
-  //   senderId: string,
-  //   eventId: string,
-  // ) {
-  //   return prisma.chatMessage.create({
-  //     data: {
-  //       conversationId,
-  //       senderId,
-  //       messageType: "EVENT_INVITE",
-  //       eventId,
-  //     },
-  //     include: {
-  //       event: true,
-  //       sender: {
-  //         select: {
-  //           id: true,
-  //           firstName: true,
-  //         },
-  //       },
-  //     },
-  //   });
-  // },
+  async createEventInviteMessage(
+    conversationId: string,
+    senderId: string,
+    eventId: string,
+  ) {
+    return prisma.chatMessage.create({
+      data: {
+        conversationId,
+        senderId,
+        messageType: "EVENT_INVITE",
+        eventId,
+      },
+      include: {
+        event: true,
+        // sender: {
+        //   select: {
+        //     id: true,
+        //     firstName: true,
+        //   },
+        // },
+      },
+    });
+  },
 
 };

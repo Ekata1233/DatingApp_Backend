@@ -10,6 +10,7 @@ import {
   getConversations,
   getMessages,
   getUserPresenceController,
+  inviteToEvent,
   // inviteToEvent,
   markConversationRead,
   sendMessage,
@@ -78,10 +79,10 @@ router.get(
   getUserPresenceController
 );
 
-// router.post(
-//   "/event/:eventId/invite",
-//   authMiddleware,
-//   inviteToEvent,
-// );
+router.post(
+  "/event/:eventId/invite",
+  authMiddleware,
+  inviteToEvent,
+);
 
 export default router;
