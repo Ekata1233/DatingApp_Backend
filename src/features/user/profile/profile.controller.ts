@@ -17,9 +17,9 @@ import {
   // updateAboutYourselfService,
   updateUserAnswerService,
 
-  
+
   setPrimaryPhotoService,
- 
+
   updateUserBioService,
   updateEducationService,
   updateWorkService,
@@ -171,6 +171,7 @@ export const updateLookingForController = async (
       message: "Relationship preference saved successfully",
       intention: user.intention,
       onboarding_step: user.onboarding_step,
+      next_step: user.next_step,
     });
   } catch (error: any) {
     return res.status(400).json({
@@ -216,14 +217,23 @@ export const updateLocationController = async (req: Request, res: Response) => {
 
     const { latitude, longitude } = locationValidation.parse(req.body);
 
-    const profile = await updateLocationService(userId, latitude, longitude);
+    const result = await updateLocationService(
+      userId,
+      latitude,
+      longitude,
+    );
 
     return res.status(200).json({
       success: true,
       message: "Location updated successfully",
+
+      onboarding_step: result.onboarding_step,
+      next_step: result.next_step,
+      profile_completion: result.profile_completion,
+
       data: {
-        latitude: Number(profile.latitude),
-        longitude: Number(profile.longitude),
+        latitude: Number(result.profile.latitude),
+        longitude: Number(result.profile.longitude),
       },
     });
   } catch (error: any) {
@@ -311,6 +321,7 @@ export const educatioController = async (req: Request, res: Response) => {
       success: true,
       message: "Education updated successfully",
       onboarding_step: user.onboarding.onboarding_step,
+      next_step: user.onboarding.next_step,
       data: user.eduWork,
     });
   } catch (error: any) {
@@ -649,18 +660,28 @@ export const updateUserBioController = async (req: Request, res: Response) => {
 };
 
 //prompt
-export const UserPromptController = async (req: Request, res: Response) => {
+export const UserPromptController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
 
     const { prompts } = promptValidation.parse(req.body);
 
-    const data = await updateUserPromptService(userId, prompts);
+    const result = await updateUserPromptService(
+      userId,
+      prompts,
+    );
 
     return res.status(200).json({
       success: true,
       message: "Prompts saved successfully",
-      data,
+
+      onboarding_step: result.onboarding_step,
+      next_step: result.next_step,
+
+      data: result.prompts,
     });
   } catch (error: any) {
     return res.status(400).json({

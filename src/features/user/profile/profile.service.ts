@@ -18,6 +18,7 @@ import { calculateProfileScore } from "../../../utils/profileCompletion.utils";
 import { ReferralService } from "../referral/referral.service";
 import { redis } from "../../../lib/redis";
 import { queueMatchScoreCalculation } from "../../../queues/match-score.queue";
+import { QUESTION_SCREEN_TO_ONBOARDING_STEP } from "../../../config/onboardingFlows";
 
 //profile update service
 export const updateProfileService = async (
@@ -95,8 +96,9 @@ export const updateInterestedInService = async (
   if (!userId) throw new Error("User ID is missing");
 
   // 👉 Calculate next step
-  const currentStep = "INTRESTED_IN";
+  const currentStep = "INTERESTED_IN";
   const nextStep = getNextStep(currentStep);
+  console.log("nextStep", nextStep);
 
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -258,12 +260,16 @@ export const updateLookingForService = async (
 
   const score = await calculateProfileScore(userId);
 
+  const currentStep = "LOOKING_FOR";
+  const nextStep = getNextStep(currentStep);
+
 
   const result = await prisma.user.update({
     where: { id: userId },
     data: {
       intentionId: selectedOption.id, // ✅ Save the option ID
-      onboarding_step: "LOOKING_FOR",
+      onboarding_step: currentStep,
+      next_step: nextStep,
       profile_completion: score,
     },
     include: {
@@ -453,9 +459,15 @@ export const updateLocationService = async (
   // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
+  const currentStep = "LOCATION";
+  const nextStep = getNextStep(currentStep);
+
   await prisma.user.update({
     where: { id: userId },
-    data: { profile_completion: score },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep, profile_completion: score
+    },
   });
 
   console.log("before bull mq")
@@ -467,7 +479,12 @@ export const updateLocationService = async (
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
-  return profile;
+  return {
+    profile,
+    onboarding_step: currentStep,
+    next_step: nextStep,
+    profile_completion: score,
+  };
 };
 
 //Question Answer
@@ -482,7 +499,7 @@ export const updateUserAnswerService = async (
   // 🔍 Check question exists
   const question = await prisma.question.findUnique({
     where: { id: questionId },
-    select: { id: true, isMulti: true },
+    select: { id: true, isMulti: true, screen: true },
   });
 
   if (!question) {
@@ -514,12 +531,30 @@ export const updateUserAnswerService = async (
     skipDuplicates: true,
   });
 
+  // =====================================================
+  // GET ONBOARDING STEP FROM QUESTION SCREEN
+  // =====================================================
+
+  const currentStep =
+    QUESTION_SCREEN_TO_ONBOARDING_STEP[question.screen];
+
+  if (!currentStep) {
+    throw new Error(
+      `No onboarding step configured for question screen: ${question.screen}`,
+    );
+  }
+
+  const nextStep = getNextStep(currentStep);
+
   // 👉 UPDATE SCORE
   const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
     where: { id: userId },
-    data: { profile_completion: score },
+    data: {
+      onboarding_step: currentStep,
+      next_step: nextStep, profile_completion: score
+    },
   });
 
   await queueMatchScoreCalculation(
@@ -530,6 +565,9 @@ export const updateUserAnswerService = async (
   await redis.del(`feed:details:${userId}`);
   return {
     questionId,
+    screen: question.screen,
+    currentStep,
+    nextStep,
     savedOptions: optionIds,
   };
 };
@@ -546,7 +584,7 @@ export const updateEducationService = async (
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
-  const currentStep = "EDUCATION";
+  const currentStep = "CAREER_AMBITION";
   const nextStep = getNextStep(currentStep);
 
   const eduWork = await prisma.userEduWork.upsert({
@@ -577,6 +615,7 @@ export const updateEducationService = async (
     },
     select: {
       onboarding_step: true,
+      next_step: true,
     },
   });
 
@@ -609,7 +648,7 @@ export const updateWorkService = async (
     throw new Error("User ID is missing");
   }
 
-  const currentStep = "WORK";
+  const currentStep = "CAREER_AMBITION";
   const nextStep = getNextStep(currentStep);
 
   const eduWork = await prisma.userEduWork.upsert({
@@ -924,7 +963,7 @@ export const uploadUserMediaService = async (
     },
   });
 
-  const currentStep = "LATEST_PHOTOS";
+  const currentStep = "PHOTOS";
   const nextStep = getNextStep(currentStep);
 
   const updatedUser = await prisma.user.update({
@@ -1169,7 +1208,7 @@ export const updateUserVideoService = async (
 export const updateUserBioService = async (userId: string, bio?: string) => {
   if (!userId) throw new Error("User ID is required");
 
-  const currentStep = "USER_BIO";
+  const currentStep = "STORY";
   const nextStep = getNextStep(currentStep);
 
   const result = await prisma.$transaction(async (tx) => {
@@ -1247,11 +1286,10 @@ export const updateUserPromptService = async (
     throw new Error("You can select maximum 3 prompts");
   }
 
-  const currentStep = "PROMPTS";
+  const currentStep = "PROMPT";
   const nextStep = getNextStep(currentStep);
 
   await prisma.$transaction(async (tx) => {
-    // Ensure UserProfile exists
     await tx.userProfile.upsert({
       where: {
         user_id: userId,
@@ -1262,14 +1300,12 @@ export const updateUserPromptService = async (
       },
     });
 
-    // Remove previous prompts
     await tx.userPrompt.deleteMany({
       where: {
         userId,
       },
     });
 
-    // Insert new prompts
     await tx.userPrompt.createMany({
       data: prompts.map((item, index) => ({
         userId,
@@ -1279,7 +1315,6 @@ export const updateUserPromptService = async (
       })),
     });
 
-    // Update onboarding step
     await tx.user.update({
       where: {
         id: userId,
@@ -1307,14 +1342,16 @@ export const updateUserPromptService = async (
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  await queueMatchScoreCalculation(userId);
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
 
-  return result;
+  return {
+    prompts: result,
+    onboarding_step: currentStep,
+    next_step: nextStep,
+  };
 };
 
 // Complete Onboarding Service
@@ -1327,8 +1364,8 @@ export const completeOnboardingService = async (userId: string) => {
     },
     data: {
       onboarding_completed: true,
-      onboarding_step: "COMPLETED",
-      next_step: null,
+      onboarding_step: "REVIEW_FINISH",
+      next_step: "COMPLETED",
     },
   });
 

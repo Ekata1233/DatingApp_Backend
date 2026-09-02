@@ -1,17 +1,53 @@
-// import https from "https";
+
+import https from "https";
+import jwt from "jsonwebtoken";
+import { prisma } from "../../../prisma/prismaClient";
+import { generateReferralCode } from "../../../utils/referral";
+import { getNextStep } from "../../../utils/onboardingFlows";
+
+/* =========================================================
+   MSG91 SEND OTP
+========================================================= */
 
 // export const sendOtp = async ({
 //   phoneNumber,
 // }: {
 //   phoneNumber: string;
 // }) => {
+//   if (!phoneNumber) {
+//     throw new Error("Phone number is required");
+//   }
+
+//   const authKey = process.env.MSG91_AUTH_KEY;
+//   const templateId = process.env.MSG91_TEMPLATE_ID;
+
+//   if (!authKey) {
+//     throw new Error("MSG91 auth key is not configured");
+//   }
+
+//   if (!templateId) {
+//     throw new Error("MSG91 template ID is not configured");
+//   }
+
+//   // Remove spaces, +91 and any non-numeric characters
+//   const cleanedPhone = phoneNumber
+//     .replace(/\s+/g, "")
+//     .replace(/^\+91/, "")
+//     .replace(/^91/, "");
+
+//   if (!/^\d{10}$/.test(cleanedPhone)) {
+//     throw new Error("Invalid Indian phone number");
+//   }
+
+//   const mobile = `91${cleanedPhone}`;
+
 //   return new Promise((resolve, reject) => {
 //     const options = {
 //       method: "POST",
 //       hostname: "control.msg91.com",
 //       path: "/api/v5/otp",
 //       headers: {
-//         authkey: process.env.MSG91_AUTH_KEY!,
+//         authkey: authKey,
 //         "Content-Type": "application/json",
 //       },
 //     };
@@ -24,12 +60,22 @@
 //       });
 
 //       res.on("end", () => {
-//         console.log("MSG91 Status:", res.statusCode);
-//         console.log("MSG91 Response:", data);
+//         console.log("MSG91 Send OTP Status:", res.statusCode);
+//         console.log("MSG91 Send OTP Response:", data);
 
 //         try {
-//           resolve(JSON.parse(data));
+//           const parsedData = JSON.parse(data);
+
+//           if (res.statusCode && res.statusCode >= 400) {
+//             return reject(parsedData);
+//           }
+
+//           resolve(parsedData);
 //         } catch {
+//           if (res.statusCode && res.statusCode >= 400) {
+//             return reject(new Error(data));
+//           }
+
 //           resolve(data);
 //         }
 //       });
@@ -41,8 +87,8 @@
 
 //     req.write(
 //       JSON.stringify({
-//         template_id: process.env.MSG91_TEMPLATE_ID,
-//         mobile: `91${phoneNumber}`,
+//         template_id: templateId,
+//         mobile,
 //         otp_length: 6,
 //         otp_expiry: 10,
 //       }),
@@ -51,79 +97,6 @@
 //     req.end();
 //   });
 // };
-
-// interface VerifyOtpParams {
-//   phoneNumber: string;
-//   otp: string;
-// }
-
-// export const verifyOtp = ({
-//   phoneNumber,
-//   otp,
-// }: VerifyOtpParams): Promise<any> => {
-//   return new Promise((resolve, reject) => {
-//     const authKey = process.env.MSG91_AUTH_KEY;
-
-//     if (!authKey) {
-//       return reject(
-//         new Error("MSG91 auth key is not configured"),
-//       );
-//     }
-
-//     // Add India country code
-//     const mobile = `91${phoneNumber}`;
-
-//     const path =
-//       `/api/v5/otp/verify` +
-//       `?otp=${encodeURIComponent(otp)}` +
-//       `&mobile=${encodeURIComponent(mobile)}`;
-
-//     const options = {
-//       method: "GET",
-//       hostname: "control.msg91.com",
-//       path,
-//       headers: {
-//         authkey: authKey,
-//       },
-//     };
-
-//     const req = https.request(options, (res) => {
-//       const chunks: Buffer[] = [];
-
-//       res.on("data", (chunk) => {
-//         chunks.push(chunk);
-//       });
-
-//       res.on("end", () => {
-//         const body = Buffer.concat(chunks).toString();
-
-//         try {
-//           const data = JSON.parse(body);
-
-//           if (res.statusCode && res.statusCode >= 400) {
-//             return reject(data);
-//           }
-
-//           resolve(data);
-//         } catch {
-//           resolve(body);
-//         }
-//       });
-//     });
-
-//     req.on("error", (error) => {
-//       reject(error);
-//     });
-
-//     req.end();
-//   });
-// };
-
-
-import https from "https";
-import jwt from "jsonwebtoken";
-import { prisma } from "../../../prisma/prismaClient";
-import { generateReferralCode } from "../../../utils/referral";
 
 /* =========================================================
    MSG91 SEND OTP
@@ -161,7 +134,26 @@ export const sendOtp = async ({
 
   const mobile = `91${cleanedPhone}`;
 
-  return new Promise((resolve, reject) => {
+  // =========================================================
+  // CHECK WHETHER USER IS ALREADY REGISTERED
+  // =========================================================
+
+  const existingUser = await prisma.user.findUnique({
+    where: {
+      phone_number: cleanedPhone,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const userAlreadyRegister = !!existingUser;
+
+  // =========================================================
+  // SEND OTP
+  // =========================================================
+
+  const otpResponse = await new Promise((resolve, reject) => {
     const options = {
       method: "POST",
       hostname: "control.msg91.com",
@@ -216,9 +208,18 @@ export const sendOtp = async ({
 
     req.end();
   });
+
+  // =========================================================
+  // RETURN OTP RESPONSE + REGISTER STATUS
+  // =========================================================
+
+  return {
+    ...(typeof otpResponse === "object" && otpResponse !== null
+      ? otpResponse
+      : { response: otpResponse }),
+    user_already_register: userAlreadyRegister,
+  };
 };
-
-
 /* =========================================================
    MSG91 VERIFY OTP
 ========================================================= */
@@ -312,7 +313,7 @@ export const verifyOtp = ({
             return reject(
               new Error(
                 msg91Response?.message ||
-                  "OTP verification failed",
+                "OTP verification failed",
               ),
             );
           }
@@ -330,7 +331,7 @@ export const verifyOtp = ({
             return reject(
               new Error(
                 msg91Response?.message ||
-                  "Invalid OTP",
+                "Invalid OTP",
               ),
             );
           }
@@ -384,6 +385,7 @@ const userSelect = {
   gender_option: true,
   onboarding_completed: true,
   onboarding_step: true,
+  next_step: true,
   profile_completion: true,
   referralCode: true,
   created_at: true,
@@ -527,11 +529,17 @@ const handleVerifiedUser = async ({
        * =====================================================
        */
 
+      const onboardingStep = "VERIFY_PHONE";
+      const nextStep = getNextStep(onboardingStep);
+
       const newUser = await tx.user.create({
         data: {
           phone_number: formattedNumber,
           is_phone_verified: true,
           referralCode: myReferralCode,
+          onboarding_step: onboardingStep,
+          next_step: nextStep,
+          onboarding_completed: false,
         },
       });
 
