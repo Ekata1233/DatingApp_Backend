@@ -340,6 +340,7 @@ export const chatRepository = {
     // --------------------------------------------------
 
     let nearbyUserIds: string[] = [];
+    let onlineUserIds: string[] = [];
 
     if (type === "nearby") {
       const currentUserProfile =
@@ -461,9 +462,15 @@ export const chatRepository = {
       };
     }
 
+
     // --------------------------------------------------
     // 7. Get conversations
     // --------------------------------------------------
+
+    const fetchLimit =
+      type === "online"
+        ? Math.max(limit * 3, 50)
+        : limit + 1;
 
     const conversations =
       await prisma.conversation.findMany({
@@ -580,6 +587,8 @@ export const chatRepository = {
         })
         : [];
 
+        console.log("user presence : ", userPresence)
+
     // --------------------------------------------------
     // 8.2 Convert presence into Map
     // --------------------------------------------------
@@ -595,6 +604,33 @@ export const chatRepository = {
     );
 
 
+    // --------------------------------------------------
+    // 8.3 ONLINE FILTER
+    // --------------------------------------------------
+
+    let filteredConversations = conversations;
+
+    if (type === "online") {
+      filteredConversations =
+        conversations.filter((conversation) => {
+          const otherParticipant =
+            conversation.participants.find(
+              (participant) =>
+                participant.userId !== userId,
+            );
+
+          if (!otherParticipant) {
+            return false;
+          }
+
+          const presence =
+            presenceMap.get(
+              otherParticipant.userId,
+            );
+
+          return presence?.isOnline === true;
+        });
+    }
     // --------------------------------------------------
     // 9. Get compatibility scores
     // --------------------------------------------------
@@ -970,7 +1006,7 @@ export const chatRepository = {
     // --------------------------------------------------
 
     const result = await Promise.all(
-      conversations.map(
+      filteredConversations.map(
         async (conversation) => {
           const currentParticipant =
             conversation.participants.find(
