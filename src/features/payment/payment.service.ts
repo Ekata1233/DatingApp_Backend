@@ -116,7 +116,7 @@ export async function createPaymentLink(userId: string, body: any) {
     // EVENT BOOKING
     // ==========================================
 
-   case PaymentPurpose.EVENT_BOOKING: {
+  case PaymentPurpose.EVENT_BOOKING: {
   console.log("========== EVENT BOOKING DEBUG ==========");
   console.log("EVENT BOOKING BODY:", body);
   console.log("EVENT ID:", body.eventId);
@@ -132,8 +132,6 @@ export async function createPaymentLink(userId: string, body: any) {
     select: {
       id: true,
       status: true,
-
-      totalCapacity: true,
 
       menCapacity: true,
       womenCapacity: true,
@@ -164,314 +162,496 @@ export async function createPaymentLink(userId: string, body: any) {
   }
 
   // ==========================================
-  // 3. GET USER TICKET TYPE
+  // 3. GET TICKET COUNTS
   // ==========================================
   //
-  // IMPORTANT:
-  // Your request does not send ticketType.
-  // So backend determines it from user's profile.
+  // Frontend sends:
   //
-  // Change `gender` below if your UserProfile field
-  // has a different name.
-  // ==========================================
-
-// ==========================================
-// 3. GET USER GENDER FROM AUTHENTICATED USER
-// ==========================================
-
-const user = await prisma.user.findUnique({
-  where: {
-    id: userId,
-  },
-  select: {
-    id: true,
-    gender: true,
-    full_name: true,
-    email: true,
-    phone_number: true,
-  },
-});
-
-if (!user) {
-  throw new Error("User not found");
-}
-
-if (!user.gender) {
-  throw new Error("User gender is not set");
-}
-
-// Event ticket type supports only:
-// MEN | WOMEN | OTHER
-
-let ticketType: "MEN" | "WOMEN" | "OTHER";
-if (!user.gender) {
-  throw new Error("User gender is not set");
-}
-switch (user.gender) {
-  case "MEN":
-    ticketType = "MEN";
-    break;
-
-  case "WOMEN":
-    ticketType = "WOMEN";
-    break;
-
-  case "NON_BINARY":
-  case "TRANS_MAN":
-  case "TRANS_WOMAN":
-  case "OTHER":
-  case "PREFER_NOT_TO_SAY":
-    ticketType = "OTHER";
-    break;
-
-  default:
-    throw new Error("Invalid user gender");
-}
-
-console.log("========== USER TICKET TYPE ==========");
-console.log("User ID:", user.id);
-console.log("User Gender:", user.gender);
-console.log("Ticket Type:", ticketType);
-  // ==========================================
-  // 4. TICKET COUNT
-  // ==========================================
+  // menTicketCount
+  // womenTicketCount
+  // otherTicketCount
   //
-  // Your Postman body doesn't send ticketCount.
-  // Therefore default = 1.
-  // ==========================================
-
-  const ticketCount = 1;
-
-  // ==========================================
-  // 5. GET CAPACITY + PRICES
-  // ==========================================
-
-  let capacity: number | null = null;
-  let entryPrice: number | null = null;
-  let discountedPrice: number | null = null;
-
-  switch (ticketType) {
-    case "MEN":
-      capacity = event.menCapacity;
-
-      entryPrice =
-        event.menEntryPrice !== null
-          ? Number(event.menEntryPrice)
-          : null;
-
-      discountedPrice =
-        event.menDiscountedPrice !== null
-          ? Number(event.menDiscountedPrice)
-          : null;
-
-      break;
-
-    case "WOMEN":
-      capacity = event.womenCapacity;
-
-      entryPrice =
-        event.womenEntryPrice !== null
-          ? Number(event.womenEntryPrice)
-          : null;
-
-      discountedPrice =
-        event.womenDiscountedPrice !== null
-          ? Number(event.womenDiscountedPrice)
-          : null;
-
-      break;
-
-    case "OTHER":
-      capacity = event.otherCapacity;
-
-      entryPrice =
-        event.otherEntryPrice !== null
-          ? Number(event.otherEntryPrice)
-          : null;
-
-      discountedPrice =
-        event.otherDiscountedPrice !== null
-          ? Number(event.otherDiscountedPrice)
-          : null;
-
-      break;
-  }
-
-  // ==========================================
-  // 6. VALIDATE PRICE
-  // ==========================================
-
-  if (entryPrice === null) {
-    throw new Error(
-      `${ticketType} ticket entry price is not available`,
-    );
-  }
-
-  // Use discounted price when available.
-  // Otherwise use normal entry price.
-  const ticketPrice =
-    discountedPrice !== null
-      ? discountedPrice
-      : entryPrice;
-
-  // ==========================================
-  // 7. VALIDATE CAPACITY
-  // ==========================================
-
-  if (capacity === null || capacity <= 0) {
-    throw new Error(
-      `${ticketType} ticket capacity is not available`,
-    );
-  }
-
-  // ==========================================
-  // 8. CHECK CONFIRMED BOOKINGS
-  // ==========================================
+  // Example:
   //
-  // IMPORTANT:
-  // Only CONFIRMED bookings reduce available capacity.
+  // MEN   = 2
+  // WOMEN = 1
+  // OTHER = 1
   //
-  // Sum ticketCount, don't count booking rows.
+  // Total = 4
+  //
   // ==========================================
 
-  const confirmedBookings =
-    await prisma.eventBooking.aggregate({
-      where: {
-        eventId: event.id,
-        ticketType,
-        status: EventBookingStatus.CONFIRMED,
-      },
-
-      _sum: {
-        ticketCount: true,
-      },
-    });
-
-  const bookedTickets =
-    confirmedBookings._sum.ticketCount ?? 0;
-
-  const remainingCapacity = Math.max(
-    capacity - bookedTickets,
-    0,
+  const menTicketCount = Number(
+    body.menTicketCount ?? 0,
   );
 
-  console.log("========== CAPACITY CHECK ==========");
-  console.log("Ticket Type:", ticketType);
-  console.log("Capacity:", capacity);
-  console.log("Confirmed Booked Tickets:", bookedTickets);
-  console.log("Remaining Capacity:", remainingCapacity);
+  const womenTicketCount = Number(
+    body.womenTicketCount ?? 0,
+  );
 
-  if (ticketCount > remainingCapacity) {
+  const otherTicketCount = Number(
+    body.otherTicketCount ?? 0,
+  );
+
+  // ==========================================
+  // 4. VALIDATE COUNTS
+  // ==========================================
+
+  if (
+    !Number.isInteger(menTicketCount) ||
+    !Number.isInteger(womenTicketCount) ||
+    !Number.isInteger(otherTicketCount)
+  ) {
     throw new Error(
-      `Only ${remainingCapacity} ${ticketType} ticket(s) available`,
+      "Ticket count must be a valid integer",
+    );
+  }
+
+  if (
+    menTicketCount < 0 ||
+    womenTicketCount < 0 ||
+    otherTicketCount < 0
+  ) {
+    throw new Error(
+      "Ticket count cannot be negative",
+    );
+  }
+
+  const ticketCount =
+    menTicketCount +
+    womenTicketCount +
+    otherTicketCount;
+
+  if (ticketCount <= 0) {
+    throw new Error(
+      "At least one ticket is required",
+    );
+  }
+
+  console.log("========== TICKET COUNTS ==========");
+  console.log("MEN:", menTicketCount);
+  console.log("WOMEN:", womenTicketCount);
+  console.log("OTHER:", otherTicketCount);
+  console.log("TOTAL:", ticketCount);
+
+  // ==========================================
+  // 5. GET FINAL PRICE FOR EACH TYPE
+  // ==========================================
+
+  const getFinalTicketPrice = (
+    ticketType: "MEN" | "WOMEN" | "OTHER",
+    entryPrice: any,
+    discountedPrice: any,
+  ) => {
+    if (entryPrice === null) {
+      throw new Error(
+        `${ticketType} ticket entry price is not available`,
+      );
+    }
+
+    return discountedPrice !== null
+      ? Number(discountedPrice)
+      : Number(entryPrice);
+  };
+
+  // ==========================================
+  // MEN PRICE
+  // ==========================================
+
+  let menPrice = 0;
+
+  if (menTicketCount > 0) {
+    menPrice = getFinalTicketPrice(
+      "MEN",
+      event.menEntryPrice,
+      event.menDiscountedPrice,
     );
   }
 
   // ==========================================
-  // 9. PRICE CALCULATION
+  // WOMEN PRICE
   // ==========================================
 
-  const ticketAmount = ticketPrice;
+  let womenPrice = 0;
+
+  if (womenTicketCount > 0) {
+    womenPrice = getFinalTicketPrice(
+      "WOMEN",
+      event.womenEntryPrice,
+      event.womenDiscountedPrice,
+    );
+  }
+
+  // ==========================================
+  // OTHER PRICE
+  // ==========================================
+
+  let otherPrice = 0;
+
+  if (otherTicketCount > 0) {
+    otherPrice = getFinalTicketPrice(
+      "OTHER",
+      event.otherEntryPrice,
+      event.otherDiscountedPrice,
+    );
+  }
+
+  console.log("========== TICKET PRICES ==========");
+  console.log("MEN PRICE:", menPrice);
+  console.log("WOMEN PRICE:", womenPrice);
+  console.log("OTHER PRICE:", otherPrice);
+
+  // ==========================================
+  // 6. CHECK MEN CAPACITY
+  // ==========================================
+
+  if (menTicketCount > 0) {
+    if (
+      event.menCapacity === null ||
+      event.menCapacity <= 0
+    ) {
+      throw new Error(
+        "MEN ticket capacity is not available",
+      );
+    }
+
+    const bookedMen =
+      await prisma.eventBookingTicket.count({
+        where: {
+          booking: {
+            eventId: event.id,
+          },
+
+          ticketType: "MEN",
+
+          status: {
+            in: [
+              "PENDING",
+              "CONFIRMED",
+            ],
+          },
+        },
+      });
+
+    const remainingMen =
+      Math.max(
+        event.menCapacity - bookedMen,
+        0,
+      );
+
+    console.log("MEN CAPACITY:", event.menCapacity);
+    console.log("MEN BOOKED:", bookedMen);
+    console.log("MEN REMAINING:", remainingMen);
+
+    if (menTicketCount > remainingMen) {
+      throw new Error(
+        `Only ${remainingMen} MEN ticket(s) available`,
+      );
+    }
+  }
+
+  // ==========================================
+  // 7. CHECK WOMEN CAPACITY
+  // ==========================================
+
+  if (womenTicketCount > 0) {
+    if (
+      event.womenCapacity === null ||
+      event.womenCapacity <= 0
+    ) {
+      throw new Error(
+        "WOMEN ticket capacity is not available",
+      );
+    }
+
+    const bookedWomen =
+      await prisma.eventBookingTicket.count({
+        where: {
+          booking: {
+            eventId: event.id,
+          },
+
+          ticketType: "WOMEN",
+
+          status: {
+            in: [
+              "PENDING",
+              "CONFIRMED",
+            ],
+          },
+        },
+      });
+
+    const remainingWomen =
+      Math.max(
+        event.womenCapacity - bookedWomen,
+        0,
+      );
+
+    console.log(
+      "WOMEN CAPACITY:",
+      event.womenCapacity,
+    );
+
+    console.log(
+      "WOMEN BOOKED:",
+      bookedWomen,
+    );
+
+    console.log(
+      "WOMEN REMAINING:",
+      remainingWomen,
+    );
+
+    if (
+      womenTicketCount > remainingWomen
+    ) {
+      throw new Error(
+        `Only ${remainingWomen} WOMEN ticket(s) available`,
+      );
+    }
+  }
+
+  // ==========================================
+  // 8. CHECK OTHER CAPACITY
+  // ==========================================
+
+  if (otherTicketCount > 0) {
+    if (
+      event.otherCapacity === null ||
+      event.otherCapacity <= 0
+    ) {
+      throw new Error(
+        "OTHER ticket capacity is not available",
+      );
+    }
+
+    const bookedOther =
+      await prisma.eventBookingTicket.count({
+        where: {
+          booking: {
+            eventId: event.id,
+          },
+
+          ticketType: "OTHER",
+
+          status: {
+            in: [
+              "PENDING",
+              "CONFIRMED",
+            ],
+          },
+        },
+      });
+
+    const remainingOther =
+      Math.max(
+        event.otherCapacity - bookedOther,
+        0,
+      );
+
+    console.log(
+      "OTHER CAPACITY:",
+      event.otherCapacity,
+    );
+
+    console.log(
+      "OTHER BOOKED:",
+      bookedOther,
+    );
+
+    console.log(
+      "OTHER REMAINING:",
+      remainingOther,
+    );
+
+    if (
+      otherTicketCount > remainingOther
+    ) {
+      throw new Error(
+        `Only ${remainingOther} OTHER ticket(s) available`,
+      );
+    }
+  }
+
+  // ==========================================
+  // 9. CALCULATE TOTAL TICKET AMOUNT
+  // ==========================================
 
   const totalAmount =
-    ticketAmount * ticketCount;
+    menPrice * menTicketCount +
+    womenPrice * womenTicketCount +
+    otherPrice * otherTicketCount;
 
-  console.log("========== PRICE CALCULATION ==========");
-  console.log("Entry Price:", entryPrice);
-  console.log("Discounted Price:", discountedPrice);
-  console.log("Final Ticket Price:", ticketPrice);
-  console.log("Ticket Count:", ticketCount);
-  console.log("Total Amount:", totalAmount);
+  const ticketAmount = totalAmount;
+
+  console.log(
+    "========== PRICE CALCULATION ==========",
+  );
+
+  console.log(
+    "MEN:",
+    menTicketCount,
+    "*",
+    menPrice,
+  );
+
+  console.log(
+    "WOMEN:",
+    womenTicketCount,
+    "*",
+    womenPrice,
+  );
+
+  console.log(
+    "OTHER:",
+    otherTicketCount,
+    "*",
+    otherPrice,
+  );
+
+  console.log(
+    "TICKET COUNT:",
+    ticketCount,
+  );
+
+  console.log(
+    "TOTAL AMOUNT:",
+    totalAmount,
+  );
 
   // ==========================================
-  // 10. FIND EXISTING PENDING BOOKING
+  // 10. CREATE BOOKING
   // ==========================================
 
-  let booking =
-    await prisma.eventBooking.findFirst({
-      where: {
-        eventId: event.id,
+  const bookingNumber =
+    `EVT_${Date.now()}_${randomUUID()
+      .replace(/-/g, "")
+      .slice(0, 8)}`;
+
+  const booking =
+    await prisma.eventBooking.create({
+      data: {
         userId,
+        eventId: event.id,
 
-        ticketType,
+        bookingNumber,
 
-        status: {
-          in: [
-            EventBookingStatus.PENDING,
-            EventBookingStatus.PAYMENT_PENDING,
+        ticketCount,
+
+        ticketAmount,
+
+        totalAmount,
+
+        paidAmount: 0,
+
+        status: EventBookingStatus.PENDING,
+
+        tickets: {
+          create: [
+            // ==================================
+            // MEN TICKETS
+            // ==================================
+
+            ...Array.from(
+              {
+                length: menTicketCount,
+              },
+              () => ({
+                ticketId:
+                  `TKT_${Date.now()}_${randomUUID()
+                    .replace(/-/g, "")
+                    .slice(0, 8)}`,
+
+                ticketType: "MEN" as const,
+
+                ticketAmount: menPrice,
+
+                status: "PENDING" as const,
+              }),
+            ),
+
+            // ==================================
+            // WOMEN TICKETS
+            // ==================================
+
+            ...Array.from(
+              {
+                length: womenTicketCount,
+              },
+              () => ({
+                ticketId:
+                  `TKT_${Date.now()}_${randomUUID()
+                    .replace(/-/g, "")
+                    .slice(0, 8)}`,
+
+                ticketType: "WOMEN" as const,
+
+                ticketAmount: womenPrice,
+
+                status: "PENDING" as const,
+              }),
+            ),
+
+            // ==================================
+            // OTHER TICKETS
+            // ==================================
+
+            ...Array.from(
+              {
+                length: otherTicketCount,
+              },
+              () => ({
+                ticketId:
+                  `TKT_${Date.now()}_${randomUUID()
+                    .replace(/-/g, "")
+                    .slice(0, 8)}`,
+
+                ticketType: "OTHER" as const,
+
+                ticketAmount: otherPrice,
+
+                status: "PENDING" as const,
+              }),
+            ),
           ],
         },
       },
 
-      orderBy: {
-        createdAt: "desc",
+      include: {
+        tickets: true,
       },
     });
 
-  // ==========================================
-  // 11. CREATE BOOKING
-  // ==========================================
-
-  if (!booking) {
-    const bookingNumber =
-      `EVT_${Date.now()}_${randomUUID()
-        .replace(/-/g, "")
-        .slice(0, 8)}`;
-
-    // const ticketId =
-    //   `TKT_${Date.now()}_${randomUUID()
-    //     .replace(/-/g, "")
-    //     .slice(0, 8)}`;
-
-    booking =
-      await prisma.eventBooking.create({
-        data: {
-          userId,
-          eventId: event.id,
-
-          bookingNumber,
-          // ticketId,
-
-          ticketType,
-          ticketCount,
-
-          // Final price actually charged
-          ticketAmount,
-
-          totalAmount,
-
-          paidAmount: 0,
-
-          status: EventBookingStatus.PENDING,
-        },
-      });
-
-    console.log(
-      "EVENT BOOKING CREATED:",
-      booking.id,
-    );
-  }
-
-  // ==========================================
-  // 12. GET REMAINING PAYMENT
-  // ==========================================
-
-  const remainingAmount =
-    Number(booking.totalAmount) -
-    Number(booking.paidAmount);
-
-  if (remainingAmount <= 0) {
-    throw new Error(
-      "Event booking is already fully paid",
-    );
-  }
-
-  amount = remainingAmount;
+  console.log(
+    "========== EVENT BOOKING CREATED ==========",
+  );
 
   console.log(
-    "Final Payment Amount:",
-    amount,
+    "Booking ID:",
+    booking.id,
   );
+
+  console.log(
+    "Booking Number:",
+    booking.bookingNumber,
+  );
+
+  console.log(
+    "Ticket Count:",
+    booking.ticketCount,
+  );
+
+  console.log(
+    "Tickets:",
+    booking.tickets,
+  );
+
+  // ==========================================
+  // 11. PAYMENT AMOUNT
+  // ==========================================
+
+  amount = totalAmount;
 
   break;
 }
