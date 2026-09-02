@@ -1,0 +1,27 @@
+BEGIN;
+
+CREATE TYPE "Type_new" AS ENUM (
+  'SINGLES_MIXER',
+  'SPEED_DATES',
+  'SINGLES_NIGHT',
+  'DINNER_DATES',
+  'LEARN_AND_MATCH',
+  'PLAY_AND_MATCH',
+  'FIT_DATES',
+  'TREK_DATES',
+  'THE_RESERVE',
+  'PROFESSIONALS_MEET',
+  'MATCHED_FOR_YOU'
+);
+
+ALTER TABLE "Event"
+ALTER COLUMN "eventType" TYPE "Type_new"
+USING ("eventType"::text::"Type_new");
+
+ALTER TYPE "Type" RENAME TO "Type_old";
+
+ALTER TYPE "Type_new" RENAME TO "Type";
+
+DROP TYPE "Type_old";
+
+COMMIT;
