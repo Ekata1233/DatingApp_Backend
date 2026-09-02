@@ -22,19 +22,44 @@
 
 // export default router;
 
+// import { Router } from "express";
+// import * as controller from "./payment.controller";
+// import authMiddleware from "../../middleware/auth.middleware";
+
+// const router = Router();
+
+// //CREATE PAYMENT LINK
+// router.post("/create-order",authMiddleware, controller.createPayment);
+
+// //SUCCESS WEBHOOK
+// router.post("/webhook", controller.payuWebhookController);
+
+// //RETURN URL
+// router.post("/return", controller.paymentReturnController);
+
+// export default router;
+
 import { Router } from "express";
-import * as controller from "./payment.controller";
+
+import {
+  createPaymentOrderController,
+  verifyPaymentController,
+} from "./payment.controller";
 import authMiddleware from "../../middleware/auth.middleware";
+
 
 const router = Router();
 
-//CREATE PAYMENT LINK
-router.post("/create-order",authMiddleware, controller.createPayment);
+router.post(
+  "/create-order",
+  authMiddleware,
+  createPaymentOrderController,
+);
 
-//SUCCESS WEBHOOK
-router.post("/webhook", controller.payuWebhookController);
-
-//RETURN URL
-router.post("/return", controller.paymentReturnController);
+router.post(
+  "/verify",
+  authMiddleware,
+  verifyPaymentController,
+);
 
 export default router;

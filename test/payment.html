@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 
 <head>
@@ -52,4 +52,79 @@ rzp.open();
 
 </body>
 
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Test Payment</title>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+
+<body>
+
+    <h2>Welvors Razorpay Test</h2>
+
+    <button onclick="payNow()">
+        Pay ₹999
+    </button>
+
+    <script>
+
+        function payNow() {
+
+            const options = {
+
+                key: "rzp_test_TCtmQuGTvgsWU0",
+
+                amount: 99900,
+
+                currency: "INR",
+
+                name: "Welvors",
+
+                description: "Test Package",
+
+                order_id: "order_TX91BOjcvQ3hns",
+
+                handler: function (response) {
+
+                    console.log(
+                        "razorpay_payment_id:",
+                        response.razorpay_payment_id
+                    );
+
+                    console.log(
+                        "razorpay_order_id:",
+                        response.razorpay_order_id
+                    );
+
+                    console.log(
+                        "razorpay_signature:",
+                        response.razorpay_signature
+                    );
+
+                    alert(
+                        "Payment Successful!\n\n" +
+                        "Payment ID: " +
+                        response.razorpay_payment_id +
+                        "\n\n" +
+                        "Order ID: " +
+                        response.razorpay_order_id +
+                        "\n\n" +
+                        "Signature: " +
+                        response.razorpay_signature
+                    );
+                }
+            };
+
+            const razorpay = new Razorpay(options);
+
+            razorpay.open();
+        }
+
+    </script>
+
+</body>
 </html>
