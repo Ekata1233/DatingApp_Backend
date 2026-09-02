@@ -1,5 +1,6 @@
 import { prisma } from "../../prisma/prismaClient";
 import { getOrCreateConversation } from "../chat/chat.helper";
+import { createNotification } from "../notification/notification.service";
 import { AppError } from "../rose/AppError";
 import { checkBlockedStatus, checkMatch } from "../rose/rose.repository";
 import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
@@ -128,7 +129,7 @@ export const sendComplimentService = async (
         complimentIdeaText = idea.text;
     }
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
         const deduction = await deductCompliment(senderId, tx);
 
         const compliment = await createUserCompliment(
@@ -250,6 +251,27 @@ export const sendComplimentService = async (
             },
         };
     });
+
+    // 🔔 Send notification AFTER transaction successfully commits
+      createNotification({
+        senderId,
+        receiverId,
+        type: "COMPLIMENT",
+        title: "You received a Compliment 💬",
+        message: "Someone sent you a compliment 💬",
+        data: {
+          complimentId: result.data.compliment.id,
+          senderId,
+          receiverId,
+          targetType,
+          targetId,
+          type: "COMPLIMENT",
+        },
+      }).catch((error) => {
+        console.error("Failed to send rose notification:", error);
+      });
+
+    return result;
 };
 
 export async function getComplimentBalanceService(

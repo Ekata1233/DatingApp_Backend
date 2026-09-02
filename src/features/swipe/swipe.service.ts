@@ -14,7 +14,7 @@ export const handleSwipe = async (data: {
   action: "LIKE" | "PASS" | "SUPERLIKE";
 }) => {
   const { swiperId, targetUserId, action } = data;
-  
+
   // Prevent self swipe
   if (swiperId === targetUserId) {
     throw new Error("Cannot swipe yourself");
@@ -118,13 +118,22 @@ export const handleSwipe = async (data: {
 
     // Fire-and-forget notification
     createNotification({
-      sender_id: swiperId,
-      receiver_id: targetUserId,
-      type: "LIKE",
+      senderId: swiperId,
+      receiverId: targetUserId,
+      type: action === "SUPERLIKE" ? "SUPERLIKE" : "LIKE",
+      title:
+        action === "SUPERLIKE"
+          ? "New Super Like ⭐"
+          : "New Like ❤️",
       message:
         action === "SUPERLIKE"
           ? "Someone super liked your profile ⭐"
           : "Someone liked your profile ❤️",
+      data: {
+        userId: swiperId,
+        targetUserId,
+        action,
+      },
     }).catch(console.error);
 
     return { matched: false };
@@ -228,19 +237,32 @@ export const handleSwipe = async (data: {
   // Fire-and-forget match notifications
   // ------------------------------------------------------------
   Promise.all([
-    createNotification({
-      sender_id: swiperId,
-      receiver_id: targetUserId,
+  createNotification({
+    senderId: swiperId,
+    receiverId: targetUserId,
+    type: "MATCH",
+    title: "It's a Match! 🎉",
+    message: "You both liked each other ❤️",
+    data: {
+      matchId: match.id,
+      userId: swiperId,
       type: "MATCH",
-      message: "It's a match 🎉",
-    }),
-    createNotification({
-      sender_id: targetUserId,
-      receiver_id: swiperId,
+    },
+  }),
+
+  createNotification({
+    senderId: targetUserId,
+    receiverId: swiperId,
+    type: "MATCH",
+    title: "It's a Match! 🎉",
+    message: "You both liked each other ❤️",
+    data: {
+      matchId: match.id,
+      userId: targetUserId,
       type: "MATCH",
-      message: "It's a match 🎉",
-    }),
-  ]).catch(console.error);
+    },
+  }),
+]).catch(console.error);
 
   return {
     matched: true,

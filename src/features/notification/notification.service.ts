@@ -3,38 +3,38 @@
 import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
 import { incrementBadgeCount } from "./badge.service";
+import { CreateNotificationParams, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
 
 export const createNotification = async ({
-  sender_id,
-  receiver_id,
+  senderId,
+  receiverId,
   type,
+  title,
   message,
-}: {
-  sender_id: string;
-  receiver_id: string;
-  type: "LIKE" | "MATCH" | "MESSAGE";
-  message: string;
-}) => {
+  data,
+}: CreateNotificationParams) => {
   const notification = await prisma.notification.create({
     data: {
-      sender_id,
-      receiver_id,
+      sender_id: senderId,
+      receiver_id: receiverId,
       type,
+      title,
       message,
+      data,
     },
   });
 
   // 🔥 REAL-TIME EMIT
   const io = getIO();
-  io.to(receiver_id).emit("new_notification", notification);
+  io.to(receiverId).emit("new_notification", notification);
 
    // Badge increment
-  await incrementBadgeCount(receiver_id);
+  await incrementBadgeCount(receiverId);
 
   // Push notification
   await sendPushNotification(
-    receiver_id,
+    receiverId,
     type,
     message
   );
@@ -54,4 +54,24 @@ export const markAsRead = async (id: string) => {
     where: { id },
     data: { is_read: true },
   });
+};
+
+export const saveDeviceTokenService = async ({
+  userId,
+  deviceToken,
+}: SaveDeviceTokenParams) => {
+  const user = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      device_token: deviceToken,
+    },
+    select: {
+      id: true,
+      device_token: true,
+    },
+  });
+
+  return user;
 };

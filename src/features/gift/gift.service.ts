@@ -10,6 +10,7 @@ import { GiftRepository } from "./gift.repository";
 import { SendGiftDTO } from "./gift.validation";
 import { getOrCreateConversation } from "../chat/chat.helper";
 import { createGiftChatMessage } from "./gift.helper";
+import { createNotification } from "../notification/notification.service";
 
 export const sendGiftService = async (
   senderId: string,
@@ -75,7 +76,7 @@ export const sendGiftService = async (
   }
 
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Wallet
     const wallet = await tx.wallet.findUnique({
       where: {
@@ -200,4 +201,25 @@ export const sendGiftService = async (
     };
 
   });
+
+  // 🔔 Send notification AFTER transaction successfully commits
+  createNotification({
+    senderId,
+    receiverId,
+    type: "GIFT",
+    title: "You received a gift 🎁",
+    message: "Someone sent you a gift 🎁",
+    data: {
+      giftId: result.gift.id,
+      senderId,
+      receiverId,
+      targetType,
+      targetId,
+      type: "GIFT",
+    },
+  }).catch((error) => {
+    console.error("Failed to send rose notification:", error);
+  });
+
+  return result;
 };

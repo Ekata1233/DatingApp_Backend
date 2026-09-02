@@ -54,9 +54,48 @@ export const sendEngagement = async (
     }
 
     /* ------------------------------------------------------------------------ */
+    /*                         Handle Business Logic Errors                     */
+    /* ------------------------------------------------------------------------ */
+
+    // Check if it's a known business error (like rose limit)
+    if (error instanceof Error) {
+      // You can check for specific error messages or use custom error classes
+      if (error.message.includes("You can only send 3 roses per day")) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          errors: {
+            fieldErrors: {
+              rose: [error.message]
+            }
+          }
+        });
+      }
+
+      // Return other business errors with proper format
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        errors: {
+          fieldErrors: {}
+        }
+      });
+    }
+
+    /* ------------------------------------------------------------------------ */
     /*                         Forward Other Errors                             */
     /* ------------------------------------------------------------------------ */
 
-    throw error;
+    // Log the error for debugging
+    console.error("Unexpected error in sendEngagement:", error);
+    
+    // Return a generic error response instead of throwing
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      errors: {
+        fieldErrors: {}
+      }
+    });
   }
 };

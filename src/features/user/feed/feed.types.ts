@@ -49,6 +49,7 @@ export interface UserFeedResponse {
   city: string | null;
   state: string | null;
   country: string | null;
+  area: string | null;
   zodiac: string | null;
   
   // Communication & Love Language

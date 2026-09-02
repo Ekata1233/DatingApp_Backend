@@ -141,7 +141,7 @@ export const sendEngagementSchema = z
         message: z
           .string()
           .min(1)
-          .max(500),
+          .max(500).optional(),
       })
       .optional(),
   })

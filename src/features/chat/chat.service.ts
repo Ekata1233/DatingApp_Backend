@@ -11,6 +11,7 @@ import {
 
 import { chatRepository } from "./chat.repository";
 import { buildMessageProgress } from "./chat.helper";
+import { createNotification } from "../notification/notification.service";
 
 export const chatService = {
   /**
@@ -387,6 +388,25 @@ export const chatService = {
         senderId,
         eventId,
       );
+
+    // 🔔 Send notification AFTER transaction successfully commits
+    createNotification({
+      senderId,
+      receiverId,
+      type: "EVENT_INVITE",
+      title: "New Event Invitation 🎉",
+      message: "Someone invited you to an event 🎉",
+      data: {
+        eventId,
+        conversationId: conversation.id,
+        messageId: message.id,
+        senderId,
+        receiverId,
+        type: "EVENT_INVITE",
+      },
+    }).catch((error) => {
+      console.error("Failed to send rose notification:", error);
+    });
 
     return {
       conversation,

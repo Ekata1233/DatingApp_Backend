@@ -566,6 +566,9 @@ export const getFeedService = async ({
         profile: {
           select: {
             city: true,
+            state: true,
+            country: true,
+            area: true,
             latitude: true,
             longitude: true,
           },
@@ -948,6 +951,7 @@ const transformUserData = (user: any): UserFeedResponse => {
     city: user.profile?.city || null,
     state: user.profile?.state || null,
     country: user.profile?.country || null,
+    area: user.profile?.area || null,
     zodiac: zodiac,
 
     // Communication & Love Language

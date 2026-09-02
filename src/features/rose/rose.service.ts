@@ -24,6 +24,7 @@ import {
 import { AppError } from './AppError';
 import { getOrCreateConversation } from "../chat/chat.helper";
 import { createRoseChatMessage } from "./rose.helper";
+import { createNotification } from "../notification/notification.service";
 
 export const sendRoseService = async (
   senderId: string,
@@ -124,7 +125,7 @@ export const sendRoseService = async (
   }
 
   // Execute transaction
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Deduct rose from balance
     const deduction = await deductRose(senderId, tx);
 
@@ -238,6 +239,27 @@ export const sendRoseService = async (
       },
     };
   });
+
+   // 🔔 Send notification AFTER transaction successfully commits
+  createNotification({
+    senderId,
+    receiverId,
+    type: "NEW_ROSE",
+    title: "You received a Rose 🌹",
+    message: "Someone sent you a rose 🌹",
+    data: {
+      roseId: result.data.rose.id,
+      senderId,
+      receiverId,
+      targetType,
+      targetId,
+      type: "ROSE",
+    },
+  }).catch((error) => {
+    console.error("Failed to send rose notification:", error);
+  });
+
+  return result;
 };
 
 export const getRoseBalanceService = async (

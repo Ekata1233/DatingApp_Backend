@@ -1047,44 +1047,107 @@ export const chatRepository = {
             ) ?? null;
 
           // --------------------------------------------------
-          // Latest message
+          // 18. Latest message - Chat list display content
           // --------------------------------------------------
 
-          const lastMessage =
-            (() => {
-              const message =
-                conversation.messages[0];
+          const lastMessage = (() => {
+            const message = conversation.messages[0];
 
-              if (!message) {
-                return null;
-              }
+            if (!message) {
+              return null;
+            }
 
-              let displayContent =
-                message.content;
+            let displayContent = message.content;
 
-              if (
-                message.messageType ===
-                "IMAGE"
-              ) {
+            switch (message.messageType) {
+              case MessageType.IMAGE:
+                displayContent = message.content
+                  ? `📷 ${message.content}`
+                  : "📷 Photo";
+                break;
+
+              case MessageType.VIDEO:
+                displayContent = message.content
+                  ? `🎥 ${message.content}`
+                  : "🎥 Video";
+                break;
+
+              case MessageType.TEXT:
+                displayContent = message.content ?? "";
+                break;
+
+              case MessageType.GIFT:
                 displayContent =
-                  message.content
-                    ? `📷 ${message.content}`
-                    : "📷Photo";
-              } else if (
-                message.messageType ===
-                "VIDEO"
-              ) {
-                displayContent =
-                  message.content
-                    ? `🎥 ${message.content}`
-                    : "🎥Video";
-              }
+                  message.senderId === userId
+                    ? "🎁 You sent a gift"
+                    : "🎁 You received a gift";
+                break;
 
-              return {
-                ...message,
-                content: displayContent,
-              };
-            })();
+              case MessageType.ROSE:
+                displayContent =
+                  message.senderId === userId
+                    ? "🌹 You sent a Rose"
+                    : "🌹 You received a Rose";
+                break;
+
+              case MessageType.COMPLIMENT:
+                displayContent =
+                  message.senderId === userId
+                    ? "💬 You sent a compliment"
+                    : "💬 You received a compliment";
+                break;
+
+              case MessageType.ENGAGEMENT:
+                displayContent =
+                  message.senderId === userId
+                    ? "✨ You sent a special interaction"
+                    : "✨ You received a special interaction";
+                break;
+
+              case MessageType.DATE_INVITE:
+                displayContent =
+                  message.senderId === userId
+                    ? "📅 You sent a date invite"
+                    : "📅 You received a date invite";
+                break;
+
+              case MessageType.DATE_CONFIRMED:
+                displayContent = "✅ Date confirmed";
+                break;
+
+              case MessageType.DATE_CANCELLED:
+                displayContent = "❌ Date cancelled";
+                break;
+
+              case MessageType.EVENT_INVITE:
+                displayContent =
+                  message.senderId === userId
+                    ? "📅 You sent an event invite"
+                    : "📅 You received an event invite";
+                break;
+
+              case MessageType.EVENT_CONFIRM:
+                displayContent = "✅ Event confirmed";
+                break;
+
+              case MessageType.EVENT_CANCEL:
+                displayContent = "❌ Event cancelled";
+                break;
+
+              case MessageType.SYSTEM:
+                displayContent = "ℹ️ System message";
+                break;
+
+              default:
+                displayContent = message.content ?? "New message";
+                break;
+            }
+
+            return {
+              ...message,
+              content: displayContent,
+            };
+          })();
 
           // --------------------------------------------------
           // Final response
@@ -1236,6 +1299,33 @@ export const chatRepository = {
             status: true,
             createdAt: true,
             updatedAt: true,
+          },
+        },
+        event: {
+          select: {
+            eventType: true,
+            title: true,
+            city: true,
+            eventTag: true,
+
+            eventDate: true,
+            startTime: true,
+            endTime: true,
+
+            venueName: true,
+            fullAddress: true,
+
+            menEntryPrice: true,
+            womenEntryPrice: true,
+            otherCapacity: true,
+
+            menDiscountedPrice: true,
+            womenDiscountedPrice: true,
+            otherDiscountedPrice: true,
+
+            heroImage: true,
+
+            safetyFeatures: true,
           },
         },
       },

@@ -61,6 +61,7 @@ import eventsRoutes from "../features/event/event.routes"
 import admirersRoutes from "../features/admirer/admirer.routes"
 import userRoutes from "../features/user/management/user.route"
 import engagementtRoutes from "../features/engagement/engagement.route"
+import notificationRoutes from "../features/notification/notification.routes";
 
 
 
@@ -138,6 +139,10 @@ router.use("/user", admirersRoutes);
 
 //ENGAGEMENT
 router.use("/user", engagementtRoutes);
+//
+
+//NOTIFICATIONS
+router.use("/user", notificationRoutes);
 //
 
 export default router;
