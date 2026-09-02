@@ -62,13 +62,13 @@ export async function getEventBookingPaymentSuccess(
     booking: {
       id: booking.id,
       bookingNumber: booking.bookingNumber,
-      ticketId: booking.ticketId,
+     
       ticketCount: booking.ticketCount,
       ticketAmount: Number(booking.ticketAmount),
       totalAmount: Number(booking.totalAmount),
       paidAmount: Number(booking.paidAmount),
       status: booking.status,
-      qrCodeUrl: booking.qrCodeUrl,
+      
     },
 
     payment: {

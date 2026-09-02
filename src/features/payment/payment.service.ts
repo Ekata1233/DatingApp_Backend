@@ -418,10 +418,10 @@ console.log("Ticket Type:", ticketType);
         .replace(/-/g, "")
         .slice(0, 8)}`;
 
-    const ticketId =
-      `TKT_${Date.now()}_${randomUUID()
-        .replace(/-/g, "")
-        .slice(0, 8)}`;
+    // const ticketId =
+    //   `TKT_${Date.now()}_${randomUUID()
+    //     .replace(/-/g, "")
+    //     .slice(0, 8)}`;
 
     booking =
       await prisma.eventBooking.create({
@@ -430,7 +430,7 @@ console.log("Ticket Type:", ticketType);
           eventId: event.id,
 
           bookingNumber,
-          ticketId,
+          // ticketId,
 
           ticketType,
           ticketCount,
