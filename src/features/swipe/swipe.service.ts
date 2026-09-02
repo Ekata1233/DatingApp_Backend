@@ -1,5 +1,5 @@
 
-import { Prisma } from "@prisma/client";
+import { NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { createNotification } from "../notification/notification.service";
 import {
@@ -120,8 +120,10 @@ export const handleSwipe = async (data: {
     createNotification({
       senderId: swiperId,
       receiverId: targetUserId,
-      type: action === "SUPERLIKE" ? "SUPERLIKE" : "LIKE",
-      title:
+      type:
+        action === "SUPERLIKE"
+          ? NotificationType.SUPER_LIKE
+          : NotificationType.NEW_LIKE, title:
         action === "SUPERLIKE"
           ? "New Super Like ⭐"
           : "New Like ❤️",
@@ -237,32 +239,32 @@ export const handleSwipe = async (data: {
   // Fire-and-forget match notifications
   // ------------------------------------------------------------
   Promise.all([
-  createNotification({
-    senderId: swiperId,
-    receiverId: targetUserId,
-    type: "MATCH",
-    title: "It's a Match! 🎉",
-    message: "You both liked each other ❤️",
-    data: {
-      matchId: match.id,
-      userId: swiperId,
-      type: "MATCH",
-    },
-  }),
+    createNotification({
+      senderId: swiperId,
+      receiverId: targetUserId,
+      type: NotificationType.NEW_MATCH,
+      title: "It's a Match! 🎉",
+      message: "You both liked each other ❤️",
+      data: {
+        matchId: match.id,
+        userId: swiperId,
+        type: "MATCH",
+      },
+    }),
 
-  createNotification({
-    senderId: targetUserId,
-    receiverId: swiperId,
-    type: "MATCH",
-    title: "It's a Match! 🎉",
-    message: "You both liked each other ❤️",
-    data: {
-      matchId: match.id,
-      userId: targetUserId,
-      type: "MATCH",
-    },
-  }),
-]).catch(console.error);
+    createNotification({
+      senderId: targetUserId,
+      receiverId: swiperId,
+      type: NotificationType.NEW_MATCH,
+      title: "It's a Match! 🎉",
+      message: "You both liked each other ❤️",
+      data: {
+        matchId: match.id,
+        userId: targetUserId,
+        type: "MATCH",
+      },
+    }),
+  ]).catch(console.error);
 
   return {
     matched: true,

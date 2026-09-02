@@ -256,7 +256,7 @@ export const sendComplimentService = async (
       createNotification({
         senderId,
         receiverId,
-        type: "COMPLIMENT",
+        type: "NEW_COMPLIMENT",
         title: "You received a Compliment 💬",
         message: "Someone sent you a compliment 💬",
         data: {

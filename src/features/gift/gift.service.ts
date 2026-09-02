@@ -206,7 +206,7 @@ export const sendGiftService = async (
   createNotification({
     senderId,
     receiverId,
-    type: "GIFT",
+    type: "NEW_GIFT",
     title: "You received a gift 🎁",
     message: "Someone sent you a gift 🎁",
     data: {
