@@ -1,3 +1,4 @@
+import { EventBookingStatus } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 
 export async function getEventBookingPaymentSuccess(
@@ -109,3 +110,95 @@ export async function getEventBookingPaymentSuccess(
     },
   };
 }
+
+
+
+interface GetUserEventBookingsParams {
+  userId: string;
+  status?: string;
+  page: number;
+  limit: number;
+}
+
+export const getUserEventBookingsService = async ({
+  userId,
+  status,
+  page,
+  limit,
+}: GetUserEventBookingsParams) => {
+  const skip = (page - 1) * limit;
+
+  const where: any = {
+    userId,
+  };
+
+  // Status filter
+  if (status && status !== "ALL") {
+    if (
+      !Object.values(EventBookingStatus).includes(
+        status as EventBookingStatus
+      )
+    ) {
+      throw new Error(`Invalid booking status: ${status}`);
+    }
+
+    where.status = status as EventBookingStatus;
+  }
+
+  const [bookings, total] = await Promise.all([
+    prisma.eventBooking.findMany({
+      where,
+
+      skip,
+      take: limit,
+
+      orderBy: {
+        createdAt: "desc",
+      },
+
+      select: {
+        id: true,
+        
+        paidAmount: true,
+
+        status: true,
+
+        
+
+        event: {
+          select: {
+            id: true,
+            title: true,
+            eventType: true,
+            eventDate: true,
+            startTime: true,
+            endTime: true,
+            venueName: true,
+            fullAddress: true,
+            latitude: true,
+            longitude: true,
+            heroImage: true,
+          },
+        },
+      },
+    }),
+
+    prisma.eventBooking.count({
+      where,
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    bookings,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    },
+  };
+};

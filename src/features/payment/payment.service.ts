@@ -175,40 +175,63 @@ export async function createPaymentLink(userId: string, body: any) {
   // has a different name.
   // ==========================================
 
-  const userProfile = await prisma.userProfile.findUnique({
+// ==========================================
+// 3. GET USER GENDER FROM AUTHENTICATED USER
+// ==========================================
+
+const user = await prisma.user.findUnique({
   where: {
-    user_id: userId,
+    id: userId,
   },
   select: {
-    interested_in: true,
+    id: true,
+    gender: true,
+    full_name: true,
+    email: true,
+    phone_number: true,
   },
 });
 
-if (!userProfile) {
-  throw new Error("User profile not found");
+if (!user) {
+  throw new Error("User not found");
 }
 
-  if (!userProfile) {
-    throw new Error("User profile not found");
-  }
+if (!user.gender) {
+  throw new Error("User gender is not set");
+}
 
-  let ticketType: "MEN" | "WOMEN" | "OTHER";
+// Event ticket type supports only:
+// MEN | WOMEN | OTHER
 
-  const gender = String(userProfile.interested_in || "")
-  .trim()
-  .toUpperCase();
-
-  if (["MALE", "MAN", "MEN"].includes(gender)) {
+let ticketType: "MEN" | "WOMEN" | "OTHER";
+if (!user.gender) {
+  throw new Error("User gender is not set");
+}
+switch (user.gender) {
+  case "MEN":
     ticketType = "MEN";
-  } else if (["FEMALE", "WOMAN", "WOMEN"].includes(gender)) {
+    break;
+
+  case "WOMEN":
     ticketType = "WOMEN";
-  } else {
+    break;
+
+  case "NON_BINARY":
+  case "TRANS_MAN":
+  case "TRANS_WOMAN":
+  case "OTHER":
+  case "PREFER_NOT_TO_SAY":
     ticketType = "OTHER";
-  }
+    break;
 
-  console.log("User Gender:", gender);
-  console.log("Ticket Type:", ticketType);
+  default:
+    throw new Error("Invalid user gender");
+}
 
+console.log("========== USER TICKET TYPE ==========");
+console.log("User ID:", user.id);
+console.log("User Gender:", user.gender);
+console.log("Ticket Type:", ticketType);
   // ==========================================
   // 4. TICKET COUNT
   // ==========================================
@@ -457,18 +480,22 @@ if (!userProfile) {
   }
 
   // Fetch authenticated user details
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      full_name: true,
-      email: true,
-      phone_number: true,
-    },
-  });
+ const user = await prisma.user.findUnique({
+  where: {
+    id: userId,
+  },
+  select: {
+    id: true,
+    gender: true,
+    full_name: true,
+    email: true,
+    phone_number: true,
+  },
+});
 
-  if (!user) {
-    throw new Error("User not found");
-  }
+if (!user) {
+  throw new Error("User not found");
+}
 
   const orderId = `ORD_${Date.now()}_${randomUUID().replace(/-/g, "")}`;
 
