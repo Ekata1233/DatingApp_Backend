@@ -2175,6 +2175,8 @@ enum MessageType {
   VIDEO
   AUDIO
   FILE
+  CONTACT
+  LOCATION
   DATE_INVITE
   DATE_CONFIRMED
   DATE_CANCELLED
@@ -2738,3 +2740,41 @@ model UserCompatibility {
   @@index([userId, score])
   @@index([userId, targetUserId])
 }
+
+enum LegalPageType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
+  COMMUNITY_GUIDELINES
+  DATING_SAFETY_TIPS
+  CHILD_SAFETY_STANDARDS
+  AGE_POLICY_18_PLUS
+  CONTENT_MODERATION_LAW_ENFORCEMENT
+  REFUND_CANCELLATION_POLICY
+  WALLET_COINS_TERMS
+  FOREVER_LOVE_PROGRAMME_TERMS
+  COOKIE_POLICY
+  DATA_YOUR_RIGHTS
+  VERIFICATION_ID_POLICY
+  DELETE_ACCOUNT_DATA
+  LICENSES_ACKNOWLEDGEMENTS
+  GRIEVANCE_OFFICER_REDRESSAL
+}
+
+model LegalPage {
+  id            String        @id @default(uuid()) @db.Uuid
+  pageType      LegalPageType @unique
+  title         String        @db.VarChar(255)
+  version       String        @db.VarChar(50)
+  content       Json
+  schemaVersion Int           @default(1)
+  effectiveFrom DateTime?
+  publishedAt   DateTime?
+  createdBy     String?       @db.Uuid
+  publishedBy   String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([pageType])
+  @@index([publishedAt])
+}
+ 
