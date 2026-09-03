@@ -100,8 +100,9 @@ model User {
   EventBooking        EventBooking[]
 
   //Notification
-  receivedNotifications Notification[] @relation("ReceivedNotifications")
-  sentNotifications     Notification[] @relation("SentNotifications")
+  receivedNotifications Notification[]      @relation("ReceivedNotifications")
+  sentNotifications     Notification[]      @relation("SentNotifications")
+  DatePlanUserBoost     DatePlanUserBoost[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -1052,36 +1053,36 @@ enum ResetPeriod {
   YEARLY
 }
 
-  model UserPackage {
-    id                    String        @id @default(uuid()) @db.Uuid
-    user_id               String        @db.Uuid
-    packageId             String        @db.Uuid
-    priceId               String        @db.Uuid
-    purchasePrice         Decimal
-    purchaseOriginalPrice Decimal?
-    purchaseDiscount      Int?
-    startDate             DateTime
-    endDate               DateTime?
-    status                PackageStatus @default(ACTIVE)
-    autoRenew             Boolean       @default(false)
-    paymentId             String?       @db.Uuid
-    payment               Payment?      @relation(fields: [paymentId], references: [id])
-    currentPackageId      String?       @db.Uuid
-    currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
+model UserPackage {
+  id                    String        @id @default(uuid()) @db.Uuid
+  user_id               String        @db.Uuid
+  packageId             String        @db.Uuid
+  priceId               String        @db.Uuid
+  purchasePrice         Decimal
+  purchaseOriginalPrice Decimal?
+  purchaseDiscount      Int?
+  startDate             DateTime
+  endDate               DateTime?
+  status                PackageStatus @default(ACTIVE)
+  autoRenew             Boolean       @default(false)
+  paymentId             String?       @db.Uuid
+  payment               Payment?      @relation(fields: [paymentId], references: [id])
+  currentPackageId      String?       @db.Uuid
+  currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-    package Package      @relation("packageRelation", fields: [packageId], references: [id])
-    price   PackagePrice @relation(fields: [priceId], references: [id])
+  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  package Package      @relation("packageRelation", fields: [packageId], references: [id])
+  price   PackagePrice @relation(fields: [priceId], references: [id])
 
-    @@index([user_id])
-    @@index([packageId])
-    @@index([status])
-    @@index([endDate])
-    @@map("user_packages")
-  }
+  @@index([user_id])
+  @@index([packageId])
+  @@index([status])
+  @@index([endDate])
+  @@map("user_packages")
+}
 
 model UserPlanUsage {
   id         String         @id @default(uuid()) @db.Uuid
@@ -1425,17 +1426,13 @@ model DatePlanOption {
 
   // Back Relations
 
-  activityPlans DatePlan[] @relation("PlanActivity")
-
-  quickTitlePlans DatePlan[] @relation("PlanQuickTitle")
-
-  whoPaysPlans DatePlan[] @relation("PlanWhoPays")
-
-  joinRequestGenderPlans DatePlan[] @relation("PlanJoinRequestGender")
-
-  visibilityPlans DatePlan[] @relation("PlanVisibility")
-
-  vibePlans DatePlanVibe[]
+  activityPlans          DatePlan[]        @relation("PlanActivity")
+  quickTitlePlans        DatePlan[]        @relation("PlanQuickTitle")
+  whoPaysPlans           DatePlan[]        @relation("PlanWhoPays")
+  joinRequestGenderPlans DatePlan[]        @relation("PlanJoinRequestGender")
+  visibilityPlans        DatePlan[]        @relation("PlanVisibility")
+  vibePlans              DatePlanVibe[]
+  datePlanRequests       DatePlanRequest[] @relation("DatePlanRequestBillSuggestion")
 
   @@index([type, isActive])
 }
@@ -1470,14 +1467,15 @@ model DatePlan {
 
   // Relations
 
-  user              User               @relation(fields: [userId], references: [id])
-  activity          DatePlanOption     @relation("PlanActivity", fields: [activityId], references: [id])
-  quickTitle        DatePlanOption?    @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
-  whoPays           DatePlanOption?    @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
-  joinRequestGender DatePlanOption?    @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
-  visibility        DatePlanOption?    @relation("PlanVisibility", fields: [visibilityId], references: [id])
+  user              User                @relation(fields: [userId], references: [id])
+  activity          DatePlanOption      @relation("PlanActivity", fields: [activityId], references: [id])
+  quickTitle        DatePlanOption?     @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
+  whoPays           DatePlanOption?     @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
+  joinRequestGender DatePlanOption?     @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
+  visibility        DatePlanOption?     @relation("PlanVisibility", fields: [visibilityId], references: [id])
   feedbacks         DatePlanFeedback[]
   reports           DatePlanReport[]
+  userBoosts        DatePlanUserBoost[]
 
   vibes         DatePlanVibe[]
   requests      DatePlanRequest[]
@@ -1516,15 +1514,17 @@ model DatePlanRequest {
   planId String @db.Uuid
 
   // Who sent request
-  requesterId String                @db.Uuid
-  status      DatePlanRequestStatus @default(PENDING)
-  message     String?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  requesterId      String                @db.Uuid
+  status           DatePlanRequestStatus @default(PENDING)
+  message          String?
+  billSuggestionId String?               @db.Uuid
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
   plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
-  requester User @relation(fields: [requesterId], references: [id])
+  requester      User            @relation(fields: [requesterId], references: [id])
+  billSuggestion DatePlanOption? @relation("DatePlanRequestBillSuggestion", fields: [billSuggestionId], references: [id])
 
   @@unique([planId, requesterId])
   @@index([planId])
@@ -1726,6 +1726,70 @@ model DatePlanTransaction {
   purchase DatePlanPurchase? @relation(fields: [purchaseId], references: [id])
 
   @@map("date_plan_transactions")
+}
+
+enum DatePlanUserBoostStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model DatePlanUserBoost {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  datePlanId           String                  @db.Uuid
+  datePlan             DatePlan                @relation(fields: [datePlanId], references: [id], onDelete: Cascade)
+  userId               String                  @db.Uuid
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boostOptionId        String                  @db.Uuid
+  boostOption          DatePlanBoostOption     @relation(fields: [boostOptionId], references: [id])
+  status               DatePlanUserBoostStatus @default(ACTIVE)
+  startedAt            DateTime                @default(now())
+  expiresAt            DateTime
+  viewCount            Int                     @default(0)
+  requestCount         Int                     @default(0)
+  approvedRequestCount Int                     @default(0)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([datePlanId])
+  @@index([userId])
+  @@index([boostOptionId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([datePlanId, status])
+}
+
+model DatePlanBoost {
+  id String @id @default(uuid()) @db.Uuid
+
+  title       String
+  description String?
+  isActive    Boolean @default(true)
+
+  options DatePlanBoostOption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DatePlanBoostOption {
+  id            String        @id @default(uuid()) @db.Uuid
+  boostId       String        @db.Uuid
+  title         String
+  durationHours Int
+  price         Decimal       @db.Decimal(10, 2)
+  currency      String        @default("INR") @db.VarChar(10)
+  isPopular     Boolean       @default(false)
+  sortOrder     Int           @default(0)
+  boost         DatePlanBoost @relation(fields: [boostId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  DatePlanUserBoost DatePlanUserBoost[]
+
+  @@unique([boostId, durationHours])
+  @@index([boostId])
+  @@index([sortOrder])
 }
 
 enum DatePlanTransactionType {
@@ -2777,4 +2841,3 @@ model LegalPage {
   @@index([pageType])
   @@index([publishedAt])
 }
- 

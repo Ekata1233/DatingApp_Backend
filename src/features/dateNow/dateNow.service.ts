@@ -531,43 +531,29 @@ export const getDatePlanRequests = async (userId: string, planId: string) => {
   return {
     plan: {
       id: plan.id,
-
       title: plan.title || plan.quickTitle?.label || plan.activity.label,
-
       activity: plan.activity.label,
-
       venueName: plan.venueName,
-
       venueAddress: plan.venueAddress,
-
       photoUrl: plan.photoUrl,
-
       requestsCount: plan.requests.length,
-
       participantLimit: plan.participantLimit,
     },
 
     requests: plan.requests.map((request) => ({
       id: request.id,
-
       status: request.status,
-
       compatibility: Math.floor(Math.random() * (95 - 75 + 1) + 75),
-
       message: request.message,
-
       requester: {
         id: request.requester.id,
-
         name: request.requester.full_name,
-
         age: request.requester.birth_date
           ? Math.floor(
               (Date.now() - new Date(request.requester.birth_date).getTime()) /
                 (365.25 * 24 * 60 * 60 * 1000),
             )
           : null,
-
         photo: request.requester.photos?.[0]?.media_url ?? null,
       },
     })),
