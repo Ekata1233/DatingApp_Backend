@@ -87,8 +87,8 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 
 router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute,eventPartnerRoutes);
-router.use("/user",waitlistRoutes,userRoutes,legalRoutes)
-
+router.use("/user",waitlistRoutes,userRoutes)
+router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 

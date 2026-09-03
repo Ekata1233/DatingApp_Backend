@@ -4,6 +4,7 @@ import {
 } from "./legal.types";
 import { renderBlocksToHtml } from "./legal.render";
 import { prisma } from "../../prisma/prismaClient";
+import { LegalPageType, Prisma } from "@prisma/client";
 
 export async function upsertLegalPageService(
   pageType: LegalPageType,

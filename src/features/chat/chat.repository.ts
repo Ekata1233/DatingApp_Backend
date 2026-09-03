@@ -30,7 +30,7 @@ export const chatRepository = {
   async findConversationBetweenUsers(userId: string, targetUserId: string) {
     return prisma.conversation.findFirst({
       where: {
-        AND: [
+        AND: [  
           {
             participants: {
               some: {
