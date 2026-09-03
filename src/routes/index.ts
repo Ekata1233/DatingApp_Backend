@@ -64,6 +64,7 @@ import engagementtRoutes from "../features/engagement/engagement.route"
 import notificationRoutes from "../features/notification/notification.routes";
 import onboardingRoutes from "../features/user/onboarding/onboarding.routes";
 import legalRoutes from "../features/legal/legal.routes";
+import datePlanBoostRoutes from "../features/admin/dateNow/datePlanBoost/datePlanBoost.routes";
 
 
 const router = Router();
@@ -123,7 +124,7 @@ router.use("/user",boostRoutes);
 
 router.use(
   "/admin/date-now",
-  dateNowAdminRoutes
+  dateNowAdminRoutes,datePlanBoostRoutes
 );
 router.use("/user/date-now", dateNowAdminRoutes);
 

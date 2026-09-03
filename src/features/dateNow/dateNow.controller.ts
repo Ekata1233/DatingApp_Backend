@@ -20,7 +20,7 @@ import {
   cancelDatePlanService,
   getDatePlanHistoryDetails,
 } from "./dateNow.service";
-import { planIdParamSchema, updateDatePlanActivitySchema } from "./dateNow.validation";
+import { planIdParamSchema, requestToJoinDatePlanSchema, updateDatePlanActivitySchema } from "./dateNow.validation";
 
 export const createDraftController = async (
   req: Request,
@@ -129,18 +129,27 @@ export const skipDatePlanController = async (req: Request, res: Response) => {
   }
 };
 
-export const requestToJoinController = async (req: Request, res: Response) => {
+export const requestToJoinController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const userId = (req as any).user.id;
+
     if (!userId) {
       throw new Error("User not authenticated");
     }
 
-    const message = req.body?.message || undefined;
+    const {
+      message,
+      billSuggestionId,
+    } = requestToJoinDatePlanSchema.parse(req.body);
+
     const request = await requestToJoinDatePlan(
       userId,
       req.params.id as string,
       message,
+      billSuggestionId,
     );
 
     res.json({
@@ -150,7 +159,9 @@ export const requestToJoinController = async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(400).json({
       success: false,
-      message: error.message,
+      message:
+        error?.issues?.[0]?.message ||
+        error.message,
     });
   }
 };

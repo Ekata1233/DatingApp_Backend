@@ -458,6 +458,7 @@ export const requestToJoinDatePlan = async (
   userId: string,
   planId: string,
   message?: string,
+  billSuggestionId?: string,
 ) => {
   const plan = await prisma.datePlan.findUnique({
     where: {
@@ -489,11 +490,30 @@ export const requestToJoinDatePlan = async (
     throw new Error("Already requested");
   }
 
+  // Validate bill suggestion if frontend sends it
+  if (billSuggestionId) {
+    const billSuggestion = await prisma.datePlanOption.findFirst({
+      where: {
+        id: billSuggestionId,
+        type: "WHO_PAYS",
+      },
+    });
+
+    if (!billSuggestion) {
+      throw new Error("Invalid bill suggestion");
+    }
+  }
+
   return prisma.datePlanRequest.create({
     data: {
       planId,
       requesterId: userId,
       message,
+      billSuggestionId,
+    },
+
+    include: {
+      billSuggestion: true,
     },
   });
 };
