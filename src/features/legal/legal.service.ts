@@ -1,7 +1,3 @@
-import {
-  LegalPageType,
-  Prisma,
-} from "@prisma/client";
 
 import {
   LegalDocumentContent,

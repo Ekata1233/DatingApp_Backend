@@ -62,8 +62,8 @@ import admirersRoutes from "../features/admirer/admirer.routes"
 import userRoutes from "../features/user/management/user.route"
 import engagementtRoutes from "../features/engagement/engagement.route"
 import notificationRoutes from "../features/notification/notification.routes";
+import onboardingRoutes from "../features/user/onboarding/onboarding.routes";
 import legalRoutes from "../features/legal/legal.routes";
-
 
 
 const router = Router();
@@ -144,6 +144,10 @@ router.use("/user", engagementtRoutes);
 
 //NOTIFICATIONS
 router.use("/user", notificationRoutes);
+//
+
+//ONBOARDING - DETAILS
+router.use("/user",onboardingRoutes);
 //
 
 export default router;

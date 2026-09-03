@@ -1,30 +1,49 @@
-// // src/modules/payment/payment.validation.ts
+import { z } from "zod";
 
-// import { z } from 'zod';
+export const createPaymentOrderSchema = z.object({
+  amount: z
+    .coerce
+    .number()
+    .positive("Amount must be greater than 0"),
 
-// export const createOrderSchema = z.object({
-//   userId: z.string().uuid('Invalid user ID'),
-//   packageId: z.string().uuid('Invalid package ID').optional(),
-//   amount: z.number().positive('Amount must be greater than 0'),
-//   currency: z.string().default('INR'),
-//   purpose: z.enum(['PACKAGE_PURCHASE', 'SUBSCRIPTION', 'WAITLIST', 'OTHER']),
-//   notes: z.record(z.any()).optional(),
-// });
+  currency: z
+    .string()
+    .length(3)
+    .default("INR"),
 
-// export const verifyPaymentSchema = z.object({
-//   razorpay_payment_id: z.string().min(1, 'Payment ID is required'),
-//   razorpay_order_id: z.string().min(1, 'Order ID is required'),
-//   razorpay_signature: z.string().min(1, 'Signature is required'),
-// });
+  purpose: z
+    .string()
+    .min(1, "Payment purpose is required"),
 
-// export const refundPaymentSchema = z.object({
-//   amount: z.number().positive('Amount must be greater than 0').optional(),
-// });
+  referenceId: z
+    .string()
+    .uuid()
+    .optional(),
 
-// export const paymentIdSchema = z.object({
-//   paymentId: z.string().uuid('Invalid payment ID'),
-// });
+  packagePriceId: z
+    .string()
+    .uuid()
+    .optional(),
+});
 
-// export const userIdSchema = z.object({
-//   userId: z.string().uuid('Invalid user ID'),
-// });
+export const verifyPaymentSchema = z.object({
+  razorpay_order_id: z
+    .string()
+    .min(1),
+
+  razorpay_payment_id: z
+    .string()
+    .min(1),
+
+  razorpay_signature: z
+    .string()
+    .min(1),
+});
+
+export type CreatePaymentOrderDTO = z.infer<
+  typeof createPaymentOrderSchema
+>;
+
+export type VerifyPaymentDTO = z.infer<
+  typeof verifyPaymentSchema
+>;
