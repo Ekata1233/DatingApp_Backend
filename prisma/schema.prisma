@@ -1052,36 +1052,36 @@ enum ResetPeriod {
   YEARLY
 }
 
-model UserPackage {
-  id                    String        @id @default(uuid()) @db.Uuid
-  user_id               String        @db.Uuid
-  packageId             String        @db.Uuid
-  priceId               String        @db.Uuid
-  purchasePrice         Decimal
-  purchaseOriginalPrice Decimal?
-  purchaseDiscount      Int?
-  startDate             DateTime
-  endDate               DateTime?
-  status                PackageStatus @default(ACTIVE)
-  autoRenew             Boolean       @default(false)
-  paymentId             String?       @db.Uuid
-  payment               Payment?      @relation(fields: [paymentId], references: [id])
-  currentPackageId      String?       @db.Uuid
-  currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
+  model UserPackage {
+    id                    String        @id @default(uuid()) @db.Uuid
+    user_id               String        @db.Uuid
+    packageId             String        @db.Uuid
+    priceId               String        @db.Uuid
+    purchasePrice         Decimal
+    purchaseOriginalPrice Decimal?
+    purchaseDiscount      Int?
+    startDate             DateTime
+    endDate               DateTime?
+    status                PackageStatus @default(ACTIVE)
+    autoRenew             Boolean       @default(false)
+    paymentId             String?       @db.Uuid
+    payment               Payment?      @relation(fields: [paymentId], references: [id])
+    currentPackageId      String?       @db.Uuid
+    currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
-  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  package Package      @relation("packageRelation", fields: [packageId], references: [id])
-  price   PackagePrice @relation(fields: [priceId], references: [id])
+    user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    package Package      @relation("packageRelation", fields: [packageId], references: [id])
+    price   PackagePrice @relation(fields: [priceId], references: [id])
 
-  @@index([user_id])
-  @@index([packageId])
-  @@index([status])
-  @@index([endDate])
-  @@map("user_packages")
-}
+    @@index([user_id])
+    @@index([packageId])
+    @@index([status])
+    @@index([endDate])
+    @@map("user_packages")
+  }
 
 model UserPlanUsage {
   id         String         @id @default(uuid()) @db.Uuid

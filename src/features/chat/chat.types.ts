@@ -65,4 +65,22 @@ export type MessageFilterType =
   | "rose"
   | "gift"
   | "compliment"
+  | "online"
   | "date";
+
+  export interface ChatUserDetails {
+  userId: string;
+  name: string | null;
+  age: number | null;
+  packageType: string | null;
+  isOnline: boolean;
+  lastSeenAt: Date | null;
+  isBlocked: boolean;
+  matchScore: number | null;
+  profileImage: string | null;
+}
+
+export interface ConversationDetailsResponse {
+  conversationId: string;
+  user: ChatUserDetails;
+}

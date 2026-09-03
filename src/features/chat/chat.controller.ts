@@ -436,3 +436,46 @@ export const inviteToEvent = async (
     });
   }
 };
+
+export const getConversationUserDetailsController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    /**
+     * User ID comes from JWT/auth middleware
+     */
+    const currentUserId = (req as any).user.id;
+
+    const { conversationId } = req.params;
+    if (typeof conversationId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid conversation ID",
+      });
+    }
+
+
+    const result =
+      await chatService.getProfileDetails(
+        conversationId,
+        currentUserId,
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversation user details fetched successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "Get conversation user details error:",
+      error,
+    );
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Something went wrong",
+    });
+  }
+};

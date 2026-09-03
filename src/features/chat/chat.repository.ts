@@ -30,7 +30,7 @@ export const chatRepository = {
   async findConversationBetweenUsers(userId: string, targetUserId: string) {
     return prisma.conversation.findFirst({
       where: {
-        AND: [  
+        AND: [
           {
             participants: {
               some: {
@@ -587,7 +587,7 @@ export const chatRepository = {
         })
         : [];
 
-        console.log("user presence : ", userPresence)
+    console.log("user presence : ", userPresence)
 
     // --------------------------------------------------
     // 8.2 Convert presence into Map
@@ -1736,6 +1736,194 @@ export const chatRepository = {
         // },
       },
     });
+  },
+
+  //CONVERSATION USER DETAILS WHICH IS AT TOP IN CHAT SECTION
+  async getConversationUserDetailsRepository(
+    conversationId: string,
+    currentUserId: string,
+  ) {
+
+     console.log("=== PROFILE REPOSITORY START ===");
+  console.log("conversationId:", conversationId);
+  console.log("currentUserId:", currentUserId);
+    /**
+     * 1. Find conversation and participants
+     */
+    const conversation = await prisma.conversation.findUnique({
+      where: {
+        id: conversationId,
+      },
+      include: {
+        participants: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+     console.log("conversation:", conversation);
+
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+
+    /**
+   * 2. Make sure current user belongs
+   *    to this conversation.
+   */
+  const currentParticipant = conversation.participants.find(
+    (participant) =>
+      participant.userId === currentUserId,
+  );
+
+  console.log(
+    "currentParticipant:",
+    currentParticipant,
+  );
+
+  if (!currentParticipant) {
+    throw new Error(
+      "You are not a participant of this conversation",
+    );
+  }
+
+
+    /**
+     * 2. Find the other participant
+     */
+    const otherParticipant = conversation.participants.find(
+      (participant) => participant.userId !== currentUserId,
+    );
+
+    console.log(
+    "otherParticipant:",
+    otherParticipant,
+  );
+
+    if (!otherParticipant) {
+      throw new Error("Other user not found in conversation");
+    }
+
+    const targetUserId = otherParticipant.userId;
+
+    console.log("targetUserId:", targetUserId);
+
+
+    /**
+     * 3. Fetch user details
+     */
+    const user = await prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      select: {
+        id: true,
+        full_name: true,
+        birth_date: true,
+
+        photos: {
+          orderBy: {
+            order: "asc",
+          },
+          select: {
+            media_url: true,
+          },
+          take: 1,
+        },
+
+        userPackages: {
+          where: {
+            status: "ACTIVE",
+            OR: [
+              {
+                endDate: null,
+              },
+              {
+                endDate: {
+                  gte: new Date(),
+                },
+              },
+            ],
+          },
+          orderBy: {
+            endDate: "desc",
+          },
+          take: 1,
+          include: {
+            package: true,
+          },
+        },
+      },
+    });
+
+    console.log("target user:", user);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    /**
+     * 4. Get match score
+     *
+     * Check both directions because your UserCompatibility
+     * has userId and targetUserId.
+     */
+    const compatibility = await prisma.userCompatibility.findFirst({
+      where: {
+        OR: [
+          {
+            userId: currentUserId,
+            targetUserId: targetUserId,
+          },
+          {
+            userId: targetUserId,
+            targetUserId: currentUserId,
+          },
+        ],
+      },
+      select: {
+        score: true,
+        percentage: true,
+      },
+    });
+
+    /**
+     * 5. Check block status
+     *
+     * If either user has blocked the other, return true.
+     */
+    const block = await prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          {
+            blockerId: currentUserId,
+            blockedId: targetUserId,
+          },
+          {
+            blockerId: targetUserId,
+            blockedId: currentUserId,
+          },
+        ],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+
+    return {
+      conversationId,
+      targetUserId,
+
+      user,
+
+      matchScore: compatibility?.percentage ?? compatibility?.score ?? null,
+
+      isBlocked: !!block,
+    };
+    
   },
 
 };
