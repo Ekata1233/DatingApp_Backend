@@ -63,7 +63,7 @@ import userRoutes from "../features/user/management/user.route"
 import engagementtRoutes from "../features/engagement/engagement.route"
 import notificationRoutes from "../features/notification/notification.routes";
 import onboardingRoutes from "../features/user/onboarding/onboarding.routes";
-
+import legalRoutes from "../features/legal/legal.routes";
 
 
 const router = Router();
@@ -88,7 +88,7 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute,eventPartnerRoutes);
 router.use("/user",waitlistRoutes,userRoutes)
-
+router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
