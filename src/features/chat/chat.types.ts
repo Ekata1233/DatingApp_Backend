@@ -39,6 +39,7 @@ export type ConversationFilter =
   | "online"
   | "nearby"
   | "date_invite"
+  | "event"
   | "gift";
 
 export interface MarkConversationReadInput {
@@ -66,6 +67,7 @@ export type MessageFilterType =
   | "gift"
   | "compliment"
   | "online"
+  | "event"
   | "date";
 
   export interface ChatUserDetails {

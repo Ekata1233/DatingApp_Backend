@@ -79,6 +79,8 @@ type: z
       "gift",
       "compliment",
       "date",
+      "online",
+      "event",
     ])
     .default("all"),
     
@@ -100,6 +102,7 @@ export const getConversationsSchema = z.object({
       "online",
       "nearby",
       "date_invite",
+      "event",
       "gift",
     ])
     .default("all"),

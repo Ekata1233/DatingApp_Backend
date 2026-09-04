@@ -19,8 +19,10 @@ import {
   updateDatePlanActivityService,
   cancelDatePlanService,
   getDatePlanHistoryDetails,
+  dateNowInviteMessage,
 } from "./dateNow.service";
 import { planIdParamSchema, requestToJoinDatePlanSchema, updateDatePlanActivitySchema } from "./dateNow.validation";
+import { getIO } from "../../config/socket";
 
 export const createDraftController = async (
   req: Request,
@@ -191,28 +193,86 @@ export const getDatePlanRequestsController = async (
 };
 
 export const approveDatePlanRequestController = async (
-  req: Request,
-  res: Response,
-) => {
-  try {
-    const userId = (req as any).user.id;
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      const userId =
+        (req as any).user.id;
 
-    const request = await approveDatePlanRequest(
-      userId,
-      req.params.requestId as string,
-    );
+      const requestId =
+        req.params.requestId as string;
 
-    res.json({
-      success: true,
-      data: request,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+      if (!requestId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Request ID is required",
+        });
+      }
+
+      const result =
+        await approveDatePlanRequest(
+          userId,
+          requestId,
+        );
+
+      // ======================================
+      // SOCKET.IO
+      // ======================================
+
+      const io = getIO();
+
+      // Requested user receives
+      // DATE_CONFIRMED instantly
+      io.to(
+        `user:${result.receiverId}`,
+      ).emit(
+        "message:receive",
+        result.message,
+      );
+
+      // Optional:
+      // update sender's other devices too
+      io.to(
+        `user:${result.senderId}`,
+      ).emit(
+        "message:receive",
+        result.message,
+      );
+
+      return res.status(200).json({
+        success: true,
+
+        message:
+          "Date request approved successfully",
+
+        data: {
+          confirmedDateId:
+            result.confirmedDateId,
+
+          conversationId:
+            result.conversation.id,
+
+          message:
+            result.message,
+        },
+      });
+    } catch (error: any) {
+      console.error(
+        "approveDatePlanRequestController error:",
+        error,
+      );
+
+      return res.status(400).json({
+        success: false,
+
+        message:
+          error.message ||
+          "Failed to approve Date Plan request",
+      });
+    }
+  };
 
 export const declineDatePlanRequestController = async (
   req: Request,
@@ -458,6 +518,7 @@ export const getDatePlanHistoryController = async (
     next(error);
   }
 };
+
 export const getDatePlanHistoryDetailsController = async (
   req: Request,
   res: Response,
@@ -482,8 +543,6 @@ export const getDatePlanHistoryDetailsController = async (
     next(error);
   }
 };
-
-
 
 export const updateDatePlanActivityController = async (
   req: Request,
@@ -590,6 +649,73 @@ export const cancelDatePlanController = async (
     return res.status(400).json({
       success: false,
       message: error.message || "Failed to cancel date plan",
+    });
+  }
+};
+
+export const inviteToDatePlan = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const senderId = (req as any).user.id;
+
+    const { datePlanId } = req.params;
+    const { receiverId } = req.body;
+
+    if (
+      typeof datePlanId !== "string" ||
+      !datePlanId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Date Plan ID",
+      });
+    }
+
+    if (!receiverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Receiver ID is required",
+      });
+    }
+
+    const result =
+      await dateNowInviteMessage.inviteToDatePlan(
+        senderId,
+        receiverId,
+        datePlanId,
+      );
+
+    // ========================================
+    // SOCKET.IO
+    // ========================================
+
+    const io = getIO();
+
+    io.to(`user:${receiverId}`).emit(
+      "message:receive",
+      result.message,
+    );
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Date invitation sent successfully",
+      data: result.message,
+    });
+  } catch (error) {
+    console.error(
+      "inviteToDatePlan error:",
+      error,
+    );
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to send Date invitation",
     });
   }
 };
