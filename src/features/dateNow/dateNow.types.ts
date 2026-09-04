@@ -57,3 +57,8 @@ export interface UpdateDatePlanActivityResponse {
   };
   updatedAt: Date;
 }
+
+export interface RequestToJoinDatePlanInput {
+  message?: string;
+  billSuggestionId?: string;
+}

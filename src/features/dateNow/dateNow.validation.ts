@@ -43,3 +43,16 @@ export const planIdParamSchema = z.object({
     .string()
     .uuid("Invalid planId"),
 });
+
+export const requestToJoinDatePlanSchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .max(500, "Message cannot exceed 500 characters")
+    .optional(),
+
+  billSuggestionId: z
+    .string()
+    .uuid("Invalid billSuggestionId")
+    .optional(),
+});

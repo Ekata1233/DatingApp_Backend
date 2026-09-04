@@ -461,6 +461,7 @@ export const requestToJoinDatePlan = async (
   userId: string,
   planId: string,
   message?: string,
+  billSuggestionId?: string,
 ) => {
   const plan = await prisma.datePlan.findUnique({
     where: {
@@ -492,11 +493,30 @@ export const requestToJoinDatePlan = async (
     throw new Error("Already requested");
   }
 
+  // Validate bill suggestion if frontend sends it
+  if (billSuggestionId) {
+    const billSuggestion = await prisma.datePlanOption.findFirst({
+      where: {
+        id: billSuggestionId,
+        type: "WHO_PAYS",
+      },
+    });
+
+    if (!billSuggestion) {
+      throw new Error("Invalid bill suggestion");
+    }
+  }
+
   return prisma.datePlanRequest.create({
     data: {
       planId,
       requesterId: userId,
       message,
+      billSuggestionId,
+    },
+
+    include: {
+      billSuggestion: true,
     },
   });
 };
@@ -1036,6 +1056,7 @@ export const getMyDatePlanRequests = async (userId: string) => {
     },
 
     include: {
+      billSuggestion: true,
       plan: {
         include: {
           activity: true,
@@ -1076,6 +1097,19 @@ export const getMyDatePlanRequests = async (userId: string) => {
     id: request.id,
     status: request.status,
     message: request.message,
+   
+    billSuggestionId: request.billSuggestionId,
+
+  
+    billSuggestion: request.billSuggestion
+      ? {
+          id: request.billSuggestion.id,
+          type: request.billSuggestion.type,
+          label: request.billSuggestion.label,
+          value: request.billSuggestion.value,
+          icon: request.billSuggestion.icon,
+        }
+      : null,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
 
