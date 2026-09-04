@@ -312,29 +312,85 @@ export const updateGiftService = async (
 /**
  * Get All Gifts
  */
-export const getAllGiftService = async () => {
-  // 1. Check Redis
-  const cached = await redis.get(ALL_GIFT_CACHE_KEY);
+/**
+ * Get All Gifts
+ * Optional category wise filter
+ */
+export const getAllGiftService = async (
+  categoryId?: number
+) => {
+  // ==========================================
+  // CACHE KEY
+  // ==========================================
+
+  const CACHE_KEY = categoryId
+    ? `gift:category:${categoryId}`
+    : ALL_GIFT_CACHE_KEY;
+
+  // ==========================================
+  // 1. CHECK REDIS
+  // ==========================================
+
+  const cached = await redis.get(CACHE_KEY);
 
   if (cached) {
-    console.log("✅ Gifts from Redis");
+    console.log(
+      categoryId
+        ? `✅ Gifts category ${categoryId} from Redis`
+        : "✅ All Gifts from Redis"
+    );
+
     return cached;
   }
 
-  console.log("📦 Gifts from Database");
+  console.log(
+    categoryId
+      ? `📦 Gifts category ${categoryId} from Database`
+      : "📦 All Gifts from Database"
+  );
 
-  // 2. Fetch from Database
+  // ==========================================
+  // 2. OPTIONAL CATEGORY VALIDATION
+  // ==========================================
+
+  if (categoryId) {
+    const category =
+      await prisma.giftCategory.findUnique({
+        where: {
+          id: categoryId,
+        },
+      });
+
+    if (!category) {
+      throw new Error("Gift category not found");
+    }
+  }
+
+  // ==========================================
+  // 3. FETCH GIFTS
+  // ==========================================
+
   const gifts = await prisma.gift.findMany({
+    where: {
+      ...(categoryId && {
+        categoryId,
+      }),
+    },
+
     include: {
       category: true,
     },
+
     orderBy: {
       createdAt: "desc",
     },
   });
 
-  // 3. Save to Redis
-  await redis.set(ALL_GIFT_CACHE_KEY, gifts, {
+  // ==========================================
+  // 4. SAVE REDIS
+  // ==========================================
+
+  await redis.set(CACHE_KEY, gifts, {
     ex: 600,
   });
 

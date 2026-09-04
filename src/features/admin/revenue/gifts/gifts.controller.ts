@@ -340,17 +340,40 @@ export const updateGiftController = async (
 /**
  * Get All Gifts
  */
+/**
+ * Get All Gifts
+ * GET /gift/list
+ * GET /gift/list?categoryId=1
+ */
 export const getAllGiftController = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const gifts = await getAllGiftService();
+    const categoryId = req.query.categoryId
+      ? Number(req.query.categoryId)
+      : undefined;
+
+    // ================= VALIDATION =================
+
+    if (
+      req.query.categoryId &&
+      (Number.isNaN(categoryId) || categoryId! <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid categoryId.",
+      });
+    }
+
+    const gifts = await getAllGiftService(categoryId);
 
     return res.status(200).json({
       success: true,
-      message: "Gift list fetched successfully.",
+      message: categoryId
+        ? "Category wise gift list fetched successfully."
+        : "Gift list fetched successfully.",
       data: gifts,
     });
   } catch (error) {
