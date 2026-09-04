@@ -19,6 +19,7 @@ import {
   updateDatePlanActivityController,
   cancelDatePlanController,
   getDatePlanHistoryDetailsController,
+  inviteToDatePlan,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -129,4 +130,11 @@ router.patch(
   authMiddleware,
   cancelDatePlanController
 );
+
+router.post(
+  "/date-plan/:datePlanId/invite",
+  authMiddleware,
+  inviteToDatePlan,
+);
+
 export default router;

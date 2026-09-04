@@ -1744,9 +1744,9 @@ export const chatRepository = {
     currentUserId: string,
   ) {
 
-     console.log("=== PROFILE REPOSITORY START ===");
-  console.log("conversationId:", conversationId);
-  console.log("currentUserId:", currentUserId);
+    console.log("=== PROFILE REPOSITORY START ===");
+    console.log("conversationId:", conversationId);
+    console.log("currentUserId:", currentUserId);
     /**
      * 1. Find conversation and participants
      */
@@ -1763,7 +1763,7 @@ export const chatRepository = {
       },
     });
 
-     console.log("conversation:", conversation);
+    console.log("conversation:", conversation);
 
     if (!conversation) {
       throw new Error("Conversation not found");
@@ -1773,21 +1773,21 @@ export const chatRepository = {
    * 2. Make sure current user belongs
    *    to this conversation.
    */
-  const currentParticipant = conversation.participants.find(
-    (participant) =>
-      participant.userId === currentUserId,
-  );
-
-  console.log(
-    "currentParticipant:",
-    currentParticipant,
-  );
-
-  if (!currentParticipant) {
-    throw new Error(
-      "You are not a participant of this conversation",
+    const currentParticipant = conversation.participants.find(
+      (participant) =>
+        participant.userId === currentUserId,
     );
-  }
+
+    console.log(
+      "currentParticipant:",
+      currentParticipant,
+    );
+
+    if (!currentParticipant) {
+      throw new Error(
+        "You are not a participant of this conversation",
+      );
+    }
 
 
     /**
@@ -1798,9 +1798,9 @@ export const chatRepository = {
     );
 
     console.log(
-    "otherParticipant:",
-    otherParticipant,
-  );
+      "otherParticipant:",
+      otherParticipant,
+    );
 
     if (!otherParticipant) {
       throw new Error("Other user not found in conversation");
@@ -1923,7 +1923,7 @@ export const chatRepository = {
 
       isBlocked: !!block,
     };
-    
+
   },
 
 };

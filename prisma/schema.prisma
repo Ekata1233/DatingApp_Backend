@@ -1481,6 +1481,7 @@ model DatePlan {
   requests      DatePlanRequest[]
   skips         DatePlanSkip[]
   DateConfirmed DateConfirmed?
+  chatMessages  ChatMessage[]     @relation("DatePlanChatMessages")
 
   @@index([userId])
   @@index([activityId])
@@ -1844,6 +1845,8 @@ model ChatMessage {
   gift           UserGift?       @relation(fields: [giftId], references: [id], onDelete: SetNull)
   eventId        String?         @db.Uuid
   event          Event?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  datePlanId     String?         @db.Uuid
+  datePlan       DatePlan?       @relation("DatePlanChatMessages", fields: [datePlanId], references: [id], onDelete: SetNull)
 
   conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User                  @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -2268,6 +2271,8 @@ enum NotificationType {
   SUBSCRIPTION_EXPIRING
   BOOST_STARTED
   BOOST_EXPIRING
+  DATE_CONFIRMED
+  DATE_INVITE
 }
 
 enum Gender {
