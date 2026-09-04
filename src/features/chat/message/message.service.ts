@@ -25,6 +25,8 @@ export const messageService = {
      * 1. Check whether sender belongs
      *    to the conversation.
      */
+
+    console.log("data in message service : ", data);
     const participant =
       await messageRepository.findConversationParticipant(
         data.conversationId,
@@ -109,6 +111,7 @@ export const messageService = {
         content: data.content,
         messageType: data.messageType,
         mediaUrl: data.mediaUrl,
+        metadata: data.metadata,
       });
 
     return message;

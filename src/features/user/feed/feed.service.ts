@@ -21,6 +21,10 @@ type UserSiblingWithDetails = Prisma.UserSiblingGetPayload<{
   };
 }>;
 
+type FeedCursorMode =
+  | "LOCATION"
+  | "FALLBACK";
+
 export const calculateAge = (
   birthDate: Date | string | null
 ): number | null => {
@@ -98,7 +102,7 @@ const ORIENTATION_COL = "sexual_orientation";
 // =========================
 // CURSOR (keyset)
 // =========================
-type Cursor = { k: number; id: string };
+type Cursor = { k: number; id: string ; mode?: FeedCursorMode; };
 
 const encodeCursor = (c: Cursor): string =>
   Buffer.from(JSON.stringify(c)).toString("base64url");
@@ -119,678 +123,2718 @@ const decodeCursor = (raw?: string | null): Cursor | null => {
 // =========================
 // FEED SERVICE (OPTIMIZED - MINIMAL DATA FETCH)
 // =========================
+// export const getFeedService = async ({
+//   userId,
+//   cursor,
+//   limit,
+//   filters,
+// }: FeedParams) => {
+//   const pageLimit = limit ?? DEFAULT_PAGE_LIMIT;
+//   const decodedCursor = decodeCursor(cursor as string | undefined);
+//   const now = new Date();
+
+//   // -------------------------
+//   // 1. CURRENT USER - MINIMAL FIELDS FOR FILTERING ONLY
+//   // -------------------------
+//   const USER_CACHE_TTL = 60 * 10; // 10 minutes
+//   const USER_CACHE_KEY = `feed:user:${userId}`;
+
+//   const currentUserPromise = async () => {
+//     const cached = await redis.get<any>(USER_CACHE_KEY);
+
+//     if (cached) {
+//       return cached;
+//     }
+
+//     // ONLY fetch fields needed for filtering - no bio, eduWork, photos, answers
+//     const user = await prisma.user.findUnique({
+//       where: { id: userId },
+//       select: {
+//         id: true,
+//         gender: true,
+//         profile: {
+//           select: {
+//             interested_in: true,
+//             sexual_orientation: true,
+//             latitude: true,
+//             longitude: true,
+//             max_distance_km: true,
+//           },
+//         },
+//       },
+//     });
+
+//     if (user) {
+//       await redis.set(USER_CACHE_KEY, user, {
+//         ex: USER_CACHE_TTL,
+//       });
+//     }
+
+//     return user;
+//   };
+
+//   // -------------------------
+//   // 2. ACTIVE BOOSTS
+//   // -------------------------
+
+//   const formatBirthDate = (date: Date | string | null): string | null => {
+//     if (!date) return null;
+
+//     const d = new Date(date);
+//     if (isNaN(d.getTime())) return null;
+
+//     const day = String(d.getDate()).padStart(2, '0');
+//     const month = String(d.getMonth() + 1).padStart(2, '0');
+//     const year = d.getFullYear();
+
+//     return `${day}-${month}-${year}`;
+//   };
+
+//   const start = performance.now();
+
+//   await prisma.$queryRaw`
+//   SELECT 1;
+// `;
+
+//   console.log(
+//     "SELECT 1:",
+//     performance.now() - start,
+//     "ms"
+//   );
+
+//   const start1 = performance.now();
+//   const [currentUser] = await Promise.all([
+//     currentUserPromise(),
+//     // REMOVED: boostPromise() - Don't fetch all boosts upfront!
+//   ]);
+//   console.log(
+//     "current user + boosts:",
+//     performance.now() - start1
+//   );
+
+//   if (!currentUser || !currentUser.profile) {
+//     throw new Error("User profile not found");
+//   }
+
+//   // -------------------------
+//   // VIP PACKAGE CHECK
+//   // VIP + VIP_ELITE
+//   // -------------------------
+
+//   // -------------------------
+//   // VIP / VIP_ELITE PACKAGE CHECK
+//   // -------------------------
+
+//   const activeVipPackage = await prisma.userPackage.findFirst({
+//     where: {
+//       user_id: userId,
+//       status: "ACTIVE",
+
+//       package: {
+//         name: {
+//           in: ["VIP", "VIP_ELITE"],
+//         },
+//       },
+
+//       OR: [
+//         {
+//           endDate: null,
+//         },
+//         {
+//           endDate: {
+//             gt: new Date(),
+//           },
+//         },
+//       ],
+//     },
+//     select: {
+//       id: true,
+//       package: {
+//         select: {
+//           name: true,
+//         },
+//       },
+//     },
+//   });
+
+//   const hasActiveVip = !!activeVipPackage;
+
+//   console.log("ACTIVE VIP PACKAGE:", activeVipPackage);
+//   console.log("HAS ACTIVE VIP/VIP_ELITE:", hasActiveVip);
+//   // const boostedUserIds = new Set(activeBoosts.map((b) => b.user_id));
+
+//   const { interested_in, sexual_orientation } = currentUser.profile;
+//   const { gender } = currentUser;
+
+//   if (!gender || !interested_in) {
+//     throw new Error("Required fields missing");
+//   }
+
+//   const myGender = gender.toUpperCase();
+//   const myInterest = interested_in.toUpperCase();
+//   const myOrientation = (sexual_orientation ?? "").toUpperCase();
+
+//   const myLatitude = Number(currentUser.profile.latitude);
+//   const myLongitude = Number(currentUser.profile.longitude);
+//   const maxDistance = currentUser.profile.max_distance_km ?? 50;
+
+//   // -------------------------
+//   // 3. PRECOMPUTE MATCH FILTERS
+//   // -------------------------
+//   const genderFilter = getGenderFromInterest(myInterest);
+
+//   const interestedInFilter = ALL_INTEREST_VALUES.filter((v) =>
+//     getGenderFromInterest(v).includes(myGender),
+//   );
+
+//   const orientationForward = getOrientationCompatibility(myOrientation);
+//   const orientationReverse = ALL_ORIENTATIONS.filter((o) =>
+//     getOrientationCompatibility(o).includes(myOrientation),
+//   );
+
+//   if (orientationForward.length === 0 || orientationReverse.length === 0) {
+//     return { users: [], nextCursor: null };
+//   }
+
+//   // -------------------------
+//   // UI structured filters
+//   // -------------------------
+//   // -------------------------
+//   // VIP-ONLY FILTER CHECK
+//   // -------------------------
+
+//   if (
+//     filters?.ambitionIds &&
+//     filters.ambitionIds.length > 0
+//   ) {
+//     if (!hasActiveVip) {
+//       return {
+//         users: [],
+//         nextCursor: null,
+//         filterRestricted: true,
+//         message: "Ambition filter is available only for VIP and VIP Elite users.",
+//       };
+//     }
+//   }
+
+
+
+//   // -------------------------
+//   // FAMILY INCOME RANGE
+//   // VIP ONLY
+//   // -------------------------
+
+//   let familyIncomeIds: number[] = [];
+
+//   if (
+//     filters?.familyIncomeMin !== undefined ||
+//     filters?.familyIncomeMax !== undefined
+//   ) {
+//     // Check VIP access
+//     if (!hasActiveVip) {
+//       return {
+//         users: [],
+//         nextCursor: null,
+//         filterRestricted: true,
+//         message:
+//           "Family income filter is available only for VIP and VIP Elite users.",
+//       };
+//     }
+
+//     const minAmount = filters.familyIncomeMin ?? 0;
+//     const maxAmount =
+//       filters.familyIncomeMax ?? Number.MAX_SAFE_INTEGER;
+
+//     const matchingIncomeRanges =
+//       await prisma.familyIncome.findMany({
+//         where: {
+//           active: true,
+
+//           AND: [
+//             {
+//               minAmount: {
+//                 lte: maxAmount,
+//               },
+//             },
+//             {
+//               OR: [
+//                 {
+//                   maxAmount: null,
+//                 },
+//                 {
+//                   maxAmount: {
+//                     gte: minAmount,
+//                   },
+//                 },
+//               ],
+//             },
+//           ],
+//         },
+
+//         select: {
+//           id: true,
+//           title: true,
+//           minAmount: true,
+//           maxAmount: true,
+//         },
+//       });
+
+//     familyIncomeIds = matchingIncomeRanges.map(
+//       (income) => income.id
+//     );
+
+//     console.log(
+//       "MATCHING FAMILY INCOME:",
+//       matchingIncomeRanges
+//     );
+
+//     console.log(
+//       "MATCHING FAMILY INCOME IDS:",
+//       familyIncomeIds
+//     );
+//   }
+
+//   if (
+//     filters?.networkingIntentIds &&
+//     filters.networkingIntentIds.length > 0
+//   ) {
+//     if (!hasActiveVip) {
+//       return {
+//         users: [],
+//         nextCursor: null,
+//         filterRestricted: true,
+//         message:
+//           "Networking Intent filter is available only for active VIP or VIP Elite users.",
+//       };
+//     }
+//   }
+//   // -------------------------
+//   // BUILD FILTER QUERY
+//   // -------------------------
+
+//   const filterQuery = filters
+//     ? buildFilterQuery({
+//       ...filters,
+//       familyIncomeIds,
+//     })
+//     : { where: {} };
+
+//   // -------------------------
+//   // DISTANCE
+//   // -------------------------
+
+//   const distanceKm =
+//     filters?.distanceKm ||
+//     currentUser.profile.max_distance_km ||
+//     50;
+
+//   console.log(
+//     "FINAL FILTER QUERY:",
+//     JSON.stringify(filterQuery, null, 2)
+//   );
+
+//   const userFilters = Object.fromEntries(
+//     Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
+//   );
+//   const profileFilters = filterQuery.where?.profile?.is || {};
+
+//   const hasManualLocationFilter =
+//     !!filters?.location?.city ||
+//     !!filters?.location?.state ||
+//     !!filters?.location?.country;
+
+//   // -------------------------
+//   // SQL fragments
+//   // -------------------------
+//   const orientCol = Prisma.raw(`${ORIENTATION_TABLE}.${ORIENTATION_COL}`);
+//   const me = Prisma.sql`ST_SetSRID(ST_MakePoint(${myLongitude}, ${myLatitude}), 4326)::geography`;
+
+//   const matchConditions = Prisma.sql`
+//     u.deleted_at IS NULL
+//     AND u.id <> ${userId}::uuid
+//     AND NOT EXISTS (
+//       SELECT 1 FROM swipes s
+//       WHERE s."swiperId" = ${userId}::uuid AND s."targetUserId" = u.id
+//     )
+//     AND NOT EXISTS (
+//       SELECT 1 FROM "UserBlock" b
+//       WHERE (b."blockerId"::uuid = ${userId}::uuid AND b."blockedId"::uuid = u.id)
+//          OR (b."blockedId"::uuid = ${userId}::uuid AND b."blockerId"::uuid = u.id)
+//     )
+//     AND u.gender::text = ANY(ARRAY[${Prisma.join(genderFilter)}]::text[])
+//     AND p.interested_in::text = ANY(ARRAY[${Prisma.join(interestedInFilter)}]::text[])
+//     AND ${orientCol}::text = ANY(ARRAY[${Prisma.join(orientationForward)}]::text[])
+//     AND ${orientCol}::text = ANY(ARRAY[${Prisma.join(orientationReverse)}]::text[])
+//   `;
+
+//   // -------------------------
+//   // Page fetch loop
+//   // -------------------------
+//   const batchSize = Math.max(pageLimit * OVERFETCH, 30);
+//   const collected: any[] = [];
+//   const meterById = new Map<string, number>();
+
+//   let cursorState: Cursor | null = decodedCursor;
+//   let nextCursor: string | null = null;
+//   let filledCursor: Cursor | null = null;
+
+//   for (let round = 0; round < MAX_ROUNDS && collected.length < pageLimit; round++) {
+//     let rows: { id: string; sort_val: number }[];
+
+//     if (hasManualLocationFilter) {
+//       const candidateStart = performance.now();
+//       rows = await prisma.$queryRaw<{ id: string; sort_val: number }[]>`
+//         SELECT
+//           u.id,
+//           (EXTRACT(EPOCH FROM u.created_at) * 1000)::float8 AS sort_val
+//         FROM users u
+//         JOIN user_profiles p ON p.user_id = u.id
+//         WHERE ${matchConditions}
+//           ${cursorState
+//           ? Prisma.sql`AND (
+//                 (EXTRACT(EPOCH FROM u.created_at) * 1000) < ${cursorState.k}
+//                 OR ((EXTRACT(EPOCH FROM u.created_at) * 1000) = ${cursorState.k} AND u.id < ${cursorState.id}::uuid)
+//               )`
+//           : Prisma.empty}
+//         ORDER BY sort_val DESC, u.id DESC
+//         LIMIT ${batchSize};
+//       `;
+//       console.log(
+//         `candidate query round ${round}:`,
+//         performance.now() - candidateStart,
+//         "ms",
+//         "rows:",
+//         rows.length
+//       );
+//     } else {
+//       const distanceLimit = distanceKm;
+//       const candidateStart = performance.now();
+//       rows = await prisma.$queryRaw<{ id: string; sort_val: number }[]>`
+//         SELECT
+//           u.id,
+//           (p.location::geography <-> ${me})::float8 AS sort_val
+//         FROM users u
+//         JOIN user_profiles p ON p.user_id = u.id
+//         WHERE ${matchConditions}
+//           AND ST_DWithin(p.location::geography, ${me}, ${distanceLimit * 1000})
+//           ${cursorState
+//           ? Prisma.sql`AND (
+//                 (p.location::geography <-> ${me}) > ${cursorState.k}
+//                 OR (
+//                   (p.location::geography <-> ${me}) = ${cursorState.k}
+//                   AND u.id > ${cursorState.id}::uuid
+//                 )
+//               )`
+//           : Prisma.empty}
+//         ORDER BY p.location::geography <-> ${me} ASC, u.id ASC
+//         LIMIT ${batchSize};
+//       `;
+//       console.log(
+//         `candidate query round ${round}:`,
+//         performance.now() - candidateStart,
+//         "ms",
+//         "rows:",
+//         rows.length
+//       );
+//     }
+
+//     if (rows.length === 0) break;
+
+//     if (!hasManualLocationFilter) {
+//       for (const r of rows) meterById.set(r.id, Number(r.sort_val));
+//     }
+
+//     // -------------------------
+//     // HYDRATE WITH MINIMAL FIELDS ONLY
+//     // -------------------------
+//     const idOrder = rows.map((r) => r.id);
+
+//     const hydrateStart = performance.now();
+
+//     const hydrated = await prisma.user.findMany({
+//       where: {
+//         id: { in: idOrder },
+//         ...userFilters,
+//         ...(Object.keys(profileFilters).length > 0
+//           ? { profile: { is: profileFilters } }
+//           : {}),
+//       },
+//       select: {
+//         id: true,
+//         full_name: true,
+//         birth_date: true,
+//         height: true,
+//         created_at: true,
+//         last_active_at: true,
+
+//         profile: {
+//           select: {
+//             city: true,
+//             state: true,
+//             country: true,
+//             area: true,
+//             latitude: true,
+//             longitude: true,
+//           },
+//         },
+
+//         eduWork: {
+//           select: {
+//             professionId: true,
+//             profession: {
+//               select: {
+//                 id: true,
+//                 name: true,
+//               },
+//             },
+//           },
+//         },
+
+//         // photos: {
+//         //   where: {
+//         //     is_primary: true,
+//         //   },
+//         //   select: {
+//         //     id: true,
+//         //     media_url: true,
+//         //     media_type: true,
+//         //   },
+//         //   take: 1,
+//         // },
+//         photos: {
+//           select: {
+//             id: true,
+//             media_url: true,
+//             media_type: true,
+//             order: true,
+//             is_primary: true,
+//           },
+//           orderBy: {
+//             order: 'asc'  // Sort by order (0, 1, 2, 3...)
+//           },
+//           take: 1,  // Take only the first one (index 0)
+//         },
+//       },
+//     });
+//     console.log(
+//       `hydration round ${round}:`,
+//       performance.now() - hydrateStart,
+//       "ms",
+//       "users:",
+//       hydrated.length
+//     )
+
+//     const byId = new Map(hydrated.map((u) => [u.id, u]));
+//     let pageFilled = false;
+
+//     for (const r of rows) {
+//       const u = byId.get(r.id);
+//       if (!u) continue;
+//       collected.push(u);
+//       if (collected.length === pageLimit) {
+//         filledCursor = { k: Number(r.sort_val), id: r.id };
+//         pageFilled = true;
+//         break;
+//       }
+//     }
+
+//     if (pageFilled) break;
+
+//     const tail = rows[rows.length - 1];
+//     cursorState = { k: Number(tail.sort_val), id: tail.id };
+
+//     if (rows.length < batchSize) break;
+//   }
+
+//   if (collected.length === 0) {
+//     return { users: [], nextCursor: null };
+//   }
+
+//   const page = collected.slice(0, pageLimit);
+//   if (filledCursor) nextCursor = encodeCursor(filledCursor);
+
+//   // ============================================================
+//   // 🚀 OPTIMIZATION: ONLY FETCH BOOSTS FOR THE 20-30 CANDIDATES
+//   // ============================================================
+//   const candidateIds = page.map((u) => u.id);
+
+//   // Fetch boosts ONLY for the candidates we're returning
+//   const boostStart = performance.now();
+//   const boostQuery = await prisma.boostUsage.findMany({
+//     where: {
+//       user_id: { in: candidateIds },
+//       is_active: true,
+//       ended_at: { gt: now },
+//     },
+//     select: {
+//       user_id: true,
+//     },
+//   });
+//   console.log(
+//     "boosts:",
+//     performance.now() - boostStart,
+//     "ms"
+//   );
+
+//   const boostedUserIds = new Set(boostQuery.map((b) => b.user_id));
+
+//   // -------------------------
+//   // REDIS PRESENCE
+//   // -------------------------
+//   const presenceStart = performance.now();
+//   const presenceMap = await getUsersPresence(page.map((u) => u.id));
+//   console.log(
+//     "presence:",
+//     performance.now() - presenceStart
+//   );
+//   // -------------------------
+//   // ENRICH WITH STATIC VALUES (NO MATCH SCORE CALCULATION)
+//   // -------------------------
+//   const nowMs = Date.now();
+//   const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
+
+//   // ============================================================
+//   // 🚀 FETCH COMPATIBILITY SCORES FOR CANDIDATES
+//   // ============================================================
+//   const compatibilityStart = performance.now();
+
+//   // Fetch compatibility scores for all candidates
+//   const compatibilityScores = await prisma.userCompatibility.findMany({
+//     where: {
+//       userId: userId,
+//       targetUserId: { in: candidateIds },
+//     },
+//     select: {
+//       targetUserId: true,
+//       score: true,
+//       percentage: true,
+//     },
+//   });
+
+//   console.log(
+//     "compatibility scores:",
+//     performance.now() - compatibilityStart,
+//     "ms"
+//   );
+
+//   // Create a map for quick lookup
+//   const compatibilityMap = new Map(
+//     compatibilityScores.map((c) => [c.targetUserId, c])
+//   );
+
+//   const enriched = page.map((user) => {
+//     const presence = presenceMap[user.id];
+//     const meters = meterById.get(user.id);
+
+//     const compat = compatibilityMap.get(user.id);
+//     const matchScore = compat?.percentage || 0; // Use percentage for 0-100 scale
+//     const compatibilityScore = compat?.score || 0; // Raw score if needed
+
+//     return {
+//       id: user.id,
+//       full_name: user.full_name,
+//       birth_date: formatBirthDate(user.birth_date),
+//       age: calculateAge(user.birth_date),
+//       height: user.height,
+//       created_at: user.created_at,
+//       last_active_at: user.last_active_at,
+
+//       profile: {
+//         city: user.profile?.city || null,
+//         latitude: user.profile?.latitude || null,
+//         longitude: user.profile?.longitude || null,
+//       },
+
+//       eduWork: {
+//         professionId: user.eduWork?.professionId || null,
+//         profession: user.eduWork?.profession || null,
+//       },
+
+//       photos: user.photos || [],
+
+//       // Static values - no calculation needed
+//       matchScore: matchScore,
+//       distanceKm: meters != null ? Math.round((meters / 1000) * 100) / 100 : 0,
+//       trust: STATIC_TRUST,
+//       replyTime: STATIC_REPLY_TIME,
+
+//       // Dynamic presence
+//       isOnline: presence?.isOnline || false,
+//       lastActiveAt: presence?.lastActiveAt || null,
+//       lastSeen: formatLastSeen(presence?.lastActiveAt),
+//       isBoosted: boostedUserIds.has(user.id),
+//     };
+//   });
+
+//   // -------------------------
+//   // RE-RANK WITHIN PAGE (using static match score)
+//   // -------------------------
+//   const sortedUsers = enriched.sort((a, b) => {
+//     const aActivity = a.lastActiveAt?.getTime() || 0;
+//     const bActivity = b.lastActiveAt?.getTime() || 0;
+//     const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
+//     const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
+//     const aIsNew = nowMs - aCreated < boostWindow;
+//     const bIsNew = nowMs - bCreated < boostWindow;
+
+//     if (a.isBoosted !== b.isBoosted) return a.isBoosted ? -1 : 1;
+//     if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
+//     // Static match score - everyone has same score, so this doesn't affect ordering
+//     if (a.matchScore !== b.matchScore) {
+//       return b.matchScore - a.matchScore;
+//     }
+//     return bActivity - aActivity;
+//   });
+
+//   // -------------------------
+//   // RESPONSE
+//   // -------------------------
+//   return {
+//     users: sortedUsers,
+//     nextCursor,
+//   };
+// };
+
 export const getFeedService = async ({
-  userId,
-  cursor,
-  limit,
-  filters,
-}: FeedParams) => {
-  const pageLimit = limit ?? DEFAULT_PAGE_LIMIT;
-  const decodedCursor = decodeCursor(cursor as string | undefined);
-  const now = new Date();
+    userId,
+    cursor,
+    limit,
+    filters,
+  }: FeedParams) => {
+    const pageLimit =
+      limit ?? DEFAULT_PAGE_LIMIT;
 
-  // -------------------------
-  // 1. CURRENT USER - MINIMAL FIELDS FOR FILTERING ONLY
-  // -------------------------
-  const USER_CACHE_TTL = 60 * 10; // 10 minutes
-  const USER_CACHE_KEY = `feed:user:${userId}`;
+    const decodedCursor =
+      decodeCursor(
+        cursor as string | undefined,
+      );
 
-  const currentUserPromise = async () => {
-    const cached = await redis.get<any>(USER_CACHE_KEY);
+    const now = new Date();
 
-    if (cached) {
-      return cached;
-    }
+    // ========================================================
+    // CURRENT USER
+    // ========================================================
 
-    // ONLY fetch fields needed for filtering - no bio, eduWork, photos, answers
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        gender: true,
-        profile: {
-          select: {
-            interested_in: true,
-            sexual_orientation: true,
-            latitude: true,
-            longitude: true,
-            max_distance_km: true,
-          },
-        },
-      },
-    });
+    const USER_CACHE_TTL =
+      60 * 10;
 
-    if (user) {
-      await redis.set(USER_CACHE_KEY, user, {
-        ex: USER_CACHE_TTL,
-      });
-    }
+    const USER_CACHE_KEY =
+      `feed:user:${userId}`;
 
-    return user;
-  };
+    const currentUserPromise =
+      async () => {
+        const cached =
+          await redis.get<any>(
+            USER_CACHE_KEY,
+          );
 
-  // -------------------------
-  // 2. ACTIVE BOOSTS
-  // -------------------------
+        if (cached) {
+          return cached;
+        }
 
-  const formatBirthDate = (date: Date | string | null): string | null => {
-    if (!date) return null;
+        const user =
+          await prisma.user.findUnique({
+            where: {
+              id: userId,
+            },
 
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return null;
+            select: {
+              id: true,
 
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
+              gender: true,
 
-    return `${day}-${month}-${year}`;
-  };
+              profile: {
+                select: {
+                  interested_in: true,
 
-  const start = performance.now();
+                  sexual_orientation:
+                    true,
 
-  await prisma.$queryRaw`
-  SELECT 1;
-`;
+                  latitude: true,
 
-  console.log(
-    "SELECT 1:",
-    performance.now() - start,
-    "ms"
-  );
+                  longitude: true,
 
-  const start1 = performance.now();
-  const [currentUser] = await Promise.all([
-    currentUserPromise(),
-    // REMOVED: boostPromise() - Don't fetch all boosts upfront!
-  ]);
-  console.log(
-    "current user + boosts:",
-    performance.now() - start1
-  );
-
-  if (!currentUser || !currentUser.profile) {
-    throw new Error("User profile not found");
-  }
-
-  // -------------------------
-  // VIP PACKAGE CHECK
-  // VIP + VIP_ELITE
-  // -------------------------
-
-  // -------------------------
-  // VIP / VIP_ELITE PACKAGE CHECK
-  // -------------------------
-
-  const activeVipPackage = await prisma.userPackage.findFirst({
-    where: {
-      user_id: userId,
-      status: "ACTIVE",
-
-      package: {
-        name: {
-          in: ["VIP", "VIP_ELITE"],
-        },
-      },
-
-      OR: [
-        {
-          endDate: null,
-        },
-        {
-          endDate: {
-            gt: new Date(),
-          },
-        },
-      ],
-    },
-    select: {
-      id: true,
-      package: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  });
-
-  const hasActiveVip = !!activeVipPackage;
-
-  console.log("ACTIVE VIP PACKAGE:", activeVipPackage);
-  console.log("HAS ACTIVE VIP/VIP_ELITE:", hasActiveVip);
-  // const boostedUserIds = new Set(activeBoosts.map((b) => b.user_id));
-
-  const { interested_in, sexual_orientation } = currentUser.profile;
-  const { gender } = currentUser;
-
-  if (!gender || !interested_in) {
-    throw new Error("Required fields missing");
-  }
-
-  const myGender = gender.toUpperCase();
-  const myInterest = interested_in.toUpperCase();
-  const myOrientation = (sexual_orientation ?? "").toUpperCase();
-
-  const myLatitude = Number(currentUser.profile.latitude);
-  const myLongitude = Number(currentUser.profile.longitude);
-  const maxDistance = currentUser.profile.max_distance_km ?? 50;
-
-  // -------------------------
-  // 3. PRECOMPUTE MATCH FILTERS
-  // -------------------------
-  const genderFilter = getGenderFromInterest(myInterest);
-
-  const interestedInFilter = ALL_INTEREST_VALUES.filter((v) =>
-    getGenderFromInterest(v).includes(myGender),
-  );
-
-  const orientationForward = getOrientationCompatibility(myOrientation);
-  const orientationReverse = ALL_ORIENTATIONS.filter((o) =>
-    getOrientationCompatibility(o).includes(myOrientation),
-  );
-
-  if (orientationForward.length === 0 || orientationReverse.length === 0) {
-    return { users: [], nextCursor: null };
-  }
-
-  // -------------------------
-  // UI structured filters
-  // -------------------------
-  // -------------------------
-  // VIP-ONLY FILTER CHECK
-  // -------------------------
-
-  if (
-    filters?.ambitionIds &&
-    filters.ambitionIds.length > 0
-  ) {
-    if (!hasActiveVip) {
-      return {
-        users: [],
-        nextCursor: null,
-        filterRestricted: true,
-        message: "Ambition filter is available only for VIP and VIP Elite users.",
-      };
-    }
-  }
-
-
-
-  // -------------------------
-  // FAMILY INCOME RANGE
-  // VIP ONLY
-  // -------------------------
-
-  let familyIncomeIds: number[] = [];
-
-  if (
-    filters?.familyIncomeMin !== undefined ||
-    filters?.familyIncomeMax !== undefined
-  ) {
-    // Check VIP access
-    if (!hasActiveVip) {
-      return {
-        users: [],
-        nextCursor: null,
-        filterRestricted: true,
-        message:
-          "Family income filter is available only for VIP and VIP Elite users.",
-      };
-    }
-
-    const minAmount = filters.familyIncomeMin ?? 0;
-    const maxAmount =
-      filters.familyIncomeMax ?? Number.MAX_SAFE_INTEGER;
-
-    const matchingIncomeRanges =
-      await prisma.familyIncome.findMany({
-        where: {
-          active: true,
-
-          AND: [
-            {
-              minAmount: {
-                lte: maxAmount,
+                  max_distance_km:
+                    true,
+                },
               },
             },
+          });
+
+        if (user) {
+          await redis.set(
+            USER_CACHE_KEY,
+            user,
             {
-              OR: [
-                {
-                  maxAmount: null,
-                },
-                {
-                  maxAmount: {
-                    gte: minAmount,
-                  },
-                },
-              ],
+              ex: USER_CACHE_TTL,
             },
-          ],
-        },
+          );
+        }
 
-        select: {
-          id: true,
-          title: true,
-          minAmount: true,
-          maxAmount: true,
-        },
-      });
-
-    familyIncomeIds = matchingIncomeRanges.map(
-      (income) => income.id
-    );
-
-    console.log(
-      "MATCHING FAMILY INCOME:",
-      matchingIncomeRanges
-    );
-
-    console.log(
-      "MATCHING FAMILY INCOME IDS:",
-      familyIncomeIds
-    );
-  }
-
-  if (
-    filters?.networkingIntentIds &&
-    filters.networkingIntentIds.length > 0
-  ) {
-    if (!hasActiveVip) {
-      return {
-        users: [],
-        nextCursor: null,
-        filterRestricted: true,
-        message:
-          "Networking Intent filter is available only for active VIP or VIP Elite users.",
+        return user;
       };
-    }
-  }
-  // -------------------------
-  // BUILD FILTER QUERY
-  // -------------------------
 
-  const filterQuery = filters
-    ? buildFilterQuery({
-      ...filters,
-      familyIncomeIds,
-    })
-    : { where: {} };
+    // ========================================================
+    // DATE FORMAT
+    // ========================================================
 
-  // -------------------------
-  // DISTANCE
-  // -------------------------
+    const formatBirthDate = (
+      date:
+        | Date
+        | string
+        | null,
+    ): string | null => {
+      if (!date) {
+        return null;
+      }
 
-  const distanceKm =
-    filters?.distanceKm ||
-    currentUser.profile.max_distance_km ||
-    50;
+      const d =
+        new Date(date);
 
-  console.log(
-    "FINAL FILTER QUERY:",
-    JSON.stringify(filterQuery, null, 2)
-  );
+      if (
+        isNaN(d.getTime())
+      ) {
+        return null;
+      }
 
-  const userFilters = Object.fromEntries(
-    Object.entries(filterQuery.where || {}).filter(([k]) => k !== "profile"),
-  );
-  const profileFilters = filterQuery.where?.profile?.is || {};
+      const day =
+        String(
+          d.getDate(),
+        ).padStart(2, "0");
 
-  const hasManualLocationFilter =
-    !!filters?.location?.city ||
-    !!filters?.location?.state ||
-    !!filters?.location?.country;
+      const month =
+        String(
+          d.getMonth() + 1,
+        ).padStart(2, "0");
 
-  // -------------------------
-  // SQL fragments
-  // -------------------------
-  const orientCol = Prisma.raw(`${ORIENTATION_TABLE}.${ORIENTATION_COL}`);
-  const me = Prisma.sql`ST_SetSRID(ST_MakePoint(${myLongitude}, ${myLatitude}), 4326)::geography`;
+      const year =
+        d.getFullYear();
 
-  const matchConditions = Prisma.sql`
-    u.deleted_at IS NULL
-    AND u.id <> ${userId}::uuid
-    AND NOT EXISTS (
-      SELECT 1 FROM swipes s
-      WHERE s."swiperId" = ${userId}::uuid AND s."targetUserId" = u.id
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM "UserBlock" b
-      WHERE (b."blockerId"::uuid = ${userId}::uuid AND b."blockedId"::uuid = u.id)
-         OR (b."blockedId"::uuid = ${userId}::uuid AND b."blockerId"::uuid = u.id)
-    )
-    AND u.gender::text = ANY(ARRAY[${Prisma.join(genderFilter)}]::text[])
-    AND p.interested_in::text = ANY(ARRAY[${Prisma.join(interestedInFilter)}]::text[])
-    AND ${orientCol}::text = ANY(ARRAY[${Prisma.join(orientationForward)}]::text[])
-    AND ${orientCol}::text = ANY(ARRAY[${Prisma.join(orientationReverse)}]::text[])
-  `;
+      return `${day}-${month}-${year}`;
+    };
 
-  // -------------------------
-  // Page fetch loop
-  // -------------------------
-  const batchSize = Math.max(pageLimit * OVERFETCH, 30);
-  const collected: any[] = [];
-  const meterById = new Map<string, number>();
+    // ========================================================
+    // DB HEALTH CHECK
+    // ========================================================
 
-  let cursorState: Cursor | null = decodedCursor;
-  let nextCursor: string | null = null;
-  let filledCursor: Cursor | null = null;
+    const start =
+      performance.now();
 
-  for (let round = 0; round < MAX_ROUNDS && collected.length < pageLimit; round++) {
-    let rows: { id: string; sort_val: number }[];
+    await prisma.$queryRaw`
+      SELECT 1;
+    `;
 
-    if (hasManualLocationFilter) {
-      const candidateStart = performance.now();
-      rows = await prisma.$queryRaw<{ id: string; sort_val: number }[]>`
-        SELECT
-          u.id,
-          (EXTRACT(EPOCH FROM u.created_at) * 1000)::float8 AS sort_val
-        FROM users u
-        JOIN user_profiles p ON p.user_id = u.id
-        WHERE ${matchConditions}
-          ${cursorState
-          ? Prisma.sql`AND (
-                (EXTRACT(EPOCH FROM u.created_at) * 1000) < ${cursorState.k}
-                OR ((EXTRACT(EPOCH FROM u.created_at) * 1000) = ${cursorState.k} AND u.id < ${cursorState.id}::uuid)
-              )`
-          : Prisma.empty}
-        ORDER BY sort_val DESC, u.id DESC
-        LIMIT ${batchSize};
-      `;
-      console.log(
-        `candidate query round ${round}:`,
-        performance.now() - candidateStart,
-        "ms",
-        "rows:",
-        rows.length
-      );
-    } else {
-      const distanceLimit = distanceKm;
-      const candidateStart = performance.now();
-      rows = await prisma.$queryRaw<{ id: string; sort_val: number }[]>`
-        SELECT
-          u.id,
-          (p.location::geography <-> ${me})::float8 AS sort_val
-        FROM users u
-        JOIN user_profiles p ON p.user_id = u.id
-        WHERE ${matchConditions}
-          AND ST_DWithin(p.location::geography, ${me}, ${distanceLimit * 1000})
-          ${cursorState
-          ? Prisma.sql`AND (
-                (p.location::geography <-> ${me}) > ${cursorState.k}
-                OR (
-                  (p.location::geography <-> ${me}) = ${cursorState.k}
-                  AND u.id > ${cursorState.id}::uuid
-                )
-              )`
-          : Prisma.empty}
-        ORDER BY p.location::geography <-> ${me} ASC, u.id ASC
-        LIMIT ${batchSize};
-      `;
-      console.log(
-        `candidate query round ${round}:`,
-        performance.now() - candidateStart,
-        "ms",
-        "rows:",
-        rows.length
+    console.log(
+      "SELECT 1:",
+      performance.now() - start,
+      "ms",
+    );
+
+    // ========================================================
+    // LOAD CURRENT USER
+    // ========================================================
+
+    const start1 =
+      performance.now();
+
+    const [currentUser] =
+      await Promise.all([
+        currentUserPromise(),
+      ]);
+
+    console.log(
+      "current user:",
+      performance.now() - start1,
+      "ms",
+    );
+
+    if (
+      !currentUser ||
+      !currentUser.profile
+    ) {
+      throw new Error(
+        "User profile not found",
       );
     }
 
-    if (rows.length === 0) break;
+    // ========================================================
+    // VIP PACKAGE CHECK
+    // ========================================================
 
-    if (!hasManualLocationFilter) {
-      for (const r of rows) meterById.set(r.id, Number(r.sort_val));
-    }
+    const activeVipPackage =
+      await prisma.userPackage.findFirst(
+        {
+          where: {
+            user_id: userId,
 
-    // -------------------------
-    // HYDRATE WITH MINIMAL FIELDS ONLY
-    // -------------------------
-    const idOrder = rows.map((r) => r.id);
+            status: "ACTIVE",
 
-    const hydrateStart = performance.now();
+            package: {
+              name: {
+                in: [
+                  "VIP",
+                  "VIP_ELITE",
+                ],
+              },
+            },
 
-    const hydrated = await prisma.user.findMany({
-      where: {
-        id: { in: idOrder },
-        ...userFilters,
-        ...(Object.keys(profileFilters).length > 0
-          ? { profile: { is: profileFilters } }
-          : {}),
-      },
-      select: {
-        id: true,
-        full_name: true,
-        birth_date: true,
-        height: true,
-        created_at: true,
-        last_active_at: true,
+            OR: [
+              {
+                endDate: null,
+              },
 
-        profile: {
-          select: {
-            city: true,
-            state: true,
-            country: true,
-            area: true,
-            latitude: true,
-            longitude: true,
+              {
+                endDate: {
+                  gt: new Date(),
+                },
+              },
+            ],
           },
-        },
 
-        eduWork: {
           select: {
-            professionId: true,
-            profession: {
+            id: true,
+
+            package: {
               select: {
-                id: true,
                 name: true,
               },
             },
           },
         },
+      );
 
-        // photos: {
-        //   where: {
-        //     is_primary: true,
-        //   },
-        //   select: {
-        //     id: true,
-        //     media_url: true,
-        //     media_type: true,
-        //   },
-        //   take: 1,
-        // },
-        photos: {
-          select: {
-            id: true,
-            media_url: true,
-            media_type: true,
-            order: true,
-            is_primary: true,
-          },
-          orderBy: {
-            order: 'asc'  // Sort by order (0, 1, 2, 3...)
-          },
-          take: 1,  // Take only the first one (index 0)
-        },
-      },
-    });
+    const hasActiveVip =
+      !!activeVipPackage;
+
     console.log(
-      `hydration round ${round}:`,
-      performance.now() - hydrateStart,
-      "ms",
-      "users:",
-      hydrated.length
-    )
+      "ACTIVE VIP PACKAGE:",
+      activeVipPackage,
+    );
 
-    const byId = new Map(hydrated.map((u) => [u.id, u]));
-    let pageFilled = false;
+    console.log(
+      "HAS ACTIVE VIP/VIP_ELITE:",
+      hasActiveVip,
+    );
 
-    for (const r of rows) {
-      const u = byId.get(r.id);
-      if (!u) continue;
-      collected.push(u);
-      if (collected.length === pageLimit) {
-        filledCursor = { k: Number(r.sort_val), id: r.id };
-        pageFilled = true;
-        break;
+    // ========================================================
+    // BASIC USER PREFERENCES
+    // ========================================================
+
+    const {
+      interested_in,
+      sexual_orientation,
+    } =
+      currentUser.profile;
+
+    const { gender } =
+      currentUser;
+
+    if (
+      !gender ||
+      !interested_in
+    ) {
+      throw new Error(
+        "Required fields missing",
+      );
+    }
+
+    const myGender =
+      gender.toUpperCase();
+
+    const myInterest =
+      interested_in.toUpperCase();
+
+    const myOrientation =
+      (
+        sexual_orientation ?? ""
+      ).toUpperCase();
+
+    // ========================================================
+    // SAFE COORDINATE HANDLING
+    // ========================================================
+
+    /**
+     * IMPORTANT
+     *
+     * Don't use:
+     *
+     * Number(null)
+     *
+     * because:
+     *
+     * Number(null) === 0
+     *
+     * which incorrectly creates:
+     *
+     * latitude = 0
+     * longitude = 0
+     */
+
+    const rawLatitude =
+      currentUser.profile
+        .latitude;
+
+    const rawLongitude =
+      currentUser.profile
+        .longitude;
+
+    const hasCurrentUserCoordinates =
+      rawLatitude !== null &&
+      rawLatitude !== undefined &&
+      rawLongitude !== null &&
+      rawLongitude !== undefined;
+
+    const myLatitude =
+      hasCurrentUserCoordinates
+        ? Number(rawLatitude)
+        : null;
+
+    const myLongitude =
+      hasCurrentUserCoordinates
+        ? Number(rawLongitude)
+        : null;
+
+    const validCurrentUserCoordinates =
+      myLatitude !== null &&
+      myLongitude !== null &&
+      Number.isFinite(
+        myLatitude,
+      ) &&
+      Number.isFinite(
+        myLongitude,
+      );
+
+    // ========================================================
+    // PRECOMPUTE MATCH FILTERS
+    // ========================================================
+
+    const genderFilter =
+      getGenderFromInterest(
+        myInterest,
+      );
+
+    const interestedInFilter =
+      ALL_INTEREST_VALUES.filter(
+        (v) =>
+          getGenderFromInterest(
+            v,
+          ).includes(
+            myGender,
+          ),
+      );
+
+    const orientationForward =
+      getOrientationCompatibility(
+        myOrientation,
+      );
+
+    const orientationReverse =
+      ALL_ORIENTATIONS.filter(
+        (orientation) =>
+          getOrientationCompatibility(
+            orientation,
+          ).includes(
+            myOrientation,
+          ),
+      );
+
+    if (
+      orientationForward.length ===
+        0 ||
+      orientationReverse.length ===
+        0
+    ) {
+      return {
+        users: [],
+        nextCursor: null,
+      };
+    }
+
+    // ========================================================
+    // VIP FILTER: AMBITION
+    // ========================================================
+
+    if (
+      filters?.ambitionIds &&
+      filters.ambitionIds
+        .length > 0
+    ) {
+      if (!hasActiveVip) {
+        return {
+          users: [],
+
+          nextCursor: null,
+
+          filterRestricted:
+            true,
+
+          message:
+            "Ambition filter is available only for VIP and VIP Elite users.",
+        };
       }
     }
 
-    if (pageFilled) break;
+    // ========================================================
+    // VIP FILTER: FAMILY INCOME
+    // ========================================================
 
-    const tail = rows[rows.length - 1];
-    cursorState = { k: Number(tail.sort_val), id: tail.id };
+    let familyIncomeIds:
+      number[] = [];
 
-    if (rows.length < batchSize) break;
-  }
+    if (
+      filters?.familyIncomeMin !==
+        undefined ||
+      filters?.familyIncomeMax !==
+        undefined
+    ) {
+      if (!hasActiveVip) {
+        return {
+          users: [],
 
-  if (collected.length === 0) {
-    return { users: [], nextCursor: null };
-  }
+          nextCursor: null,
 
-  const page = collected.slice(0, pageLimit);
-  if (filledCursor) nextCursor = encodeCursor(filledCursor);
+          filterRestricted:
+            true,
 
-  // ============================================================
-  // 🚀 OPTIMIZATION: ONLY FETCH BOOSTS FOR THE 20-30 CANDIDATES
-  // ============================================================
-  const candidateIds = page.map((u) => u.id);
+          message:
+            "Family income filter is available only for VIP and VIP Elite users.",
+        };
+      }
 
-  // Fetch boosts ONLY for the candidates we're returning
-  const boostStart = performance.now();
-  const boostQuery = await prisma.boostUsage.findMany({
-    where: {
-      user_id: { in: candidateIds },
-      is_active: true,
-      ended_at: { gt: now },
-    },
-    select: {
-      user_id: true,
-    },
-  });
-  console.log(
-    "boosts:",
-    performance.now() - boostStart,
-    "ms"
-  );
+      const minAmount =
+        filters.familyIncomeMin ??
+        0;
 
-  const boostedUserIds = new Set(boostQuery.map((b) => b.user_id));
+      const maxAmount =
+        filters.familyIncomeMax ??
+        Number.MAX_SAFE_INTEGER;
 
-  // -------------------------
-  // REDIS PRESENCE
-  // -------------------------
-  const presenceStart = performance.now();
-  const presenceMap = await getUsersPresence(page.map((u) => u.id));
-  console.log(
-    "presence:",
-    performance.now() - presenceStart
-  );
-  // -------------------------
-  // ENRICH WITH STATIC VALUES (NO MATCH SCORE CALCULATION)
-  // -------------------------
-  const nowMs = Date.now();
-  const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
+      const matchingIncomeRanges =
+        await prisma.familyIncome.findMany(
+          {
+            where: {
+              active: true,
 
-  // ============================================================
-  // 🚀 FETCH COMPATIBILITY SCORES FOR CANDIDATES
-  // ============================================================
-  const compatibilityStart = performance.now();
+              AND: [
+                {
+                  minAmount: {
+                    lte: maxAmount,
+                  },
+                },
 
-  // Fetch compatibility scores for all candidates
-  const compatibilityScores = await prisma.userCompatibility.findMany({
-    where: {
-      userId: userId,
-      targetUserId: { in: candidateIds },
-    },
-    select: {
-      targetUserId: true,
-      score: true,
-      percentage: true,
-    },
-  });
+                {
+                  OR: [
+                    {
+                      maxAmount:
+                        null,
+                    },
 
-  console.log(
-    "compatibility scores:",
-    performance.now() - compatibilityStart,
-    "ms"
-  );
+                    {
+                      maxAmount:
+                        {
+                          gte: minAmount,
+                        },
+                    },
+                  ],
+                },
+              ],
+            },
 
-  // Create a map for quick lookup
-  const compatibilityMap = new Map(
-    compatibilityScores.map((c) => [c.targetUserId, c])
-  );
+            select: {
+              id: true,
 
-  const enriched = page.map((user) => {
-    const presence = presenceMap[user.id];
-    const meters = meterById.get(user.id);
+              title: true,
 
-    const compat = compatibilityMap.get(user.id);
-    const matchScore = compat?.percentage || 0; // Use percentage for 0-100 scale
-    const compatibilityScore = compat?.score || 0; // Raw score if needed
+              minAmount: true,
 
-    return {
-      id: user.id,
-      full_name: user.full_name,
-      birth_date: formatBirthDate(user.birth_date),
-      age: calculateAge(user.birth_date),
-      height: user.height,
-      created_at: user.created_at,
-      last_active_at: user.last_active_at,
+              maxAmount: true,
+            },
+          },
+        );
+
+      familyIncomeIds =
+        matchingIncomeRanges.map(
+          (income) =>
+            income.id,
+        );
+
+      console.log(
+        "MATCHING FAMILY INCOME:",
+        matchingIncomeRanges,
+      );
+
+      console.log(
+        "MATCHING FAMILY INCOME IDS:",
+        familyIncomeIds,
+      );
+    }
+
+    // ========================================================
+    // VIP FILTER: NETWORKING INTENT
+    // ========================================================
+
+    if (
+      filters?.networkingIntentIds &&
+      filters.networkingIntentIds
+        .length > 0
+    ) {
+      if (!hasActiveVip) {
+        return {
+          users: [],
+
+          nextCursor: null,
+
+          filterRestricted:
+            true,
+
+          message:
+            "Networking Intent filter is available only for active VIP or VIP Elite users.",
+        };
+      }
+    }
+
+    // ========================================================
+    // NORMAL FILTER QUERY
+    // Includes location when frontend provides location
+    // ========================================================
+
+    const filterQuery =
+      filters
+        ? buildFilterQuery({
+            ...filters,
+            familyIncomeIds,
+          })
+        : {
+            where: {},
+          };
+
+    console.log(
+      "NORMAL FILTER QUERY:",
+      JSON.stringify(
+        filterQuery,
+        null,
+        2,
+      ),
+    );
+
+    const userFilters =
+      Object.fromEntries(
+        Object.entries(
+          filterQuery.where ||
+            {},
+        ).filter(
+          ([key]) =>
+            key !== "profile",
+        ),
+      );
+
+    const profileFilters =
+      filterQuery.where
+        ?.profile?.is || {};
+
+    // ========================================================
+    // MANUAL LOCATION CHECK
+    // ========================================================
+
+    const hasManualLocationFilter =
+      !!filters?.location
+        ?.city ||
+      !!filters?.location
+        ?.state ||
+      !!filters?.location
+        ?.country;
+
+    // ========================================================
+    // DISTANCE
+    // ========================================================
+
+    const distanceKm =
+      filters?.distanceKm ??
+      currentUser.profile
+        .max_distance_km ??
+      50;
+
+    // ========================================================
+    // FALLBACK FILTER QUERY
+    // IMPORTANT:
+    //
+    // Remove ONLY:
+    // - location
+    // - distanceKm
+    //
+    // Keep:
+    // - age
+    // - height
+    // - interests
+    // - languages
+    // - education
+    // - profession
+    // - zodiac
+    // - lifestyle
+    // - ambition
+    // - income
+    // - networking
+    // - etc.
+    // ========================================================
+
+    let fallbackFilterQuery:
+      any = {
+      where: {},
+    };
+
+    if (filters) {
+      const {
+        location:
+          _ignoredLocation,
+
+        distanceKm:
+          _ignoredDistance,
+
+        ...filtersWithoutLocation
+      } = filters;
+
+      fallbackFilterQuery =
+        buildFilterQuery({
+          ...filtersWithoutLocation,
+
+          familyIncomeIds,
+        });
+    }
+
+    console.log(
+      "FALLBACK FILTER QUERY:",
+      JSON.stringify(
+        fallbackFilterQuery,
+        null,
+        2,
+      ),
+    );
+
+    const fallbackUserFilters =
+      Object.fromEntries(
+        Object.entries(
+          fallbackFilterQuery
+            .where || {},
+        ).filter(
+          ([key]) =>
+            key !== "profile",
+        ),
+      );
+
+    const fallbackProfileFilters =
+      fallbackFilterQuery
+        .where?.profile?.is ||
+      {};
+
+    // ========================================================
+    // SQL MATCH CONDITIONS
+    // ========================================================
+
+    const orientCol =
+      Prisma.raw(
+        `${ORIENTATION_TABLE}.${ORIENTATION_COL}`,
+      );
+
+    const matchConditions =
+      Prisma.sql`
+        u.deleted_at IS NULL
+
+        AND u.id <> ${userId}::uuid
+
+        AND NOT EXISTS (
+          SELECT 1
+          FROM swipes s
+          WHERE
+            s."swiperId" = ${userId}::uuid
+            AND s."targetUserId" = u.id
+        )
+
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "UserBlock" b
+          WHERE
+            (
+              b."blockerId"::uuid = ${userId}::uuid
+              AND b."blockedId"::uuid = u.id
+            )
+            OR
+            (
+              b."blockedId"::uuid = ${userId}::uuid
+              AND b."blockerId"::uuid = u.id
+            )
+        )
+
+        AND u.gender::text =
+          ANY(
+            ARRAY[
+              ${Prisma.join(
+                genderFilter,
+              )}
+            ]::text[]
+          )
+
+        AND p.interested_in::text =
+          ANY(
+            ARRAY[
+              ${Prisma.join(
+                interestedInFilter,
+              )}
+            ]::text[]
+          )
+
+        AND ${orientCol}::text =
+          ANY(
+            ARRAY[
+              ${Prisma.join(
+                orientationForward,
+              )}
+            ]::text[]
+          )
+
+        AND ${orientCol}::text =
+          ANY(
+            ARRAY[
+              ${Prisma.join(
+                orientationReverse,
+              )}
+            ]::text[]
+          )
+      `;
+
+    // ========================================================
+    // REUSABLE SELECT
+    // ========================================================
+
+    const userSelect = {
+      id: true,
+
+      full_name: true,
+
+      birth_date: true,
+
+      height: true,
+
+      created_at: true,
+
+      last_active_at: true,
 
       profile: {
-        city: user.profile?.city || null,
-        latitude: user.profile?.latitude || null,
-        longitude: user.profile?.longitude || null,
+        select: {
+          city: true,
+
+          state: true,
+
+          country: true,
+
+          area: true,
+
+          latitude: true,
+
+          longitude: true,
+        },
       },
 
       eduWork: {
-        professionId: user.eduWork?.professionId || null,
-        profession: user.eduWork?.profession || null,
+        select: {
+          professionId: true,
+
+          profession: {
+            select: {
+              id: true,
+
+              name: true,
+            },
+          },
+        },
       },
 
-      photos: user.photos || [],
+      photos: {
+        select: {
+          id: true,
 
-      // Static values - no calculation needed
-      matchScore: matchScore,
-      distanceKm: meters != null ? Math.round((meters / 1000) * 100) / 100 : 0,
-      trust: STATIC_TRUST,
-      replyTime: STATIC_REPLY_TIME,
+          media_url: true,
 
-      // Dynamic presence
-      isOnline: presence?.isOnline || false,
-      lastActiveAt: presence?.lastActiveAt || null,
-      lastSeen: formatLastSeen(presence?.lastActiveAt),
-      isBoosted: boostedUserIds.has(user.id),
+          media_type: true,
+
+          order: true,
+
+          is_primary: true,
+        },
+
+        orderBy: {
+          order:
+            "asc" as const,
+        },
+
+        take: 1,
+      },
     };
-  });
 
-  // -------------------------
-  // RE-RANK WITHIN PAGE (using static match score)
-  // -------------------------
-  const sortedUsers = enriched.sort((a, b) => {
-    const aActivity = a.lastActiveAt?.getTime() || 0;
-    const bActivity = b.lastActiveAt?.getTime() || 0;
-    const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
-    const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
-    const aIsNew = nowMs - aCreated < boostWindow;
-    const bIsNew = nowMs - bCreated < boostWindow;
+    // ========================================================
+    // PAGINATION VARIABLES
+    // ========================================================
 
-    if (a.isBoosted !== b.isBoosted) return a.isBoosted ? -1 : 1;
-    if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
-    // Static match score - everyone has same score, so this doesn't affect ordering
-    if (a.matchScore !== b.matchScore) {
-      return b.matchScore - a.matchScore;
+    const batchSize =
+      Math.max(
+        Math.ceil(
+          pageLimit *
+            OVERFETCH,
+        ),
+        30,
+      );
+
+    const collected:
+      any[] = [];
+
+    const meterById =
+      new Map<
+        string,
+        number
+      >();
+
+    let nextCursor:
+      string | null = null;
+
+    let filledCursor:
+      Cursor | null =
+      null;
+
+    let locationFallbackUsed =
+      decodedCursor?.mode ===
+      "FALLBACK";
+
+    // ========================================================
+    // NORMAL LOCATION SEARCH
+    // ========================================================
+
+    /**
+     * If cursor says FALLBACK,
+     * DON'T retry location.
+     *
+     * We already know frontend
+     * is paging through fallback
+     * results.
+     */
+
+    const shouldRunNormalLocationSearch =
+      decodedCursor?.mode !==
+      "FALLBACK";
+
+    if (
+      shouldRunNormalLocationSearch
+    ) {
+      let cursorState:
+        Cursor | null =
+        decodedCursor;
+
+      // ======================================================
+      // CASE 1:
+      // MANUAL CITY / STATE / COUNTRY
+      // ======================================================
+
+      if (
+        hasManualLocationFilter
+      ) {
+        console.log(
+          "LOCATION MODE: MANUAL CITY/STATE/COUNTRY",
+        );
+
+        for (
+          let round = 0;
+          round < MAX_ROUNDS &&
+          collected.length <
+            pageLimit;
+          round++
+        ) {
+          const candidateStart =
+            performance.now();
+
+          const rows =
+            await prisma.$queryRaw<
+              {
+                id: string;
+                sort_val: number;
+              }[]
+            >`
+              SELECT
+                u.id,
+
+                (
+                  EXTRACT(
+                    EPOCH FROM u.created_at
+                  ) * 1000
+                )::float8 AS sort_val
+
+              FROM users u
+
+              JOIN user_profiles p
+                ON p.user_id = u.id
+
+              WHERE
+                ${matchConditions}
+
+                ${
+                  cursorState
+                    ? Prisma.sql`
+                        AND (
+                          (
+                            EXTRACT(
+                              EPOCH FROM u.created_at
+                            ) * 1000
+                          ) < ${cursorState.k}
+
+                          OR (
+                            (
+                              EXTRACT(
+                                EPOCH FROM u.created_at
+                              ) * 1000
+                            ) = ${cursorState.k}
+
+                            AND u.id <
+                              ${cursorState.id}::uuid
+                          )
+                        )
+                      `
+                    : Prisma.empty
+                }
+
+              ORDER BY
+                sort_val DESC,
+                u.id DESC
+
+              LIMIT ${batchSize};
+            `;
+
+          console.log(
+            `MANUAL LOCATION candidate round ${round}:`,
+            performance.now() -
+              candidateStart,
+            "ms",
+            "rows:",
+            rows.length,
+          );
+
+          if (
+            rows.length === 0
+          ) {
+            break;
+          }
+
+          const idOrder =
+            rows.map(
+              (row) =>
+                row.id,
+            );
+
+          const hydrateStart =
+            performance.now();
+
+          /**
+           * IMPORTANT:
+           *
+           * This is where actual:
+           *
+           * city = Pune
+           * state = Maharashtra
+           * country = India
+           *
+           * is applied through
+           * buildFilterQuery().
+           */
+
+          const hydrated =
+            await prisma.user.findMany(
+              {
+                where: {
+                  id: {
+                    in: idOrder,
+                  },
+
+                  ...userFilters,
+
+                  ...(Object.keys(
+                    profileFilters,
+                  ).length > 0
+                    ? {
+                        profile: {
+                          is: profileFilters,
+                        },
+                      }
+                    : {}),
+                },
+
+                select:
+                  userSelect,
+              },
+            );
+
+          console.log(
+            `MANUAL LOCATION hydration round ${round}:`,
+            performance.now() -
+              hydrateStart,
+            "ms",
+            "users:",
+            hydrated.length,
+          );
+
+          const byId =
+            new Map(
+              hydrated.map(
+                (user) => [
+                  user.id,
+                  user,
+                ],
+              ),
+            );
+
+          let pageFilled =
+            false;
+
+          for (
+            const row of rows
+          ) {
+            const user =
+              byId.get(
+                row.id,
+              );
+
+            if (!user) {
+              continue;
+            }
+
+            collected.push(
+              user,
+            );
+
+            if (
+              collected.length ===
+              pageLimit
+            ) {
+              filledCursor = {
+                k: Number(
+                  row.sort_val,
+                ),
+
+                id: row.id,
+
+                mode:
+                  "LOCATION",
+              };
+
+              pageFilled =
+                true;
+
+              break;
+            }
+          }
+
+          if (pageFilled) {
+            break;
+          }
+
+          const tail =
+            rows[
+              rows.length -
+                1
+            ];
+
+          cursorState = {
+            k: Number(
+              tail.sort_val,
+            ),
+
+            id: tail.id,
+
+            mode:
+              "LOCATION",
+          };
+
+          if (
+            rows.length <
+            batchSize
+          ) {
+            break;
+          }
+        }
+      }
+
+      // ======================================================
+      // CASE 2:
+      // DISTANCE / LAT / LNG
+      // ======================================================
+
+      else if (
+        validCurrentUserCoordinates
+      ) {
+        console.log(
+          "LOCATION MODE: DISTANCE",
+          `${distanceKm} KM`,
+        );
+
+        const me =
+          Prisma.sql`
+            ST_SetSRID(
+              ST_MakePoint(
+                ${myLongitude},
+                ${myLatitude}
+              ),
+              4326
+            )::geography
+          `;
+
+        for (
+          let round = 0;
+          round < MAX_ROUNDS &&
+          collected.length <
+            pageLimit;
+          round++
+        ) {
+          const candidateStart =
+            performance.now();
+
+          const rows =
+            await prisma.$queryRaw<
+              {
+                id: string;
+                sort_val: number;
+              }[]
+            >`
+              SELECT
+                u.id,
+
+                (
+                  p.location::geography
+                  <-> ${me}
+                )::float8
+                  AS sort_val
+
+              FROM users u
+
+              JOIN user_profiles p
+                ON p.user_id = u.id
+
+              WHERE
+                ${matchConditions}
+
+                AND p.location
+                  IS NOT NULL
+
+                AND ST_DWithin(
+                  p.location::geography,
+                  ${me},
+                  ${distanceKm * 1000}
+                )
+
+                ${
+                  cursorState
+                    ? Prisma.sql`
+                        AND (
+                          (
+                            p.location::geography
+                            <-> ${me}
+                          ) > ${cursorState.k}
+
+                          OR (
+                            (
+                              p.location::geography
+                              <-> ${me}
+                            ) = ${cursorState.k}
+
+                            AND u.id >
+                              ${cursorState.id}::uuid
+                          )
+                        )
+                      `
+                    : Prisma.empty
+                }
+
+              ORDER BY
+                p.location::geography
+                  <-> ${me} ASC,
+
+                u.id ASC
+
+              LIMIT ${batchSize};
+            `;
+
+          console.log(
+            `DISTANCE candidate round ${round}:`,
+            performance.now() -
+              candidateStart,
+            "ms",
+            "rows:",
+            rows.length,
+          );
+
+          if (
+            rows.length === 0
+          ) {
+            break;
+          }
+
+          for (
+            const row of rows
+          ) {
+            meterById.set(
+              row.id,
+              Number(
+                row.sort_val,
+              ),
+            );
+          }
+
+          const idOrder =
+            rows.map(
+              (row) =>
+                row.id,
+            );
+
+          const hydrateStart =
+            performance.now();
+
+          const hydrated =
+            await prisma.user.findMany(
+              {
+                where: {
+                  id: {
+                    in: idOrder,
+                  },
+
+                  ...userFilters,
+
+                  ...(Object.keys(
+                    profileFilters,
+                  ).length > 0
+                    ? {
+                        profile: {
+                          is: profileFilters,
+                        },
+                      }
+                    : {}),
+                },
+
+                select:
+                  userSelect,
+              },
+            );
+
+          console.log(
+            `DISTANCE hydration round ${round}:`,
+            performance.now() -
+              hydrateStart,
+            "ms",
+            "users:",
+            hydrated.length,
+          );
+
+          const byId =
+            new Map(
+              hydrated.map(
+                (user) => [
+                  user.id,
+                  user,
+                ],
+              ),
+            );
+
+          let pageFilled =
+            false;
+
+          for (
+            const row of rows
+          ) {
+            const user =
+              byId.get(
+                row.id,
+              );
+
+            if (!user) {
+              continue;
+            }
+
+            collected.push(
+              user,
+            );
+
+            if (
+              collected.length ===
+              pageLimit
+            ) {
+              filledCursor = {
+                k: Number(
+                  row.sort_val,
+                ),
+
+                id: row.id,
+
+                mode:
+                  "LOCATION",
+              };
+
+              pageFilled =
+                true;
+
+              break;
+            }
+          }
+
+          if (pageFilled) {
+            break;
+          }
+
+          const tail =
+            rows[
+              rows.length -
+                1
+            ];
+
+          cursorState = {
+            k: Number(
+              tail.sort_val,
+            ),
+
+            id: tail.id,
+
+            mode:
+              "LOCATION",
+          };
+
+          if (
+            rows.length <
+            batchSize
+          ) {
+            break;
+          }
+        }
+      } else {
+        /**
+         * Current user has no
+         * latitude / longitude.
+         *
+         * Don't query (0,0).
+         *
+         * Directly go to fallback.
+         */
+
+        console.log(
+          "CURRENT USER HAS NO VALID LAT/LNG. SKIPPING DISTANCE AND USING FALLBACK.",
+        );
+      }
     }
-    return bActivity - aActivity;
-  });
 
-  // -------------------------
-  // RESPONSE
-  // -------------------------
-  return {
-    users: sortedUsers,
-    nextCursor,
+    // ========================================================
+    // LOCATION FALLBACK
+    // ========================================================
+
+    /**
+     * Run fallback when:
+     *
+     * 1. manual location returned 0
+     *
+     * OR
+     *
+     * 2. distance returned 0
+     *
+     * OR
+     *
+     * 3. current user has no lat/lng
+     *
+     * OR
+     *
+     * 4. previous cursor was already
+     *    in FALLBACK mode.
+     */
+
+    if (
+      collected.length === 0
+    ) {
+      locationFallbackUsed =
+        true;
+
+      console.log(
+        "====================================",
+      );
+
+      console.log(
+        "NO USERS FOUND WITH LOCATION.",
+      );
+
+      console.log(
+        "RUNNING FALLBACK WITHOUT LOCATION/DISTANCE.",
+      );
+
+      console.log(
+        "ALL OTHER FILTERS ARE STILL ACTIVE.",
+      );
+
+      console.log(
+        "====================================",
+      );
+
+      /**
+       * If we already returned
+       * fallback page 1,
+       * page 2 should continue
+       * using its fallback cursor.
+       *
+       * Otherwise fallback starts
+       * fresh.
+       */
+
+      let fallbackCursorState:
+        Cursor | null =
+        decodedCursor?.mode ===
+        "FALLBACK"
+          ? decodedCursor
+          : null;
+
+      // clear distance because
+      // fallback users may not have it
+      meterById.clear();
+
+      for (
+        let round = 0;
+        round < MAX_ROUNDS &&
+        collected.length <
+          pageLimit;
+        round++
+      ) {
+        const candidateStart =
+          performance.now();
+
+        /**
+         * IMPORTANT:
+         *
+         * NO:
+         *
+         * ST_DWithin()
+         *
+         * NO:
+         *
+         * city/state/country
+         *
+         * Only base compatibility
+         * conditions here.
+         */
+
+        const rows =
+          await prisma.$queryRaw<
+            {
+              id: string;
+              sort_val: number;
+            }[]
+          >`
+            SELECT
+              u.id,
+
+              (
+                EXTRACT(
+                  EPOCH FROM u.created_at
+                ) * 1000
+              )::float8
+                AS sort_val
+
+            FROM users u
+
+            JOIN user_profiles p
+              ON p.user_id = u.id
+
+            WHERE
+              ${matchConditions}
+
+              ${
+                fallbackCursorState
+                  ? Prisma.sql`
+                      AND (
+                        (
+                          EXTRACT(
+                            EPOCH FROM u.created_at
+                          ) * 1000
+                        ) < ${fallbackCursorState.k}
+
+                        OR (
+                          (
+                            EXTRACT(
+                              EPOCH FROM u.created_at
+                            ) * 1000
+                          ) = ${fallbackCursorState.k}
+
+                          AND u.id <
+                            ${fallbackCursorState.id}::uuid
+                        )
+                      )
+                    `
+                  : Prisma.empty
+              }
+
+            ORDER BY
+              sort_val DESC,
+              u.id DESC
+
+            LIMIT ${batchSize};
+          `;
+
+        console.log(
+          `FALLBACK candidate round ${round}:`,
+          performance.now() -
+            candidateStart,
+          "ms",
+          "rows:",
+          rows.length,
+        );
+
+        if (
+          rows.length === 0
+        ) {
+          break;
+        }
+
+        const idOrder =
+          rows.map(
+            (row) =>
+              row.id,
+          );
+
+        const hydrateStart =
+          performance.now();
+
+        /**
+         * Here we're using:
+         *
+         * fallbackUserFilters
+         * +
+         * fallbackProfileFilters
+         *
+         * Therefore location is gone,
+         * but every other filter stays.
+         */
+
+        const hydrated =
+          await prisma.user.findMany(
+            {
+              where: {
+                id: {
+                  in: idOrder,
+                },
+
+                ...fallbackUserFilters,
+
+                ...(Object.keys(
+                  fallbackProfileFilters,
+                ).length > 0
+                  ? {
+                      profile: {
+                        is:
+                          fallbackProfileFilters,
+                      },
+                    }
+                  : {}),
+              },
+
+              select:
+                userSelect,
+            },
+          );
+
+        console.log(
+          `FALLBACK hydration round ${round}:`,
+          performance.now() -
+            hydrateStart,
+          "ms",
+          "users:",
+          hydrated.length,
+        );
+
+        const byId =
+          new Map(
+            hydrated.map(
+              (user) => [
+                user.id,
+                user,
+              ],
+            ),
+          );
+
+        let pageFilled =
+          false;
+
+        for (
+          const row of rows
+        ) {
+          const user =
+            byId.get(
+              row.id,
+            );
+
+          if (!user) {
+            continue;
+          }
+
+          collected.push(
+            user,
+          );
+
+          if (
+            collected.length ===
+            pageLimit
+          ) {
+            filledCursor = {
+              k: Number(
+                row.sort_val,
+              ),
+
+              id: row.id,
+
+              mode:
+                "FALLBACK",
+            };
+
+            pageFilled =
+              true;
+
+            break;
+          }
+        }
+
+        if (pageFilled) {
+          break;
+        }
+
+        const tail =
+          rows[
+            rows.length -
+              1
+          ];
+
+        fallbackCursorState =
+          {
+            k: Number(
+              tail.sort_val,
+            ),
+
+            id: tail.id,
+
+            mode:
+              "FALLBACK",
+          };
+
+        if (
+          rows.length <
+          batchSize
+        ) {
+          break;
+        }
+      }
+    }
+
+    // ========================================================
+    // STILL NO USERS
+    // ========================================================
+
+    if (
+      collected.length === 0
+    ) {
+      return {
+        users: [],
+
+        nextCursor: null,
+
+        locationFallbackUsed,
+      };
+    }
+
+    // ========================================================
+    // PAGE
+    // ========================================================
+
+    const page =
+      collected.slice(
+        0,
+        pageLimit,
+      );
+
+    if (filledCursor) {
+      nextCursor =
+        encodeCursor(
+          filledCursor,
+        );
+    }
+
+    const candidateIds =
+      page.map(
+        (user) =>
+          user.id,
+      );
+
+    // ========================================================
+    // BOOSTS
+    // ========================================================
+
+    const boostStart =
+      performance.now();
+
+    const boostQuery =
+      await prisma.boostUsage.findMany(
+        {
+          where: {
+            user_id: {
+              in: candidateIds,
+            },
+
+            is_active: true,
+
+            ended_at: {
+              gt: now,
+            },
+          },
+
+          select: {
+            user_id: true,
+          },
+        },
+      );
+
+    console.log(
+      "boosts:",
+      performance.now() -
+        boostStart,
+      "ms",
+    );
+
+    const boostedUserIds =
+      new Set(
+        boostQuery.map(
+          (boost) =>
+            boost.user_id,
+        ),
+      );
+
+    // ========================================================
+    // PRESENCE
+    // ========================================================
+
+    const presenceStart =
+      performance.now();
+
+    const presenceMap =
+      await getUsersPresence(
+        candidateIds,
+      );
+
+    console.log(
+      "presence:",
+      performance.now() -
+        presenceStart,
+      "ms",
+    );
+
+    // ========================================================
+    // COMPATIBILITY SCORE
+    // ========================================================
+
+    const compatibilityStart =
+      performance.now();
+
+    const compatibilityScores =
+      await prisma.userCompatibility.findMany(
+        {
+          where: {
+            userId,
+
+            targetUserId: {
+              in: candidateIds,
+            },
+          },
+
+          select: {
+            targetUserId: true,
+
+            score: true,
+
+            percentage: true,
+          },
+        },
+      );
+
+    console.log(
+      "compatibility scores:",
+      performance.now() -
+        compatibilityStart,
+      "ms",
+    );
+
+    const compatibilityMap =
+      new Map(
+        compatibilityScores.map(
+          (compatibility) => [
+            compatibility.targetUserId,
+            compatibility,
+          ],
+        ),
+      );
+
+    // ========================================================
+    // ENRICH USERS
+    // ========================================================
+
+    const nowMs =
+      Date.now();
+
+    const boostWindow =
+      NEW_USER_BOOST_HOURS *
+      60 *
+      60 *
+      1000;
+
+    const enriched =
+      page.map(
+        (user) => {
+          const presence =
+            presenceMap[
+              user.id
+            ];
+
+          const meters =
+            meterById.get(
+              user.id,
+            );
+
+          const compat =
+            compatibilityMap.get(
+              user.id,
+            );
+
+          const matchScore =
+            compat?.percentage ??
+            0;
+
+          const compatibilityScore =
+            compat?.score ?? 0;
+
+          return {
+            id: user.id,
+
+            full_name:
+              user.full_name,
+
+            birth_date:
+              formatBirthDate(
+                user.birth_date,
+              ),
+
+            age: calculateAge(
+              user.birth_date,
+            ),
+
+            height:
+              user.height,
+
+            created_at:
+              user.created_at,
+
+            last_active_at:
+              user.last_active_at,
+
+            profile: {
+              city:
+                user.profile
+                  ?.city ||
+                null,
+
+              state:
+                user.profile
+                  ?.state ||
+                null,
+
+              country:
+                user.profile
+                  ?.country ||
+                null,
+
+              latitude:
+                user.profile
+                  ?.latitude ||
+                null,
+
+              longitude:
+                user.profile
+                  ?.longitude ||
+                null,
+            },
+
+            eduWork: {
+              professionId:
+                user.eduWork
+                  ?.professionId ||
+                null,
+
+              profession:
+                user.eduWork
+                  ?.profession ||
+                null,
+            },
+
+            photos:
+              user.photos ||
+              [],
+
+            matchScore,
+
+            compatibilityScore,
+
+            /**
+             * Distance is available
+             * only when actual
+             * distance mode was used.
+             *
+             * For:
+             *
+             * manual city mode
+             * fallback mode
+             *
+             * distance is null.
+             */
+
+            distanceKm:
+              meters != null
+                ? Math.round(
+                    (
+                      meters /
+                      1000
+                    ) *
+                      100,
+                  ) / 100
+                : null,
+
+            trust:
+              STATIC_TRUST,
+
+            replyTime:
+              STATIC_REPLY_TIME,
+
+            isOnline:
+              presence?.isOnline ||
+              false,
+
+            lastActiveAt:
+              presence?.lastActiveAt ||
+              null,
+
+            lastSeen:
+              formatLastSeen(
+                presence?.lastActiveAt,
+              ),
+
+            isBoosted:
+              boostedUserIds.has(
+                user.id,
+              ),
+          };
+        },
+      );
+
+    // ========================================================
+    // SORT RETURNED PAGE
+    // ========================================================
+
+    const sortedUsers =
+      enriched.sort(
+        (a, b) => {
+          const aActivity =
+            a.lastActiveAt
+              ?.getTime() ||
+            0;
+
+          const bActivity =
+            b.lastActiveAt
+              ?.getTime() ||
+            0;
+
+          const aCreated =
+            a.created_at
+              ? new Date(
+                  a.created_at,
+                ).getTime()
+              : 0;
+
+          const bCreated =
+            b.created_at
+              ? new Date(
+                  b.created_at,
+                ).getTime()
+              : 0;
+
+          const aIsNew =
+            nowMs -
+              aCreated <
+            boostWindow;
+
+          const bIsNew =
+            nowMs -
+              bCreated <
+            boostWindow;
+
+          // 1. BOOSTED FIRST
+          if (
+            a.isBoosted !==
+            b.isBoosted
+          ) {
+            return a.isBoosted
+              ? -1
+              : 1;
+          }
+
+          // 2. NEW USERS
+          if (
+            aIsNew !==
+            bIsNew
+          ) {
+            return aIsNew
+              ? -1
+              : 1;
+          }
+
+          // 3. MATCH SCORE
+          if (
+            a.matchScore !==
+            b.matchScore
+          ) {
+            return (
+              b.matchScore -
+              a.matchScore
+            );
+          }
+
+          // 4. ACTIVE USERS
+          return (
+            bActivity -
+            aActivity
+          );
+        },
+      );
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return {
+      users: sortedUsers,
+
+      nextCursor,
+
+      /**
+       * false:
+       * users came from preferred
+       * city/distance.
+       *
+       * true:
+       * location produced zero
+       * users, so location was
+       * removed.
+       */
+      locationFallbackUsed,
+    };
   };
-};
-
 
 export const getFeedDetailsService = async (
   userId: string,

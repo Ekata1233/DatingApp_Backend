@@ -12,6 +12,7 @@ import {
   addPurchasedRosesSchema,
   validate,
 } from "./rose.validation";
+import { getIO } from "../../config/socket";
 
 export const sendRoseController = async (req: Request, res: Response) => {
   try {
@@ -21,6 +22,35 @@ export const sendRoseController = async (req: Request, res: Response) => {
     const data = await sendRoseService(senderId, {
       ...validatedData,
     });
+
+    const receiverId = validatedData.receiverId;
+    console.log("receiverId in sendRoseController : ", receiverId);
+    // ========================================
+    // SOCKET.IO
+    // ========================================
+
+
+
+    const io = getIO();
+
+    const room = `user:${receiverId}`;
+
+    const sockets = await io.in(room).fetchSockets();
+
+    console.log("🔥 ROSE RECEIVER ROOM:", room);
+
+    console.log(
+      "🔥 SOCKETS IN RECEIVER ROOM:",
+      sockets.map((socket) => ({
+        socketId: socket.id,
+        userId: (socket as any).user?.id,
+      }))
+    );
+
+    io.to(`user:${receiverId}`).emit(
+      "message:receive",
+      data.message,
+    );
 
     return res.status(201).json({
       success: true,
