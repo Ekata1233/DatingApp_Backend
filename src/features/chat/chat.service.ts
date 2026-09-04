@@ -1,6 +1,7 @@
 // src/modules/chat/chat.service.ts
 
 import {
+  ConversationDetailsResponse,
   CreateConversationInput,
   DeleteMessageInput,
   GetConversationsInput,
@@ -12,6 +13,7 @@ import {
 import { chatRepository } from "./chat.repository";
 import { buildMessageProgress } from "./chat.helper";
 import { createNotification } from "../notification/notification.service";
+import { presenceService } from "./presence/presence.service";
 
 export const chatService = {
   /**
@@ -411,6 +413,118 @@ export const chatService = {
     return {
       conversation,
       message,
+    };
+  },
+
+ async getProfileDetails(
+    conversationId: string,
+    currentUserId: string,
+  ) {
+    console.log(
+    "=== GET PROFILE DETAILS SERVICE ===",
+  );
+    if (!conversationId) {
+      throw new Error(
+        "Conversation ID is required",
+      );
+    }
+
+    if (!currentUserId) {
+      throw new Error(
+        "User ID is required",
+      );
+    }
+
+    /**
+     * Get profile information from DB
+     */
+    const result =
+      await chatRepository.getConversationUserDetailsRepository(
+        conversationId,
+        currentUserId,
+      );
+      
+    /**
+     * Get real-time presence from Redis
+     */
+    const presence =
+      await presenceService.getPresence(
+        result.targetUserId,
+      );
+
+    /**
+     * Calculate age
+     */
+    let age: number | null = null;
+
+    if (result.user.birth_date) {
+      const today = new Date();
+
+      const birthDate =
+        new Date(
+          result.user.birth_date,
+        );
+
+      age =
+        today.getFullYear() -
+        birthDate.getFullYear();
+
+      const monthDifference =
+        today.getMonth() -
+        birthDate.getMonth();
+
+      if (
+        monthDifference < 0 ||
+        (
+          monthDifference === 0 &&
+          today.getDate() <
+            birthDate.getDate()
+        )
+      ) {
+        age--;
+      }
+    }
+
+    /**
+     * Active package
+     */
+    const activePackage =
+      result.user.userPackages?.[0];
+
+    const packageType =
+      activePackage?.package?.name ??
+      "FREE";
+
+    /**
+     * Profile image
+     */
+    const profileImage =
+      result.user.photos?.[0]
+        ?.media_url ?? null;
+
+    return {
+      conversationId:result.conversationId,
+      user: {userId:result.targetUserId,
+        name:result.user.full_name,
+
+        age,
+
+        packageType,
+
+        isOnline:
+          presence.isOnline,
+
+        lastSeenAt:
+          presence.lastSeenAt,
+
+        isBlocked:
+          result.isBlocked,
+
+        matchScore:
+          result.matchScore ?? 0,
+
+        profileImage,
+      },
     };
   },
 };

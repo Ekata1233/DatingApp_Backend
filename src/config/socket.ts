@@ -3,6 +3,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { AuthenticatedSocket, socketAuthMiddleware } from "../middleware/socketAuth.middleware";
 import { registerChatSocket } from "../features/chat/socket/chat.socket";
 import { presenceService } from "../features/chat/presence/presence.service";
+import { registerProfileSocket } from "../features/chat/profile/profile.socket";
 
 
 let io: SocketIOServer;
@@ -35,6 +36,7 @@ export const initializeSocket = (server: HttpServer): SocketIOServer => {
    * Register socket modules
    */
   registerChatSocket(io);
+  registerProfileSocket(io)
 
   io.on("connection", async (socket) => {
     const userId = (socket as AuthenticatedSocket).userId;

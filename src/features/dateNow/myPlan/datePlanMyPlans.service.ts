@@ -236,6 +236,17 @@ export const getMyPlansService = async ({
                 id: true,
                 full_name: true,
                 birth_date: true,
+                profile: {
+                  select: {
+                    country: true,
+                    state: true,
+                    city: true,
+                    area: true,
+                    max_distance_km: true,
+                    latitude: true,
+                    longitude: true,
+                  },
+                },
 
                 photos: {
                   where: {
@@ -261,6 +272,7 @@ export const getMyPlansService = async ({
                 },
               },
             },
+            billSuggestion: true,
           },
         },
 
@@ -455,7 +467,19 @@ export const getMyPlansService = async ({
         status: request.status,
 
         message: request.message,
+        // BILL SUGGESTION ID
+        billSuggestionId: request.billSuggestionId,
 
+        // BILL SUGGESTION DETAILS
+        billSuggestion: request.billSuggestion
+          ? {
+              id: request.billSuggestion.id,
+              type: request.billSuggestion.type,
+              label: request.billSuggestion.label,
+              value: request.billSuggestion.value,
+              icon: request.billSuggestion.icon,
+            }
+          : null,
         createdAt: request.createdAt,
 
         requester: {
@@ -468,6 +492,30 @@ export const getMyPlansService = async ({
           photo: request.requester.photos[0]?.media_url ?? null,
 
           matchPercentage: null,
+           location: request.requester.profile
+    ? {
+        country:
+          request.requester.profile.country,
+
+        state:
+          request.requester.profile.state,
+
+        city:
+          request.requester.profile.city,
+
+        area:
+          request.requester.profile.area,
+
+        maxDistanceKm:
+          request.requester.profile.max_distance_km,
+
+        latitude:
+          request.requester.profile.latitude,
+
+        longitude:
+          request.requester.profile.longitude,
+      }
+    : null,
         },
       })),
     };

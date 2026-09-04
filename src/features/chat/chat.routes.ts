@@ -8,6 +8,7 @@ import {
   deleteConversation,
   deleteMessage,
   getConversations,
+  getConversationUserDetailsController,
   getMessages,
   getUserPresenceController,
   inviteToEvent,
@@ -83,6 +84,12 @@ router.post(
   "/event/:eventId/invite",
   authMiddleware,
   inviteToEvent,
+);
+
+router.get(
+  "/:conversationId/details",
+  authMiddleware,
+  getConversationUserDetailsController,
 );
 
 export default router;

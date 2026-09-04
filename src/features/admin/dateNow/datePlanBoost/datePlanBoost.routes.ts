@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { createOrUpdateDatePlanBoostController, getDatePlanBoostController } from "./datePlanBoost.controller";
+import { createOrUpdateDatePlanBoostController, getActiveDatePlanBoostForMobileController, getDatePlanBoostController } from "./datePlanBoost.controller";
+import authMiddleware from "../../../../middleware/auth.middleware";
 
 
 
@@ -11,8 +12,12 @@ router.post(
 );
 
 router.get(
-  "/date-plan-boosts/get",
+  "/date-plan-boosts/get-all",
   getDatePlanBoostController,
 );
-
+router.get(
+  "/date-plan-boosts/get",
+  authMiddleware,
+  getActiveDatePlanBoostForMobileController,
+);
 export default router;

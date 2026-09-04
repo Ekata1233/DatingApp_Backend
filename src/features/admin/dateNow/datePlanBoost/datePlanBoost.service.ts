@@ -105,12 +105,13 @@ export const getDatePlanBoostService = async () => {
 
   return boost;
 };
-export const getActiveDatePlanBoostService = async () => {
+export const getActiveDatePlanBoostForMobileService = async (
+  userId: string,
+) => {
   const boost = await prisma.datePlanBoost.findFirst({
     where: {
       isActive: true,
     },
-
     include: {
       options: {
         orderBy: {
@@ -124,5 +125,33 @@ export const getActiveDatePlanBoostService = async () => {
     throw new Error("Active date plan boost not found");
   }
 
-  return boost;
+  const wallet = await prisma.wallet.findUnique({
+    where: {
+      userId,
+    },
+    select: {
+      balance: true,
+    },
+  });
+
+  return {
+    id: boost.id,
+    title: boost.title,
+    description: boost.description,
+    isActive: boost.isActive,
+
+    walletBalance: wallet
+      ? Number(wallet.balance)
+      : 0,
+
+    options: boost.options.map((option) => ({
+      id: option.id,
+      title: option.title,
+      durationHours: option.durationHours,
+      price: Number(option.price),
+      currency: option.currency,
+      isPopular: option.isPopular,
+      sortOrder: option.sortOrder,
+    })),
+  };
 };

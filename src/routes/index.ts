@@ -65,6 +65,7 @@ import notificationRoutes from "../features/notification/notification.routes";
 import onboardingRoutes from "../features/user/onboarding/onboarding.routes";
 import legalRoutes from "../features/legal/legal.routes";
 import datePlanBoostRoutes from "../features/admin/dateNow/datePlanBoost/datePlanBoost.routes";
+import datePlanUserBoostRoutes from "../features/dateNow/datePlanUserBoost/datePlanUserBoost.routes";
 
 
 const router = Router();
@@ -93,7 +94,7 @@ router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes,datePlanUserBoostRoutes,compliRoutes,eventsRoutes)
 
 router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes,eventsRoutes)
 router.use("/user",blockRoutes)

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { createOrUpdateDatePlanBoostService, getDatePlanBoostService } from "./datePlanBoost.service";
+import { createOrUpdateDatePlanBoostService, getActiveDatePlanBoostForMobileService, getDatePlanBoostService } from "./datePlanBoost.service";
 
 
 
@@ -87,6 +87,46 @@ export const getDatePlanBoostController = async (
   } catch (error: any) {
     console.error(
       "Get Date Plan Boost Error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Something went wrong",
+    });
+  }
+};
+
+
+export const getActiveDatePlanBoostForMobileController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized user",
+      });
+    }
+
+    const result =
+      await getActiveDatePlanBoostForMobileService(
+        userId,
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Date plan boost fetched successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "Get Mobile Date Plan Boost Error:",
       error,
     );
 
