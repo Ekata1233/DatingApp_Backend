@@ -19,6 +19,7 @@ import { ReferralService } from "../referral/referral.service";
 import { redis } from "../../../lib/redis";
 import { queueMatchScoreCalculation } from "../../../queues/match-score.queue";
 import { QUESTION_SCREEN_TO_ONBOARDING_STEP } from "../../../config/onboardingFlows";
+import { clearFeedUserCache } from "../user.helper";
 
 //profile update service
 export const updateProfileService = async (
@@ -83,6 +84,7 @@ export const updateProfileService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return user;
 };
@@ -138,6 +140,7 @@ export const updateInterestedInService = async (
   );
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return {
     updatedProfile,
@@ -211,7 +214,7 @@ export const updateReligionService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
-
+  await clearFeedUserCache(userId);
   return updatedProfile;
 };
 
@@ -287,7 +290,7 @@ export const updateLookingForService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
-
+  await clearFeedUserCache(userId);
   return result;
 };
 
@@ -350,7 +353,7 @@ export const updateAddressService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
-
+  await clearFeedUserCache(userId);
   return result;
 };
 
@@ -478,7 +481,7 @@ export const updateLocationService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
-
+  await clearFeedUserCache(userId);
   return {
     profile,
     onboarding_step: currentStep,
@@ -563,6 +566,8 @@ export const updateUserAnswerService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
+
   return {
     questionId,
     screen: question.screen,
@@ -625,6 +630,7 @@ export const updateEducationService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
   return {
     eduWork,
     onboarding: updatedUser,
@@ -696,6 +702,7 @@ export const updateWorkService = async (
     userId,
   );
 
+  await clearFeedUserCache(userId);
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
   return {
@@ -819,6 +826,8 @@ export const updateFamilyProfileService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
+
   return {
     updatedProfile: familyProfile,
     updatedUser,
@@ -902,6 +911,7 @@ export const updateLanguageService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };
@@ -1055,6 +1065,7 @@ export const updateUserMediaService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
   return updatedMedia;
 };
 
@@ -1127,6 +1138,7 @@ export const deleteUserMediaService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return {
     message:
@@ -1200,6 +1212,7 @@ export const updateUserVideoService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return video;
 };
@@ -1262,6 +1275,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };
@@ -1346,6 +1360,7 @@ export const updateUserPromptService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return {
     prompts: result,
@@ -1383,5 +1398,6 @@ export const completeOnboardingService = async (userId: string) => {
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
   return user;
 };

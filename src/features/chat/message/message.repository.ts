@@ -67,6 +67,8 @@ export const messageRepository = {
         },
       });
 
+      console.log("message created in message repo : ", message);
+
       await tx.conversation.update({
         where: {
           id: data.conversationId,

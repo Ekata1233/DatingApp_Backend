@@ -1232,6 +1232,7 @@ export const chatRepository = {
               in: [
                 MessageType.DATE_CONFIRMED,
                 MessageType.DATE_CANCELLED,
+                MessageType.DATE_INVITE,
               ],
             },
           }
@@ -1285,6 +1286,8 @@ export const chatRepository = {
         roseId: true,
         complimentId: true,
         giftId: true,
+        eventId: true,
+        datePlanId: true,
 
         // Current Rose state
         rose: {
@@ -1364,6 +1367,103 @@ export const chatRepository = {
             safetyFeatures: true,
           },
         },
+        datePlan: {
+          select: {
+            id: true,
+
+            // Step 1
+            activityId: true,
+            title: true,
+            quickTitleId: true,
+            note: true,
+            photoUrl: true,
+
+            // Step 2
+            venueName: true,
+            venueAddress: true,
+            venueLat: true,
+            venueLng: true,
+
+            // Step 3
+            duration: true,
+            whoPaysId: true,
+            participantLimit: true,
+            joinRequestGenderId: true,
+            visibilityId: true,
+
+            status: true,
+            eventDateTime: true,
+            expiresAt: true,
+
+            createdAt: true,
+            updatedAt: true,
+
+            // Activity
+            activity: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // Quick title
+            quickTitle: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // Who pays
+            whoPays: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // Joining gender
+            joinRequestGender: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // Visibility
+            visibility: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // Requests
+            requests: {
+              select: {
+                id: true,
+                status: true,
+                requesterId: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
       },
     });
   },
@@ -1390,6 +1490,7 @@ export const chatRepository = {
           metadata: data.metadata ?? undefined,
         },
       });
+
 
       /**
        * Update conversation's updatedAt.

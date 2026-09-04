@@ -10,6 +10,11 @@ import {
 import { EditProfileResponse } from "./editProfile.types";
 import { redis } from "../../../../lib/redis";
 import { queueMatchScoreCalculation } from "../../../../queues/match-score.queue";
+import { clearFeedUserCache } from "../../user.helper";
+import { getProfileRoom } from "../../../chat/profile/profile.socket";
+import { getIO } from "../../../../config/socket";
+import { chatRepository } from "../../../chat/chat.repository";
+import { chatService } from "../../../chat/chat.service";
 
 
 const CACHE_TTL = 604800;
@@ -134,8 +139,101 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
   // Clear cache only after a successful transaction
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   console.log("🗑️ Edit profile cache cleared");
+
+  // ------------------------------------------
+  // SOCKET: PROFILE UPDATED
+  // ------------------------------------------
+
+  const io = getIO();
+
+  // Find users who have conversations with this user
+  const conversations =
+    await chatRepository.findUserConversations(
+      userId,
+    );
+
+  console.log(
+    "Found conversations for userId:",
+    userId,
+    "Conversations:",
+    conversations,
+  );
+
+  for (const conversation of conversations) {
+    // Your repository already returns the OTHER user here
+    const otherUserId =
+      conversation.user?.id;
+
+    if (!otherUserId) {
+      console.log(
+        "Other user not found for conversation:",
+        conversation.conversationId,
+      );
+
+      continue;
+    }
+
+    const conversationId =
+      conversation.conversationId;
+
+    if (!conversationId) {
+      console.log(
+        "Conversation ID missing:",
+        conversation,
+      );
+
+      continue;
+    }
+
+    const profileRoom =
+      getProfileRoom(
+        userId,
+        otherUserId,
+      );
+
+    const sockets =
+      await io.in(profileRoom).fetchSockets();
+
+    console.log("PROFILE ROOM:", profileRoom);
+    console.log(
+      "SOCKETS IN PROFILE ROOM:",
+      sockets.length,
+    );
+
+    console.log(
+      "SOCKET IDS:",
+      sockets.map((s) => s.id),
+    );
+
+    // Get latest profile details
+    const profileDetails =
+      await chatService.getProfileDetails(
+        conversationId,
+        otherUserId,
+      );
+
+    console.log(
+      "Emitting profile:details",
+      {
+        profileRoom,
+        conversationId,
+        updatedUserId: userId,
+        otherUserId,
+      },
+    );
+
+    io.to(profileRoom).emit(
+      "profile:details",
+      {
+        success: true,
+        data: profileDetails,
+        updatedUserId: userId,
+      },
+    );
+  }
 
   return result;
 
@@ -149,6 +247,7 @@ export const updateBioService = async (userId: string, bio: string) => {
   );
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
   return updatedBio;
 };
 
@@ -297,6 +396,7 @@ export const updateQuestionAnswersService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };
@@ -385,7 +485,7 @@ export const updateEduWorkService = async (userId: string, payload: any) => {
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
-
+  await clearFeedUserCache(userId);
   return result;
 };
 
@@ -458,6 +558,7 @@ export const updateUserPromptService = async (userId: string, payload: any) => {
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };
@@ -513,6 +614,7 @@ export const updateLocationService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };
@@ -549,6 +651,7 @@ export const deleteUserPromptService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };
