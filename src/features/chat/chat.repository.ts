@@ -1112,6 +1112,30 @@ export const chatRepository = {
                 displayContent = message.content ?? "";
                 break;
 
+              case MessageType.AUDIO:
+                displayContent = message.content
+                  ? `🎵 ${message.content}`
+                  : "🎵 Audio";
+                break;
+
+              case MessageType.FILE:
+                displayContent = message.content
+                  ? `📎 ${message.content}`
+                  : "📎 File";
+                break;
+
+              case MessageType.CONTACT:
+                displayContent = message.content
+                  ? `👤 ${message.content}`
+                  : "👤 Contact";
+                break;
+
+              case MessageType.LOCATION:
+                displayContent = message.content
+                  ? `📍 ${message.content}`
+                  : "📍 Location";
+                break;
+
               case MessageType.GIFT:
                 displayContent =
                   message.senderId === userId
