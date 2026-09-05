@@ -922,11 +922,9 @@ export const uploadUserMediaService = async (
   files: any[],
   mediaType: "IMAGE" | "VIDEO",
 ) => {
-  if (!userId) throw new Error("User ID is required");
-
-  console.log("User ID:", userId);
-  // console.log("Files received:", files);
-  console.log("Media type:", mediaType);
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
 
   if (!files || files.length === 0) {
     throw new Error(
@@ -936,70 +934,183 @@ export const uploadUserMediaService = async (
     );
   }
 
+  // ==================================================
+  // 1. GET EXISTING MEDIA
+  // ==================================================
+
+  const existingMedia = await prisma.userPhoto.findMany({
+    where: {
+      user_id: userId,
+      media_type: mediaType,
+    },
+    select: {
+      id: true,
+      order: true,
+      is_primary: true,
+    },
+    orderBy: {
+      order: "desc",
+    },
+  });
+
+  // ==================================================
+  // 2. FIND CURRENT HIGHEST ORDER
+  // ==================================================
+
+ const highestOrder =
+  existingMedia.length > 0
+    ? existingMedia[0].order ?? 0
+    : 0;
+
+  // ==================================================
+  // 3. CHECK IF PRIMARY PHOTO ALREADY EXISTS
+  // ==================================================
+
+  const hasPrimaryPhoto =
+    mediaType === "IMAGE" &&
+    existingMedia.some(
+      (media) => media.is_primary,
+    );
+
+  // ==================================================
+  // 4. UPLOAD MEDIA
+  // ==================================================
+
   const uploadedMedia = await Promise.all(
-    files.map(async (file: any, index: number) => {
-      const base64File = file.data.toString("base64");
+    files.map(
+      async (
+        file: any,
+        index: number,
+      ) => {
+        const base64File =
+          file.data.toString("base64");
 
-      const uploadResponse = await imagekit.upload({
-        file: base64File,
-        fileName: file.name,
-        folder:
-          mediaType === "IMAGE"
-            ? "/user-photos"
-            : "/user-videos",
-      });
+        const uploadResponse =
+          await imagekit.upload({
+            file: base64File,
+            fileName: file.name,
+            folder:
+              mediaType === "IMAGE"
+                ? "/user-photos"
+                : "/user-videos",
+          });
 
-      return {
-        user_id: userId,
-        media_url: uploadResponse.url,
-        order: index + 1,
-        is_primary: index === 0,
-        media_type: mediaType,
-      };
-    }),
+        return {
+          user_id: userId,
+
+          media_url:
+            uploadResponse.url,
+
+          // Continue after existing photos
+          order:
+            highestOrder +
+            index +
+            1,
+
+          // Only first-ever image becomes primary
+          is_primary:
+            mediaType === "IMAGE" &&
+            !hasPrimaryPhoto &&
+            index === 0,
+
+          media_type: mediaType,
+        };
+      },
+    ),
   );
+
+  // ==================================================
+  // 5. SAVE MEDIA
+  // ==================================================
 
   await prisma.userPhoto.createMany({
     data: uploadedMedia,
   });
 
-  const savedMedia = await prisma.userPhoto.findMany({
-    where: {
-      user_id: userId,
-      media_type: mediaType,
-    },
-    orderBy: {
-      created_at: "asc",
-    },
-  });
+  // ==================================================
+  // 6. GET ALL MEDIA IN CORRECT ORDER
+  // ==================================================
+
+  const savedMedia =
+    await prisma.userPhoto.findMany({
+      where: {
+        user_id: userId,
+        media_type: mediaType,
+      },
+
+      orderBy: {
+        order: "asc",
+      },
+    });
+
+  // ==================================================
+  // 7. ONBOARDING
+  // ==================================================
 
   const currentStep = "PHOTOS";
-  const nextStep = getNextStep(currentStep);
 
-  const updatedUser = await prisma.user.update({
-    where: {
-      id: userId,
-    },
-    data: {
-      onboarding_step: currentStep,
-      next_step: nextStep,
-    },
-    select: {
-      onboarding_step: true,
-      next_step: true,
-    },
-  });
+  const nextStep =
+    getNextStep(currentStep);
 
-  const score = await calculateProfileScore(userId);
+  const updatedUser =
+    await prisma.user.update({
+      where: {
+        id: userId,
+      },
+
+      data: {
+        onboarding_step:
+          currentStep,
+
+        next_step:
+          nextStep,
+      },
+
+      select: {
+        onboarding_step: true,
+        next_step: true,
+      },
+    });
+
+  // ==================================================
+  // 8. PROFILE SCORE
+  // ==================================================
+
+  const score =
+    await calculateProfileScore(
+      userId,
+    );
 
   await prisma.user.update({
     where: {
       id: userId,
     },
+
     data: {
-      profile_completion: score,
+      profile_completion:
+        score,
     },
   });
+
+  // ==================================================
+  // 9. UPDATE MATCH SCORE + CACHE
+  // ==================================================
+
+  await queueMatchScoreCalculation(
+    userId,
+  );
+
+  await redis.del(
+    `profile:edit:${userId}`,
+  );
+
+  await redis.del(
+    `feed:details:${userId}`,
+  );
+
+  await clearFeedUserCache(
+    userId,
+  );
 
   return {
     media: savedMedia,
@@ -1114,31 +1225,121 @@ export const deleteUserMediaService = async (
   mediaId: string,
   mediaType: "IMAGE" | "VIDEO",
 ) => {
-  const media = await prisma.userPhoto.findFirst({
-    where: {
-      id: mediaId,
-      user_id: userId,
-      media_type: mediaType,
-    },
-  });
+  const media =
+    await prisma.userPhoto.findFirst({
+      where: {
+        id: mediaId,
+        user_id: userId,
+        media_type: mediaType,
+      },
+    });
 
   if (!media) {
-    throw new Error("Media not found");
+    throw new Error(
+      "Media not found",
+    );
   }
 
-  await prisma.userPhoto.delete({
-    where: {
-      id: mediaId,
+  await prisma.$transaction(
+    async (tx) => {
+      // Delete media
+      await tx.userPhoto.delete({
+        where: {
+          id: mediaId,
+        },
+      });
+
+      // ==============================================
+      // IMAGE LOGIC
+      // ==============================================
+
+      if (mediaType === "IMAGE") {
+        const remainingPhotos =
+          await tx.userPhoto.findMany({
+            where: {
+              user_id: userId,
+              media_type: "IMAGE",
+            },
+
+            orderBy: {
+              order: "asc",
+            },
+          });
+
+        // ------------------------------------------
+        // Reassign order
+        // ------------------------------------------
+
+        for (
+          let i = 0;
+          i < remainingPhotos.length;
+          i++
+        ) {
+          await tx.userPhoto.update({
+            where: {
+              id: remainingPhotos[i].id,
+            },
+
+            data: {
+              order: i + 1,
+            },
+          });
+        }
+
+        // ------------------------------------------
+        // If deleted photo was primary,
+        // make first remaining photo primary
+        // ------------------------------------------
+
+        if (
+          media.is_primary &&
+          remainingPhotos.length > 0
+        ) {
+          await tx.userPhoto.update({
+            where: {
+              id: remainingPhotos[0].id,
+            },
+
+            data: {
+              is_primary: true,
+            },
+          });
+        }
+      }
     },
-  });
+  );
 
   await queueMatchScoreCalculation(
     userId,
   );
 
-  await redis.del(`profile:edit:${userId}`);
-  await redis.del(`feed:details:${userId}`);
-  await clearFeedUserCache(userId);
+  await redis.del(
+    `profile:edit:${userId}`,
+  );
+
+  await redis.del(
+    `feed:details:${userId}`,
+  );
+
+  await clearFeedUserCache(
+    userId,
+  );
+
+  const score =
+    await calculateProfileScore(
+      userId,
+    );
+
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+
+    data: {
+      profile_completion:
+        score,
+    },
+  });
 
   return {
     message:
