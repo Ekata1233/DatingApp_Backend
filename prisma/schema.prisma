@@ -104,6 +104,12 @@ model User {
   sentNotifications     Notification[]      @relation("SentNotifications")
   DatePlanUserBoost     DatePlanUserBoost[]
 
+  //Relationship tag
+  relationshipTagProposalsSentRelationshipTagProposal[]@relation("RelationshipTagProposalSender")
+relationshipTagProposalsReceivedRelationshipTagProposal[]@relation("RelationshipTagProposalReceiver")
+relationshipsAsUser1UserRelationship[]@relation("RelationshipUser1")
+relationshipsAsUser2UserRelationship[]@relation("RelationshipUser2")
+
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])
@@ -2257,6 +2263,10 @@ enum MessageType {
   EVENT_INVITE
   EVENT_CONFIRM
   EVENT_CANCEL
+  RELATIONSHIP_TAG_PROPOSAL
+  RELATIONSHIP_TAG_ACCEPTED
+  RELATIONSHIP_TAG_REJECTED
+  RELATIONSHIP_TAG_CANCELLED
 }
 
 enum NotificationType {
@@ -2847,4 +2857,66 @@ model LegalPage {
 
   @@index([pageType])
   @@index([publishedAt])
+}
+
+enum RelationshipTag {
+  IN_RELATIONSHIP
+  OPEN_RELATIONSHIP
+  ENGAGED
+  DATE_TO_MARRY
+}
+
+enum RelationshipTagProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum UserRelationshipStatus {
+  ACTIVE
+  ENDED
+}
+
+model RelationshipTagProposal {
+  id          String                        @id @default(uuid()) @db.Uuid
+  senderId    String                        @db.Uuid
+  receiverId  String                        @db.Uuid
+  tag         RelationshipTag
+  status      RelationshipTagProposalStatus @default(PENDING)
+  message     String?
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+  respondedAt DateTime?
+
+  sender      User @relation("RelationshipTagProposalSender",fields: [senderId],references: [id],onDelete: Cascade)
+  receiver    User @relation("RelationshipTagProposalReceiver",fields: [receiverId],references: [id],onDelete: Cascade)
+  relationship UserRelationship?
+
+  @@index([senderId, status])
+  @@index([receiverId, status])
+  @@index([receiverId, createdAt])
+  @@map("relationship_tag_proposals")
+}
+
+model UserRelationship {
+  id          String                 @id @default(uuid()) @db.Uuid
+  user1Id     String                 @db.Uuid
+  user2Id     String                 @db.Uuid
+  tag         RelationshipTag
+  status      UserRelationshipStatus @default(ACTIVE)
+  startedAt   DateTime               @default(now())
+  endedAt     DateTime?
+  proposalId  String?                @unique @db.Uuid
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  user1       User @relation("RelationshipUser1",fields: [user1Id],references: [id],onDelete: Cascade)
+  user2       User @relation("RelationshipUser2",fields: [user2Id],references: [id],onDelete: Cascade)
+  proposal    RelationshipTagProposal? @relation(fields: [proposalId],references: [id],onDelete: SetNull)
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id, status])
+  @@index([user2Id, status])
+  @@map("user_relationships")
 }
