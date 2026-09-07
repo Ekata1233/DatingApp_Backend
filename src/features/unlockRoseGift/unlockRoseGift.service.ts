@@ -330,6 +330,9 @@ export const incrementRoseAndGiftMessages = async (
 ) => {
   const now = new Date();
 
+  console.log("sendid : ", senderId)
+  console.log("receiver id : ", receiverId)
+
   return prisma.$transaction(
     async (tx) => {
       // =====================================================
@@ -405,6 +408,8 @@ export const incrementRoseAndGiftMessages = async (
           },
         });
 
+        console.log("pending gift : ", pendingGift)
+
       // =====================================================
       // NOTHING PENDING
       // =====================================================
@@ -476,6 +481,8 @@ export const incrementRoseAndGiftMessages = async (
         const newGiftMessages =
           pendingGift.messagesSent +
           1;
+
+          console.log("new gift messge sent count : ", newGiftMessages)
 
         // -----------------------------------------
         // Update progress first
@@ -764,8 +771,7 @@ export const redeemGiftReward = async (
     });
   }
 
-  const redeemAmount = 10; // Assuming each rose is worth 10 units of currency
-    new Prisma.Decimal(
+  const redeemAmount = new Prisma.Decimal(
       userGift.pricePaid,
     );
 

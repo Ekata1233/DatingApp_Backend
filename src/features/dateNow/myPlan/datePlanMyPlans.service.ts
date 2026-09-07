@@ -134,13 +134,20 @@ export const getMyPlansService = async ({
 
     // Exclude plans where the logged-in user
     // has already submitted MET feedback
-    feedbacks: {
-      none: {
-        reviewerId: userId,
-        attendanceStatus: DatePlanAttendanceStatus.MET,
-        status: DatePlanFeedbackStatus.SUBMITTED,
-      },
+   feedbacks: {
+  none: {
+    reviewerId: userId,
+
+    attendanceStatus: {
+      in: [
+        DatePlanAttendanceStatus.MET,
+        DatePlanAttendanceStatus.NO_SHOW,
+      ],
     },
+
+    status: DatePlanFeedbackStatus.SUBMITTED,
+  },
+},
   };
 
   /**
@@ -648,6 +655,7 @@ export const updateMetUser = async ({
       },
     },
   });
+console.log("feedback",feedback);
 
   if (!feedback) {
     throw new Error(
