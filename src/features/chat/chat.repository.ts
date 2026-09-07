@@ -1259,10 +1259,19 @@ export const chatRepository = {
                 MessageType.DATE_INVITE,
               ],
             },
-          }
-          : {
-            messageType: type.toUpperCase() as MessageType,
-          };
+          } : type === "event"
+            ? {
+              messageType: {
+                in: [
+                  MessageType.EVENT_INVITE,
+                  MessageType.EVENT_CONFIRM,
+                  MessageType.EVENT_CANCEL,
+                ],
+              },
+            }
+            : {
+              messageType: type.toUpperCase() as MessageType,
+            };
     return prisma.chatMessage.findMany({
       where: {
         conversationId,
