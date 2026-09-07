@@ -68,6 +68,8 @@ import datePlanBoostRoutes from "../features/admin/dateNow/datePlanBoost/datePla
 import datePlanUserBoostRoutes from "../features/dateNow/datePlanUserBoost/datePlanUserBoost.routes";
 import relationshipTagRoutes from "../features/relationshipTag/relationshipTag.routes";
 import myBalanceRoutes from "../features/user/my-balance/myBalance.routes";
+import walletRoutes from "../features/wallet/wallet.route";
+
 
 
 const router = Router();
@@ -160,5 +162,9 @@ router.use("/user", relationshipTagRoutes);
 
 //MY BALANCE
 router.use("/user", myBalanceRoutes);
+//
+
+//WALLET
+router.use("/user", walletRoutes);
 //
 export default router;

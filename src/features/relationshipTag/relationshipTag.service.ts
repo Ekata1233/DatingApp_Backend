@@ -1,6 +1,8 @@
+import { RelationshipTag, UserRelationshipStatus } from "@prisma/client";
 import { calculateAge } from "../chat/chat.repository";
 import { relationshipTagRepository } from "./relationshipTag.repository";
 import { RelationshipTagProposalInput } from "./relationshipTag.validation";
+import { prisma } from "../../prisma/prismaClient";
 
 export const relationshipTagService = {
 
@@ -99,40 +101,40 @@ export const relationshipTagService = {
      * 7. Create proposal
      * ----------------------------------------
      */
-const result =
-  await relationshipTagRepository.createProposalWithMessage(
-    senderId,
-    receiverId,
-    tag,
-    message
-  );
+    const result =
+      await relationshipTagRepository.createProposalWithMessage(
+        senderId,
+        receiverId,
+        tag,
+        message
+      );
 
     /**
      * ----------------------------------------
      * 8. Return response
      * ----------------------------------------
      */
-   return {
-    proposal: {
-      id: result.proposal.id,
-      tag: result.proposal.tag,
-      status: result.proposal.status,
-      message: result.proposal.message,
-      createdAt: result.proposal.createdAt,
+    return {
+      proposal: {
+        id: result.proposal.id,
+        tag: result.proposal.tag,
+        status: result.proposal.status,
+        message: result.proposal.message,
+        createdAt: result.proposal.createdAt,
 
-      sender: {
-        id: result.proposal.sender.id,
-        fullName: result.proposal.sender.full_name,
+        sender: {
+          id: result.proposal.sender.id,
+          fullName: result.proposal.sender.full_name,
+        },
+
+        receiver: {
+          id: result.proposal.receiver.id,
+          fullName: result.proposal.receiver.full_name,
+        },
       },
 
-      receiver: {
-        id: result.proposal.receiver.id,
-        fullName: result.proposal.receiver.full_name,
-      },
-    },
-
-    message: result.message,
-  };
+      message: result.message,
+    };
   },
 
   /**
@@ -157,24 +159,24 @@ const result =
         userId
       );
 
-     return proposals.map((proposal) => ({
-    id: proposal.id,
-    tag: proposal.tag,
-    status: proposal.status,
-    message: proposal.message,
-    createdAt: proposal.createdAt,
+    return proposals.map((proposal) => ({
+      id: proposal.id,
+      tag: proposal.tag,
+      status: proposal.status,
+      message: proposal.message,
+      createdAt: proposal.createdAt,
 
-    sender: {
-      id: proposal.sender.id,
-      fullName: proposal.sender.full_name,
+      sender: {
+        id: proposal.sender.id,
+        fullName: proposal.sender.full_name,
 
-      age: calculateAge(
-        proposal.sender.birth_date
-      ),
+        age: calculateAge(
+          proposal.sender.birth_date
+        ),
 
-      photos: proposal.sender.photos,
-    },
-  }));
+        photos: proposal.sender.photos,
+      },
+    }));
   },
 
   /**
@@ -182,59 +184,59 @@ const result =
    * Accept proposal
    * ----------------------------------------
    */
-async acceptProposal(
-  proposalId: string,
-  userId: string
-) {
-  const result =
-    await relationshipTagRepository.acceptProposal(
-      proposalId,
-      userId
-    );
+  async acceptProposal(
+    proposalId: string,
+    userId: string
+  ) {
+    const result =
+      await relationshipTagRepository.acceptProposal(
+        proposalId,
+        userId
+      );
 
-  const {
-    relationship,
-    proposal,
-    message,
-  } = result;
-
-
-  // Determine partner
-  const partner =
-    userId === proposal.senderId
-      ? proposal.receiver
-      : proposal.sender;
+    const {
+      relationship,
+      proposal,
+      message,
+    } = result;
 
 
-  return {
-    id: relationship.id,
+    // Determine partner
+    const partner =
+      userId === proposal.senderId
+        ? proposal.receiver
+        : proposal.sender;
 
-    tag: relationship.tag,
 
-    status: relationship.status,
+    return {
+      id: relationship.id,
 
-    startedAt: relationship.startedAt,
+      tag: relationship.tag,
 
-    partner: {
-      id: partner.id,
+      status: relationship.status,
 
-      fullName:
-        partner.full_name,
-    },
+      startedAt: relationship.startedAt,
 
-    proposal: {
-      id: proposal.id,
+      partner: {
+        id: partner.id,
 
-      status: proposal.status,
+        fullName:
+          partner.full_name,
+      },
 
-      respondedAt:
-        proposal.respondedAt,
-    },
+      proposal: {
+        id: proposal.id,
 
-    // Important
-    message,
-  };
-},
+        status: proposal.status,
+
+        respondedAt:
+          proposal.respondedAt,
+      },
+
+      // Important
+      message,
+    };
+  },
 
   async rejectProposal(
     proposalId: string,
@@ -298,3 +300,294 @@ async acceptProposal(
 
 
 };
+
+// relationship.service.ts
+
+const getRelationshipTagLabel = (
+  tag: RelationshipTag,
+) => {
+  const labels: Record<
+    RelationshipTag,
+    string
+  > = {
+    IN_RELATIONSHIP: "In a relationship",
+    OPEN_RELATIONSHIP: "Open relationship",
+    ENGAGED: "Engaged",
+    DATE_TO_MARRY: "Dating to marry",
+  };
+
+  return labels[tag];
+};
+
+const getFirstName = (
+  fullName?: string | null,
+) => {
+  if (!fullName) {
+    return "Partner";
+  }
+
+  return fullName.trim().split(/\s+/)[0];
+};
+
+const formatSinceDate = (
+  date: Date,
+) => {
+  return new Intl.DateTimeFormat(
+    "en-GB",
+    {
+      day: "2-digit",
+      month: "short",
+    },
+  ).format(date);
+};
+
+/**
+ * Determines whether this relationship
+ * should hide the user from normal/new matches.
+ */
+const isExclusiveRelationship = (
+  tag: RelationshipTag,
+): boolean => {
+  const exclusiveTags: RelationshipTag[] = [
+    RelationshipTag.IN_RELATIONSHIP,
+    RelationshipTag.ENGAGED,
+    RelationshipTag.DATE_TO_MARRY,
+  ];
+
+  return exclusiveTags.includes(tag);
+};
+
+export const getCommitmentManagementService =
+  async (
+    userId: string,
+  ) => {
+    // -----------------------------------------
+    // 1. Find all ACTIVE relationships
+    // -----------------------------------------
+
+    const relationships =
+      await prisma.userRelationship.findMany({
+        where: {
+          status:
+            UserRelationshipStatus.ACTIVE,
+
+          OR: [
+            {
+              user1Id: userId,
+            },
+            {
+              user2Id: userId,
+            },
+          ],
+        },
+
+        include: {
+          user1: {
+            select: {
+              id: true,
+              full_name: true,
+
+              photos: {
+                orderBy: {
+                  order: "asc",
+                },
+
+                select: {
+                  media_url: true,
+                },
+
+                take: 1,
+              },
+            },
+          },
+
+          user2: {
+            select: {
+              id: true,
+              full_name: true,
+
+              photos: {
+                orderBy: {
+                  order: "asc",
+                },
+
+                select: {
+                  media_url: true,
+                },
+
+                take: 1,
+              },
+            },
+          },
+
+          proposal: {
+            select: {
+              id: true,
+              senderId: true,
+              receiverId: true,
+              tag: true,
+              status: true,
+              message: true,
+              createdAt: true,
+              respondedAt: true,
+            },
+          },
+        },
+
+        orderBy: {
+          startedAt: "desc",
+        },
+      });
+
+    // -----------------------------------------
+    // 2. No commitment
+    // -----------------------------------------
+
+    if (!relationships.length) {
+      return {
+        hasCommitment: false,
+        commitments: [],
+      };
+    }
+
+    // -----------------------------------------
+    // 3. Transform for mobile screen
+    // -----------------------------------------
+
+    const commitments = relationships.map(
+      (relationship) => {
+        const isUser1 =
+          relationship.user1Id === userId;
+
+        // Logged-in user
+        const self = isUser1
+          ? relationship.user1
+          : relationship.user2;
+
+        // Other person
+        const partner = isUser1
+          ? relationship.user2
+          : relationship.user1;
+
+        const tagLabel =
+          getRelationshipTagLabel(
+            relationship.tag,
+          );
+
+        const exclusive =
+          isExclusiveRelationship(
+            relationship.tag,
+          );
+
+        const firstName =
+          getFirstName(
+            partner.full_name,
+          );
+
+        return {
+          relationshipId:
+            relationship.id,
+
+          // ================================
+          // SELF PROFILE
+          // ================================
+
+          self: {
+            id: self.id,
+
+            fullName:
+              self.full_name,
+
+            firstName:
+              getFirstName(
+                self.full_name,
+              ),
+
+            photo:
+              self.photos[0]
+                ?.media_url ?? null,
+          },
+
+          // ================================
+          // PARTNER PROFILE
+          // ================================
+
+          partner: {
+            id: partner.id,
+
+            fullName:
+              partner.full_name,
+
+            firstName,
+
+            photo:
+              partner.photos[0]
+                ?.media_url ?? null,
+
+            identityVerified: false,
+          },
+
+          tag: relationship.tag,
+
+          tagLabel,
+
+          title:
+            `Together with ${firstName}`,
+
+          exclusivity: {
+            isExclusive: exclusive,
+
+            hiddenFromNewMatches:
+              exclusive,
+
+            label: exclusive
+              ? "Exclusive — hidden from new matches"
+              : "Open relationship",
+          },
+
+          sharedIntent: {
+            value:
+              relationship.tag,
+
+            label:
+              tagLabel,
+          },
+
+          since:
+            relationship.startedAt,
+
+          sinceLabel:
+            formatSinceDate(
+              relationship.startedAt,
+            ),
+
+          confirmation: {
+            mutuallyConfirmed: true,
+
+            label:
+              "Mutually confirmed",
+
+            proposalId:
+              relationship.proposal
+                ?.id ?? null,
+
+            confirmedAt:
+              relationship.proposal
+                ?.respondedAt ??
+              relationship.startedAt,
+          },
+
+          createdAt:
+            relationship.createdAt,
+
+          updatedAt:
+            relationship.updatedAt,
+        };
+      },
+    );
+
+    return {
+      hasCommitment: true,
+      commitments,
+    };
+  };
