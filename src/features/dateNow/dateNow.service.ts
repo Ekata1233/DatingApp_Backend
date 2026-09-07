@@ -6,6 +6,8 @@ import {
   TransactionSource,
   Prisma,
   PrismaClient,
+  DatePlanAttendanceStatus,
+  DatePlanFeedbackStatus,
 } from "@prisma/client";
 import {
   UpdateDatePlanActivityDTO,
@@ -198,9 +200,9 @@ const calculateDistanceKm = (
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
 
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
@@ -406,10 +408,10 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
 
   const eventTime = plan.eventDateTime
     ? plan.eventDateTime.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    })
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
     : null;
   return {
     id: plan.id,
@@ -436,9 +438,9 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
         plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
       age: plan.user.birth_date
         ? Math.floor(
-          (Date.now() - new Date(plan.user.birth_date).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000),
-        )
+            (Date.now() - new Date(plan.user.birth_date).getTime()) /
+              (365.25 * 24 * 60 * 60 * 1000),
+          )
         : null,
     },
   };
@@ -573,9 +575,9 @@ export const getDatePlanRequests = async (userId: string, planId: string) => {
         name: request.requester.full_name,
         age: request.requester.birth_date
           ? Math.floor(
-            (Date.now() - new Date(request.requester.birth_date).getTime()) /
-            (365.25 * 24 * 60 * 60 * 1000),
-          )
+              (Date.now() - new Date(request.requester.birth_date).getTime()) /
+                (365.25 * 24 * 60 * 60 * 1000),
+            )
           : null,
         photo: request.requester.photos?.[0]?.media_url ?? null,
       },
@@ -591,22 +593,21 @@ export const approveDatePlanRequest = async (
   // 1. FIND REQUEST
   // ==========================================
 
-  const request =
-    await prisma.datePlanRequest.findUnique({
-      where: {
-        id: requestId,
-      },
+  const request = await prisma.datePlanRequest.findUnique({
+    where: {
+      id: requestId,
+    },
 
-      include: {
-        requester: true,
+    include: {
+      requester: true,
 
-        plan: {
-          include: {
-            user: true,
-          },
+      plan: {
+        include: {
+          user: true,
         },
       },
-    });
+    },
+  });
 
   if (!request) {
     throw new Error("Request not found");
@@ -621,9 +622,7 @@ export const approveDatePlanRequest = async (
   }
 
   if (request.status !== "PENDING") {
-    throw new Error(
-      "This request has already been processed",
-    );
+    throw new Error("This request has already been processed");
   }
 
   const senderId = request.plan.userId;
@@ -634,228 +633,212 @@ export const approveDatePlanRequest = async (
   // 3. TRANSACTION
   // ==========================================
 
-  const result = await prisma.$transaction(
-    async (tx) => {
-      // ======================================
-      // APPROVE REQUEST
-      // ======================================
+  const result = await prisma.$transaction(async (tx) => {
+    // ======================================
+    // APPROVE REQUEST
+    // ======================================
 
-      const approvedRequest =
-        await tx.datePlanRequest.update({
-          where: {
-            id: requestId,
-          },
+    const approvedRequest = await tx.datePlanRequest.update({
+      where: {
+        id: requestId,
+      },
 
-          data: {
-            status: "APPROVED",
-          },
-        });
+      data: {
+        status: "APPROVED",
+      },
+    });
 
-      // ======================================
-      // DECLINE OTHER REQUESTS
-      // ======================================
+    // ======================================
+    // DECLINE OTHER REQUESTS
+    // ======================================
 
-      await tx.datePlanRequest.updateMany({
-        where: {
-          planId: request.planId,
+    await tx.datePlanRequest.updateMany({
+      where: {
+        planId: request.planId,
 
-          id: {
-            not: requestId,
-          },
-
-          status: "PENDING",
+        id: {
+          not: requestId,
         },
 
+        status: "PENDING",
+      },
+
+      data: {
+        status: "DECLINED",
+      },
+    });
+
+    // ======================================
+    // PLAN BOOKED
+    // ======================================
+
+    await tx.datePlan.update({
+      where: {
+        id: request.planId,
+      },
+
+      data: {
+        status: "BOOKED",
+      },
+    });
+
+    // ======================================
+    // CREATE CONFIRMED DATE
+    // ======================================
+
+    const confirmedDate = await tx.dateConfirmed.create({
+      data: {
+        planId: request.plan.id,
+
+        hostUserId: request.plan.userId,
+
+        participantId: request.requesterId,
+
+        title: request.plan.title,
+
+        venueName: request.plan.venueName,
+
+        venueAddress: request.plan.venueAddress,
+
+        eventDateTime: request.plan.eventDateTime!,
+
+        status: "UPCOMING",
+      },
+    });
+
+    // ======================================
+    // FIND CONVERSATION
+    // ======================================
+
+    let conversation = await tx.conversation.findFirst({
+      where: {
+        AND: [
+          {
+            participants: {
+              some: {
+                userId: senderId,
+              },
+            },
+          },
+
+          {
+            participants: {
+              some: {
+                userId: receiverId,
+              },
+            },
+          },
+        ],
+      },
+
+      include: {
+        participants: true,
+      },
+    });
+
+    // ======================================
+    // CREATE CONVERSATION
+    // ======================================
+
+    if (!conversation) {
+      conversation = await tx.conversation.create({
         data: {
-          status: "DECLINED",
-        },
-      });
-
-      // ======================================
-      // PLAN BOOKED
-      // ======================================
-
-      await tx.datePlan.update({
-        where: {
-          id: request.planId,
-        },
-
-        data: {
-          status: "BOOKED",
-        },
-      });
-
-      // ======================================
-      // CREATE CONFIRMED DATE
-      // ======================================
-
-      const confirmedDate =
-        await tx.dateConfirmed.create({
-          data: {
-            planId: request.plan.id,
-
-            hostUserId:
-              request.plan.userId,
-
-            participantId:
-              request.requesterId,
-
-            title: request.plan.title,
-
-            venueName:
-              request.plan.venueName,
-
-            venueAddress:
-              request.plan.venueAddress,
-
-            eventDateTime:
-              request.plan.eventDateTime!,
-
-            status: "UPCOMING",
-          },
-        });
-
-      // ======================================
-      // FIND CONVERSATION
-      // ======================================
-
-      let conversation =
-        await tx.conversation.findFirst({
-          where: {
-            AND: [
+          participants: {
+            create: [
               {
-                participants: {
-                  some: {
-                    userId: senderId,
-                  },
-                },
+                userId: senderId,
               },
 
               {
-                participants: {
-                  some: {
-                    userId: receiverId,
-                  },
-                },
+                userId: receiverId,
               },
             ],
           },
-
-          include: {
-            participants: true,
-          },
-        });
-
-      // ======================================
-      // CREATE CONVERSATION
-      // ======================================
-
-      if (!conversation) {
-        conversation =
-          await tx.conversation.create({
-            data: {
-              participants: {
-                create: [
-                  {
-                    userId: senderId,
-                  },
-
-                  {
-                    userId: receiverId,
-                  },
-                ],
-              },
-            },
-
-            include: {
-              participants: true,
-            },
-          });
-      }
-
-      // ======================================
-      // CREATE DATE_CONFIRMED MESSAGE
-      // ======================================
-
-      const message =
-        await tx.chatMessage.create({
-          data: {
-            conversationId:
-              conversation.id,
-
-            // IMPORTANT:
-            // host approved the request,
-            // therefore host is sender
-            senderId,
-
-            messageType:
-              "DATE_CONFIRMED",
-
-            datePlanId:
-              request.planId,
-
-            metadata: {
-              confirmedDateId:
-                confirmedDate.id,
-
-              status: "ACTIVE",
-            },
-          },
-
-          include: {
-            sender: true,
-
-            datePlan: {
-              include: {
-                user: true,
-
-                activity: true,
-
-                quickTitle: true,
-
-                whoPays: true,
-
-                joinRequestGender: true,
-
-                visibility: true,
-
-                requests: {
-                  select: {
-                    id: true,
-                    requesterId: true,
-                    status: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-
-      // ======================================
-      // UPDATE CONVERSATION TIME
-      // ======================================
-
-      await tx.conversation.update({
-        where: {
-          id: conversation.id,
         },
 
-        data: {
-          updatedAt: new Date(),
+        include: {
+          participants: true,
         },
       });
+    }
 
-      return {
-        approvedRequest,
+    // ======================================
+    // CREATE DATE_CONFIRMED MESSAGE
+    // ======================================
 
-        confirmedDate,
+    const message = await tx.chatMessage.create({
+      data: {
+        conversationId: conversation.id,
 
-        conversation,
+        // IMPORTANT:
+        // host approved the request,
+        // therefore host is sender
+        senderId,
 
-        message,
-      };
-    },
-  );
+        messageType: "DATE_CONFIRMED",
+
+        datePlanId: request.planId,
+
+        metadata: {
+          confirmedDateId: confirmedDate.id,
+
+          status: "ACTIVE",
+        },
+      },
+
+      include: {
+        sender: true,
+
+        datePlan: {
+          include: {
+            user: true,
+
+            activity: true,
+
+            quickTitle: true,
+
+            whoPays: true,
+
+            joinRequestGender: true,
+
+            visibility: true,
+
+            requests: {
+              select: {
+                id: true,
+                requesterId: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // ======================================
+    // UPDATE CONVERSATION TIME
+    // ======================================
+
+    await tx.conversation.update({
+      where: {
+        id: conversation.id,
+      },
+
+      data: {
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      approvedRequest,
+
+      confirmedDate,
+
+      conversation,
+
+      message,
+    };
+  });
 
   // ==========================================
   // 4. NOTIFICATION
@@ -870,21 +853,16 @@ export const approveDatePlanRequest = async (
 
     title: "Date confirmed ☕",
 
-    message:
-      "Your Date Now request has been approved 💫",
+    message: "Your Date Now request has been approved 💫",
 
     data: {
-      datePlanId:
-        request.planId,
+      datePlanId: request.planId,
 
-      confirmedDateId:
-        result.confirmedDate.id,
+      confirmedDateId: result.confirmedDate.id,
 
-      conversationId:
-        result.conversation.id,
+      conversationId: result.conversation.id,
 
-      messageId:
-        result.message.id,
+      messageId: result.message.id,
 
       senderId,
 
@@ -893,10 +871,7 @@ export const approveDatePlanRequest = async (
       type: "DATE_CONFIRMED",
     },
   }).catch((error) => {
-    console.error(
-      "Failed to send Date Confirmed notification:",
-      error,
-    );
+    console.error("Failed to send Date Confirmed notification:", error);
   });
 
   // ==========================================
@@ -910,14 +885,11 @@ export const approveDatePlanRequest = async (
 
     receiverId,
 
-    confirmedDateId:
-      result.confirmedDate.id,
+    confirmedDateId: result.confirmedDate.id,
 
-    conversation:
-      result.conversation,
+    conversation: result.conversation,
 
-    message:
-      result.message,
+    message: result.message,
   };
 };
 
@@ -1050,9 +1022,64 @@ export const topUpDatePlanPackage = async (
 };
 
 export const getMyDatePlanRequests = async (userId: string) => {
+  const now = new Date();
   const requests = await prisma.datePlanRequest.findMany({
     where: {
       requesterId: userId,
+
+      plan: {
+        /**
+         * 1. Remove cancelled and expired plans
+         */
+        status: {
+          notIn: [PlanStatus.CANCELLED, PlanStatus.EXPIRED],
+        },
+
+        /**
+         * 2. Remove plan when expiresAt has passed
+         *
+         * Keep plans where:
+         * - expiresAt is null
+         * OR
+         * - expiresAt is still in future
+         */
+        OR: [
+          {
+            expiresAt: null,
+          },
+          {
+            expiresAt: {
+              gt: now,
+            },
+          },
+        ],
+
+        /**
+         * 3. Remove plan when logged-in requester
+         * has completed feedback.
+         *
+         * MET + SUBMITTED
+         * NO_SHOW + SUBMITTED
+         */
+        feedbacks: {
+          none: {
+            status: DatePlanFeedbackStatus.SUBMITTED,
+
+            OR: [
+              {
+                // Host confirmed meeting this logged-in requester
+                attendanceStatus: DatePlanAttendanceStatus.MET,
+                metUserId: userId,
+              },
+
+              {
+                // No-show feedback submitted for the plan
+                attendanceStatus: DatePlanAttendanceStatus.NO_SHOW,
+              },
+            ],
+          },
+        },
+      },
     },
 
     include: {
@@ -1097,10 +1124,9 @@ export const getMyDatePlanRequests = async (userId: string) => {
     id: request.id,
     status: request.status,
     message: request.message,
-   
+
     billSuggestionId: request.billSuggestionId,
 
-  
     billSuggestion: request.billSuggestion
       ? {
           id: request.billSuggestion.id,
@@ -1125,9 +1151,9 @@ export const getMyDatePlanRequests = async (userId: string) => {
 
       activity: request.plan.activity
         ? {
-          name: request.plan.activity.label,
-          icon: request.plan.activity.icon,
-        }
+            name: request.plan.activity.label,
+            icon: request.plan.activity.icon,
+          }
         : null,
       quickTitle: request.plan.quickTitle?.label,
       whoPays: request.plan.whoPays?.label,
@@ -1580,16 +1606,16 @@ export const getDatePlanHistory = async (
        */
       participant: participant
         ? {
-          id: participant.id,
+            id: participant.id,
 
-          name: participant.full_name,
+            name: participant.full_name,
 
-          age: participant.birth_date
-            ? calculateAge(participant.birth_date)
-            : null,
+            age: participant.birth_date
+              ? calculateAge(participant.birth_date)
+              : null,
 
-          photoUrl: participant.photos[0]?.media_url ?? null,
-        }
+            photoUrl: participant.photos[0]?.media_url ?? null,
+          }
         : null,
 
       /**
@@ -1611,8 +1637,7 @@ export const getDatePlanHistory = async (
             ? calculateAge(request.requester.birth_date)
             : null,
 
-          photoUrl:
-            request.requester.photos[0]?.media_url ?? null,
+          photoUrl: request.requester.photos[0]?.media_url ?? null,
 
           status: request.status,
         })),
@@ -1628,12 +1653,12 @@ export const getDatePlanHistory = async (
        */
       confirmedDate: confirmed
         ? {
-          id: confirmed.id,
+            id: confirmed.id,
 
-          status: confirmed.status,
+            status: confirmed.status,
 
-          eventDateTime: confirmed.eventDateTime,
-        }
+            eventDateTime: confirmed.eventDateTime,
+          }
         : null,
 
       /**
@@ -1810,14 +1835,13 @@ export const getDatePlanHistoryDetails = async (
    * MET + SUBMITTED feedback has highest priority.
    */
   const historyStatus =
-    feedback?.attendanceStatus === "MET" &&
-      feedback?.status === "SUBMITTED"
+    feedback?.attendanceStatus === "MET" && feedback?.status === "SUBMITTED"
       ? "COMPLETED"
       : getHistoryStatus(
-        plan.status,
-        confirmed?.status ?? null,
-        plan.eventDateTime,
-      );
+          plan.status,
+          confirmed?.status ?? null,
+          plan.eventDateTime,
+        );
 
   const statusLabel = getHistoryStatusLabel(historyStatus);
 
@@ -1832,21 +1856,17 @@ export const getDatePlanHistoryDetails = async (
   const requestStats = {
     total: plan._count.requests,
 
-    pending: plan.requests.filter(
-      (request) => request.status === "PENDING",
-    ).length,
+    pending: plan.requests.filter((request) => request.status === "PENDING")
+      .length,
 
-    approved: plan.requests.filter(
-      (request) => request.status === "APPROVED",
-    ).length,
+    approved: plan.requests.filter((request) => request.status === "APPROVED")
+      .length,
 
-    declined: plan.requests.filter(
-      (request) => request.status === "DECLINED",
-    ).length,
+    declined: plan.requests.filter((request) => request.status === "DECLINED")
+      .length,
 
-    cancelled: plan.requests.filter(
-      (request) => request.status === "CANCELLED",
-    ).length,
+    cancelled: plan.requests.filter((request) => request.status === "CANCELLED")
+      .length,
   };
 
   return {
@@ -1865,11 +1885,11 @@ export const getDatePlanHistoryDetails = async (
 
     quickTitle: plan.quickTitle
       ? {
-        id: plan.quickTitle.id,
-        label: plan.quickTitle.label,
-        value: plan.quickTitle.value,
-        icon: plan.quickTitle.icon,
-      }
+          id: plan.quickTitle.id,
+          label: plan.quickTitle.label,
+          value: plan.quickTitle.value,
+          icon: plan.quickTitle.icon,
+        }
       : null,
 
     activity: plan.activity,
@@ -1896,17 +1916,16 @@ export const getDatePlanHistoryDetails = async (
      */
     participant: participant
       ? {
-        id: participant.id,
+          id: participant.id,
 
-        name: participant.full_name,
+          name: participant.full_name,
 
-        age: participant.birth_date
-          ? calculateAge(participant.birth_date)
-          : null,
+          age: participant.birth_date
+            ? calculateAge(participant.birth_date)
+            : null,
 
-        photoUrl:
-          participant.photos[0]?.media_url ?? null,
-      }
+          photoUrl: participant.photos[0]?.media_url ?? null,
+        }
       : null,
 
     /**
@@ -1914,17 +1933,17 @@ export const getDatePlanHistoryDetails = async (
      */
     feedback: feedback
       ? {
-        id: feedback.id,
-        attendanceStatus: feedback.attendanceStatus,
-        status: feedback.status,
-        metUserId: feedback.metUserId,
-        overallRating: feedback.overallRating,
-        personRating: feedback.personRating,
-        noShowReason: feedback.noShowReason,
-        experienceTags: feedback.experienceTags,
-        comment: feedback.comment,
-        createdAt: feedback.createdAt,
-      }
+          id: feedback.id,
+          attendanceStatus: feedback.attendanceStatus,
+          status: feedback.status,
+          metUserId: feedback.metUserId,
+          overallRating: feedback.overallRating,
+          personRating: feedback.personRating,
+          noShowReason: feedback.noShowReason,
+          experienceTags: feedback.experienceTags,
+          comment: feedback.comment,
+          createdAt: feedback.createdAt,
+        }
       : null,
 
     /**
@@ -1968,8 +1987,7 @@ export const getDatePlanHistoryDetails = async (
           ? calculateAge(request.requester.birth_date)
           : null,
 
-        photoUrl:
-          request.requester.photos[0]?.media_url ?? null,
+        photoUrl: request.requester.photos[0]?.media_url ?? null,
 
         status: request.status,
       })),
@@ -1979,27 +1997,23 @@ export const getDatePlanHistoryDetails = async (
      */
     confirmedDate: confirmed
       ? {
-        id: confirmed.id,
+          id: confirmed.id,
 
-        status: confirmed.status,
+          status: confirmed.status,
 
-        eventDateTime: confirmed.eventDateTime,
+          eventDateTime: confirmed.eventDateTime,
 
-        participant: confirmed.participant
-          ? {
-            id: confirmed.participant.id,
-            name: confirmed.participant.full_name,
-            age: confirmed.participant.birth_date
-              ? calculateAge(
-                confirmed.participant.birth_date,
-              )
-              : null,
-            photoUrl:
-              confirmed.participant.photos[0]?.media_url ??
-              null,
-          }
-          : null,
-      }
+          participant: confirmed.participant
+            ? {
+                id: confirmed.participant.id,
+                name: confirmed.participant.full_name,
+                age: confirmed.participant.birth_date
+                  ? calculateAge(confirmed.participant.birth_date)
+                  : null,
+                photoUrl: confirmed.participant.photos[0]?.media_url ?? null,
+              }
+            : null,
+        }
       : null,
 
     /**
@@ -2150,9 +2164,7 @@ export const dateNowInviteMessage = {
     // ========================================
 
     if (senderId === receiverId) {
-      throw new Error(
-        "You cannot invite yourself to a Date Plan",
-      );
+      throw new Error("You cannot invite yourself to a Date Plan");
     }
 
     // ========================================
@@ -2160,9 +2172,7 @@ export const dateNowInviteMessage = {
     // ========================================
 
     const datePlan =
-      await dateNowInviteMessageRepo.findDatePlanById(
-        datePlanId,
-      );
+      await dateNowInviteMessageRepo.findDatePlanById(datePlanId);
 
     if (!datePlan) {
       throw new Error("Date Plan not found");
@@ -2171,55 +2181,46 @@ export const dateNowInviteMessage = {
     // Optional but recommended:
     // only owner can invite users
     if (datePlan.userId !== senderId) {
-      throw new Error(
-        "You can only invite users to your own Date Plan",
-      );
+      throw new Error("You can only invite users to your own Date Plan");
     }
 
     // ========================================
     // 3. CHECK PLAN STATUS
     // ========================================
 
-    if (
-      datePlan.status !== "ACTIVE"
-    ) {
-      throw new Error(
-        "This Date Plan is not active",
-      );
+    if (datePlan.status !== "ACTIVE") {
+      throw new Error("This Date Plan is not active");
     }
 
     // ========================================
     // 4. FIND CONVERSATION
     // ========================================
 
-    let conversation =
-      await chatRepository.findConversationBetweenUsers(
-        senderId,
-        receiverId,
-      );
+    let conversation = await chatRepository.findConversationBetweenUsers(
+      senderId,
+      receiverId,
+    );
 
     // ========================================
     // 5. CREATE CONVERSATION IF NOT EXISTS
     // ========================================
 
     if (!conversation) {
-      conversation =
-        await chatRepository.createConversation(
-          senderId,
-          receiverId,
-        );
+      conversation = await chatRepository.createConversation(
+        senderId,
+        receiverId,
+      );
     }
 
     // ========================================
     // 6. CREATE DATE_INVITE MESSAGE
     // ========================================
 
-    const message =
-      await dateNowInviteMessageRepo.createDateInviteMessage(
-        conversation.id,
-        senderId,
-        datePlanId,
-      );
+    const message = await dateNowInviteMessageRepo.createDateInviteMessage(
+      conversation.id,
+      senderId,
+      datePlanId,
+    );
 
     // ========================================
     // 7. NOTIFICATION
@@ -2233,17 +2234,14 @@ export const dateNowInviteMessage = {
 
       title: "New Date Invitation ☕",
 
-      message:
-        "Someone invited you to a Date Now plan 💫",
+      message: "Someone invited you to a Date Now plan 💫",
 
       data: {
         datePlanId,
 
-        conversationId:
-          conversation.id,
+        conversationId: conversation.id,
 
-        messageId:
-          message.id,
+        messageId: message.id,
 
         senderId,
 
@@ -2252,10 +2250,7 @@ export const dateNowInviteMessage = {
         type: "DATE_INVITE",
       },
     }).catch((error) => {
-      console.error(
-        "Failed to send Date Invite notification:",
-        error,
-      );
+      console.error("Failed to send Date Invite notification:", error);
     });
 
     return {
@@ -2263,4 +2258,4 @@ export const dateNowInviteMessage = {
       message,
     };
   },
-}
+};
