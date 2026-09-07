@@ -55,7 +55,7 @@ router.get(
 );
 
 router.patch(
-  "/relationships/:relationshipId/end",
+  "/relationship-tags/:relationshipId/end",
   authMiddleware,
   endRelationshipController,
 );  

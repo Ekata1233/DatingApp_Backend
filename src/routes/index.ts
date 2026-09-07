@@ -88,7 +88,7 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes,boostRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes,boostRoutes,reportRoutes);
 
 
 

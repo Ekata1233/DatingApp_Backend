@@ -1,12 +1,35 @@
 import express from "express";
-import { reportUserController } from "./report.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
+import { createUserReportController, getAdminReportByIdController, getAllUserReportsController, getMyReportByIdController, getMyReportsController } from "./report.controller";
+
 
 const router = express.Router();
 
-router.patch(
-  "/report",
+
+router.post(
+  "/reports",
   authMiddleware,
-  reportUserController
+  createUserReportController
+);
+router.get(
+  "/reports/my",
+  authMiddleware,
+  getMyReportsController
+);
+router.get(
+  "/reports/:reportId",
+  authMiddleware,
+  getMyReportByIdController
+);
+router.get(
+  "/reports",
+  
+  getAllUserReportsController
+);
+
+router.get(
+  "/reports/:reportId",
+ 
+  getAdminReportByIdController
 );
 export default router;

@@ -1,6 +1,6 @@
 import { RelationshipTag, UserRelationshipStatus } from "@prisma/client";
 import { calculateAge } from "../chat/chat.repository";
-import { relationshipTagRepository } from "./relationshipTag.repository";
+import { endRelationshipRepository, findRelationshipByIdRepository, relationshipTagRepository } from "./relationshipTag.repository";
 import { RelationshipTagProposalInput } from "./relationshipTag.validation";
 import { prisma } from "../../prisma/prismaClient";
 
@@ -443,11 +443,18 @@ export const getCommitmentManagementService =async (
     // -----------------------------------------
 
     if (!relationships.length) {
-      return {
-        hasCommitment: false,
-        commitments: [],
-      };
-    }
+  return {
+    hasCommitment: false,
+
+    status: "SINGLE",
+
+    title: "You're single",
+
+    message: "Open to new matches again",
+
+    commitments: [],
+  };
+}
 
     // -----------------------------------------
     // 3. Transform for mobile screen
@@ -591,3 +598,75 @@ export const getCommitmentManagementService =async (
     };
   };
   
+
+  // relationship.service.ts
+  
+
+export const endRelationshipService = async (
+  userId: string,
+  relationshipId: string,
+) => {
+  const relationship =
+    await findRelationshipByIdRepository(relationshipId);
+
+  if (!relationship) {
+    throw new Error("Relationship not found");
+  }
+
+  // Only relationship users can end it
+  const isRelationshipUser =
+    relationship.user1Id === userId ||
+    relationship.user2Id === userId;
+
+  if (!isRelationshipUser) {
+    throw new Error(
+      "You are not authorized to end this relationship",
+    );
+  }
+
+  if (
+    relationship.status ===
+    UserRelationshipStatus.ENDED
+  ) {
+    throw new Error(
+      "Relationship is already ended",
+    );
+  }
+
+  const endedRelationship =
+    await endRelationshipRepository(
+      relationshipId,
+    );
+
+  const partner =
+    endedRelationship.user1Id === userId
+      ? endedRelationship.user2
+      : endedRelationship.user1;
+
+  const self =
+    endedRelationship.user1Id === userId
+      ? endedRelationship.user1
+      : endedRelationship.user2;
+
+  return {
+    id: endedRelationship.id,
+    tag: endedRelationship.tag,
+    status: endedRelationship.status,
+    startedAt: endedRelationship.startedAt,
+    endedAt: endedRelationship.endedAt,
+
+    self: {
+      id: self.id,
+      fullName: self.full_name,
+      profilePhoto:
+        self.photos[0]?.media_url ?? null,
+    },
+
+    partner: {
+      id: partner.id,
+      fullName: partner.full_name,
+      profilePhoto:
+        partner.photos[0]?.media_url ?? null,
+    },
+  };
+};
