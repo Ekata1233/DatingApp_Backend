@@ -66,6 +66,7 @@ import onboardingRoutes from "../features/user/onboarding/onboarding.routes";
 import legalRoutes from "../features/legal/legal.routes";
 import datePlanBoostRoutes from "../features/admin/dateNow/datePlanBoost/datePlanBoost.routes";
 import datePlanUserBoostRoutes from "../features/dateNow/datePlanUserBoost/datePlanUserBoost.routes";
+import relationshipTagRoutes from "../features/relationshipTag/relationshipTag.routes";
 
 
 const router = Router();
@@ -150,6 +151,10 @@ router.use("/user", notificationRoutes);
 
 //ONBOARDING - DETAILS
 router.use("/user",onboardingRoutes);
+//
+
+//RELATIONSHIP TAG
+router.use("/user", relationshipTagRoutes); 
 //
 
 export default router;

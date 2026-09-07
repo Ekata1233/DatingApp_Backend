@@ -1,5 +1,6 @@
+import { calculateAge } from "../chat/chat.repository";
 import { relationshipTagRepository } from "./relationshipTag.repository";
-import { RelationshipTagProposalInput } from "./relationshipTag.schema";
+import { RelationshipTagProposalInput } from "./relationshipTag.validation";
 
 export const relationshipTagService = {
 
@@ -98,13 +99,13 @@ export const relationshipTagService = {
      * 7. Create proposal
      * ----------------------------------------
      */
-    const result =
-      await relationshipTagRepository.createProposal({
-        senderId,
-        receiverId,
-        tag,
-        message,
-      });
+const result =
+  await relationshipTagRepository.createProposalWithMessage(
+    senderId,
+    receiverId,
+    tag,
+    message
+  );
 
     /**
      * ----------------------------------------
@@ -156,7 +157,24 @@ export const relationshipTagService = {
         userId
       );
 
-    return proposals;
+     return proposals.map((proposal) => ({
+    id: proposal.id,
+    tag: proposal.tag,
+    status: proposal.status,
+    message: proposal.message,
+    createdAt: proposal.createdAt,
+
+    sender: {
+      id: proposal.sender.id,
+      fullName: proposal.sender.full_name,
+
+      age: calculateAge(
+        proposal.sender.birth_date
+      ),
+
+      photos: proposal.sender.photos,
+    },
+  }));
   },
 
   /**

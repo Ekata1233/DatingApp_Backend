@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { relationshipTagService } from "./relationshipTag.service";
-import { relationshipTagSchema } from "./relationshipTag.schema";
 import { getIO } from "../../config/socket";
+import { relationshipTagSchema } from "./relationshipTag.validation";
 
 export const relationshipTagController = {
 
@@ -87,7 +87,7 @@ export const relationshipTagController = {
             return res.status(201).json({
                 success: true,
                 message: "Relationship tag proposal sent successfully",
-                data: proposal,
+                data: result.proposal,
             });
         } catch (error: any) {
             console.error(
@@ -141,7 +141,7 @@ export const relationshipTagController = {
              * Get authenticated user
              * ----------------------------------------
              */
-            const userId = req.user?.id;
+            const userId = (req as any).user?.id;
 
             if (!userId) {
                 return res.status(401).json({
@@ -208,7 +208,9 @@ export const relationshipTagController = {
              */
             const userId = (req as any).user?.id;
 
-            const { proposalId } = req.params;
+            const { proposalId } = req.params as {
+                proposalId: string;
+            };
 
             if (!userId) {
                 return res.status(401).json({
@@ -350,9 +352,10 @@ export const relationshipTagController = {
         res: Response
     ) {
         try {
-            const userId = req.user?.id;
-            const { proposalId } = req.params;
-
+            const userId = (req as any).user?.id;
+const { proposalId } = req.params as {
+      proposalId: string;
+    };
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -419,8 +422,10 @@ export const relationshipTagController = {
         res: Response
     ) {
         try {
-            const userId = req.user?.id;
-            const { proposalId } = req.params;
+            const userId = (req as any).user?.id;
+            const { proposalId } = req.params as {
+                proposalId: string;
+            };
 
             if (!userId) {
                 return res.status(401).json({

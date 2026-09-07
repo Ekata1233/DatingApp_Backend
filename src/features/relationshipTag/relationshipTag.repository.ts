@@ -264,15 +264,20 @@ export const relationshipTagRepository = {
                     select: {
                         id: true,
                         full_name: true,
+                        birth_date: true,
+
                         photos: {
                             select: {
                                 id: true,
-                                url: true,
-                                is_primary: true,
+                                media_url: true,
+                                media_type: true,
+                                order: true,
                             },
+
                             orderBy: {
-                                is_primary: "desc",
+                                order: "asc",
                             },
+
                             take: 1,
                         },
                     },

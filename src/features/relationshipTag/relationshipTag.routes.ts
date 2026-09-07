@@ -10,7 +10,7 @@ const router = Router();
  * POST /api/relationship-tags/proposals
  */
 router.post(
-  "/proposals",
+  "/relationship-tags/create-proposals",
   authMiddleware,
   relationshipTagController.createProposal
 );
@@ -21,7 +21,7 @@ router.post(
  * GET /api/relationship-tags/proposals/received
  */
 router.get(
-  "/proposals/received",
+  "/relationship-tags/received-proposals",
   authMiddleware,
   relationshipTagController.getReceivedProposals
 );
@@ -31,19 +31,19 @@ router.get(
  * /api/relationship-tags/proposals/:proposalId/accept
  */
 router.post(
-  "/proposals/:proposalId/accept",
+  "/relationship-tags/proposals/:proposalId/accept",
   authMiddleware,
   relationshipTagController.acceptProposal
 );
 
 router.post(
-  "/proposals/:proposalId/reject",
+  "/relationship-tags/proposals/:proposalId/reject",
   authMiddleware,
   relationshipTagController.rejectProposal
 );
 
 router.post(
-  "/proposals/:proposalId/cancel",
+  "/relationship-tags/proposals/:proposalId/cancel",
   authMiddleware,
   relationshipTagController.cancelProposal
 );

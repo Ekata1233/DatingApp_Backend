@@ -105,10 +105,10 @@ model User {
   DatePlanUserBoost     DatePlanUserBoost[]
 
   //Relationship tag
-  relationshipTagProposalsSentRelationshipTagProposal[]@relation("RelationshipTagProposalSender")
-relationshipTagProposalsReceivedRelationshipTagProposal[]@relation("RelationshipTagProposalReceiver")
-relationshipsAsUser1UserRelationship[]@relation("RelationshipUser1")
-relationshipsAsUser2UserRelationship[]@relation("RelationshipUser2")
+  relationshipTagProposalsSent     RelationshipTagProposal[] @relation("RelationshipTagProposalSender")
+  relationshipTagProposalsReceived RelationshipTagProposal[] @relation("RelationshipTagProposalReceiver")
+  relationshipsAsUser1             UserRelationship[]        @relation("RelationshipUser1")
+  relationshipsAsUser2             UserRelationship[]        @relation("RelationshipUser2")
 
   @@index([phone_number])
   @@index([google_id])
@@ -2889,8 +2889,8 @@ model RelationshipTagProposal {
   updatedAt   DateTime                      @updatedAt
   respondedAt DateTime?
 
-  sender      User @relation("RelationshipTagProposalSender",fields: [senderId],references: [id],onDelete: Cascade)
-  receiver    User @relation("RelationshipTagProposalReceiver",fields: [receiverId],references: [id],onDelete: Cascade)
+  sender       User              @relation("RelationshipTagProposalSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver     User              @relation("RelationshipTagProposalReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   relationship UserRelationship?
 
   @@index([senderId, status])
@@ -2900,20 +2900,20 @@ model RelationshipTagProposal {
 }
 
 model UserRelationship {
-  id          String                 @id @default(uuid()) @db.Uuid
-  user1Id     String                 @db.Uuid
-  user2Id     String                 @db.Uuid
-  tag         RelationshipTag
-  status      UserRelationshipStatus @default(ACTIVE)
-  startedAt   DateTime               @default(now())
-  endedAt     DateTime?
-  proposalId  String?                @unique @db.Uuid
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  id         String                 @id @default(uuid()) @db.Uuid
+  user1Id    String                 @db.Uuid
+  user2Id    String                 @db.Uuid
+  tag        RelationshipTag
+  status     UserRelationshipStatus @default(ACTIVE)
+  startedAt  DateTime               @default(now())
+  endedAt    DateTime?
+  proposalId String?                @unique @db.Uuid
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
 
-  user1       User @relation("RelationshipUser1",fields: [user1Id],references: [id],onDelete: Cascade)
-  user2       User @relation("RelationshipUser2",fields: [user2Id],references: [id],onDelete: Cascade)
-  proposal    RelationshipTagProposal? @relation(fields: [proposalId],references: [id],onDelete: SetNull)
+  user1    User                     @relation("RelationshipUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2    User                     @relation("RelationshipUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  proposal RelationshipTagProposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
 
   @@unique([user1Id, user2Id])
   @@index([user1Id, status])
