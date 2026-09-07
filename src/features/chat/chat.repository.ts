@@ -1330,6 +1330,7 @@ export const chatRepository = {
         },
 
         // Current Gift state
+        // Current Gift state
         gift: {
           select: {
             id: true,
@@ -1346,6 +1347,28 @@ export const chatRepository = {
             isUnlocked: true,
             unlockedAt: true,
             expiresAt: true,
+
+            // ✅ Actual Gift master details
+            gift: {
+              select: {
+                id: true,
+                categoryId: true,
+                image: true,
+                name: true,
+                coinCost: true,
+                triggerLine: true,
+                receiverLine: true,
+                isLive: true,
+
+                // ✅ Gift category details
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
 
