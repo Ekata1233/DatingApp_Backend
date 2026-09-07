@@ -444,11 +444,18 @@ export const getCommitmentManagementService =
     // -----------------------------------------
 
     if (!relationships.length) {
-      return {
-        hasCommitment: false,
-        commitments: [],
-      };
-    }
+  return {
+    hasCommitment: false,
+
+    status: "SINGLE",
+
+    title: "You're single",
+
+    message: "Open to new matches again",
+
+    commitments: [],
+  };
+}
 
     // -----------------------------------------
     // 3. Transform for mobile screen
