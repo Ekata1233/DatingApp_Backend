@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getCommitmentManagementService, relationshipTagService } from "./relationshipTag.service";
+import { endRelationshipService, getCommitmentManagementService, relationshipTagService } from "./relationshipTag.service";
 import { getIO } from "../../config/socket";
 import { relationshipTagSchema } from "./relationshipTag.validation";
 
@@ -353,9 +353,9 @@ export const relationshipTagController = {
     ) {
         try {
             const userId = (req as any).user?.id;
-const { proposalId } = req.params as {
-      proposalId: string;
-    };
+            const { proposalId } = req.params as {
+                proposalId: string;
+            };
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -492,36 +492,70 @@ const { proposalId } = req.params as {
 
 // relationship.controller.ts
 
-export const getCommitmentManagementController =
-  async (
+export const getCommitmentManagementController = async (
     req: Request,
     res: Response,
-  ) => {
+) => {
     try {
-      const userId = (req as any).user.id;
+        const userId = (req as any).user.id;
 
-      const result =
-        await getCommitmentManagementService(
-          userId,
+        const result =
+            await getCommitmentManagementService(
+                userId,
+            );
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "Commitment details fetched successfully",
+            data: result,
+        });
+    } catch (error: any) {
+        console.error(
+            "GET COMMITMENT MANAGEMENT ERROR:",
+            error,
         );
 
-      return res.status(200).json({
-        success: true,
-        message:
-          "Commitment details fetched successfully",
-        data: result,
-      });
-    } catch (error: any) {
-      console.error(
-        "GET COMMITMENT MANAGEMENT ERROR:",
-        error,
+        return res.status(500).json({
+            success: false,
+            message:
+                error.message ||
+                "Failed to fetch commitment details",
+        });
+    }
+};
+
+// relationship.controller.ts
+
+export const endRelationshipController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const relationshipId = String(
+      req.params.relationshipId,
+    );
+
+    const relationship =
+      await endRelationshipService(
+        userId,
+        relationshipId,
       );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          error.message ||
-          "Failed to fetch commitment details",
-      });
-    }
-  };
+    return res.status(200).json({
+      success: true,
+      message:
+        "Relationship ended successfully",
+      data: relationship,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to end relationship",
+    });
+  }
+};

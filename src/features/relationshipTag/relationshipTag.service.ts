@@ -357,8 +357,7 @@ const isExclusiveRelationship = (
   return exclusiveTags.includes(tag);
 };
 
-export const getCommitmentManagementService =
-  async (
+export const getCommitmentManagementService =async (
     userId: string,
   ) => {
     // -----------------------------------------
@@ -591,3 +590,4 @@ export const getCommitmentManagementService =
       commitments,
     };
   };
+  

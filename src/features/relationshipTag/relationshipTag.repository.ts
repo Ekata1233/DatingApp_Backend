@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, UserRelationshipStatus } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -703,4 +703,65 @@ export const relationshipTagRepository = {
         });
     },
 
+};
+
+// end relationship.repository.ts
+
+export const findRelationshipByIdRepository = async (
+  relationshipId: string,
+) => {
+  return prisma.userRelationship.findUnique({
+    where: {
+      id: relationshipId,
+    },
+  });
+};
+
+export const endRelationshipRepository = async (
+  relationshipId: string,
+) => {
+  return prisma.userRelationship.update({
+    where: {
+      id: relationshipId,
+    },
+    data: {
+      status: UserRelationshipStatus.ENDED,
+      endedAt: new Date(),
+    },
+    include: {
+      user1: {
+        select: {
+          id: true,
+          full_name: true,
+          photos: {
+            orderBy: {
+              created_at: "asc",
+            },
+            take: 1,
+            select: {
+              id: true,
+              media_url: true,
+            },
+          },
+        },
+      },
+
+      user2: {
+        select: {
+          id: true,
+          full_name: true,
+          photos: {
+            orderBy: {
+              created_at: "asc",
+            },
+            take: 1,
+            select: {
+              id: true,
+              media_url: true,
+            },
+          },
+        },
+      },
+    },
+  });
 };

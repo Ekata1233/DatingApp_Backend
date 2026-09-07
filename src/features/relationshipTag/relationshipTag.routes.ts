@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getCommitmentManagementController, relationshipTagController } from "./relationshipTag.controller";
+import { endRelationshipController, getCommitmentManagementController, relationshipTagController } from "./relationshipTag.controller";
 import authMiddleware from "../../middleware/auth.middleware";
 
 const router = Router();
@@ -53,5 +53,11 @@ router.get(
   authMiddleware,
   getCommitmentManagementController,
 );
+
+router.patch(
+  "/relationships/:relationshipId/end",
+  authMiddleware,
+  endRelationshipController,
+);  
 
 export default router;
