@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { relationshipTagService } from "./relationshipTag.service";
+import { getCommitmentManagementService, relationshipTagService } from "./relationshipTag.service";
 import { getIO } from "../../config/socket";
 import { relationshipTagSchema } from "./relationshipTag.validation";
 
@@ -489,3 +489,39 @@ const { proposalId } = req.params as {
 
 
 };
+
+// relationship.controller.ts
+
+export const getCommitmentManagementController =
+  async (
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      const userId = (req as any).user.id;
+
+      const result =
+        await getCommitmentManagementService(
+          userId,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Commitment details fetched successfully",
+        data: result,
+      });
+    } catch (error: any) {
+      console.error(
+        "GET COMMITMENT MANAGEMENT ERROR:",
+        error,
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Failed to fetch commitment details",
+      });
+    }
+  };
