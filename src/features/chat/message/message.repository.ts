@@ -56,6 +56,19 @@ export const messageRepository = {
     metadata?: Prisma.InputJsonValue | null;
   }) {
     return prisma.$transaction(async (tx) => {
+       const metadata =
+      data.metadata &&
+      typeof data.metadata === "object" &&
+      !Array.isArray(data.metadata)
+        ? (data.metadata as Record<string, any>)
+        : {};
+
+        console.log("MESSAGE TYPE:", data.messageType);
+console.log("MESSAGE METADATA:", data.metadata);
+console.log("EXTRACTED ROSE ID:", metadata.roseId);
+console.log("EXTRACTED GIFT ID:", metadata.giftId);
+console.log("EXTRACTED COMPLIMENT ID:", metadata.complimentId);
+
       const message = await tx.chatMessage.create({
         data: {
           conversationId: data.conversationId,
@@ -64,6 +77,26 @@ export const messageRepository = {
           messageType: data.messageType,
           mediaUrl: data.mediaUrl ?? null,
           metadata: data.metadata ?? undefined,
+           // Optional Rose relation
+        roseId:
+          data.messageType === MessageType.ROSE &&
+          metadata.roseId
+            ? metadata.roseId
+            : null,
+
+        // Optional Gift relation
+        giftId:
+          data.messageType === MessageType.GIFT &&
+          metadata.giftId
+            ? metadata.giftId
+            : null,
+
+        // Optional Compliment relation
+        complimentId:
+          data.messageType === MessageType.COMPLIMENT &&
+          metadata.complimentId
+            ? metadata.complimentId
+            : null,
         },
       });
 

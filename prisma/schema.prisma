@@ -2956,3 +2956,4 @@ model UserRelationship {
   @@index([user2Id, status])
   @@map("user_relationships")
 }
+
