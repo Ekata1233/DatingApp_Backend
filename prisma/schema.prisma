@@ -110,6 +110,10 @@ model User {
   relationshipsAsUser1             UserRelationship[]        @relation("RelationshipUser1")
   relationshipsAsUser2             UserRelationship[]        @relation("RelationshipUser2")
 
+  // Reports
+  reportsCreated  UserReport[] @relation("ReportsCreated")
+  reportsReceived UserReport[] @relation("ReportsReceived")
+
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])
@@ -680,12 +684,44 @@ model UserBlock {
 }
 
 model UserReport {
-  id         String   @id @default(uuid()) @db.Uuid
-  reporterId String
-  reportedId String
-  createdAt  DateTime @default(now())
+  id          String       @id @default(uuid()) @db.Uuid
+  reporterId  String       @db.Uuid
+  reportedId  String       @db.Uuid
+  reason      String       @db.VarChar(100)
+  description String?      @db.VarChar(300)
+  status      ReportStatus @default(PENDING)
+  adminNote   String?      @db.Text
+  reviewedBy  String?      @db.Uuid
+  reviewedAt  DateTime?
+  actionTaken ReportAction @default(NONE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  reporter     User @relation("ReportsCreated", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser User @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
 
   @@unique([reporterId, reportedId])
+  @@index([reportedId])
+  @@index([reporterId])
+  @@index([status])
+  @@index([reason])
+  @@index([createdAt])
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportAction {
+  NONE
+  WARNING
+  CONTENT_REMOVED
+  ACCOUNT_RESTRICTED
+  ACCOUNT_SUSPENDED
+  ACCOUNT_BANNED
 }
 
 model UserSwipe {
