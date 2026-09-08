@@ -144,6 +144,82 @@ export const chatSocketService = {
         giftId: userGift.id,
       };
     }
+
+    if (payload.messageType === MessageType.COMPLIMENT) {
+      const payloadMetadata =
+        payload.metadata &&
+          typeof payload.metadata === "object" &&
+          !Array.isArray(payload.metadata)
+          ? (payload.metadata as Record<string, unknown>)
+          : {};
+
+      /**
+       * Frontend sends ComplimentIdea.id
+       *
+       * Example:
+       * "cmta1160v0002f3el0a113qqw"
+       *
+       * This is CUID, NOT UserCompliment UUID.
+       */
+      const complimentIdeaId = String(
+        payloadMetadata.complimentId ?? ""
+      ).trim();
+
+      if (!complimentIdeaId) {
+        throw new Error("Valid Compliment ID is required");
+      }
+
+      /**
+       * Find compliment idea from catalog
+       */
+      const complimentIdea = await prisma.complimentIdea.findUnique({
+        where: {
+          id: complimentIdeaId,
+        },
+      });
+
+      if (!complimentIdea) {
+        throw new Error("Compliment not found");
+      }
+
+      /**
+       * Create actual UserCompliment
+       *
+       * UserCompliment.id = UUID
+       * ComplimentIdea.id = CUID
+       */
+      const userCompliment = await prisma.userCompliment.create({
+        data: {
+          senderId: userId,
+          receiverId: receiverId,
+
+          ideaId: complimentIdea.id,
+
+          // You can use frontend content or catalog text
+          message: payload.content ?? complimentIdea.text,
+
+          status: "PENDING",
+        },
+      });
+
+      /**
+       * IMPORTANT:
+       *
+       * ChatMessage.complimentId expects UUID.
+       *
+       * So replace frontend ComplimentIdea.id
+       * with created UserCompliment.id.
+       */
+      metadata = {
+        ...payloadMetadata,
+
+        // UUID
+        complimentId: userCompliment.id,
+
+        // Optional: keep original catalog ID if frontend needs it
+        complimentIdeaId: complimentIdea.id,
+      };
+    }
     /**
      * Save message to database.
      * 

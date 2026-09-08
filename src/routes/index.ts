@@ -69,6 +69,7 @@ import datePlanUserBoostRoutes from "../features/dateNow/datePlanUserBoost/dateP
 import relationshipTagRoutes from "../features/relationshipTag/relationshipTag.routes";
 import myBalanceRoutes from "../features/user/my-balance/myBalance.routes";
 import walletRoutes from "../features/wallet/wallet.route";
+import membershipRoutes from "../features/package/membership/membership.routes";
 
 
 
@@ -163,5 +164,9 @@ router.use("/user", myBalanceRoutes);
 
 //WALLET
 router.use("/user", walletRoutes);
+//
+
+//MEMBERSHIP
+router.use("/user", membershipRoutes);
 //
 export default router;
