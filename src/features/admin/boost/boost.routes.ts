@@ -9,7 +9,7 @@ const router = express.Router();
 router.post("/create", createBoostController);
 router.get("/get-all", getBoostsController); 
 router.get("/boost/get", getAllBoostsController); 
-router.get("/boost/get-all", authMiddleware,getBoostsController); 
+router.get("/boost/get-all",getBoostsController); 
 
 // ============================================================
 // BOOST INFO APIs

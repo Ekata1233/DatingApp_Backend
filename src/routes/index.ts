@@ -106,9 +106,7 @@ router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)
 router.use("/user",detailsRoutes)
 
-//boost upgrade and active route
-router.use("/user",boostRoutes)
-//
+
 
 //last seen & online status 
 router.use("/user",lastActivityRoutes)
@@ -117,7 +115,7 @@ router.use("/user",lastActivityRoutes)
 //swipe routes
 router.use("/user", swipeRoutes);
 //
-
+router.use("/boost", boostRoutes);
 //gift , compliment, rose NEW MATCHES
 router.use("/user", newMatchesRoutes)
 //
@@ -125,7 +123,6 @@ router.use("/user", newMatchesRoutes)
 router.use("/user", dateNowRoutes,myPlanRoutes);
 
 router.use("/user", purchaseStoreRoutes);
-router.use("/user",boostRoutes);
 
 router.use(
   "/admin/date-now",

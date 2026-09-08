@@ -58,9 +58,9 @@ export const getBoostsController = async (
   res: Response
 ) => {
   try {
-    const userId = (req as any).user.id;
+   
 
-    const result = await getBoostsService(userId);
+    const result = await getBoostsService();
 
     return res.status(200).json({
       success: true,
