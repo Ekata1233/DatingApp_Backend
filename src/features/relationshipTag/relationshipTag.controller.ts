@@ -245,45 +245,45 @@ export const relationshipTagController = {
             // SOCKET.IO
             // ========================================
 
-            const io = getIO();
+            // const io = getIO();
 
 
-            // Sender + receiver
-            const senderId =
-                result.message.metadata &&
-                    typeof result.message.metadata === "object"
-                    ? (result.message.metadata as any).senderId
-                    : null;
+            // // Sender + receiver
+            // const senderId =
+            //     result.message.metadata &&
+            //         typeof result.message.metadata === "object"
+            //         ? (result.message.metadata as any).senderId
+            //         : null;
 
-            const receiverId =
-                result.message.metadata &&
-                    typeof result.message.metadata === "object"
-                    ? (result.message.metadata as any).receiverId
-                    : null;
+            // const receiverId =
+            //     result.message.metadata &&
+            //         typeof result.message.metadata === "object"
+            //         ? (result.message.metadata as any).receiverId
+            //         : null;
 
 
             // ========================================
             // Emit to sender
             // ========================================
 
-            if (senderId) {
-                io.to(`user:${senderId}`).emit(
-                    "message:receive",
-                    result.message
-                );
-            }
+            // if (senderId) {
+            //     io.to(`user:${senderId}`).emit(
+            //         "message:receive",
+            //         result.message
+            //     );
+            // }
 
 
             // ========================================
             // Emit to receiver
             // ========================================
 
-            if (receiverId) {
-                io.to(`user:${receiverId}`).emit(
-                    "message:receive",
-                    result.message
-                );
-            }
+            // if (receiverId) {
+            //     io.to(`user:${receiverId}`).emit(
+            //         "message:receive",
+            //         result.message
+            //     );
+            // }
 
 
             // ========================================
