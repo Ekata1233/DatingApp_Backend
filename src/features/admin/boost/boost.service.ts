@@ -198,7 +198,7 @@ export const getAllBoostsService = async () => {
 };
 
 // ✅ GET API for mob
-export const getBoostsService = async (userId: string) => {
+export const getBoostsService = async () => {
   const [boosts, userBoosts] = await Promise.all([
     prisma.boost.findMany({
       include: {
@@ -215,7 +215,7 @@ export const getBoostsService = async (userId: string) => {
 
     prisma.userBoost.findMany({
       where: {
-        user_id: userId,
+        
         is_active: true,
       },
       select: {
@@ -240,10 +240,7 @@ export const getBoostsService = async (userId: string) => {
       description: boost.description,
       is_active: boost.is_active,
 
-      // 1. FEATURES
-      boostDuration: boost.boostDuration,
-      singleBoostWalletPrice: boost.singleBoostWalletPrice,
-      visibilityMultiplier: boost.visibilityMultiplier,
+      
 
       // 2. OPTIONS
       options: boost.options,
