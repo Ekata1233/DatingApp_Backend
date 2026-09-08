@@ -56,7 +56,97 @@ export const chatSocketService = {
 
     const isNew = !hasPreviousMessages;
     /**
+  * 3. Find the other participant BEFORE
+  *    creating the message.
+  *
+  *    We need receiverId when creating UserGift.
+  */
+    const receiverId = await chatService.getOtherParticipant(
+      payload.conversationId,
+      userId,
+    );
+    let metadata = payload.metadata;
+
+    if (payload.messageType === MessageType.GIFT) {
+      const payloadMetadata =
+        payload.metadata &&
+          typeof payload.metadata === "object" &&
+          !Array.isArray(payload.metadata)
+          ? (payload.metadata as Record<string, unknown>)
+          : {};
+
+      /**
+       * Frontend sends catalog Gift.id
+       *
+       * Gift.id = Int
+       */
+      const giftId = Number(payloadMetadata.giftId);
+
+      if (!giftId || Number.isNaN(giftId)) {
+        throw new Error("Valid Gift ID is required");
+      }
+
+      /**
+       * 4.1 Find catalog Gift
+       */
+      const gift = await prisma.gift.findUnique({
+        where: {
+          id: giftId,
+        },
+      });
+
+      if (!gift) {
+        throw new Error("Gift not found");
+      }
+
+      if (!gift.isLive) {
+        throw new Error("Gift is currently inactive");
+      }
+
+      /**
+       * 4.2 Create UserGift
+       *
+       * gift.id       = Int
+       * UserGift.id   = UUID
+       */
+      const userGift = await prisma.userGift.create({
+        data: {
+          giftId: gift.id,
+          giftName: gift.name,
+          senderId: userId,
+          receiverId: receiverId,
+
+          pricePaid: gift.coinCost,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      /**
+       * 4.3 IMPORTANT
+       *
+       * ChatMessage.giftId expects UserGift.id
+       * which is UUID.
+       *
+       * Therefore:
+       *
+       * Before:
+       * {
+       *   giftId: 1
+       * }
+       *
+       * After:
+       * {
+       *   giftId: "uuid-of-user-gift"
+       * }
+       */
+      metadata = {
+        ...payloadMetadata,
+        giftId: userGift.id,
+      };
+    }
+    /**
      * Save message to database.
+     * 
      */
     const message = await messageService.createMessage({
       userId,
@@ -65,7 +155,7 @@ export const chatSocketService = {
       content: payload.content,
       messageType: payload.messageType,
       mediaUrl: payload.mediaUrl,
-      metadata: payload.metadata,
+      metadata: metadata,
     });
 
     /**
@@ -86,10 +176,10 @@ export const chatSocketService = {
     /**
      * 4. Find the other participant.
      */
-    const receiverId = await chatService.getOtherParticipant(
-      payload.conversationId,
-      userId,
-    );
+    // const receiverId = await chatService.getOtherParticipant(
+    //   payload.conversationId,
+    //   userId,
+    // );
 
     let interactionResult = null;
 
