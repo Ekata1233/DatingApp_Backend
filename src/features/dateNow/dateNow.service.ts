@@ -1825,6 +1825,51 @@ export const getDatePlanHistoryDetails = async (
     throw new Error("Date plan history not found");
   }
 
+const [packageFeatures, activeBoost] = await Promise.all([
+  /**
+   * Current Date Plan cost
+   */
+  prisma.datePlanPackageFeatures.findFirst({
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      costToPostPlan: true,
+      costToPostPlanActive: true,
+    },
+  }),
+
+  /**
+   * Active boost for THIS user + THIS plan
+   */
+  prisma.datePlanUserBoost.findFirst({
+    where: {
+      userId,
+      datePlanId: planId,
+      status: "ACTIVE",
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+
+    include: {
+      boostOption: {
+        select: {
+          id: true,
+          title: true,
+          durationHours: true,
+          price: true,
+          currency: true,
+        },
+      },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  }),
+]);
+
   const confirmed = plan.DateConfirmed;
 
   const feedback = plan.feedbacks?.[0] ?? null;
@@ -1953,20 +1998,28 @@ export const getDatePlanHistoryDetails = async (
 
     participantLimit: plan.participantLimit,
 
-    /**
-     * Static cost information
-     */
-    boost: {
-      enabled: true,
-      label: "Yes",
-      duration: "3h",
-    },
+boost: {
+  enabled: !!activeBoost,
 
-    planCost: {
-      amount: 100,
-      currency: "INR",
-      label: "₹100",
-    },
+  label: activeBoost ? "Yes" : "No",
+
+  duration: activeBoost
+    ? `${activeBoost.boostOption.durationHours}h`
+    : null,
+},
+
+
+planCost: {
+  amount: packageFeatures
+    ? Number(packageFeatures.costToPostPlan)
+    : 0,
+
+  currency: "INR",
+
+  label: packageFeatures
+    ? `₹${Number(packageFeatures.costToPostPlan)}`
+    : "₹0",
+},
 
     /**
      * Requests
