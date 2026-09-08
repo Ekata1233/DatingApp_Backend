@@ -210,3 +210,192 @@ export async function confirmEventBooking(
 
   return updatedBooking;
 }
+
+
+
+
+
+
+export async function confirmsEventBooking(
+  tx: any,
+  payment: any,
+) {
+  console.log(
+    "========== CONFIRM EVENT BOOKING ==========",
+  );
+
+  if (!payment.referenceId) {
+    throw new Error(
+      "Event booking referenceId missing from payment",
+    );
+  }
+
+  // ==========================================
+  // 1. GET EXACT BOOKING
+  // ==========================================
+
+  const booking =
+    await tx.eventBooking.findFirst({
+      where: {
+        id: payment.referenceId,
+        userId: payment.userId,
+      },
+
+      include: {
+        tickets: true,
+      },
+    });
+
+  if (!booking) {
+    throw new Error(
+      "Event booking not found",
+    );
+  }
+
+  // ==========================================
+  // 2. IDEMPOTENCY
+  // ==========================================
+
+  if (
+    booking.status ===
+    EventBookingStatus.CONFIRMED
+  ) {
+    console.log(
+      "Event booking already confirmed:",
+      booking.id,
+    );
+
+    return booking;
+  }
+
+  if (
+    ![
+      EventBookingStatus.PENDING,
+      EventBookingStatus.PAYMENT_PENDING,
+    ].includes(booking.status)
+  ) {
+    throw new Error(
+      `Booking cannot be confirmed from status ${booking.status}`,
+    );
+  }
+
+  // ==========================================
+  // 3. PAYMENT CALCULATION
+  // ==========================================
+
+  const currentPaidAmount =
+    Number(booking.paidAmount || 0);
+
+  const paymentAmount =
+    Number(payment.amount);
+
+  const totalAmount =
+    Number(booking.totalAmount);
+
+  const newPaidAmount =
+    currentPaidAmount +
+    paymentAmount;
+
+  const isFullyPaid =
+    newPaidAmount >= totalAmount;
+
+  // ==========================================
+  // 4. UPDATE BOOKING
+  // ==========================================
+
+  const updatedBooking =
+    await tx.eventBooking.update({
+      where: {
+        id: booking.id,
+      },
+
+      data: {
+        paidAmount: Math.min(
+          newPaidAmount,
+          totalAmount,
+        ),
+
+        paymentId: payment.id,
+
+        status: isFullyPaid
+          ? EventBookingStatus.CONFIRMED
+          : EventBookingStatus.PAYMENT_PENDING,
+      },
+
+      include: {
+        tickets: true,
+      },
+    });
+
+  // ==========================================
+  // 5. CONFIRM TICKETS + QR
+  // ==========================================
+
+  if (isFullyPaid) {
+    for (
+      const ticket of
+        updatedBooking.tickets
+    ) {
+      if (
+        ticket.status ===
+        EventTicketStatus.CONFIRMED &&
+        ticket.qrCodeUrl
+      ) {
+        continue;
+      }
+
+      const qrData =
+        JSON.stringify({
+          type: "EVENT_TICKET",
+
+          bookingId:
+            updatedBooking.id,
+
+          bookingNumber:
+            updatedBooking.bookingNumber,
+
+          ticketId:
+            ticket.ticketId,
+
+          ticketType:
+            ticket.ticketType,
+
+          eventId:
+            updatedBooking.eventId,
+        });
+
+      const qrCodeUrl =
+        await QRCode.toDataURL(
+          qrData,
+          {
+            errorCorrectionLevel:
+              "H",
+
+            margin: 2,
+
+            width: 400,
+          },
+        );
+
+      await tx.eventBookingTicket.update({
+        where: {
+          id: ticket.id,
+        },
+
+        data: {
+          qrCodeUrl,
+
+          status:
+            EventTicketStatus.CONFIRMED,
+        },
+      });
+    }
+  }
+
+  console.log(
+    "Event booking confirmed:",
+    updatedBooking.id,
+  );
+
+  return updatedBooking;
+}

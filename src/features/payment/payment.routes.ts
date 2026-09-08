@@ -25,6 +25,7 @@
 import { Router } from "express";
 import * as controller from "./payment.controller";
 import authMiddleware from "../../middleware/auth.middleware";
+import { createPaymentOrderController, razorpayWebhookController, verifyPaymentController } from "./payment.controller";
 
 const router = Router();
 
@@ -36,5 +37,21 @@ router.post("/webhook", controller.payuWebhookController);
 
 //RETURN URL
 router.post("/return", controller.paymentReturnController);
+
+router.post(
+  "/order-create",
+  authMiddleware,
+  createPaymentOrderController,
+);
+
+router.post(
+  "/verify",
+  authMiddleware,
+  verifyPaymentController,
+);
+router.post(
+  "/webhook",
+  razorpayWebhookController,
+);
 
 export default router;

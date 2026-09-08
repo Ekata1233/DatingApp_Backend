@@ -17,7 +17,24 @@ const app = express();
 // );
 app.use(corsMiddleware);
 app.use(compression());
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (
+      req: any,
+      res,
+      buf,
+    ) => {
+      if (
+        req.originalUrl.includes(
+          "/payments/webhook",
+        )
+      ) {
+        req.rawBody =
+          Buffer.from(buf);
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 
 app.use(

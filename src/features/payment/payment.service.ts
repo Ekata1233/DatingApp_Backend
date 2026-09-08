@@ -18,7 +18,7 @@
   import { creditBoostHandler } from "../purchaseStore/handlers/creditBoost.handler";
   import { creditComplimentHandler } from "../purchaseStore/handlers/creditCompliment.handler";
   import { creditDatePlanHandler } from "../purchaseStore/handlers/creditDatePlan.handler";
-  import { confirmEventBooking } from "./handlers/event.handler";
+  import { confirmEventBooking, confirmsEventBooking } from "./handlers/event.handler";
 
   //CREATE PAYMENT LINK
   export async function createPaymentLink(userId: string, body: any) {
@@ -895,3 +895,1079 @@
 
     return result;
   }
+
+
+
+  
+
+
+  import { razorpay } from "../../config/razorpay";
+import {
+  verifyRazorpaySignature,
+  verifyRazorpayWebhookSignature,
+} from "./payment.utils";
+
+import type {
+  
+  CreatePaymentsOrderDTO,
+  VerifyPaymentsDTO,
+} from "./payment.validation";
+
+import type {
+  RazorpayWebhookPayload,
+} from "./payment.types";
+import { Prisma } from "@prisma/client";
+
+const convertToPaise = (amount: number): number => {
+  return Math.round(amount * 100);
+};
+
+const convertFromPaise = (amount: number): number => {
+  return amount / 100;
+};
+const createEventBookingForPayment =
+  async (
+    userId: string,
+    data: CreatePaymentsOrderDTO,
+  ) => {
+    if (!data.eventId) {
+      throw new Error(
+        "Event ID is required",
+      );
+    }
+
+    const event =
+      await prisma.event.findUnique({
+        where: {
+          id: data.eventId,
+        },
+
+        select: {
+          id: true,
+          status: true,
+
+          menCapacity: true,
+          womenCapacity: true,
+          otherCapacity: true,
+
+          menEntryPrice: true,
+          womenEntryPrice: true,
+          otherEntryPrice: true,
+
+          menDiscountedPrice: true,
+          womenDiscountedPrice: true,
+          otherDiscountedPrice: true,
+        },
+      });
+
+    if (!event) {
+      throw new Error(
+        "Event not found",
+      );
+    }
+
+    if (
+      event.status !== EventStatus.LIVE
+    ) {
+      throw new Error(
+        "Event is not live",
+      );
+    }
+
+    // =====================================
+    // TICKET COUNTS
+    // =====================================
+
+    const menTicketCount =
+      Number(
+        data.menTicketCount ?? 0,
+      );
+
+    const womenTicketCount =
+      Number(
+        data.womenTicketCount ?? 0,
+      );
+
+    const otherTicketCount =
+      Number(
+        data.otherTicketCount ?? 0,
+      );
+
+    if (
+      !Number.isInteger(
+        menTicketCount,
+      ) ||
+      !Number.isInteger(
+        womenTicketCount,
+      ) ||
+      !Number.isInteger(
+        otherTicketCount,
+      )
+    ) {
+      throw new Error(
+        "Ticket count must be a valid integer",
+      );
+    }
+
+    if (
+      menTicketCount < 0 ||
+      womenTicketCount < 0 ||
+      otherTicketCount < 0
+    ) {
+      throw new Error(
+        "Ticket count cannot be negative",
+      );
+    }
+
+    const ticketCount =
+      menTicketCount +
+      womenTicketCount +
+      otherTicketCount;
+
+    if (ticketCount <= 0) {
+      throw new Error(
+        "At least one ticket is required",
+      );
+    }
+
+    // =====================================
+    // PRICE
+    // =====================================
+
+    const getFinalPrice = (
+      type:
+        | "MEN"
+        | "WOMEN"
+        | "OTHER",
+      entryPrice: any,
+      discountedPrice: any,
+    ) => {
+      if (entryPrice === null) {
+        throw new Error(
+          `${type} ticket price is unavailable`,
+        );
+      }
+
+      return discountedPrice !==
+        null
+        ? Number(discountedPrice)
+        : Number(entryPrice);
+    };
+
+    const menPrice =
+      menTicketCount > 0
+        ? getFinalPrice(
+            "MEN",
+            event.menEntryPrice,
+            event.menDiscountedPrice,
+          )
+        : 0;
+
+    const womenPrice =
+      womenTicketCount > 0
+        ? getFinalPrice(
+            "WOMEN",
+            event.womenEntryPrice,
+            event.womenDiscountedPrice,
+          )
+        : 0;
+
+    const otherPrice =
+      otherTicketCount > 0
+        ? getFinalPrice(
+            "OTHER",
+            event.otherEntryPrice,
+            event.otherDiscountedPrice,
+          )
+        : 0;
+
+    // =====================================
+    // CAPACITY
+    // =====================================
+
+    const checkCapacity = async (
+      ticketType:
+        | "MEN"
+        | "WOMEN"
+        | "OTHER",
+      requestedCount: number,
+      capacity: number | null,
+    ) => {
+      if (requestedCount <= 0) {
+        return;
+      }
+
+      if (
+        capacity === null ||
+        capacity <= 0
+      ) {
+        throw new Error(
+          `${ticketType} ticket capacity is not available`,
+        );
+      }
+
+      const alreadyBooked =
+        await prisma
+          .eventBookingTicket
+          .count({
+            where: {
+              booking: {
+                eventId: event.id,
+              },
+
+              ticketType,
+
+              status: {
+                in: [
+                  "PENDING",
+                  "CONFIRMED",
+                ],
+              },
+            },
+          });
+
+      const remaining =
+        Math.max(
+          capacity -
+            alreadyBooked,
+          0,
+        );
+
+      if (
+        requestedCount >
+        remaining
+      ) {
+        throw new Error(
+          `Only ${remaining} ${ticketType} ticket(s) available`,
+        );
+      }
+    };
+
+    await checkCapacity(
+      "MEN",
+      menTicketCount,
+      event.menCapacity,
+    );
+
+    await checkCapacity(
+      "WOMEN",
+      womenTicketCount,
+      event.womenCapacity,
+    );
+
+    await checkCapacity(
+      "OTHER",
+      otherTicketCount,
+      event.otherCapacity,
+    );
+
+    // =====================================
+    // TOTAL
+    // =====================================
+
+    const ticketAmount =
+      menPrice *
+        menTicketCount +
+      womenPrice *
+        womenTicketCount +
+      otherPrice *
+        otherTicketCount;
+
+    if (ticketAmount <= 0) {
+      throw new Error(
+        "Invalid event payment amount",
+      );
+    }
+
+    const bookingNumber =
+      `EVT_${Date.now()}_${randomUUID()
+        .replace(/-/g, "")
+        .slice(0, 8)}`;
+
+    // =====================================
+    // CREATE BOOKING
+    // =====================================
+
+    const booking =
+      await prisma
+        .eventBooking
+        .create({
+          data: {
+            userId,
+
+            eventId:
+              event.id,
+
+            bookingNumber,
+
+            ticketCount,
+
+            ticketAmount,
+
+            totalAmount:
+              ticketAmount,
+
+            paidAmount: 0,
+
+            status:
+              EventBookingStatus.PAYMENT_PENDING,
+
+            tickets: {
+              create: [
+                ...Array.from(
+                  {
+                    length:
+                      menTicketCount,
+                  },
+                  () => ({
+                    ticketId:
+                      `TKT_${Date.now()}_${randomUUID()
+                        .replace(
+                          /-/g,
+                          "",
+                        )
+                        .slice(
+                          0,
+                          8,
+                        )}`,
+
+                    ticketType:
+                      "MEN" as const,
+
+                    ticketAmount:
+                      menPrice,
+
+                    status:
+                      "PENDING" as const,
+                  }),
+                ),
+
+                ...Array.from(
+                  {
+                    length:
+                      womenTicketCount,
+                  },
+                  () => ({
+                    ticketId:
+                      `TKT_${Date.now()}_${randomUUID()
+                        .replace(
+                          /-/g,
+                          "",
+                        )
+                        .slice(
+                          0,
+                          8,
+                        )}`,
+
+                    ticketType:
+                      "WOMEN" as const,
+
+                    ticketAmount:
+                      womenPrice,
+
+                    status:
+                      "PENDING" as const,
+                  }),
+                ),
+
+                ...Array.from(
+                  {
+                    length:
+                      otherTicketCount,
+                  },
+                  () => ({
+                    ticketId:
+                      `TKT_${Date.now()}_${randomUUID()
+                        .replace(
+                          /-/g,
+                          "",
+                        )
+                        .slice(
+                          0,
+                          8,
+                        )}`,
+
+                    ticketType:
+                      "OTHER" as const,
+
+                    ticketAmount:
+                      otherPrice,
+
+                    status:
+                      "PENDING" as const,
+                  }),
+                ),
+              ],
+            },
+          },
+
+          include: {
+            tickets: true,
+          },
+        });
+
+    return {
+      booking,
+      amount:
+        ticketAmount,
+    };
+  };
+export const createPaymentOrderService =
+  async (
+    userId: string,
+    data: CreatePaymentsOrderDTO,
+  ) => {
+    if (!userId) {
+      throw new Error(
+        "User ID is required",
+      );
+    }
+
+    let amount = 0;
+
+    let referenceId:
+      | string
+      | undefined =
+      data.referenceId;
+
+    let eventBooking:
+      | any
+      | null = null;
+
+    // =========================================
+    // EVENT BOOKING
+    // =========================================
+
+    if (
+      data.purpose ===
+      PaymentPurpose.EVENT_BOOKING
+    ) {
+      const eventResult =
+        await createEventBookingForPayment(
+          userId,
+          data,
+        );
+
+      amount =
+        eventResult.amount;
+
+      eventBooking =
+        eventResult.booking;
+
+      // VERY IMPORTANT
+      referenceId =
+        eventResult.booking.id;
+    } else {
+      amount =
+        Number(data.amount);
+
+      if (
+        !Number.isFinite(
+          amount,
+        ) ||
+        amount <= 0
+      ) {
+        throw new Error(
+          "Invalid payment amount",
+        );
+      }
+    }
+
+    const amountInPaise =
+      convertToPaise(amount);
+
+    if (
+      amountInPaise <= 0
+    ) {
+      throw new Error(
+        "Invalid payment amount",
+      );
+    }
+
+    const receipt =
+      `receipt_${Date.now()}_${userId.slice(
+        0,
+        8,
+      )}`;
+
+    // =========================================
+    // RAZORPAY ORDER
+    // =========================================
+
+    const razorpayOrder =
+      await razorpay.orders.create({
+        amount:
+          amountInPaise,
+
+        currency:
+          data.currency ||
+          "INR",
+
+        receipt,
+
+        notes: {
+          userId,
+
+          purpose:
+            data.purpose,
+
+          referenceId:
+            referenceId || "",
+
+          eventBookingId:
+            eventBooking?.id ||
+            "",
+
+          eventId:
+            data.eventId ||
+            "",
+
+          packagePriceId:
+            data.packagePriceId ||
+            "",
+        },
+      });
+
+    // =========================================
+    // PAYMENT
+    // =========================================
+
+    const payment =
+      await prisma.payment.create({
+        data: {
+          userId,
+
+          amount,
+
+          currency:
+            data.currency ||
+            "INR",
+
+          // While pending:
+          // payment_id = Razorpay order id
+          payment_id:
+            razorpayOrder.id,
+
+          status:
+            PaymentStatus.PENDING,
+
+          purpose:
+            data.purpose,
+
+          // EVENT_BOOKING:
+          // referenceId = booking.id
+          referenceId,
+
+          packagePriceId:
+            data.packagePriceId,
+
+          gatewayResponse:
+            razorpayOrder as any,
+        },
+      });
+
+    return {
+      paymentId:
+        payment.id,
+
+      razorpayOrderId:
+        razorpayOrder.id,
+
+      razorpayKeyId:
+        process.env
+          .RAZORPAY_KEY_ID,
+
+      amount:
+        razorpayOrder.amount,
+
+      amountInRupees:
+        convertFromPaise(
+          Number(
+            razorpayOrder.amount,
+          ),
+        ),
+
+      currency:
+        razorpayOrder.currency,
+
+      status:
+        razorpayOrder.status,
+
+      eventBooking:
+        eventBooking
+          ? {
+              id:
+                eventBooking.id,
+
+              bookingNumber:
+                eventBooking.bookingNumber,
+
+              ticketCount:
+                eventBooking.ticketCount,
+
+              totalAmount:
+                eventBooking.totalAmount,
+
+              status:
+                eventBooking.status,
+
+              tickets:
+                eventBooking.tickets,
+            }
+          : null,
+    };
+  };
+
+export const verifyPaymentService =
+  async (
+    userId: string,
+    data: VerifyPaymentsDTO,
+  ) => {
+    if (!userId) {
+      throw new Error(
+        "User ID is required",
+      );
+    }
+
+    // =========================================
+    // FIND PAYMENT
+    // =========================================
+
+    const payment =
+      await prisma.payment.findFirst({
+        where: {
+          userId,
+
+          OR: [
+            {
+              payment_id:
+                data.razorpay_order_id,
+            },
+            {
+              transactionId:
+                data.razorpay_order_id,
+            },
+          ],
+        },
+      });
+
+    if (!payment) {
+      throw new Error(
+        "Payment order not found",
+      );
+    }
+
+    // =========================================
+    // IDEMPOTENCY
+    // =========================================
+
+    if (
+      payment.status ===
+      PaymentStatus.COMPLETED
+    ) {
+      return {
+        success: true,
+        message:
+          "Payment already verified",
+        payment,
+      };
+    }
+
+    // =========================================
+    // VERIFY SIGNATURE
+    // =========================================
+
+    const isValid =
+      verifyRazorpaySignature(
+        data.razorpay_order_id,
+
+        data.razorpay_payment_id,
+
+        data.razorpay_signature,
+      );
+
+    if (!isValid) {
+      await prisma.payment.update({
+        where: {
+          id: payment.id,
+        },
+
+        data: {
+          status:
+            PaymentStatus.FAILED,
+
+          gatewayResponse: {
+            error:
+              "Invalid Razorpay signature",
+          },
+        },
+      });
+
+      throw new Error(
+        "Invalid Razorpay payment signature",
+      );
+    }
+
+    // =========================================
+    // COMPLETE PAYMENT + FULFIL
+    // SAME TRANSACTION
+    // =========================================
+
+    const result =
+      await prisma.$transaction(
+        async (tx) => {
+          const currentPayment =
+            await tx.payment.findUnique({
+              where: {
+                id: payment.id,
+              },
+            });
+
+          if (!currentPayment) {
+            throw new Error(
+              "Payment not found",
+            );
+          }
+
+          if (
+            currentPayment.status ===
+            PaymentStatus.COMPLETED
+          ) {
+            return {
+              payment:
+                currentPayment,
+              eventBooking:
+                null,
+              alreadyProcessed:
+                true,
+            };
+          }
+
+          const updatedPayment =
+            await tx.payment.update({
+              where: {
+                id: payment.id,
+              },
+
+              data: {
+                // Razorpay PAYMENT ID
+                payment_id:
+                  data.razorpay_payment_id,
+
+                // Razorpay ORDER ID
+                transactionId:
+                  data.razorpay_order_id,
+
+                status:
+                  PaymentStatus.COMPLETED,
+
+                paidAt:
+                  new Date(),
+
+                gatewayResponse: {
+                  razorpay_order_id:
+                    data.razorpay_order_id,
+
+                  razorpay_payment_id:
+                    data.razorpay_payment_id,
+
+                  razorpay_signature:
+                    data.razorpay_signature,
+                },
+              },
+            });
+
+          let eventBooking =
+            null;
+
+          // ===================================
+          // EVENT BOOKING
+          // ===================================
+
+          if (
+            updatedPayment.purpose ===
+            PaymentPurpose.EVENT_BOOKING
+          ) {
+            eventBooking =
+              await confirmsEventBooking(
+                tx,
+                updatedPayment,
+              );
+          }
+
+          return {
+            payment:
+              updatedPayment,
+
+            eventBooking,
+
+            alreadyProcessed:
+              false,
+          };
+        },
+        {
+          maxWait: 10000,
+          timeout: 30000,
+          isolationLevel:
+            "Serializable",
+        },
+      );
+
+    return {
+      success: true,
+
+      message:
+        result.alreadyProcessed
+          ? "Payment already verified"
+          : "Payment verified successfully",
+
+      payment:
+        result.payment,
+
+      eventBooking:
+        result.eventBooking,
+    };
+  };
+
+export const handleRazorpayWebhookService =
+  async (
+    rawBody: string | Buffer,
+    signature: string,
+  ) => {
+    const isValid =
+      verifyRazorpayWebhookSignature(
+        rawBody,
+        signature,
+      );
+
+    if (!isValid) {
+      throw new Error(
+        "Invalid Razorpay webhook signature",
+      );
+    }
+
+    const webhook =
+      JSON.parse(
+        Buffer.isBuffer(rawBody)
+          ? rawBody.toString(
+              "utf8",
+            )
+          : rawBody,
+      ) as RazorpayWebhookPayload;
+
+    switch (webhook.event) {
+      // ========================================
+      // PAYMENT CAPTURED
+      // ========================================
+
+      case "payment.captured": {
+        const paymentEntity =
+          webhook.payload.payment
+            ?.entity;
+
+        if (!paymentEntity) {
+          return {
+            success: true,
+          };
+        }
+
+        const payment =
+          await prisma.payment.findFirst({
+            where: {
+              OR: [
+                {
+                  payment_id:
+                    paymentEntity.order_id,
+                },
+
+                {
+                  transactionId:
+                    paymentEntity.order_id,
+                },
+              ],
+            },
+          });
+
+        if (!payment) {
+          console.warn(
+            "Payment not found for Razorpay order:",
+            paymentEntity.order_id,
+          );
+
+          return {
+            success: true,
+          };
+        }
+
+        if (
+          payment.status ===
+          PaymentStatus.COMPLETED
+        ) {
+          return {
+            success: true,
+            alreadyProcessed:
+              true,
+          };
+        }
+
+        await prisma.$transaction(
+          async (tx) => {
+            const currentPayment =
+              await tx.payment.findUnique({
+                where: {
+                  id: payment.id,
+                },
+              });
+
+            if (!currentPayment) {
+              throw new Error(
+                "Payment not found",
+              );
+            }
+
+            if (
+              currentPayment.status ===
+              PaymentStatus.COMPLETED
+            ) {
+              return;
+            }
+
+            const updatedPayment =
+              await tx.payment.update({
+                where: {
+                  id: payment.id,
+                },
+
+                data: {
+                  payment_id:
+                    paymentEntity.id,
+
+                  transactionId:
+                    paymentEntity.order_id,
+
+                  status:
+                    PaymentStatus.COMPLETED,
+
+                  paidAt:
+                    new Date(),
+
+                  gatewayResponse:
+                    JSON.parse(
+                      JSON.stringify(
+                        webhook,
+                      ),
+                    ),
+                },
+              });
+
+            // ===============================
+            // EVENT BOOKING
+            // ===============================
+
+            if (
+              updatedPayment.purpose ===
+              PaymentPurpose.EVENT_BOOKING
+            ) {
+              await confirmsEventBooking(
+                tx,
+                updatedPayment,
+              );
+            }
+          },
+          {
+            maxWait: 10000,
+
+            timeout: 30000,
+
+            isolationLevel:
+              "Serializable",
+          },
+        );
+
+        break;
+      }
+
+      // ========================================
+      // PAYMENT FAILED
+      // ========================================
+
+      case "payment.failed": {
+        const paymentEntity =
+          webhook.payload.payment
+            ?.entity;
+
+        if (!paymentEntity) {
+          return;
+        }
+
+        const payment =
+          await prisma.payment.findFirst({
+            where: {
+              OR: [
+                {
+                  payment_id:
+                    paymentEntity.order_id,
+                },
+
+                {
+                  transactionId:
+                    paymentEntity.order_id,
+                },
+              ],
+            },
+          });
+
+        if (!payment) {
+          return;
+        }
+
+        if (
+          payment.status ===
+          PaymentStatus.COMPLETED
+        ) {
+          return;
+        }
+
+        await prisma.payment.update({
+          where: {
+            id: payment.id,
+          },
+
+          data: {
+            status:
+              PaymentStatus.FAILED,
+
+            gatewayResponse:
+              JSON.parse(
+                JSON.stringify(
+                  webhook,
+                ),
+              ),
+          },
+        });
+
+        break;
+      }
+
+      case "order.paid": {
+        console.log(
+          "Razorpay order paid:",
+          webhook.payload.order
+            ?.entity.id,
+        );
+
+        break;
+      }
+
+      default: {
+        console.log(
+          "Unhandled Razorpay event:",
+          webhook.event,
+        );
+      }
+    }
+
+    return {
+      success: true,
+    };
+  };
