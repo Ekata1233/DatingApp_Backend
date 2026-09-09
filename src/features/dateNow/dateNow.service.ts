@@ -339,7 +339,12 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
             },
           },
 
-          photos: true,
+          photos: {
+          where: {
+            order: 1,
+          },
+          take: 1,
+        },
         },
       },
       activity: true,
@@ -406,13 +411,9 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
     ? plan.eventDateTime.toISOString().split("T")[0]
     : null;
 
-  const eventTime = plan.eventDateTime
-    ? plan.eventDateTime.toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })
-    : null;
+ const eventTime = plan.eventDateTime
+  ? `T${plan.eventDateTime.toISOString().split("T")[1]}`
+  : null;
   return {
     id: plan.id,
     matchScore: plan.matchScore,

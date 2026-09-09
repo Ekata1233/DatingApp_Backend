@@ -40,7 +40,13 @@ export const verifyPaymentSchema = z.object({
     .min(1),
 });
 
+export type CreatePaymentOrderDTO = z.infer<
+  typeof createPaymentOrderSchema
+>;
 
+export type VerifyPaymentDTO = z.infer<
+  typeof verifyPaymentSchema
+>;
 
 //razorpay
 

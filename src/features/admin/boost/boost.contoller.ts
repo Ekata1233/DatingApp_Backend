@@ -59,8 +59,8 @@ export const getBoostsController = async (
 ) => {
   try {
    
-
-    const result = await getBoostsService();
+const type = req.query.type as BoostType | undefined;
+    const result = await getBoostsService(type);
 
     return res.status(200).json({
       success: true,
