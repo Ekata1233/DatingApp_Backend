@@ -198,16 +198,29 @@ export const getAllBoostsService = async () => {
 };
 
 // ✅ GET API for mob
-export const getBoostsService = async () => {
+export const getBoostsService = async (
+  type?: BoostType
+) => {
   const [boosts, userBoosts] = await Promise.all([
     prisma.boost.findMany({
+      where: {
+        is_active: true,
+
+          ...(type ? { name: type } : {}),
+      },
+
       include: {
         options: {
           where: {
             is_active: true,
           },
+
+          orderBy: {
+            created_at: "asc",
+          },
         },
       },
+
       orderBy: {
         created_at: "desc",
       },
@@ -215,9 +228,9 @@ export const getBoostsService = async () => {
 
     prisma.userBoost.findMany({
       where: {
-        
         is_active: true,
       },
+
       select: {
         total_boosts: true,
       },
@@ -225,7 +238,8 @@ export const getBoostsService = async () => {
   ]);
 
   const availableBoost = userBoosts.reduce(
-    (total, boost) => total + boost.total_boosts,
+    (total, boost) =>
+      total + boost.total_boosts,
     0
   );
 
@@ -233,23 +247,27 @@ export const getBoostsService = async () => {
     availableBoost,
 
     boosts: boosts.map((boost) => ({
-      // Basic Boost Data
       id: boost.id,
+
+      type: boost.name,
+
       name: boost.name,
+
       title: boost.title,
+
       description: boost.description,
+
       is_active: boost.is_active,
 
-      
-
-      // 2. OPTIONS
       options: boost.options,
 
-      // 3. INFO
       whyBoostWorks: boost.whyBoostWorks,
-      boostVsSuperBoost: boost.boostVsSuperBoost,
+
+      boostVsSuperBoost:
+        boost.boostVsSuperBoost,
 
       created_at: boost.created_at,
+
       updated_at: boost.updated_at,
     })),
   };
