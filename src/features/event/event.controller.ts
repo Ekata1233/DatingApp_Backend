@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getEventBookingPaymentSuccess, getUserEventBookingsService } from "./event.service";
+import { cancelEventBookingService, getEventBookingPaymentSuccess, getUserEventBookingsService } from "./event.service";
 
 export const getEventBookingPaymentSuccessController = async (
   req: Request,
@@ -101,6 +101,74 @@ export const getUserEventBookingsController = async (
       success: false,
       message:
         error.message || "Failed to fetch event bookings",
+    });
+  }
+};
+
+
+
+
+/* =========================================================
+   CANCEL EVENT BOOKING
+========================================================= */
+
+export const cancelEventBookingController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const bookingId = req.params.bookingId as string;
+
+    const { reason, comment } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking ID is required",
+      });
+    }
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Cancellation reason is required",
+      });
+    }
+
+    const data = await cancelEventBookingService(
+      userId,
+      bookingId,
+      {
+        reason,
+        comment,
+      },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error(
+      "CANCEL EVENT BOOKING ERROR:",
+      error,
+    );
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error?.message ||
+        "Failed to cancel event booking",
     });
   }
 };

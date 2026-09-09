@@ -17,6 +17,7 @@ import {
   sendMessage,
 } from "./chat.controller";
 import authMiddleware from "../../middleware/auth.middleware";
+import { getSharedItemsController } from "./sharedItem/sharedItem.controller";
 
 
 const router = Router();
@@ -90,6 +91,12 @@ router.get(
   "/:conversationId/details",
   authMiddleware,
   getConversationUserDetailsController,
+);
+
+router.get(
+  "/shareditem/:conversationId",
+  authMiddleware,
+  getSharedItemsController,
 );
 
 export default router;
