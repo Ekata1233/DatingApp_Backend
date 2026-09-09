@@ -114,6 +114,8 @@ model User {
   reportsCreated  UserReport[] @relation("ReportsCreated")
   reportsReceived UserReport[] @relation("ReportsReceived")
 
+  callbackRequests CallbackRequest[]
+
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])
@@ -752,6 +754,10 @@ model UserMatch {
   last_message_at DateTime?
   is_active       Boolean   @default(true)
   is_deleted      Boolean   @default(false)
+  unmatched_at    DateTime?
+  unmatched_by    String?   @db.Uuid
+  unmatch_reason  String?   @db.Text
+  unmatch_note    String?   @db.Text
   user1           User      @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
   user2           User      @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
 
@@ -2957,3 +2963,46 @@ model UserRelationship {
   @@map("user_relationships")
 }
 
+enum CallbackStatus {
+  REQUESTED
+  SCHEDULED
+  RESOLVED
+  MISSED
+  CANCELLED
+}
+
+model CallbackRequest {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @db.Uuid
+  callbackNumber String         @unique @db.VarChar(20)
+  callbackDate   DateTime       @db.Date
+  timeWindow     String         @db.VarChar(50)
+  topic          String?        @db.VarChar(100)
+  status         CallbackStatus @default(REQUESTED)
+  agentName      String?        @db.VarChar(100)
+  callDuration   Int?
+  resolutionNote String?        @db.Text
+  resolvedAt     DateTime?
+  missedAt       DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([callbackDate, status])
+}
+
+model SupportFaq {
+  id        String   @id @default(uuid()) @db.Uuid
+  question  String   @db.VarChar(255)
+  answer    String   @db.Text
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
