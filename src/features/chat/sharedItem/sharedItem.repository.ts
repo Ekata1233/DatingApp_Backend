@@ -25,8 +25,8 @@ const getMessageTypes = (
     case "DOCUMENTS":
       return [MessageType.FILE];
 
-    case "LINKS":
-      return [MessageType.LINK];
+    // case "LINKS":
+    //   return [MessageType.LINK];
 
     default:
       return [];
