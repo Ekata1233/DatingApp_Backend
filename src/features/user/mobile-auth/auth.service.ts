@@ -757,31 +757,81 @@ const handleVerifiedUser = async ({
   const jwtSecret = process.env.JWT_SECRET;
 
   if (!jwtSecret) {
-    throw new Error(
-      "JWT_SECRET is not configured",
-    );
+    throw new Error("JWT_SECRET is not configured");
   }
+
+  /* =========================================================
+     CREATE USER SESSION
+  ========================================================= */
+
+  const sessionExpiry = new Date();
+
+  sessionExpiry.setDate(
+    sessionExpiry.getDate() + 30,
+  );
+
+  const session =
+    await prisma.userSession.create({
+      data: {
+        userId: result.id,
+        isActive: true,
+        expiresAt: sessionExpiry,
+      },
+    });
+
+  /* =========================================================
+     CREATE JWT
+  ========================================================= */
 
   const token = jwt.sign(
     {
       userId: result.id,
+      sessionId: session.id,
     },
     jwtSecret,
     {
-      expiresIn: "7d",
+      expiresIn: "30d",
     },
   );
 
-
-  /*
-   * =======================================================
-   * FINAL RESPONSE
-   * =======================================================
-   */
+  /* =========================================================
+     FINAL RESPONSE
+  ========================================================= */
 
   return {
     user: result,
     token,
     is_register: isRegister,
+  }
+};
+
+export const logoutService = async (
+  userId: string,
+  sessionId: string,
+) => {
+  const session = await prisma.userSession.findFirst({
+    where: {
+      id: sessionId,
+      userId,
+      isActive: true,
+    },
+  });
+
+  if (!session) {
+    throw new Error("Session not found or already logged out");
+  }
+
+  await prisma.userSession.update({
+    where: {
+      id: sessionId,
+    },
+    data: {
+      isActive: false,
+      logoutAt: new Date(),
+    },
+  });
+
+  return {
+    message: "Logged out successfully",
   };
 };

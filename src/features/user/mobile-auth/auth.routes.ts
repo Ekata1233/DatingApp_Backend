@@ -12,9 +12,10 @@
 // export default router;
 
 import { Router } from "express";
-import { sendOtpController, verifyOtpController } from "./auth.controller";
+import { logoutController, sendOtpController, verifyOtpController } from "./auth.controller";
 import { prisma } from "../../../prisma/prismaClient";
 import jwt from "jsonwebtoken";
+import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = Router();
 
@@ -71,6 +72,12 @@ router.post("/send-otp", sendOtpController);
  *         description: Phone verified successfully
  */
 router.post("/verify-otp", verifyOtpController);
+
+router.post(
+  "/logout",
+  authMiddleware,
+  logoutController,
+);
 
 router.post("/token/:userId", async (req, res) => {
 
