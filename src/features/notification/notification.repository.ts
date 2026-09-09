@@ -1,20 +1,23 @@
 // Working on this file: src/features/notification/notification.repository.ts
 
+import { NotificationType } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 
 export const getNotificationsRepository = async (
   userId: string,
   skip: number,
   take: number,
-  type?: any,
+  types?: NotificationType[],
 ) => {
   return prisma.notification.findMany({
     where: {
       receiver_id: userId,
 
-      ...(type
+      ...(types && types.length > 0
         ? {
-            type,
+            type: {
+              in: types,
+            },
           }
         : {}),
     },
@@ -51,28 +54,38 @@ export const getNotificationsRepository = async (
 
 export const getNotificationCountRepository = async (
   userId: string,
-  type?: any,
+  types?: NotificationType[],
 ) => {
   return prisma.notification.count({
     where: {
       receiver_id: userId,
 
-      ...(type
-        ? {
-            type,
-          }
-        : {}),
-    },
+      ...(types && types.length > 0
+          ? {
+              type: {
+                in: types,
+              },
+            }
+          : {}),
+      },
   });
 };
 
 export const getUnreadNotificationCountRepository = async (
   userId: string,
+  types?: NotificationType[],
 ) => {
   return prisma.notification.count({
     where: {
       receiver_id: userId,
       is_read: false,
+       ...(types && types.length > 0
+          ? {
+              type: {
+                in: types,
+              },
+            }
+          : {}),
     },
   });
 };

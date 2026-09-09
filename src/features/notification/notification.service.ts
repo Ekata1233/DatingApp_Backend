@@ -5,7 +5,7 @@ import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
 import { incrementBadgeCount } from "./badge.service";
 import { findNotificationByIdRepository, getNotificationCountRepository, getNotificationsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository } from "./notification.repository";
-import { CreateNotificationParams, SaveDeviceTokenParams } from "./notification.types";
+import { CreateNotificationParams, NotificationCategory, notificationCategoryMap, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
 
 export const createNotification = async ({
@@ -82,10 +82,25 @@ export const getNotificationsService = async (
   userId: string,
   page = 1,
   limit = 20,
-  type?: NotificationType,
+  category: NotificationCategory = "ALL",
 ) => {
   if (!userId) {
     throw new Error("User ID is required");
+  }
+
+  const allowedCategories: NotificationCategory[] = [
+    "ALL",
+    "LIKES_ROSES",
+    "MATCHES",
+    "GIFTS",
+    "DATES",
+    "EVENTS",
+  ];
+
+  if (!allowedCategories.includes(category)) {
+    throw new Error(
+      "Invalid notification category",
+    );
   }
 
   const safePage =
@@ -101,6 +116,17 @@ export const getNotificationsService = async (
   const skip =
     (safePage - 1) * safeLimit;
 
+  let types:
+    | NotificationType[]
+    | undefined;
+
+  if (category !== "ALL") {
+    types =
+      notificationCategoryMap[
+        category
+      ];
+  }
+
   const [
     notifications,
     total,
@@ -110,62 +136,87 @@ export const getNotificationsService = async (
       userId,
       skip,
       safeLimit,
-      type,
+      types,
     ),
 
     getNotificationCountRepository(
       userId,
-      type,
+      types,
     ),
 
     getUnreadNotificationCountRepository(
       userId,
+      types,
     ),
   ]);
 
-  const data =
-    notifications.map((notification) => ({
-      id: notification.id,
-
-      type: notification.type,
-
-      title: notification.title,
-
-      message: notification.message,
-
-      data: notification.data,
-
-      isRead: notification.is_read,
-
-      readAt: notification.readAt,
-
-      createdAt: notification.created_at,
-
-      sender: {
-        id: notification.sender.id,
-
-        name:
-          notification.sender.full_name,
-
-        birthDate:
-          notification.sender.birth_date,
-
-        photo:
-          notification.sender.photos[0]
-            ?.media_url ?? null,
-      },
-    }));
-
   return {
-    notifications: data,
+    category,
+
+    notifications:
+      notifications.map(
+        (notification) => ({
+          id: notification.id,
+
+          type:
+            notification.type,
+
+          title:
+            notification.title,
+
+          message:
+            notification.message,
+
+          data:
+            notification.data,
+
+          isRead:
+            notification.is_read,
+
+          readAt:
+            notification.readAt,
+
+          createdAt:
+            notification.created_at,
+
+          sender:
+            notification.sender
+              ? {
+                  id:
+                    notification
+                      .sender.id,
+
+                  name:
+                    notification
+                      .sender
+                      .full_name,
+
+                  birthDate:
+                    notification
+                      .sender
+                      .birth_date,
+
+                  photo:
+                    notification
+                      .sender
+                      .photos[0]
+                      ?.media_url ??
+                    null,
+                }
+              : null,
+        }),
+      ),
 
     pagination: {
       page: safePage,
       limit: safeLimit,
       total,
-      totalPages: Math.ceil(
-        total / safeLimit,
-      ),
+
+      totalPages:
+        Math.ceil(
+          total /
+            safeLimit,
+        ),
     },
 
     unreadCount,
