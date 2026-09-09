@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { sendOtp, verifyOtp } from "./auth.service";
+import { logoutService, sendOtp, verifyOtp } from "./auth.service";
 
 export const sendOtpController = async (
   req: Request,
@@ -53,6 +53,31 @@ export const verifyOtpController = async (
       success: false,
       message:
         error?.message || "OTP verification failed",
+    });
+  }
+};
+
+export const logoutController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const sessionId = (req as any).user.sessionId;
+
+    const result = await logoutService(
+      userId,
+      sessionId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Logout failed",
     });
   }
 };
