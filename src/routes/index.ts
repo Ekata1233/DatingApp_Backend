@@ -70,8 +70,8 @@ import relationshipTagRoutes from "../features/relationshipTag/relationshipTag.r
 import myBalanceRoutes from "../features/user/my-balance/myBalance.routes";
 import walletRoutes from "../features/wallet/wallet.route";
 import membershipRoutes from "../features/package/membership/membership.routes";
+import unmatchRoutes from "../features/match/match.routes"
 import supportRoutes from "../features/support/support.routes"
-
 
 const router = Router();
 
@@ -168,5 +168,9 @@ router.use("/user", walletRoutes);
 
 //MEMBERSHIP
 router.use("/user", membershipRoutes);
+//
+
+//UNMATCH 
+router.use("/user", unmatchRoutes)
 //
 export default router;
