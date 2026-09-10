@@ -1218,6 +1218,7 @@ export const setPrimaryPhotoService = async (
 
   await redis.del(`profile:edit:${userId}`);
   await redis.del(`feed:details:${userId}`);
+  await clearFeedUserCache(userId);
 
   return result;
 };

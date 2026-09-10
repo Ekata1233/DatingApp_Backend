@@ -4,7 +4,7 @@ import { NotificationType } from "@prisma/client";
 import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
 import { incrementBadgeCount } from "./badge.service";
-import { findNotificationByIdRepository, getNotificationCountRepository, getNotificationsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository } from "./notification.repository";
+import { createNotificationSettingRepository, findNotificationByIdRepository, getNotificationCountRepository, getNotificationSettingRepository, getNotificationsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository, updateNotificationSettingRepository } from "./notification.repository";
 import { CreateNotificationParams, NotificationCategory, notificationCategoryMap, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
 
@@ -309,5 +309,51 @@ export const markAllNotificationsReadService = async (userId: string) => {
   return {
     updatedCount: result.count,
     unreadCount: 0,
+  };
+};
+
+/**
+ * Get current user's notification setting
+ */
+export const getNotificationSettingService = async (
+  userId: string,
+) => {
+  let setting =
+    await getNotificationSettingRepository(userId);
+
+  // Existing users may not have settings yet
+  if (!setting) {
+    setting =
+      await createNotificationSettingRepository(userId);
+  }
+
+  return {
+    isEnabled: setting.isEnabled,
+    mutedUntil: setting.mutedUntil,
+  };
+};
+
+/**
+ * Update notification ON / OFF
+ */
+export const updateNotificationSettingService = async (
+  userId: string,
+  isEnabled: boolean,
+) => {
+  if (typeof isEnabled !== "boolean") {
+    throw new Error(
+      "isEnabled must be a boolean value",
+    );
+  }
+
+  const setting =
+    await updateNotificationSettingRepository(
+      userId,
+      isEnabled,
+    );
+
+  return {
+    isEnabled: setting.isEnabled,
+    mutedUntil: setting.mutedUntil,
   };
 };

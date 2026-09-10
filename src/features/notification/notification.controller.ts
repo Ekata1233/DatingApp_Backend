@@ -249,3 +249,99 @@ export const markAllNotificationsReadController = async (
     });
   }
 };
+
+/**
+ * GET notification setting
+ */
+export const getNotificationSettingController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const data =
+      await service.getNotificationSettingService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Notification setting fetched successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error(
+      "Get notification setting error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to fetch notification setting",
+    });
+  }
+};
+
+/**
+ * PATCH notification setting
+ */
+export const updateNotificationSettingController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { isEnabled } = req.body;
+
+    if (typeof isEnabled !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "isEnabled is required and must be boolean",
+      });
+    }
+
+    const data =
+      await service.updateNotificationSettingService(
+        userId,
+        isEnabled,
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: isEnabled
+        ? "Notifications enabled successfully"
+        : "Notifications muted successfully",
+      data,
+    });
+  } catch (error: any) {
+    console.error(
+      "Update notification setting error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to update notification setting",
+    });
+  }
+};
