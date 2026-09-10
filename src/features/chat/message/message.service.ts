@@ -13,6 +13,7 @@ import {
   MarkMessageReadInput,
   MarkMessagesReadInput,
 } from "./message.types";
+import { createMatchFromReplyService } from "../../match/match.service";
 
 export const messageService = {
   /**
@@ -27,8 +28,7 @@ export const messageService = {
      */
 
     console.log("data in message service : ", data);
-    const participant =
-      await messageRepository.findConversationParticipant(
+    const participant = await messageRepository.findConversationParticipant(
         data.conversationId,
         data.userId
       );
@@ -113,6 +113,46 @@ export const messageService = {
         mediaUrl: data.mediaUrl,
         metadata: data.metadata,
       });
+
+      /**
+ * Check whether this message is
+ * a reply that should create match.
+ *
+ * IMPORTANT:
+ * Don't run this for Rose/Gift/Compliment
+ * themselves.
+ */
+const replyTypes: MessageType[] = [
+  MessageType.TEXT,
+  MessageType.IMAGE,
+  MessageType.VIDEO,
+  MessageType.AUDIO,
+  MessageType.FILE,
+];
+
+if (
+  replyTypes.includes(
+    data.messageType,
+  )
+) {
+  try {
+    const matchResult =
+      await createMatchFromReplyService(
+        data.conversationId,
+        data.userId,
+      );
+
+    console.log(
+      "MATCH FROM REPLY RESULT:",
+      matchResult,
+    );
+  } catch (error) {
+    console.error(
+      "MATCH FROM REPLY ERROR:",
+      error,
+    );
+  }
+}
 
     return message;
   },

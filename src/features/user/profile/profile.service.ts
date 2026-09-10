@@ -300,6 +300,7 @@ export const updateAddressService = async (
   country: string,
   state: string,
   city: string,
+  area: string,
 ) => {
   if (!userId) throw new Error("User ID is missing");
 
@@ -317,12 +318,14 @@ export const updateAddressService = async (
         country,
         state,
         city,
+        area
       },
       create: {
         user_id: userId,
         country,
         state,
         city,
+        area
       },
     });
 

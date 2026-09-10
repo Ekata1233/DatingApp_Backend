@@ -185,9 +185,9 @@ export const updateLookingForController = async (
 export const addressController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { country, state, city } = req.body;
+    const { country, state, city,area } = req.body;
 
-    const user = await updateAddressService(userId, country, state, city);
+    const user = await updateAddressService(userId, country, state, city,area);
 
     return res.status(200).json({
       success: true,

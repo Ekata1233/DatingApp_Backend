@@ -1246,7 +1246,17 @@ export const chatRepository = {
   /**
    * Get messages using cursor pagination.
    */
-  async findMessages(conversationId: string, userId: string, cursor?: string, limit = 30, type: MessageFilterType = "all",) {
+  async findMessages(
+    conversationId: string,
+    userId: string,
+    cursor?: string,
+    limit = 30,
+    type: MessageFilterType = "all",
+  ) {
+    // =========================================================
+    // MESSAGE TYPE FILTER
+    // =========================================================
+
     const messageTypeFilter =
       type === "all"
         ? {}
@@ -1259,7 +1269,8 @@ export const chatRepository = {
                 MessageType.DATE_INVITE,
               ],
             },
-          } : type === "event"
+          }
+          : type === "event"
             ? {
               messageType: {
                 in: [
@@ -1270,258 +1281,374 @@ export const chatRepository = {
               },
             }
             : {
-              messageType: type.toUpperCase() as MessageType,
+              messageType:
+                type.toUpperCase() as MessageType,
             };
-    return prisma.chatMessage.findMany({
-      where: {
-        conversationId,
-        deletedAt: null,
-        // Clear chat deletion for this user
-        deletions: {
-          none: {
-            userId,
+
+    // =========================================================
+    // GET MESSAGES
+    // =========================================================
+
+    const messages =
+      await prisma.chatMessage.findMany({
+        where: {
+          conversationId,
+
+          deletedAt: null,
+
+          // Clear chat deletion for this user
+          deletions: {
+            none: {
+              userId,
+            },
           },
-        },
-        // Message type filter
-        ...messageTypeFilter,
-      },
 
-      orderBy: {
-        createdAt: "desc",
-      },
-
-      take: limit + 1,
-
-      ...(cursor
-        ? {
-          skip: 1,
-          cursor: {
-            id: cursor,
-          },
-        }
-        : {}),
-
-      select: {
-        id: true,
-        conversationId: true,
-        senderId: true,
-
-        content: true,
-        messageType: true,
-        mediaUrl: true,
-        metadata: true,
-
-        createdAt: true,
-        deliveredAt: true,
-        readAt: true,
-
-        // Special interaction IDs
-        roseId: true,
-        complimentId: true,
-        giftId: true,
-        eventId: true,
-        datePlanId: true,
-
-        // Current Rose state
-        rose: {
-          select: {
-            id: true,
-            senderId: true,
-            receiverId: true,
-            targetType: true,
-            targetId: true,
-            requiredMessages: true,
-            messagesSent: true,
-            isUnlocked: true,
-            unlockedAt: true,
-            expiresAt: true,
-          },
+          ...messageTypeFilter,
         },
 
-        // Current Gift state
-        // Current Gift state
-        gift: {
-          select: {
-            id: true,
-            senderId: true,
-            receiverId: true,
-            giftId: true,
-            giftName: true,
-            pricePaid: true,
-            message: true,
-            targetType: true,
-            targetId: true,
-            requiredMessages: true,
-            messagesSent: true,
-            isUnlocked: true,
-            unlockedAt: true,
-            expiresAt: true,
+        orderBy: {
+          createdAt: "desc",
+        },
 
-            // ✅ Actual Gift master details
-            gift: {
-              select: {
-                id: true,
-                categoryId: true,
-                image: true,
-                name: true,
-                coinCost: true,
-                triggerLine: true,
-                receiverLine: true,
-                isLive: true,
+        take: limit + 1,
 
-                // ✅ Gift category details
-                category: {
-                  select: {
-                    id: true,
-                    name: true,
+        ...(cursor
+          ? {
+            skip: 1,
+            cursor: {
+              id: cursor,
+            },
+          }
+          : {}),
+
+        select: {
+          // =====================================================
+          // BASIC MESSAGE DATA
+          // =====================================================
+
+          id: true,
+          conversationId: true,
+          senderId: true,
+
+          content: true,
+          messageType: true,
+          mediaUrl: true,
+          metadata: true,
+
+          createdAt: true,
+          deliveredAt: true,
+          readAt: true,
+
+          // =====================================================
+          // SPECIAL IDS
+          // =====================================================
+
+          roseId: true,
+          complimentId: true,
+          giftId: true,
+          eventId: true,
+          datePlanId: true,
+
+          // =====================================================
+          // ROSE
+          // =====================================================
+
+          rose: {
+            select: {
+              id: true,
+              senderId: true,
+              receiverId: true,
+              targetType: true,
+              targetId: true,
+              requiredMessages: true,
+              messagesSent: true,
+              isUnlocked: true,
+              unlockedAt: true,
+              expiresAt: true,
+            },
+          },
+
+          // =====================================================
+          // GIFT
+          // =====================================================
+
+          gift: {
+            select: {
+              id: true,
+              senderId: true,
+              receiverId: true,
+
+              giftId: true,
+              giftName: true,
+              pricePaid: true,
+              message: true,
+
+              targetType: true,
+              targetId: true,
+
+              requiredMessages: true,
+              messagesSent: true,
+
+              isUnlocked: true,
+              unlockedAt: true,
+              expiresAt: true,
+
+              gift: {
+                select: {
+                  id: true,
+                  categoryId: true,
+                  image: true,
+                  name: true,
+                  coinCost: true,
+                  triggerLine: true,
+                  receiverLine: true,
+                  isLive: true,
+
+                  category: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
                   },
                 },
               },
             },
           },
-        },
 
-        // Compliment
-        compliment: {
-          select: {
-            id: true,
-            senderId: true,
-            receiverId: true,
-            targetType: true,
-            targetId: true,
-            ideaId: true,
-            message: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        },
-        event: {
-          select: {
-            eventType: true,
-            title: true,
-            city: true,
-            eventTag: true,
+          // =====================================================
+          // COMPLIMENT
+          // =====================================================
 
-            eventDate: true,
-            startTime: true,
-            endTime: true,
+          compliment: {
+            select: {
+              id: true,
+              senderId: true,
+              receiverId: true,
 
-            venueName: true,
-            fullAddress: true,
+              targetType: true,
+              targetId: true,
 
-            menEntryPrice: true,
-            womenEntryPrice: true,
-            otherCapacity: true,
+              ideaId: true,
+              message: true,
+              status: true,
 
-            menDiscountedPrice: true,
-            womenDiscountedPrice: true,
-            otherDiscountedPrice: true,
-
-            heroImage: true,
-
-            safetyFeatures: true,
-          },
-        },
-        datePlan: {
-          select: {
-            id: true,
-
-            // Step 1
-            activityId: true,
-            title: true,
-            quickTitleId: true,
-            note: true,
-            photoUrl: true,
-
-            // Step 2
-            venueName: true,
-            venueAddress: true,
-            venueLat: true,
-            venueLng: true,
-
-            // Step 3
-            duration: true,
-            whoPaysId: true,
-            participantLimit: true,
-            joinRequestGenderId: true,
-            visibilityId: true,
-
-            status: true,
-            eventDateTime: true,
-            expiresAt: true,
-
-            createdAt: true,
-            updatedAt: true,
-
-            // Activity
-            activity: {
-              select: {
-                id: true,
-                type: true,
-                label: true,
-                value: true,
-                icon: true,
-              },
-            },
-
-            // Quick title
-            quickTitle: {
-              select: {
-                id: true,
-                type: true,
-                label: true,
-                value: true,
-                icon: true,
-              },
-            },
-
-            // Who pays
-            whoPays: {
-              select: {
-                id: true,
-                type: true,
-                label: true,
-                value: true,
-                icon: true,
-              },
-            },
-
-            // Joining gender
-            joinRequestGender: {
-              select: {
-                id: true,
-                type: true,
-                label: true,
-                value: true,
-                icon: true,
-              },
-            },
-
-            // Visibility
-            visibility: {
-              select: {
-                id: true,
-                type: true,
-                label: true,
-                value: true,
-                icon: true,
-              },
-            },
-
-            // Requests
-            requests: {
-              select: {
-                id: true,
-                status: true,
-                requesterId: true,
-                createdAt: true,
-              },
+              createdAt: true,
+              updatedAt: true,
             },
           },
+
+          // =====================================================
+          // EVENT
+          // =====================================================
+
+          event: {
+            select: {
+              id: true,
+
+              eventType: true,
+              title: true,
+              city: true,
+              eventTag: true,
+
+              eventDate: true,
+              startTime: true,
+              endTime: true,
+
+              venueName: true,
+              fullAddress: true,
+
+              menEntryPrice: true,
+              womenEntryPrice: true,
+              otherCapacity: true,
+
+              menDiscountedPrice: true,
+              womenDiscountedPrice: true,
+              otherDiscountedPrice: true,
+
+              heroImage: true,
+
+              safetyFeatures: true,
+            },
+          },
+
+          // =====================================================
+          // DATE PLAN
+          // =====================================================
+
+          datePlan: {
+            select: {
+              id: true,
+
+              userId: true,
+
+              // =================================================
+              // STEP 1
+              // =================================================
+
+              activityId: true,
+              title: true,
+              quickTitleId: true,
+              note: true,
+              photoUrl: true,
+
+              // =================================================
+              // STEP 2
+              // =================================================
+
+              venueName: true,
+              venueAddress: true,
+              venueLat: true,
+              venueLng: true,
+
+              // =================================================
+              // STEP 3
+              // =================================================
+
+              duration: true,
+              whoPaysId: true,
+              participantLimit: true,
+              joinRequestGenderId: true,
+              visibilityId: true,
+
+              status: true,
+              eventDateTime: true,
+              expiresAt: true,
+
+              createdAt: true,
+              updatedAt: true,
+
+              // =================================================
+              // ACTIVITY
+              // =================================================
+
+              activity: {
+                select: {
+                  id: true,
+                  type: true,
+                  label: true,
+                  value: true,
+                  icon: true,
+                },
+              },
+
+              // =================================================
+              // QUICK TITLE
+              // =================================================
+
+              quickTitle: {
+                select: {
+                  id: true,
+                  type: true,
+                  label: true,
+                  value: true,
+                  icon: true,
+                },
+              },
+
+              // =================================================
+              // WHO PAYS
+              // =================================================
+
+              whoPays: {
+                select: {
+                  id: true,
+                  type: true,
+                  label: true,
+                  value: true,
+                  icon: true,
+                },
+              },
+
+              // =================================================
+              // JOIN REQUEST GENDER
+              // =================================================
+
+              joinRequestGender: {
+                select: {
+                  id: true,
+                  type: true,
+                  label: true,
+                  value: true,
+                  icon: true,
+                },
+              },
+
+              // =================================================
+              // VISIBILITY
+              // =================================================
+
+              visibility: {
+                select: {
+                  id: true,
+                  type: true,
+                  label: true,
+                  value: true,
+                  icon: true,
+                },
+              },
+
+              // =================================================
+              // ONLY CURRENT LOGGED-IN USER'S REQUEST
+              // =================================================
+
+              requests: {
+                where: {
+                  requesterId: userId,
+                },
+
+                select: {
+                  id: true,
+                },
+
+                take: 1,
+              },
+            },
+          },
         },
-      },
-    });
+      });
+
+    // =========================================================
+    // FORMAT RESPONSE
+    // =========================================================
+
+    const formattedMessages =
+      messages.map((message) => {
+        // =======================================================
+        // DATE PLAN
+        // =======================================================
+
+        let formattedDatePlan = null;
+
+        if (message.datePlan) {
+          const {
+            requests,
+            ...datePlanData
+          } = message.datePlan;
+
+          // If current user has at least one request,
+          // then user has already requested this plan.
+          const is_already_requested =
+            requests.length > 0;
+
+          formattedDatePlan = {
+            ...datePlanData,
+
+            is_already_requested,
+          };
+        }
+
+        // =======================================================
+        // FINAL MESSAGE
+        // =======================================================
+
+        return {
+          ...message,
+
+          datePlan: formattedDatePlan,
+        };
+      });
+
+    return formattedMessages;
   },
 
   /**

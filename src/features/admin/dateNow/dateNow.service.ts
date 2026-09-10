@@ -631,13 +631,13 @@ export const getDatePlanPackageDataService = async (
         userId,
       },
       select: {
-        totalDatePlan: true,
+        balance: true,
       },
     }),
   ]);
 
   return {
-    availableDatePlan: userStats?.totalDatePlan ?? 0,
+    availableDatePlan: userStats?.balance ?? 0,
     packages,
     info,
     

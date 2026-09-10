@@ -278,19 +278,27 @@ export const findConversationMatchState = async (
   });
 };
 
-export const markConversationMatched = async (
-  conversationId: string,
-) => {
-  return prisma.conversation.update({
-    where: {
-      id: conversationId,
-    },
-    data: {
-      match: true,
-      matchPendingForUserId: null,
-    },
-  });
-};
+export const markConversationMatched =
+  async (
+    conversationId: string,
+    replyingUserId: string,
+  ) => {
+    return prisma.conversation.updateMany({
+      where: {
+        id: conversationId,
+
+        match: false,
+
+        matchPendingForUserId:
+          replyingUserId,
+      },
+
+      data: {
+        match: true,
+        matchPendingForUserId: null,
+      },
+    });
+  };
 
 /**
  * Set receiver as the user whose reply

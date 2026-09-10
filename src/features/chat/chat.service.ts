@@ -254,9 +254,9 @@ export const chatService = {
          * therefore future messages don't
          * execute match detection.
          */
-        await markConversationMatched(
-          data.conversationId,
-        );
+        // await markConversationMatched(
+        //   data.conversationId,
+        // );
       }
 
       /**
@@ -274,9 +274,9 @@ export const chatService = {
 
         console.log("match : ", match)
 
-        await markConversationMatched(
-          data.conversationId,
-        );
+        // await markConversationMatched(
+        //   data.conversationId,
+        // );
       }
     }
 
