@@ -1,9 +1,11 @@
 // Working on this file: src/features/notification/notification.repository.ts
 
+import { NotificationType } from "@prisma/client";
 import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
 import { incrementBadgeCount } from "./badge.service";
-import { CreateNotificationParams, SaveDeviceTokenParams } from "./notification.types";
+import { findNotificationByIdRepository, getNotificationCountRepository, getNotificationsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository } from "./notification.repository";
+import { CreateNotificationParams, NotificationCategory, notificationCategoryMap, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
 
 export const createNotification = async ({
@@ -29,7 +31,7 @@ export const createNotification = async ({
   const io = getIO();
   io.to(receiverId).emit("new_notification", notification);
 
-   // Badge increment
+  // Badge increment
   await incrementBadgeCount(receiverId);
 
   // Push notification
@@ -74,4 +76,238 @@ export const saveDeviceTokenService = async ({
   });
 
   return user;
+};
+
+export const getNotificationsService = async (
+  userId: string,
+  page = 1,
+  limit = 20,
+  category: NotificationCategory = "ALL",
+) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
+
+  const allowedCategories: NotificationCategory[] = [
+    "ALL",
+    "LIKES_ROSES",
+    "MATCHES",
+    "GIFTS",
+    "DATES",
+    "EVENTS",
+  ];
+
+  if (!allowedCategories.includes(category)) {
+    throw new Error(
+      "Invalid notification category",
+    );
+  }
+
+  const safePage =
+    page > 0
+      ? page
+      : 1;
+
+  const safeLimit =
+    limit > 0 && limit <= 100
+      ? limit
+      : 20;
+
+  const skip =
+    (safePage - 1) * safeLimit;
+
+  let types:
+    | NotificationType[]
+    | undefined;
+
+  if (category !== "ALL") {
+    types =
+      notificationCategoryMap[
+        category
+      ];
+  }
+
+  const [
+    notifications,
+    total,
+    unreadCount,
+  ] = await Promise.all([
+    getNotificationsRepository(
+      userId,
+      skip,
+      safeLimit,
+      types,
+    ),
+
+    getNotificationCountRepository(
+      userId,
+      types,
+    ),
+
+    getUnreadNotificationCountRepository(
+      userId,
+      types,
+    ),
+  ]);
+
+  return {
+    category,
+
+    notifications:
+      notifications.map(
+        (notification) => ({
+          id: notification.id,
+
+          type:
+            notification.type,
+
+          title:
+            notification.title,
+
+          message:
+            notification.message,
+
+          data:
+            notification.data,
+
+          isRead:
+            notification.is_read,
+
+          readAt:
+            notification.readAt,
+
+          createdAt:
+            notification.created_at,
+
+          sender:
+            notification.sender
+              ? {
+                  id:
+                    notification
+                      .sender.id,
+
+                  name:
+                    notification
+                      .sender
+                      .full_name,
+
+                  birthDate:
+                    notification
+                      .sender
+                      .birth_date,
+
+                  photo:
+                    notification
+                      .sender
+                      .photos[0]
+                      ?.media_url ??
+                    null,
+                }
+              : null,
+        }),
+      ),
+
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+
+      totalPages:
+        Math.ceil(
+          total /
+            safeLimit,
+        ),
+    },
+
+    unreadCount,
+  };
+};
+
+export const getUnreadCountService = async (
+  userId: string,
+) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
+
+  const unreadCount =
+    await getUnreadNotificationCountRepository(
+      userId,
+    );
+
+  return {
+    unreadCount,
+  };
+};
+
+export const markNotificationReadService = async (
+  userId: string,
+  notificationId: string,
+) => {
+  if (!notificationId) {
+    throw new Error(
+      "Notification ID is required",
+    );
+  }
+
+  const notification =
+    await findNotificationByIdRepository(
+      notificationId,
+      userId,
+    );
+
+  if (!notification) {
+    throw new Error(
+      "Notification not found",
+    );
+  }
+
+  if (!notification.is_read) {
+    await markNotificationReadRepository(
+      notificationId,
+    );
+  }
+
+  const unreadCount =
+    await getUnreadNotificationCountRepository(
+      userId,
+    );
+
+  // emitNotificationRead(
+  //   userId,
+  //   notificationId,
+  // );
+
+  // emitUnreadCount(
+  //   userId,
+  //   unreadCount,
+  // );
+
+  return {
+    notificationId,
+    isRead: true,
+    unreadCount,
+  };
+};
+
+export const markAllNotificationsReadService = async (userId: string) => {
+  if (!userId) {
+    throw new Error(
+      "User ID is required",
+    );
+  }
+
+  const result =
+    await markAllNotificationsReadRepository(
+      userId,
+    );
+
+  // emitNotificationsReadAll(userId);
+
+  // emitUnreadCount(userId, 0);
+
+  return {
+    updatedCount: result.count,
+    unreadCount: 0,
+  };
 };

@@ -14,3 +14,41 @@ export interface CreateNotificationParams {
   message: string;
   data?: Record<string, any>;
 }
+
+export type NotificationCategory =
+  | "ALL"
+  | "LIKES_ROSES"
+  | "MATCHES"
+  | "GIFTS"
+  | "DATES"
+  | "EVENTS";
+
+export const notificationCategoryMap: Record<
+  Exclude<NotificationCategory, "ALL">,
+  NotificationType[]
+> = {
+  LIKES_ROSES: [
+    NotificationType.NEW_LIKE,
+    NotificationType.NEW_ROSE,
+    NotificationType.NEW_COMPLIMENT,
+    NotificationType.SUPER_LIKE,
+  ],
+
+  MATCHES: [
+    NotificationType.NEW_MATCH,
+  ],
+
+  GIFTS: [
+    NotificationType.NEW_GIFT,
+  ],
+
+  DATES: [
+    NotificationType.DATE_CONFIRMED,
+    NotificationType.DATE_INVITE,
+  ],
+
+  EVENTS: [
+    NotificationType.EVENT_INVITE,
+    NotificationType.EVENT_RESPONSE,
+  ],
+};
