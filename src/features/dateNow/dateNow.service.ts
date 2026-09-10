@@ -622,51 +622,96 @@ export const approveDatePlanRequest = async (
     throw new Error("Not authorized");
   }
 
-  if (request.status !== "PENDING") {
+// ==========================================
+// 3. CHECK PARTICIPANT LIMIT
+// ==========================================
+
+// ==========================================
+// 3. CHECK PARTICIPANT LIMIT
+// ==========================================
+
+const participantLimit =
+  request.plan.participantLimit ?? 1;
+
+// Count already approved requests
+const approvedCount =
+  await prisma.datePlanRequest.count({
+    where: {
+      planId: request.planId,
+      status: "APPROVED",
+    },
+  });
+
+// ==========================================
+// VALIDATE PARTICIPANT LIMIT
+// 1 = One Person
+// 2 = Two People
+// 3-15 = Small Group
+// ==========================================
+
+if (
+  participantLimit < 1 ||
+  participantLimit > 15
+) {
+  throw new Error(
+    "Invalid participant limit. Allowed limits are 1 person, 2 people, or Small Group (3-15 people).",
+  );
+}
+
+// ==========================================
+// REQUEST ALREADY APPROVED
+// ==========================================
+
+if (request.status === "APPROVED") {
+  throw new Error(
+    "This request has already been approved",
+  );
+}
+
+// ==========================================
+// PARTICIPANT LIMIT ALREADY REACHED
+// ==========================================
+
+if (approvedCount >= participantLimit) {
+  if (participantLimit === 1) {
     throw new Error(
-      "This request has already been processed",
+      "Participant limit reached. This Date Plan allows only 1 person.",
     );
   }
 
-  // ==========================================
-  // 3. PARTICIPANT LIMIT VALIDATION
-  // ==========================================
-
-  const participantLimit =
-    request.plan.participantLimit ?? 1;
-
-  if (
-    participantLimit < 1 ||
-    participantLimit > 15
-  ) {
+  if (participantLimit === 2) {
     throw new Error(
-      "Participant limit must be between 1 and 15",
+      "Participant limit reached. This Date Plan allows only 2 people.",
     );
   }
 
-  // Count already approved participants
-  const approvedCount =
-    await prisma.datePlanRequest.count({
-      where: {
-        planId: request.planId,
-        status: "APPROVED",
-      },
-    });
+  throw new Error(
+    `Small Group limit reached. This Date Plan allows a maximum of ${participantLimit} people.`,
+  );
+}
 
-  // ==========================================
-  // CHECK IF PLAN IS ALREADY FULL
-  // ==========================================
+// ==========================================
+// REQUEST ALREADY DECLINED
+// ==========================================
 
-  if (approvedCount >= participantLimit) {
-    throw new Error(
-      `This Date Plan is full. Maximum ${participantLimit} participant${
-        participantLimit > 1 ? "s" : ""
-      } allowed.`,
-    );
-  }
+if (request.status === "DECLINED") {
+  throw new Error(
+    "This request has already been declined",
+  );
+}
 
-  const senderId = request.plan.userId;
-  const receiverId = request.requesterId;
+// ==========================================
+// OTHER STATUS
+// ==========================================
+
+if (request.status !== "PENDING") {
+  throw new Error(
+    "This request has already been processed",
+  );
+}
+
+const senderId = request.plan.userId;
+const receiverId = request.requesterId;
 
   // After approving current request
   const newApprovedCount =
