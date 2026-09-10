@@ -14,6 +14,9 @@ import { chatRepository } from "./chat.repository";
 import { buildMessageProgress } from "./chat.helper";
 import { createNotification } from "../notification/notification.service";
 import { presenceService } from "./presence/presence.service";
+import { findConversationMatchState, markConversationMatched } from "../match/match.repository";
+import { createMatchFromReplyService } from "../match/match.service";
+import console from "console";
 
 export const chatService = {
   /**
@@ -138,6 +141,8 @@ export const chatService = {
       data.userId,
     );
 
+    console.log("participant : ", participant)
+
     if (!participant) {
       throw new Error(
         "You are not allowed to send messages in this conversation",
@@ -162,6 +167,20 @@ export const chatService = {
     }
 
     /**
+  * 4. Get conversation match state.
+  */
+    const conversation =
+      await findConversationMatchState(
+        data.conversationId,
+      );
+
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+
+    console.log("conversation : ", conversation)
+
+    /**
      * Create message.
      */
     const message = await chatRepository.createMessage({
@@ -171,6 +190,95 @@ export const chatService = {
       messageType: data.messageType,
       mediaUrl: data.mediaUrl,
     });
+
+    console.log("message : ", message)
+
+    /**
+ * Default match response.
+ */
+    let matchCreated = false;
+    let match = null;
+    let matchedBy:
+      | "ROSE_REPLY"
+      | "GIFT_REPLY"
+      | "COMPLIMENT_REPLY"
+      | null = null;
+
+    /**
+     * These message types are considered
+     * actual replies.
+     *
+     * Sending another Rose/Gift/Compliment
+     * should not automatically create match.
+     */
+    const replyMessageTypes = [
+      "TEXT",
+      "IMAGE",
+      "VIDEO",
+      "AUDIO",
+      "FILE",
+      "LINK"
+    ];
+
+    /**
+     * 6. Check match only when:
+     *
+     * - conversation is not already matched
+     * - a match reply is pending
+     * - current sender is the expected replying user
+     * - current message is a valid reply type
+     */
+    if (
+      !conversation.match &&
+      conversation.matchPendingForUserId ===
+      data.userId &&
+      replyMessageTypes.includes(data.messageType)
+    ) {
+      const matchResult =
+        await createMatchFromReplyService(
+          data.conversationId,
+          data.userId,
+        );
+
+      console.log("matchResult : ", matchResult)
+
+      /**
+       * First valid reply created the match.
+       */
+      if (matchResult.matched) {
+        matchCreated = true;
+        match = matchResult.match;
+
+        /**
+         * Mark conversation as matched,
+         * therefore future messages don't
+         * execute match detection.
+         */
+        await markConversationMatched(
+          data.conversationId,
+        );
+      }
+
+      /**
+       * Safety case:
+       * UserMatch already exists but
+       * conversation.match was false.
+       *
+       * Sync conversation state.
+       */
+      else if (matchResult.alreadyMatched) {
+        match =
+          "match" in matchResult
+            ? matchResult.match
+            : null;
+
+        console.log("match : ", match)
+
+        await markConversationMatched(
+          data.conversationId,
+        );
+      }
+    }
 
     /**
      * Get the other participant.
@@ -416,13 +524,13 @@ export const chatService = {
     };
   },
 
- async getProfileDetails(
+  async getProfileDetails(
     conversationId: string,
     currentUserId: string,
   ) {
     console.log(
-    "=== GET PROFILE DETAILS SERVICE ===",
-  );
+      "=== GET PROFILE DETAILS SERVICE ===",
+    );
     if (!conversationId) {
       throw new Error(
         "Conversation ID is required",
@@ -443,7 +551,7 @@ export const chatService = {
         conversationId,
         currentUserId,
       );
-      
+
     /**
      * Get real-time presence from Redis
      */
@@ -478,7 +586,7 @@ export const chatService = {
         (
           monthDifference === 0 &&
           today.getDate() <
-            birthDate.getDate()
+          birthDate.getDate()
         )
       ) {
         age--;
@@ -503,9 +611,10 @@ export const chatService = {
         ?.media_url ?? null;
 
     return {
-      conversationId:result.conversationId,
-      user: {userId:result.targetUserId,
-        name:result.user.full_name,
+      conversationId: result.conversationId,
+      user: {
+        userId: result.targetUserId,
+        name: result.user.full_name,
 
         age,
 
