@@ -623,227 +623,301 @@ export const approveDatePlanRequest = async (
   }
 
   if (request.status !== "PENDING") {
-    throw new Error("This request has already been processed");
+    throw new Error(
+      "This request has already been processed",
+    );
   }
 
-  const senderId = request.plan.userId;
-
-  const receiverId = request.requesterId;
-
   // ==========================================
-  // 3. TRANSACTION
+  // 3. PARTICIPANT LIMIT VALIDATION
   // ==========================================
 
-  const result = await prisma.$transaction(async (tx) => {
-    // ======================================
-    // APPROVE REQUEST
-    // ======================================
+  const participantLimit =
+    request.plan.participantLimit ?? 1;
 
-    const approvedRequest = await tx.datePlanRequest.update({
+  if (
+    participantLimit < 1 ||
+    participantLimit > 15
+  ) {
+    throw new Error(
+      "Participant limit must be between 1 and 15",
+    );
+  }
+
+  // Count already approved participants
+  const approvedCount =
+    await prisma.datePlanRequest.count({
       where: {
-        id: requestId,
-      },
-
-      data: {
+        planId: request.planId,
         status: "APPROVED",
       },
     });
 
-    // ======================================
-    // DECLINE OTHER REQUESTS
-    // ======================================
+  // ==========================================
+  // CHECK IF PLAN IS ALREADY FULL
+  // ==========================================
 
-    await tx.datePlanRequest.updateMany({
-      where: {
-        planId: request.planId,
+  if (approvedCount >= participantLimit) {
+    throw new Error(
+      `This Date Plan is full. Maximum ${participantLimit} participant${
+        participantLimit > 1 ? "s" : ""
+      } allowed.`,
+    );
+  }
 
-        id: {
-          not: requestId,
-        },
+  const senderId = request.plan.userId;
+  const receiverId = request.requesterId;
 
-        status: "PENDING",
-      },
+  // After approving current request
+  const newApprovedCount =
+    approvedCount + 1;
 
-      data: {
-        status: "DECLINED",
-      },
-    });
+  const isPlanFull =
+    newApprovedCount >= participantLimit;
 
-    // ======================================
-    // PLAN BOOKED
-    // ======================================
+  // ==========================================
+  // 4. TRANSACTION
+  // ==========================================
 
-    await tx.datePlan.update({
-      where: {
-        id: request.planId,
-      },
+  const result = await prisma.$transaction(
+    async (tx) => {
+      // ======================================
+      // APPROVE CURRENT REQUEST
+      // ======================================
 
-      data: {
-        status: "BOOKED",
-      },
-    });
-
-    // ======================================
-    // CREATE CONFIRMED DATE
-    // ======================================
-
-    const confirmedDate = await tx.dateConfirmed.create({
-      data: {
-        planId: request.plan.id,
-
-        hostUserId: request.plan.userId,
-
-        participantId: request.requesterId,
-
-        title: request.plan.title,
-
-        venueName: request.plan.venueName,
-
-        venueAddress: request.plan.venueAddress,
-
-        eventDateTime: request.plan.eventDateTime!,
-
-        status: "UPCOMING",
-      },
-    });
-
-    // ======================================
-    // FIND CONVERSATION
-    // ======================================
-
-    let conversation = await tx.conversation.findFirst({
-      where: {
-        AND: [
-          {
-            participants: {
-              some: {
-                userId: senderId,
-              },
-            },
+      const approvedRequest =
+        await tx.datePlanRequest.update({
+          where: {
+            id: requestId,
           },
 
-          {
-            participants: {
-              some: {
-                userId: receiverId,
-              },
-            },
+          data: {
+            status: "APPROVED",
           },
-        ],
-      },
+        });
 
-      include: {
-        participants: true,
-      },
-    });
+      // ======================================
+      // IF LIMIT REACHED
+      // DECLINE REMAINING PENDING REQUESTS
+      // ======================================
 
-    // ======================================
-    // CREATE CONVERSATION
-    // ======================================
+      if (isPlanFull) {
+        await tx.datePlanRequest.updateMany({
+          where: {
+            planId: request.planId,
 
-    if (!conversation) {
-      conversation = await tx.conversation.create({
-        data: {
-          participants: {
-            create: [
+            id: {
+              not: requestId,
+            },
+
+            status: "PENDING",
+          },
+
+          data: {
+            status: "DECLINED",
+          },
+        });
+      }
+
+      // ======================================
+      // UPDATE PLAN STATUS
+      // ======================================
+
+      // Only mark BOOKED when participant
+      // limit has actually been reached.
+      if (isPlanFull) {
+        await tx.datePlan.update({
+          where: {
+            id: request.planId,
+          },
+
+          data: {
+            status: "BOOKED",
+          },
+        });
+      }
+
+      // ======================================
+      // CREATE CONFIRMED DATE
+      // ======================================
+
+      const confirmedDate =
+        await tx.dateConfirmed.create({
+          data: {
+            planId: request.plan.id,
+
+            hostUserId:
+              request.plan.userId,
+
+            participantId:
+              request.requesterId,
+
+            title: request.plan.title,
+
+            venueName:
+              request.plan.venueName,
+
+            venueAddress:
+              request.plan.venueAddress,
+
+            eventDateTime:
+              request.plan.eventDateTime!,
+
+            status: "UPCOMING",
+          },
+        });
+
+      // ======================================
+      // FIND CONVERSATION
+      // ======================================
+
+      let conversation =
+        await tx.conversation.findFirst({
+          where: {
+            AND: [
               {
-                userId: senderId,
+                participants: {
+                  some: {
+                    userId: senderId,
+                  },
+                },
               },
 
               {
-                userId: receiverId,
+                participants: {
+                  some: {
+                    userId: receiverId,
+                  },
+                },
               },
             ],
           },
-        },
 
-        include: {
-          participants: true,
-        },
-      });
-    }
-
-    // ======================================
-    // CREATE DATE_CONFIRMED MESSAGE
-    // ======================================
-
-    const message = await tx.chatMessage.create({
-      data: {
-        conversationId: conversation.id,
-
-        // IMPORTANT:
-        // host approved the request,
-        // therefore host is sender
-        senderId,
-
-        messageType: "DATE_CONFIRMED",
-
-        datePlanId: request.planId,
-
-        metadata: {
-          confirmedDateId: confirmedDate.id,
-
-          status: "ACTIVE",
-        },
-      },
-
-      include: {
-        sender: true,
-
-        datePlan: {
           include: {
-            user: true,
+            participants: true,
+          },
+        });
 
-            activity: true,
+      // ======================================
+      // CREATE CONVERSATION
+      // ======================================
 
-            quickTitle: true,
+      if (!conversation) {
+        conversation =
+          await tx.conversation.create({
+            data: {
+              participants: {
+                create: [
+                  {
+                    userId: senderId,
+                  },
 
-            whoPays: true,
+                  {
+                    userId: receiverId,
+                  },
+                ],
+              },
+            },
 
-            joinRequestGender: true,
+            include: {
+              participants: true,
+            },
+          });
+      }
 
-            visibility: true,
+      // ======================================
+      // CREATE DATE_CONFIRMED MESSAGE
+      // ======================================
 
-            requests: {
-              select: {
-                id: true,
-                requesterId: true,
-                status: true,
+      const message =
+        await tx.chatMessage.create({
+          data: {
+            conversationId:
+              conversation.id,
+
+            senderId,
+
+            messageType:
+              "DATE_CONFIRMED",
+
+            datePlanId:
+              request.planId,
+
+            metadata: {
+              confirmedDateId:
+                confirmedDate.id,
+
+              status: "ACTIVE",
+
+              participantLimit,
+
+              approvedParticipants:
+                newApprovedCount,
+
+              remainingSlots:
+                Math.max(
+                  participantLimit -
+                    newApprovedCount,
+                  0,
+                ),
+            },
+          },
+
+          include: {
+            sender: true,
+
+            datePlan: {
+              include: {
+                user: true,
+
+                activity: true,
+
+                quickTitle: true,
+
+                whoPays: true,
+
+                joinRequestGender:
+                  true,
+
+                visibility: true,
+
+                requests: {
+                  select: {
+                    id: true,
+                    requesterId: true,
+                    status: true,
+                  },
+                },
               },
             },
           },
+        });
+
+      // ======================================
+      // UPDATE CONVERSATION TIME
+      // ======================================
+
+      await tx.conversation.update({
+        where: {
+          id: conversation.id,
         },
-      },
-    });
 
-    // ======================================
-    // UPDATE CONVERSATION TIME
-    // ======================================
+        data: {
+          updatedAt: new Date(),
+        },
+      });
 
-    await tx.conversation.update({
-      where: {
-        id: conversation.id,
-      },
-
-      data: {
-        updatedAt: new Date(),
-      },
-    });
-
-    return {
-      approvedRequest,
-
-      confirmedDate,
-
-      conversation,
-
-      message,
-    };
-  });
+      return {
+        approvedRequest,
+        confirmedDate,
+        conversation,
+        message,
+      };
+    },
+  );
 
   // ==========================================
-  // 4. NOTIFICATION
-  // AFTER TRANSACTION SUCCESS
+  // 5. NOTIFICATION
   // ==========================================
 
   createNotification({
@@ -854,43 +928,63 @@ export const approveDatePlanRequest = async (
 
     title: "Date confirmed ☕",
 
-    message: "Your Date Now request has been approved 💫",
+    message:
+      "Your Date Now request has been approved 💫",
 
     data: {
       datePlanId: request.planId,
 
-      confirmedDateId: result.confirmedDate.id,
+      confirmedDateId:
+        result.confirmedDate.id,
 
-      conversationId: result.conversation.id,
+      conversationId:
+        result.conversation.id,
 
-      messageId: result.message.id,
+      messageId:
+        result.message.id,
 
       senderId,
-
       receiverId,
 
       type: "DATE_CONFIRMED",
     },
   }).catch((error) => {
-    console.error("Failed to send Date Confirmed notification:", error);
+    console.error(
+      "Failed to send Date Confirmed notification:",
+      error,
+    );
   });
 
   // ==========================================
-  // 5. RETURN DATA FOR SOCKET
+  // 6. RETURN DATA
   // ==========================================
 
   return {
     success: true,
 
     senderId,
-
     receiverId,
 
-    confirmedDateId: result.confirmedDate.id,
+    confirmedDateId:
+      result.confirmedDate.id,
 
-    conversation: result.conversation,
+    conversation:
+      result.conversation,
 
     message: result.message,
+
+    participantLimit,
+
+    approvedParticipants:
+      newApprovedCount,
+
+    remainingSlots: Math.max(
+      participantLimit -
+        newApprovedCount,
+      0,
+    ),
+
+    isPlanFull,
   };
 };
 

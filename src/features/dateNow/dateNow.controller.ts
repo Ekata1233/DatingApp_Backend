@@ -242,22 +242,34 @@ export const approveDatePlanRequestController = async (
       );
 
       return res.status(200).json({
-        success: true,
+  success: true,
 
-        message:
-          "Date request approved successfully",
+  message:
+    "Date request approved successfully",
 
-        data: {
-          confirmedDateId:
-            result.confirmedDateId,
+  data: {
+    confirmedDateId:
+      result.confirmedDateId,
 
-          conversationId:
-            result.conversation.id,
+    conversationId:
+      result.conversation.id,
 
-          message:
-            result.message,
-        },
-      });
+    message:
+      result.message,
+
+    participantLimit:
+      result.participantLimit,
+
+    approvedParticipants:
+      result.approvedParticipants,
+
+    remainingSlots:
+      result.remainingSlots,
+
+    isPlanFull:
+      result.isPlanFull,
+  },
+});
     } catch (error: any) {
       console.error(
         "approveDatePlanRequestController error:",
