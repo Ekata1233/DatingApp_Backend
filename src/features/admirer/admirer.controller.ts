@@ -21,7 +21,6 @@ export const getAdmirers = async (
 
     const result = await admirerService.getAdmirers({
       userId,
-      type,
       direction,
       page,
       limit,
