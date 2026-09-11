@@ -1,5 +1,4 @@
 import { PurchasePaymentMethod, PaymentPurpose } from "@prisma/client";
-import { createPaymentLink } from "../payment/payment.service";
 import { CreatePurchaseDto } from "./purchaseStore.types";
 import { prisma } from "../../prisma/prismaClient";
 import { walletPurchaseService } from "./handlers/wallet.handler";
@@ -62,14 +61,14 @@ export async function createPurchaseService(
 
             return walletPurchaseService(userId, storePack);
 
-        case PurchasePaymentMethod.PAYMENT_GATEWAY:
+        // case PurchasePaymentMethod.PAYMENT_GATEWAY:
 
-            return createPaymentLink(userId, {
-                purpose: PaymentPurpose.OTHER,
-                storePackId: storePack.id,
-                amount,
-                description: storePack.title,
-            });
+        //     return createPaymentLink(userId, {
+        //         purpose: PaymentPurpose.OTHER,
+        //         storePackId: storePack.id,
+        //         amount,
+        //         description: storePack.title,
+        //     });
 
         default:
 

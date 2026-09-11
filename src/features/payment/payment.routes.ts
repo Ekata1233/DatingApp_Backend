@@ -29,14 +29,14 @@ import { createPaymentOrderController, razorpayWebhookController, verifyPaymentC
 
 const router = Router();
 
-//CREATE PAYMENT LINK
-router.post("/create-order",authMiddleware, controller.createPayment);
+// //CREATE PAYMENT LINK
+// router.post("/create-order",authMiddleware, controller.createPayment);
 
-//SUCCESS WEBHOOK
-router.post("/webhook", controller.payuWebhookController);
+// //SUCCESS WEBHOOK
+// router.post("/webhook", controller.payuWebhookController);
 
-//RETURN URL
-router.post("/return", controller.paymentReturnController);
+// //RETURN URL
+// router.post("/return", controller.paymentReturnController);
 
 router.post(
   "/order-create",

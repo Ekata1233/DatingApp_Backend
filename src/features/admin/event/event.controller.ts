@@ -7,6 +7,14 @@ import { prisma } from "../../../prisma/prismaClient";
 interface EventParams {
   id: string;
 }
+
+interface CheckoutParams {
+  eventId: string;
+}
+
+interface CheckoutQuery {
+  ticketCount?: string;
+}
 //first step - basic
 export const createEventController = async (
   req: Request,
@@ -510,3 +518,109 @@ export const getEventDetailsController = async (
     });
   }
 };
+
+
+
+
+
+// ==========================================
+// GET EVENT CHECKOUT DETAILS
+// ==========================================
+export const getEventCheckoutDetailsController =
+  async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const eventId =
+        req.params.eventId as string;
+
+      const ticketCount = Number(
+        req.query.ticketCount ?? 1,
+      );
+
+      const ticketType =
+        req.query.ticketType as
+          | "MEN"
+          | "WOMEN"
+          | "OTHER"
+          | undefined;
+
+      const couponCode =
+        req.query.couponCode
+          ? String(req.query.couponCode)
+          : undefined;
+
+      const data =
+        await EventService.getEventCheckoutDetails(
+          eventId,
+          ticketCount,
+          ticketType,
+          couponCode,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Event checkout details fetched successfully",
+        data,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        message:
+          error?.message ||
+          "Failed to fetch event checkout details",
+      });
+    }
+  };
+
+
+  export const calculateEventCheckoutController =
+  async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const eventId =
+        req.params.eventId as string;
+
+      const {
+        tickets,
+        couponCode,
+      } = req.body;
+
+      if (
+        !Array.isArray(tickets) ||
+        tickets.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Tickets are required",
+        });
+      }
+
+      const data =
+        await EventService.calculateEventCheckout(
+          eventId,
+          tickets,
+          couponCode,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Event checkout calculated successfully",
+        data,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        message:
+          error?.message ||
+          "Failed to calculate checkout",
+      });
+    }
+  };
