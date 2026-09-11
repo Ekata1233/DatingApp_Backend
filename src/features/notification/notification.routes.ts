@@ -39,4 +39,22 @@ router.patch(
     controller.markNotificationReadController,
 );
 
+/**
+ * Get notification setting
+ */
+router.get(
+  "/notification/mute",
+  authMiddleware,
+  controller.getNotificationSettingController,
+);
+
+/**
+ * Enable / Disable notifications
+ */
+router.patch(
+  "/notification/mute",
+  authMiddleware,
+  controller.updateNotificationSettingController,
+);
+
 export default router;

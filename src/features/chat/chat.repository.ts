@@ -1468,6 +1468,23 @@ export const chatRepository = {
               heroImage: true,
 
               safetyFeatures: true,
+              // =========================================
+              // CURRENT USER EVENT BOOKING
+              // =========================================
+              EventBooking: {
+                where: {
+                  userId: userId,
+
+                  // Consider event booked only after confirmation
+                  status: "CONFIRMED",
+                },
+
+                select: {
+                  id: true,
+                },
+
+                take: 1,
+              },
             },
           },
 
@@ -1638,6 +1655,27 @@ export const chatRepository = {
         }
 
         // =======================================================
+        // EVENT
+        // =======================================================
+
+        let formattedEvent = null;
+
+        if (message.event) {
+          const {
+            EventBooking,
+            ...eventData
+          } = message.event;
+
+          const is_event_book =
+            EventBooking.length > 0;
+
+          formattedEvent = {
+            ...eventData,
+            is_event_book,
+          };
+        }
+
+        // =======================================================
         // FINAL MESSAGE
         // =======================================================
 
@@ -1645,6 +1683,7 @@ export const chatRepository = {
           ...message,
 
           datePlan: formattedDatePlan,
+          event: formattedEvent,
         };
       });
 

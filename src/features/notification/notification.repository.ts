@@ -132,3 +132,53 @@ export const markAllNotificationsReadRepository = async (
     },
   });
 };
+
+/**
+ * Get user's notification setting
+ */
+export const getNotificationSettingRepository = async (
+  userId: string,
+) => {
+  return prisma.userNotificationSetting.findUnique({
+    where: {
+      userId,
+    },
+  });
+};
+
+/**
+ * Create default notification setting
+ */
+export const createNotificationSettingRepository = async (
+  userId: string,
+) => {
+  return prisma.userNotificationSetting.create({
+    data: {
+      userId,
+      isEnabled: true,
+    },
+  });
+};
+
+/**
+ * Update notification setting
+ */
+export const updateNotificationSettingRepository = async (
+  userId: string,
+  isEnabled: boolean,
+) => {
+  return prisma.userNotificationSetting.upsert({
+    where: {
+      userId,
+    },
+
+    create: {
+      userId,
+      isEnabled,
+    },
+
+    update: {
+      isEnabled,
+    },
+  });
+};
