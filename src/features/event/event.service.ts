@@ -6,70 +6,152 @@ export async function getEventBookingPaymentSuccess(
   userId: string,
   bookingId: string,
 ) {
-  const booking = await prisma.eventBooking.findFirst({
-    where: {
-      id: bookingId,
-      userId,
-    },
-    include: {
-      event: {
-        select: {
-          id: true,
-          title: true,
-          eventDate: true,
-          startTime: true,
-          endTime: true,
-          venueName: true,
-          fullAddress: true,
-          city: true,
-          heroImage: true,
+  const booking =
+    await prisma.eventBooking.findFirst({
+      where: {
+        id: bookingId,
+        userId,
+      },
+
+      include: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+            eventDate: true,
+            startTime: true,
+            endTime: true,
+            venueName: true,
+            fullAddress: true,
+            city: true,
+            heroImage: true,
+          },
+        },
+
+        payment: {
+          select: {
+            id: true,
+            payment_id: true,
+            transactionId: true,
+            amount: true,
+            currency: true,
+            status: true,
+            paidAt: true,
+            gatewayResponse: true,
+          },
+        },
+
+        tickets: {
+          select: {
+            id: true,
+            ticketId: true,
+            ticketType: true,
+            ticketAmount: true,
+            qrCodeUrl: true,
+            status: true,
+          },
         },
       },
-      payment: {
-        select: {
-          id: true,
-          payment_id: true,
-          transactionId: true,
-          amount: true,
-          currency: true,
-          status: true,
-          paidAt: true,
-          gatewayResponse: true,
-        },
-      },
-    },
-  });
+    });
 
   if (!booking) {
-    throw new Error("Event booking not found");
+    throw new Error(
+      "Event booking not found",
+    );
   }
 
-  if (booking.status !== "CONFIRMED") {
+  if (
+    booking.status !==
+    "CONFIRMED"
+  ) {
     throw new Error(
       `Event booking is not confirmed. Current status: ${booking.status}`,
     );
   }
 
   if (!booking.payment) {
-    throw new Error("Payment details not found");
+    throw new Error(
+      "Payment details not found",
+    );
   }
 
   const gatewayResponse: any =
     booking.payment.gatewayResponse || {};
 
-  const result = gatewayResponse?.result || {};
+  const result =
+    gatewayResponse?.result || {};
 
   return {
     booking: {
-      id: booking.id,
-      bookingNumber: booking.bookingNumber,
-     
-      ticketCount: booking.ticketCount,
-      ticketAmount: Number(booking.ticketAmount),
-      totalAmount: Number(booking.totalAmount),
-      paidAmount: Number(booking.paidAmount),
-      status: booking.status,
-      
+      id:
+        booking.id,
+
+      bookingNumber:
+        booking.bookingNumber,
+
+      ticketCount:
+        booking.ticketCount,
+
+      ticketAmount:
+        Number(
+          booking.ticketAmount,
+        ),
+
+      // NEW
+      discountAmount:
+        Number(
+          booking.discountAmount,
+        ),
+
+      // NEW
+      platformFee:
+        Number(
+          booking.platformFee,
+        ),
+
+      // NEW
+      gstAmount:
+        Number(
+          booking.gstAmount,
+        ),
+
+      totalAmount:
+        Number(
+          booking.totalAmount,
+        ),
+
+      paidAmount:
+        Number(
+          booking.paidAmount,
+        ),
+
+      status:
+        booking.status,
+
+      tickets:
+        booking.tickets.map(
+          (ticket) => ({
+            id:
+              ticket.id,
+
+            ticketId:
+              ticket.ticketId,
+
+            ticketType:
+              ticket.ticketType,
+
+            ticketAmount:
+              Number(
+                ticket.ticketAmount,
+              ),
+
+            qrCodeUrl:
+              ticket.qrCodeUrl,
+
+            status:
+              ticket.status,
+          }),
+        ),
     },
 
     payment: {
@@ -78,7 +160,8 @@ export async function getEventBookingPaymentSuccess(
         result.transactionId ||
         null,
 
-      orderId: booking.payment.transactionId,
+      orderId:
+        booking.payment.transactionId,
 
       paidVia:
         result.paymentMode ||
@@ -86,28 +169,53 @@ export async function getEventBookingPaymentSuccess(
         gatewayResponse?.mode ||
         null,
 
-      paidAt: booking.payment.paidAt,
+      paidAt:
+        booking.payment.paidAt,
 
-      amount: Number(booking.payment.amount),
+      amount:
+        Number(
+          booking.payment.amount,
+        ),
 
-      currency: booking.payment.currency || "INR",
+      currency:
+        booking.payment.currency ||
+        "INR",
 
-      status: booking.payment.status,
+      status:
+        booking.payment.status,
 
       gatewayPaymentStatus:
-        result.paymentStatus || null,
+        result.paymentStatus ||
+        null,
     },
 
     event: {
-      id: booking.event.id,
-      title: booking.event.title,
-      eventDate: booking.event.eventDate,
-      startTime: booking.event.startTime,
-      endTime: booking.event.endTime,
-      venueName: booking.event.venueName,
-      fullAddress: booking.event.fullAddress,
-      city: booking.event.city,
-      heroImage: booking.event.heroImage,
+      id:
+        booking.event.id,
+
+      title:
+        booking.event.title,
+
+      eventDate:
+        booking.event.eventDate,
+
+      startTime:
+        booking.event.startTime,
+
+      endTime:
+        booking.event.endTime,
+
+      venueName:
+        booking.event.venueName,
+
+      fullAddress:
+        booking.event.fullAddress,
+
+      city:
+        booking.event.city,
+
+      heroImage:
+        booking.event.heroImage,
     },
   };
 }
@@ -121,89 +229,216 @@ interface GetUserEventBookingsParams {
   limit: number;
 }
 
-export const getUserEventBookingsService = async ({
-  userId,
-  status,
-  page,
-  limit,
-}: GetUserEventBookingsParams) => {
-  const skip = (page - 1) * limit;
+interface GetUserEventBookingsParams {
+  userId: string;
+  status?: string;
+  page: number;
+  limit: number;
+}
 
-  const where: any = {
+export const getUserEventBookingsService =
+  async ({
     userId,
-  };
+    status,
+    page,
+    limit,
+  }: GetUserEventBookingsParams) => {
+    const skip =
+      (page - 1) * limit;
 
-  // Status filter
-  if (status && status !== "ALL") {
+    const where: any = {
+      userId,
+    };
+
+    // Status filter
     if (
-      !Object.values(EventBookingStatus).includes(
-        status as EventBookingStatus
-      )
+      status &&
+      status !== "ALL"
     ) {
-      throw new Error(`Invalid booking status: ${status}`);
+      if (
+        !Object.values(
+          EventBookingStatus,
+        ).includes(
+          status as EventBookingStatus,
+        )
+      ) {
+        throw new Error(
+          `Invalid booking status: ${status}`,
+        );
+      }
+
+      where.status =
+        status as EventBookingStatus;
     }
 
-    where.status = status as EventBookingStatus;
-  }
+    const [
+      bookings,
+      total,
+    ] =
+      await Promise.all([
+        prisma.eventBooking.findMany({
+          where,
 
-  const [bookings, total] = await Promise.all([
-    prisma.eventBooking.findMany({
-      where,
+          skip,
 
-      skip,
-      take: limit,
+          take:
+            limit,
 
-      orderBy: {
-        createdAt: "desc",
-      },
+          orderBy: {
+            createdAt:
+              "desc",
+          },
 
-      select: {
-        id: true,
-        
-        paidAmount: true,
-
-        status: true,
-
-        
-
-        event: {
           select: {
             id: true,
-            title: true,
-            eventType: true,
-            eventDate: true,
-            startTime: true,
-            endTime: true,
-            venueName: true,
-            fullAddress: true,
-            latitude: true,
-            longitude: true,
-            heroImage: true,
+
+            // NEW
+            bookingNumber:
+              true,
+
+            // NEW
+            ticketCount:
+              true,
+
+            // NEW
+            ticketAmount:
+              true,
+
+            // NEW
+            discountAmount:
+              true,
+
+            // NEW
+            platformFee:
+              true,
+
+            // NEW
+            gstAmount:
+              true,
+
+            // NEW
+            totalAmount:
+              true,
+
+            paidAmount:
+              true,
+
+            status:
+              true,
+
+            createdAt:
+              true,
+
+            tickets: {
+              select: {
+                id: true,
+                ticketId: true,
+                ticketType: true,
+                ticketAmount: true,
+                qrCodeUrl: true,
+                status: true,
+              },
+            },
+
+            event: {
+              select: {
+                id: true,
+                title: true,
+                eventType: true,
+                eventDate: true,
+                startTime: true,
+                endTime: true,
+                venueName: true,
+                fullAddress: true,
+                latitude: true,
+                longitude: true,
+                heroImage: true,
+              },
+            },
           },
-        },
+        }),
+
+        prisma.eventBooking.count({
+          where,
+        }),
+      ]);
+
+    const totalPages =
+      Math.ceil(
+        total / limit,
+      );
+
+    const formattedBookings =
+      bookings.map(
+        (booking) => ({
+          ...booking,
+
+          ticketAmount:
+            Number(
+              booking.ticketAmount,
+            ),
+
+          discountAmount:
+            Number(
+              booking.discountAmount,
+            ),
+
+          platformFee:
+            Number(
+              booking.platformFee,
+            ),
+
+          gstAmount:
+            Number(
+              booking.gstAmount,
+            ),
+
+          totalAmount:
+            Number(
+              booking.totalAmount,
+            ),
+
+          paidAmount:
+            Number(
+              booking.paidAmount,
+            ),
+
+          tickets:
+            booking.tickets.map(
+              (ticket) => ({
+                ...ticket,
+
+                ticketAmount:
+                  Number(
+                    ticket.ticketAmount,
+                  ),
+              }),
+            ),
+        }),
+      );
+
+    return {
+      bookings:
+        formattedBookings,
+
+      pagination: {
+        page,
+
+        limit,
+
+        total,
+
+        totalPages,
+
+        hasNextPage:
+          page <
+          totalPages,
+
+        hasPreviousPage:
+          page > 1,
       },
-    }),
-
-    prisma.eventBooking.count({
-      where,
-    }),
-  ]);
-
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    bookings,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-      hasNextPage: page < totalPages,
-      hasPreviousPage: page > 1,
-    },
+    };
   };
-};
-
 
 
 

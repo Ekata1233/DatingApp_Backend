@@ -72,7 +72,7 @@ import walletRoutes from "../features/wallet/wallet.route";
 import membershipRoutes from "../features/package/membership/membership.routes";
 import unmatchRoutes from "../features/match/match.routes"
 import supportRoutes from "../features/support/support.routes"
-
+import globalAmountsRoutes from "../features/admin/setiings/global-amount/globalAmount.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -89,7 +89,7 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package",packageRoutes)
 router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes,boostRoutes,reportRoutes,supportRoutes);
+router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes,boostRoutes,reportRoutes,supportRoutes,globalAmountsRoutes);
 
 
 

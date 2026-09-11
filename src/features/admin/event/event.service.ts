@@ -1,4 +1,4 @@
-import { Gender, Type } from "@prisma/client";
+import { Gender, Prisma, Type } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import {
   CreateEventInput,
@@ -1665,4 +1665,600 @@ return {
 
   bookingStats,
 };
+};
+
+
+
+
+
+type CheckoutTicketType = "MEN" | "WOMEN" | "OTHER";
+
+const getTicketTypeFromGender = (
+  gender: Gender | null,
+): CheckoutTicketType => {
+  switch (gender) {
+    case Gender.MEN:
+      return "MEN";
+
+    case Gender.WOMEN:
+      return "WOMEN";
+
+    default:
+      return "OTHER";
+  }
+};
+
+
+
+
+
+export const getEventCheckoutDetails = async (
+  eventId: string,
+  ticketCount: number = 1,
+  ticketType?: "MEN" | "WOMEN" | "OTHER",
+  couponCode?: string,
+) => {
+  // ==========================================
+  // 1. GET EVENT
+  // ==========================================
+
+  const event = await prisma.event.findUnique({
+    where: {
+      id: eventId,
+    },
+
+    select: {
+      id: true,
+      title: true,
+      eventType: true,
+      eventTag: true,
+      status: true,
+
+      eventDate: true,
+      startTime: true,
+      endTime: true,
+
+      venueName: true,
+      fullAddress: true,
+
+      totalCapacity: true,
+
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
+
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
+
+      discountPercentage: true,
+
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
+    },
+  });
+
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  if (event.status !== "LIVE") {
+    throw new Error(
+      "This event is not available for booking",
+    );
+  }
+
+  // ==========================================
+  // 2. GLOBAL AMOUNT
+  // ==========================================
+
+  const globalAmount =
+    await prisma.globalAmount.findFirst({
+      orderBy: {
+        createdAt: "desc",
+      },
+
+      select: {
+        gst: true,
+        eventPlatformFee: true,
+      },
+    });
+
+  const gstPercentage =
+    globalAmount?.gst ??
+    new Prisma.Decimal(0);
+
+  const eventPlatformFee =
+    globalAmount?.eventPlatformFee ??
+    new Prisma.Decimal(0);
+
+  // ==========================================
+  // 3. AVAILABLE TICKET OPTIONS
+  // ==========================================
+
+  const ticketOptions = [
+    {
+      ticketType: "MEN" as const,
+      label: "Man",
+
+      capacity: event.menCapacity ?? 0,
+
+      entryPrice:
+        event.menEntryPrice?.toFixed(2) ??
+        "0.00",
+
+      discountedPrice:
+        event.menDiscountedPrice?.toFixed(2) ??
+        event.menEntryPrice?.toFixed(2) ??
+        "0.00",
+    },
+
+    {
+      ticketType: "WOMEN" as const,
+      label: "Woman",
+
+      capacity: event.womenCapacity ?? 0,
+
+      entryPrice:
+        event.womenEntryPrice?.toFixed(2) ??
+        "0.00",
+
+      discountedPrice:
+        event.womenDiscountedPrice?.toFixed(2) ??
+        event.womenEntryPrice?.toFixed(2) ??
+        "0.00",
+    },
+
+    {
+      ticketType: "OTHER" as const,
+      label: "Other",
+
+      capacity: event.otherCapacity ?? 0,
+
+      entryPrice:
+        event.otherEntryPrice?.toFixed(2) ??
+        "0.00",
+
+      discountedPrice:
+        event.otherDiscountedPrice?.toFixed(2) ??
+        event.otherEntryPrice?.toFixed(2) ??
+        "0.00",
+    },
+  ].filter((ticket) => ticket.capacity > 0);
+
+  const availableTicketTypes =
+    ticketOptions.map(
+      (ticket) => ticket.ticketType,
+    );
+
+  // ==========================================
+  // 4. DEFAULT / SELECTED TICKET
+  // ==========================================
+
+  const selectedTicket =
+    ticketType
+      ? ticketOptions.find(
+          (item) =>
+            item.ticketType === ticketType,
+        )
+      : ticketOptions[0];
+
+  if (!selectedTicket) {
+    throw new Error(
+      "No ticket type is available for this event",
+    );
+  }
+
+  // ==========================================
+  // 5. VALIDATE TICKET COUNT
+  // ==========================================
+
+  if (
+    !Number.isInteger(ticketCount) ||
+    ticketCount < 1
+  ) {
+    throw new Error(
+      "Ticket count must be at least 1",
+    );
+  }
+
+  // ==========================================
+  // 6. CALCULATE ORIGINAL AMOUNT
+  // ==========================================
+
+  const originalUnitPrice =
+    new Prisma.Decimal(
+      selectedTicket.entryPrice,
+    );
+
+  const discountedUnitPrice =
+    new Prisma.Decimal(
+      selectedTicket.discountedPrice,
+    );
+
+  const originalTicketAmount =
+    originalUnitPrice.mul(ticketCount);
+
+  // ==========================================
+  // 7. TICKET AMOUNT
+  // ==========================================
+
+  const ticketAmount =
+    discountedUnitPrice.mul(ticketCount);
+
+  // ==========================================
+  // 8. DISCOUNT AMOUNT
+  // ==========================================
+
+  const discountAmount =
+    originalTicketAmount.minus(
+      ticketAmount,
+    );
+
+  // ==========================================
+  // 9. PLATFORM FEE
+  // ==========================================
+
+  const platformFee =
+    new Prisma.Decimal(
+      eventPlatformFee,
+    );
+
+  // ==========================================
+  // 10. COUPON DISCOUNT
+  // ==========================================
+
+  /*
+    Later when you create Coupon table,
+    calculate actual coupon discount here.
+
+    For now:
+  */
+
+  const couponDiscount =
+    new Prisma.Decimal(0);
+
+  // ==========================================
+  // 11. TAXABLE AMOUNT
+  // ==========================================
+
+  const taxableAmount =
+    ticketAmount
+      .plus(platformFee)
+      .minus(couponDiscount);
+
+  // ==========================================
+  // 12. GST
+  // ==========================================
+
+  const gstAmount =
+    taxableAmount
+      .mul(gstPercentage)
+      .div(100);
+
+  // ==========================================
+  // 13. TOTAL AMOUNT
+  // ==========================================
+
+  const totalAmount =
+    taxableAmount.plus(
+      gstAmount,
+    );
+
+  // ==========================================
+  // 14. RESPONSE
+  // ==========================================
+
+  return {
+    event: {
+      id: event.id,
+      title: event.title,
+
+      eventType: event.eventType,
+      eventTag: event.eventTag,
+
+      eventDate: event.eventDate,
+      startTime: event.startTime,
+      endTime: event.endTime,
+
+      venueName: event.venueName,
+      fullAddress: event.fullAddress,
+
+      totalCapacity: event.totalCapacity,
+    },
+
+    pricing: {
+      discountPercentage:
+        event.discountPercentage?.toFixed(2) ??
+        "0.00",
+
+      gstPercentage:
+        gstPercentage.toFixed(2),
+
+      eventPlatformFee:
+        eventPlatformFee.toFixed(2),
+    },
+
+    ticketOptions,
+
+    availableTicketTypes,
+
+    bookingPreview: {
+      ticketType:
+        selectedTicket.ticketType,
+
+      ticketCount,
+
+      originalTicketAmount:
+        originalTicketAmount.toFixed(2),
+
+      ticketAmount:
+        ticketAmount.toFixed(2),
+
+      platformFee:
+        platformFee.toFixed(2),
+
+      gstAmount:
+        gstAmount.toFixed(2),
+
+      discountAmount:
+        discountAmount.toFixed(2),
+
+      couponCode:
+        couponCode ?? null,
+
+      couponDiscount:
+        couponDiscount.toFixed(2),
+
+      totalAmount:
+        totalAmount.toFixed(2),
+    },
+  };
+};
+
+type TicketInput = {
+  ticketType: "MEN" | "WOMEN" | "OTHER";
+  quantity: number;
+};
+
+export const calculateEventCheckout = async (
+  eventId: string,
+  tickets: TicketInput[],
+  couponCode?: string,
+) => {
+  const event =
+    await prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+
+      select: {
+        id: true,
+        title: true,
+
+        menCapacity: true,
+        womenCapacity: true,
+        otherCapacity: true,
+
+        menEntryPrice: true,
+        womenEntryPrice: true,
+        otherEntryPrice: true,
+
+        menDiscountedPrice: true,
+        womenDiscountedPrice: true,
+        otherDiscountedPrice: true,
+
+        discountPercentage: true,
+      },
+    });
+
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  const globalAmount =
+    await prisma.globalAmount.findFirst({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+  const gstPercentage =
+    globalAmount?.gst ??
+    new Prisma.Decimal(0);
+
+  const platformFee =
+    globalAmount?.eventPlatformFee ??
+    new Prisma.Decimal(0);
+
+  let originalTicketAmount =
+    new Prisma.Decimal(0);
+
+  let ticketAmount =
+    new Prisma.Decimal(0);
+
+  let ticketCount = 0;
+
+  const ticketBreakdown = [];
+
+  for (const ticket of tickets) {
+    const quantity =
+      Number(ticket.quantity);
+
+    if (
+      !Number.isInteger(quantity) ||
+      quantity < 1
+    ) {
+      throw new Error(
+        "Invalid ticket quantity",
+      );
+    }
+
+    let capacity = 0;
+
+    let originalPrice =
+      new Prisma.Decimal(0);
+
+    let finalPrice =
+      new Prisma.Decimal(0);
+
+    if (ticket.ticketType === "MEN") {
+      capacity =
+        event.menCapacity ?? 0;
+
+      if (capacity <= 0) {
+        throw new Error(
+          "Men tickets are not available",
+        );
+      }
+
+      originalPrice =
+        event.menEntryPrice ??
+        new Prisma.Decimal(0);
+
+      finalPrice =
+        event.menDiscountedPrice ??
+        originalPrice;
+    }
+
+    if (ticket.ticketType === "WOMEN") {
+      capacity =
+        event.womenCapacity ?? 0;
+
+      if (capacity <= 0) {
+        throw new Error(
+          "Women tickets are not available",
+        );
+      }
+
+      originalPrice =
+        event.womenEntryPrice ??
+        new Prisma.Decimal(0);
+
+      finalPrice =
+        event.womenDiscountedPrice ??
+        originalPrice;
+    }
+
+    if (ticket.ticketType === "OTHER") {
+      capacity =
+        event.otherCapacity ?? 0;
+
+      if (capacity <= 0) {
+        throw new Error(
+          "Other tickets are not available",
+        );
+      }
+
+      originalPrice =
+        event.otherEntryPrice ??
+        new Prisma.Decimal(0);
+
+      finalPrice =
+        event.otherDiscountedPrice ??
+        originalPrice;
+    }
+
+    const originalAmount =
+      originalPrice.mul(quantity);
+
+    const amount =
+      finalPrice.mul(quantity);
+
+    originalTicketAmount =
+      originalTicketAmount.plus(
+        originalAmount,
+      );
+
+    ticketAmount =
+      ticketAmount.plus(amount);
+
+    ticketCount += quantity;
+
+    ticketBreakdown.push({
+      ticketType:
+        ticket.ticketType,
+
+      quantity,
+
+      originalUnitPrice:
+        originalPrice.toFixed(2),
+
+      unitPrice:
+        finalPrice.toFixed(2),
+
+      originalAmount:
+        originalAmount.toFixed(2),
+
+      amount:
+        amount.toFixed(2),
+    });
+  }
+
+  const discountAmount =
+    originalTicketAmount.minus(
+      ticketAmount,
+    );
+
+  // For now
+  const couponDiscount =
+    couponCode
+      ? new Prisma.Decimal(100)
+      : new Prisma.Decimal(0);
+
+  const subtotal =
+    ticketAmount.plus(
+      platformFee,
+    );
+
+  const gstAmount =
+    subtotal
+      .mul(gstPercentage)
+      .div(100);
+
+  const totalBeforeCoupon =
+    subtotal.plus(
+      gstAmount,
+    );
+
+  const totalAmount =
+    totalBeforeCoupon.minus(
+      couponDiscount,
+    );
+
+  return {
+    eventId,
+
+    ticketCount,
+
+    ticketBreakdown,
+
+    originalTicketAmount:
+      originalTicketAmount.toFixed(2),
+
+    ticketAmount:
+      ticketAmount.toFixed(2),
+
+    discountAmount:
+      discountAmount.toFixed(2),
+
+    platformFee:
+      platformFee.toFixed(2),
+
+    gstPercentage:
+      gstPercentage.toFixed(2),
+
+    gstAmount:
+      gstAmount.toFixed(2),
+
+    couponCode:
+      couponCode ?? null,
+
+    couponDiscount:
+      couponDiscount.toFixed(2),
+
+    totalAmount:
+      totalAmount.toFixed(2),
+  };
 };
