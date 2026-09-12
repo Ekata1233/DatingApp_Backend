@@ -200,9 +200,9 @@ const calculateDistanceKm = (
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
 
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
@@ -308,7 +308,9 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
         not: userId,
       },
 
-      DateConfirmed: null,
+      DateConfirmed: {
+        none: {},
+      },
       eventDateTime: dateFilter,
 
       requests: {
@@ -340,11 +342,11 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
           },
 
           photos: {
-          where: {
-            order: 1,
+            where: {
+              order: 1,
+            },
+            take: 1,
           },
-          take: 1,
-        },
         },
       },
       activity: true,
@@ -411,9 +413,9 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
     ? plan.eventDateTime.toISOString().split("T")[0]
     : null;
 
- const eventTime = plan.eventDateTime
-  ? `T${plan.eventDateTime.toISOString().split("T")[1]}`
-  : null;
+  const eventTime = plan.eventDateTime
+    ? `T${plan.eventDateTime.toISOString().split("T")[1]}`
+    : null;
   return {
     id: plan.id,
     matchScore: plan.matchScore,
@@ -439,9 +441,9 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
         plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
       age: plan.user.birth_date
         ? Math.floor(
-            (Date.now() - new Date(plan.user.birth_date).getTime()) /
-              (365.25 * 24 * 60 * 60 * 1000),
-          )
+          (Date.now() - new Date(plan.user.birth_date).getTime()) /
+          (365.25 * 24 * 60 * 60 * 1000),
+        )
         : null,
     },
   };
@@ -576,9 +578,9 @@ export const getDatePlanRequests = async (userId: string, planId: string) => {
         name: request.requester.full_name,
         age: request.requester.birth_date
           ? Math.floor(
-              (Date.now() - new Date(request.requester.birth_date).getTime()) /
-                (365.25 * 24 * 60 * 60 * 1000),
-            )
+            (Date.now() - new Date(request.requester.birth_date).getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000),
+          )
           : null,
         photo: request.requester.photos?.[0]?.media_url ?? null,
       },
@@ -622,96 +624,96 @@ export const approveDatePlanRequest = async (
     throw new Error("Not authorized");
   }
 
-// ==========================================
-// 3. CHECK PARTICIPANT LIMIT
-// ==========================================
+  // ==========================================
+  // 3. CHECK PARTICIPANT LIMIT
+  // ==========================================
 
-// ==========================================
-// 3. CHECK PARTICIPANT LIMIT
-// ==========================================
+  // ==========================================
+  // 3. CHECK PARTICIPANT LIMIT
+  // ==========================================
 
-const participantLimit =
-  request.plan.participantLimit ?? 1;
+  const participantLimit =
+    request.plan.participantLimit ?? 1;
 
-// Count already approved requests
-const approvedCount =
-  await prisma.datePlanRequest.count({
-    where: {
-      planId: request.planId,
-      status: "APPROVED",
-    },
-  });
+  // Count already approved requests
+  const approvedCount =
+    await prisma.datePlanRequest.count({
+      where: {
+        planId: request.planId,
+        status: "APPROVED",
+      },
+    });
 
-// ==========================================
-// VALIDATE PARTICIPANT LIMIT
-// 1 = One Person
-// 2 = Two People
-// 3-15 = Small Group
-// ==========================================
+  // ==========================================
+  // VALIDATE PARTICIPANT LIMIT
+  // 1 = One Person
+  // 2 = Two People
+  // 3-15 = Small Group
+  // ==========================================
 
-if (
-  participantLimit < 1 ||
-  participantLimit > 15
-) {
-  throw new Error(
-    "Invalid participant limit. Allowed limits are 1 person, 2 people, or Small Group (3-15 people).",
-  );
-}
-
-// ==========================================
-// REQUEST ALREADY APPROVED
-// ==========================================
-
-if (request.status === "APPROVED") {
-  throw new Error(
-    "This request has already been approved",
-  );
-}
-
-// ==========================================
-// PARTICIPANT LIMIT ALREADY REACHED
-// ==========================================
-
-if (approvedCount >= participantLimit) {
-  if (participantLimit === 1) {
+  if (
+    participantLimit < 1 ||
+    participantLimit > 15
+  ) {
     throw new Error(
-      "Participant limit reached. This Date Plan allows only 1 person.",
+      "Invalid participant limit. Allowed limits are 1 person, 2 people, or Small Group (3-15 people).",
     );
   }
 
-  if (participantLimit === 2) {
+  // ==========================================
+  // REQUEST ALREADY APPROVED
+  // ==========================================
+
+  if (request.status === "APPROVED") {
     throw new Error(
-      "Participant limit reached. This Date Plan allows only 2 people.",
+      "This request has already been approved",
     );
   }
 
-  throw new Error(
-    `Small Group limit reached. This Date Plan allows a maximum of ${participantLimit} people.`,
-  );
-}
+  // ==========================================
+  // PARTICIPANT LIMIT ALREADY REACHED
+  // ==========================================
 
-// ==========================================
-// REQUEST ALREADY DECLINED
-// ==========================================
+  if (approvedCount >= participantLimit) {
+    if (participantLimit === 1) {
+      throw new Error(
+        "Participant limit reached. This Date Plan allows only 1 person.",
+      );
+    }
 
-if (request.status === "DECLINED") {
-  throw new Error(
-    "This request has already been declined",
-  );
-}
+    if (participantLimit === 2) {
+      throw new Error(
+        "Participant limit reached. This Date Plan allows only 2 people.",
+      );
+    }
 
-// ==========================================
-// OTHER STATUS
-// ==========================================
+    throw new Error(
+      `Small Group limit reached. This Date Plan allows a maximum of ${participantLimit} people.`,
+    );
+  }
 
-if (request.status !== "PENDING") {
-  throw new Error(
-    "This request has already been processed",
-  );
-}
+  // ==========================================
+  // REQUEST ALREADY DECLINED
+  // ==========================================
 
-const senderId = request.plan.userId;
-const receiverId = request.requesterId;
+  if (request.status === "DECLINED") {
+    throw new Error(
+      "This request has already been declined",
+    );
+  }
+
+  // ==========================================
+  // OTHER STATUS
+  // ==========================================
+
+  if (request.status !== "PENDING") {
+    throw new Error(
+      "This request has already been processed",
+    );
+  }
+
+  const senderId = request.plan.userId;
+  const receiverId = request.requesterId;
 
   // After approving current request
   const newApprovedCount =
@@ -902,7 +904,7 @@ const receiverId = request.requesterId;
               remainingSlots:
                 Math.max(
                   participantLimit -
-                    newApprovedCount,
+                  newApprovedCount,
                   0,
                 ),
             },
@@ -1025,7 +1027,7 @@ const receiverId = request.requesterId;
 
     remainingSlots: Math.max(
       participantLimit -
-        newApprovedCount,
+      newApprovedCount,
       0,
     ),
 
@@ -1269,12 +1271,12 @@ export const getMyDatePlanRequests = async (userId: string) => {
 
     billSuggestion: request.billSuggestion
       ? {
-          id: request.billSuggestion.id,
-          type: request.billSuggestion.type,
-          label: request.billSuggestion.label,
-          value: request.billSuggestion.value,
-          icon: request.billSuggestion.icon,
-        }
+        id: request.billSuggestion.id,
+        type: request.billSuggestion.type,
+        label: request.billSuggestion.label,
+        value: request.billSuggestion.value,
+        icon: request.billSuggestion.icon,
+      }
       : null,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
@@ -1291,9 +1293,9 @@ export const getMyDatePlanRequests = async (userId: string) => {
 
       activity: request.plan.activity
         ? {
-            name: request.plan.activity.label,
-            icon: request.plan.activity.icon,
-          }
+          name: request.plan.activity.label,
+          icon: request.plan.activity.icon,
+        }
         : null,
       quickTitle: request.plan.quickTitle?.label,
       whoPays: request.plan.whoPays?.label,
@@ -1639,8 +1641,7 @@ export const getDatePlanHistory = async (
     console.log("EVENT DATE:", plan.eventDateTime);
     console.log("CONFIRMED DATE:", plan.DateConfirmed);
 
-    const confirmed = plan.DateConfirmed;
-
+    const confirmed = plan.DateConfirmed?.[0] ?? null;
     /**
      * 1. Calculate actual history status
      */
@@ -1746,16 +1747,16 @@ export const getDatePlanHistory = async (
        */
       participant: participant
         ? {
-            id: participant.id,
+          id: participant.id,
 
-            name: participant.full_name,
+          name: participant.full_name,
 
-            age: participant.birth_date
-              ? calculateAge(participant.birth_date)
-              : null,
+          age: participant.birth_date
+            ? calculateAge(participant.birth_date)
+            : null,
 
-            photoUrl: participant.photos[0]?.media_url ?? null,
-          }
+          photoUrl: participant.photos[0]?.media_url ?? null,
+        }
         : null,
 
       /**
@@ -1793,12 +1794,12 @@ export const getDatePlanHistory = async (
        */
       confirmedDate: confirmed
         ? {
-            id: confirmed.id,
+          id: confirmed.id,
 
-            status: confirmed.status,
+          status: confirmed.status,
 
-            eventDateTime: confirmed.eventDateTime,
-          }
+          eventDateTime: confirmed.eventDateTime,
+        }
         : null,
 
       /**
@@ -1965,53 +1966,52 @@ export const getDatePlanHistoryDetails = async (
     throw new Error("Date plan history not found");
   }
 
-const [packageFeatures, activeBoost] = await Promise.all([
-  /**
-   * Current Date Plan cost
-   */
-  prisma.datePlanPackageFeatures.findFirst({
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      costToPostPlan: true,
-      costToPostPlanActive: true,
-    },
-  }),
-
-  /**
-   * Active boost for THIS user + THIS plan
-   */
-  prisma.datePlanUserBoost.findFirst({
-    where: {
-      userId,
-      datePlanId: planId,
-      status: "ACTIVE",
-      expiresAt: {
-        gt: new Date(),
+  const [packageFeatures, activeBoost] = await Promise.all([
+    /**
+     * Current Date Plan cost
+     */
+    prisma.datePlanPackageFeatures.findFirst({
+      orderBy: {
+        createdAt: "desc",
       },
-    },
+      select: {
+        costToPostPlan: true,
+        costToPostPlanActive: true,
+      },
+    }),
 
-    include: {
-      boostOption: {
-        select: {
-          id: true,
-          title: true,
-          durationHours: true,
-          price: true,
-          currency: true,
+    /**
+     * Active boost for THIS user + THIS plan
+     */
+    prisma.datePlanUserBoost.findFirst({
+      where: {
+        userId,
+        datePlanId: planId,
+        status: "ACTIVE",
+        expiresAt: {
+          gt: new Date(),
         },
       },
-    },
 
-    orderBy: {
-      createdAt: "desc",
-    },
-  }),
-]);
+      include: {
+        boostOption: {
+          select: {
+            id: true,
+            title: true,
+            durationHours: true,
+            price: true,
+            currency: true,
+          },
+        },
+      },
 
-  const confirmed = plan.DateConfirmed;
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+  ]);
 
+  const confirmed = plan.DateConfirmed?.[0] ?? null;
   const feedback = plan.feedbacks?.[0] ?? null;
 
   /**
@@ -2023,10 +2023,10 @@ const [packageFeatures, activeBoost] = await Promise.all([
     feedback?.attendanceStatus === "MET" && feedback?.status === "SUBMITTED"
       ? "COMPLETED"
       : getHistoryStatus(
-          plan.status,
-          confirmed?.status ?? null,
-          plan.eventDateTime,
-        );
+        plan.status,
+        confirmed?.status ?? null,
+        plan.eventDateTime,
+      );
 
   const statusLabel = getHistoryStatusLabel(historyStatus);
 
@@ -2070,11 +2070,11 @@ const [packageFeatures, activeBoost] = await Promise.all([
 
     quickTitle: plan.quickTitle
       ? {
-          id: plan.quickTitle.id,
-          label: plan.quickTitle.label,
-          value: plan.quickTitle.value,
-          icon: plan.quickTitle.icon,
-        }
+        id: plan.quickTitle.id,
+        label: plan.quickTitle.label,
+        value: plan.quickTitle.value,
+        icon: plan.quickTitle.icon,
+      }
       : null,
 
     activity: plan.activity,
@@ -2101,16 +2101,16 @@ const [packageFeatures, activeBoost] = await Promise.all([
      */
     participant: participant
       ? {
-          id: participant.id,
+        id: participant.id,
 
-          name: participant.full_name,
+        name: participant.full_name,
 
-          age: participant.birth_date
-            ? calculateAge(participant.birth_date)
-            : null,
+        age: participant.birth_date
+          ? calculateAge(participant.birth_date)
+          : null,
 
-          photoUrl: participant.photos[0]?.media_url ?? null,
-        }
+        photoUrl: participant.photos[0]?.media_url ?? null,
+      }
       : null,
 
     /**
@@ -2118,17 +2118,17 @@ const [packageFeatures, activeBoost] = await Promise.all([
      */
     feedback: feedback
       ? {
-          id: feedback.id,
-          attendanceStatus: feedback.attendanceStatus,
-          status: feedback.status,
-          metUserId: feedback.metUserId,
-          overallRating: feedback.overallRating,
-          personRating: feedback.personRating,
-          noShowReason: feedback.noShowReason,
-          experienceTags: feedback.experienceTags,
-          comment: feedback.comment,
-          createdAt: feedback.createdAt,
-        }
+        id: feedback.id,
+        attendanceStatus: feedback.attendanceStatus,
+        status: feedback.status,
+        metUserId: feedback.metUserId,
+        overallRating: feedback.overallRating,
+        personRating: feedback.personRating,
+        noShowReason: feedback.noShowReason,
+        experienceTags: feedback.experienceTags,
+        comment: feedback.comment,
+        createdAt: feedback.createdAt,
+      }
       : null,
 
     /**
@@ -2138,28 +2138,28 @@ const [packageFeatures, activeBoost] = await Promise.all([
 
     participantLimit: plan.participantLimit,
 
-boost: {
-  enabled: !!activeBoost,
+    boost: {
+      enabled: !!activeBoost,
 
-  label: activeBoost ? "Yes" : "No",
+      label: activeBoost ? "Yes" : "No",
 
-  duration: activeBoost
-    ? `${activeBoost.boostOption.durationHours}h`
-    : null,
-},
+      duration: activeBoost
+        ? `${activeBoost.boostOption.durationHours}h`
+        : null,
+    },
 
 
-planCost: {
-  amount: packageFeatures
-    ? Number(packageFeatures.costToPostPlan)
-    : 0,
+    planCost: {
+      amount: packageFeatures
+        ? Number(packageFeatures.costToPostPlan)
+        : 0,
 
-  currency: "INR",
+      currency: "INR",
 
-  label: packageFeatures
-    ? `₹${Number(packageFeatures.costToPostPlan)}`
-    : "₹0",
-},
+      label: packageFeatures
+        ? `₹${Number(packageFeatures.costToPostPlan)}`
+        : "₹0",
+    },
 
     /**
      * Requests
@@ -2190,23 +2190,23 @@ planCost: {
      */
     confirmedDate: confirmed
       ? {
-          id: confirmed.id,
+        id: confirmed.id,
 
-          status: confirmed.status,
+        status: confirmed.status,
 
-          eventDateTime: confirmed.eventDateTime,
+        eventDateTime: confirmed.eventDateTime,
 
-          participant: confirmed.participant
-            ? {
-                id: confirmed.participant.id,
-                name: confirmed.participant.full_name,
-                age: confirmed.participant.birth_date
-                  ? calculateAge(confirmed.participant.birth_date)
-                  : null,
-                photoUrl: confirmed.participant.photos[0]?.media_url ?? null,
-              }
-            : null,
-        }
+        participant: confirmed.participant
+          ? {
+            id: confirmed.participant.id,
+            name: confirmed.participant.full_name,
+            age: confirmed.participant.birth_date
+              ? calculateAge(confirmed.participant.birth_date)
+              : null,
+            photoUrl: confirmed.participant.photos[0]?.media_url ?? null,
+          }
+          : null,
+      }
       : null,
 
     /**
