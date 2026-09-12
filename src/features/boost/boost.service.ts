@@ -40,9 +40,12 @@ export const upgradeBoostService = async (userId: string, boost_option_id: strin
 
 export const activateBoostService = async (userId: string, user_boost_id: string) => {
   // 1. Fetch user boost
+  console.log("user boost id : ", user_boost_id)
   const userBoost = await prisma.userBoost.findUnique({
     where: { id: user_boost_id },
   });
+
+  console.log("user boost : ", userBoost)
 
   if (!userBoost) {
     throw new Error("BOOST_NOT_FOUND");

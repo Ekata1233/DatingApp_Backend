@@ -85,6 +85,8 @@ export const handleSwipe = async (data: {
   // No reverse like: save swipe only
   // ------------------------------------------------------------
   if (!reverse) {
+
+    console.log("in swipe transaction : ")
     await prisma.$transaction(
       async (tx) => {
         // Duplicate swipe check inside transaction
@@ -113,8 +115,11 @@ export const handleSwipe = async (data: {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
     );
+    console.log("after swipe transaction : ")
 
     cacheSwipe(swiperId, targetUserId).catch(console.error);
+    console.log("after cacge transaction : ")
+    console.log("before notification swipe transaction : ")
 
     // Fire-and-forget notification
     createNotification({
@@ -123,7 +128,8 @@ export const handleSwipe = async (data: {
       type:
         action === "SUPERLIKE"
           ? NotificationType.SUPER_LIKE
-          : NotificationType.NEW_LIKE, title:
+          : NotificationType.NEW_LIKE,
+      title:
         action === "SUPERLIKE"
           ? "New Super Like ⭐"
           : "New Like ❤️",
@@ -137,6 +143,7 @@ export const handleSwipe = async (data: {
         action,
       },
     }).catch(console.error);
+    console.log("after notification transaction : ")
 
     return { matched: false };
   }

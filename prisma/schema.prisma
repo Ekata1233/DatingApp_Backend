@@ -103,7 +103,10 @@ model User {
   receivedNotifications Notification[]           @relation("ReceivedNotifications")
   sentNotifications     Notification[]           @relation("SentNotifications")
   notificationSetting   UserNotificationSetting?
-  DatePlanUserBoost     DatePlanUserBoost[]
+  notificationMutes     UserNotificationMute[]   @relation("NotificationMuteOwner")
+  mutedByUsers          UserNotificationMute[]   @relation("NotificationMutedUser")
+
+  DatePlanUserBoost DatePlanUserBoost[]
 
   //Relationship tag
   relationshipTagProposalsSent     RelationshipTagProposal[] @relation("RelationshipTagProposalSender")
@@ -1431,15 +1434,37 @@ model Notification {
 }
 
 model UserNotificationSetting {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @unique @db.Uuid
-  isEnabled  Boolean   @default(true)
-  mutedUntil DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @unique @db.Uuid
+  isEnabled         Boolean   @default(true)
+  mutedUntil        DateTime?
+  newMatchesEnabled Boolean   @default(true)
+  messagesEnabled   Boolean   @default(true)
+  likesRosesEnabled Boolean   @default(true)
+  eventsEnabled     Boolean   @default(true)
+  promotionsEnabled Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model UserNotificationMute {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId      String    @db.Uuid
+  mutedUserId String    @db.Uuid
+  isMuted     Boolean   @default(true)
+  mutedUntil  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user      User @relation("NotificationMuteOwner", fields: [userId], references: [id], onDelete: Cascade)
+  mutedUser User @relation("NotificationMutedUser", fields: [mutedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mutedUserId])
+  @@index([mutedUserId])
 }
 
 model DatePlanPackage {
@@ -1566,7 +1591,7 @@ model DatePlan {
   vibes         DatePlanVibe[]
   requests      DatePlanRequest[]
   skips         DatePlanSkip[]
-  DateConfirmed DateConfirmed?
+  DateConfirmed DateConfirmed[]
   chatMessages  ChatMessage[]     @relation("DatePlanChatMessages")
 
   @@index([userId])
@@ -1636,7 +1661,7 @@ model DatePlanSkip {
 
 model DateConfirmed {
   id            String              @id @default(uuid()) @db.Uuid
-  planId        String              @unique @db.Uuid
+  planId        String              @db.Uuid
   hostUserId    String              @db.Uuid
   participantId String              @db.Uuid
   title         String?
