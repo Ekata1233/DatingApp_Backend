@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { blockUserService, unblockUserService } from "./block.service";
+import { blockUserService, getBlockedUsersService, unblockUserService } from "./block.service";
 import { getProfileRoom } from "../../chat/profile/profile.socket";
 import { getIO } from "../../../config/socket";
 import { chatService } from "../../chat/chat.service";
@@ -191,3 +191,40 @@ export const unblockUserController = async (
     });
   }
 };
+
+
+
+
+export const getBlockedUsersController =
+  async (
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      const userId = (req as any).user!.id;
+
+      const blockedUsers =
+        await getBlockedUsersService(
+          userId,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Blocked users fetched successfully",
+        data: blockedUsers,
+      });
+    } catch (error: any) {
+      console.error(
+        "GET BLOCKED USERS ERROR:",
+        error,
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Failed to fetch blocked users",
+      });
+    }
+  };

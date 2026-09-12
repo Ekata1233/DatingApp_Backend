@@ -20,7 +20,6 @@
 // }
 
 
-
 import crypto from "crypto";
 
 export const verifyRazorpaySignature = (
@@ -28,34 +27,113 @@ export const verifyRazorpaySignature = (
   paymentId: string,
   signature: string,
 ): boolean => {
-  const secret = process.env.RAZORPAY_KEY_SECRET;
+  const secret =
+    process.env.RAZORPAY_KEY_SECRET;
 
   if (!secret) {
-    throw new Error("RAZORPAY_KEY_SECRET is missing");
+    throw new Error(
+      "RAZORPAY_KEY_SECRET is missing",
+    );
   }
 
-  const generatedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(`${orderId}|${paymentId}`)
-    .digest("hex");
+  const payload =
+    `${orderId}|${paymentId}`;
 
-  return generatedSignature === signature;
+  const generatedSignature =
+    crypto
+      .createHmac(
+        "sha256",
+        secret,
+      )
+      .update(payload)
+      .digest("hex");
+
+  console.log(
+    "========== RAZORPAY SIGNATURE DEBUG ==========",
+  );
+
+  console.log(
+    "PAYLOAD:",
+    payload,
+  );
+
+  console.log(
+    "SECRET EXISTS:",
+    !!secret,
+  );
+
+  console.log(
+    "SECRET LENGTH:",
+    secret.length,
+  );
+
+  console.log(
+    "RECEIVED SIGNATURE:",
+    signature,
+  );
+
+  console.log(
+    "GENERATED SIGNATURE:",
+    generatedSignature,
+  );
+
+  if (
+    generatedSignature.length !==
+    signature.length
+  ) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    Buffer.from(
+      generatedSignature,
+      "hex",
+    ),
+    Buffer.from(
+      signature,
+      "hex",
+    ),
+  );
 };
 
 export const verifyRazorpayWebhookSignature = (
   rawBody: string | Buffer,
   signature: string,
 ): boolean => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const secret =
+    process.env
+      .RAZORPAY_WEBHOOK_SECRET;
 
   if (!secret) {
-    throw new Error("RAZORPAY_WEBHOOK_SECRET is missing");
+    throw new Error(
+      "RAZORPAY_WEBHOOK_SECRET is missing",
+    );
   }
 
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
-    .digest("hex");
+  const expectedSignature =
+    crypto
+      .createHmac(
+        "sha256",
+        secret,
+      )
+      .update(rawBody)
+      .digest("hex");
 
-  return expectedSignature === signature;
+  if (
+    expectedSignature.length !==
+    signature.length
+  ) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    Buffer.from(
+      expectedSignature,
+      "hex",
+    ),
+    Buffer.from(
+      signature,
+      "hex",
+    ),
+  );
 };

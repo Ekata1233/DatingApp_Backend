@@ -1,5 +1,5 @@
 import express from "express";
-import { blockUserController, unblockUserController } from "./block.controller";
+import { blockUserController, getBlockedUsersController, unblockUserController } from "./block.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -14,5 +14,11 @@ router.delete(
   "/unblock/:blockedId",
   authMiddleware,
   unblockUserController
+);
+
+router.get(
+  "/blocked-users/list",
+  authMiddleware,
+  getBlockedUsersController,
 );
 export default router;
