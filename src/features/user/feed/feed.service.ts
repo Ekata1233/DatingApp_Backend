@@ -2978,6 +2978,7 @@ const transformUserData = (user: any): UserFeedResponse => {
     fullName: user.full_name,
     age: age,
     gender: user.gender,
+    phone_number:user.phone_number,
 
     // Static values
     matchScore: STATIC_MATCH_SCORE,

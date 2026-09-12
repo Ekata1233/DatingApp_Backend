@@ -32,7 +32,7 @@ export interface UserFeedResponse {
   fullName: string | null;
   age: number | null;
   gender: string | null;
-  
+  phone_number: string|null;
   // Static values
   matchScore: number;
   trust: number;
