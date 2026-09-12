@@ -1858,7 +1858,7 @@ export const verifyPaymentService =
     }
 
     // =========================================
-    // FIND PAYMENT
+    // 1. FIND PAYMENT
     // =========================================
 
     const payment =
@@ -1869,14 +1869,12 @@ export const verifyPaymentService =
           OR: [
             {
               payment_id:
-                data
-                  .razorpay_order_id,
+                data.razorpay_order_id,
             },
 
             {
               transactionId:
-                data
-                  .razorpay_order_id,
+                data.razorpay_order_id,
             },
           ],
         },
@@ -1888,8 +1886,32 @@ export const verifyPaymentService =
       );
     }
 
+    console.log(
+      "========== VERIFY PAYMENT ==========",
+    );
+
+    console.log(
+      "Payment DB ID:",
+      payment.id,
+    );
+
+    console.log(
+      "Payment status:",
+      payment.status,
+    );
+
+    console.log(
+      "Payment purpose:",
+      payment.purpose,
+    );
+
+    console.log(
+      "Payment referenceId:",
+      payment.referenceId,
+    );
+
     // =========================================
-    // IDEMPOTENCY
+    // 2. IDEMPOTENCY
     // =========================================
 
     if (
@@ -1903,75 +1925,105 @@ export const verifyPaymentService =
           "Payment already verified",
 
         payment,
+
+        eventBooking: null,
       };
     }
 
     // =========================================
-    // VERIFY SIGNATURE
+    // 3. GET SERVER-SIDE ORDER ID
+    // =========================================
+
+    const storedOrderId =
+      payment.transactionId ||
+      payment.payment_id;
+
+    if (!storedOrderId) {
+      throw new Error(
+        "Razorpay order ID not found",
+      );
+    }
+
+    console.log(
+      "Stored Order ID:",
+      storedOrderId,
+    );
+
+    console.log(
+      "Received Order ID:",
+      data.razorpay_order_id,
+    );
+
+    console.log(
+      "Received Payment ID:",
+      data.razorpay_payment_id,
+    );
+
+    // =========================================
+    // 4. ORDER ID CHECK
+    // =========================================
+
+    if (
+      storedOrderId !==
+      data.razorpay_order_id
+    ) {
+      throw new Error(
+        "Razorpay order ID mismatch",
+      );
+    }
+
+    // =========================================
+    // 5. VERIFY SIGNATURE
     // =========================================
 
     const isValid =
       verifyRazorpaySignature(
-        data
-          .razorpay_order_id,
-
-        data
-          .razorpay_payment_id,
-
-        data
-          .razorpay_signature,
+        storedOrderId,
+        data.razorpay_payment_id,
+        data.razorpay_signature,
       );
 
+    console.log(
+      "Signature valid:",
+      isValid,
+    );
+
     if (!isValid) {
-      await prisma.payment.update({
-        where: {
-          id:
-            payment.id,
-        },
-
-        data: {
-          status:
-            PaymentStatus.FAILED,
-
-          gatewayResponse: {
-            error:
-              "Invalid Razorpay signature",
-          },
-        },
-      });
-
       throw new Error(
         "Invalid Razorpay payment signature",
       );
     }
 
     // =========================================
-    // COMPLETE PAYMENT + FULFIL
-    // SAME TRANSACTION
+    // 6. COMPLETE PAYMENT + FULFIL
     // =========================================
 
     const result =
       await prisma.$transaction(
         async (tx) => {
+          // =====================================
+          // RE-FETCH INSIDE TRANSACTION
+          // =====================================
+
           const currentPayment =
             await tx.payment.findUnique({
               where: {
-                id:
-                  payment.id,
+                id: payment.id,
               },
             });
 
-          if (
-            !currentPayment
-          ) {
+          if (!currentPayment) {
             throw new Error(
               "Payment not found",
             );
           }
 
+          // =====================================
+          // IDEMPOTENCY INSIDE TRANSACTION
+          // =====================================
+
           if (
-            currentPayment
-              .status ===
+            currentPayment.status ===
             PaymentStatus.COMPLETED
           ) {
             return {
@@ -1986,65 +2038,84 @@ export const verifyPaymentService =
             };
           }
 
+          // =====================================
+          // UPDATE PAYMENT
+          // =====================================
+
           const updatedPayment =
             await tx.payment.update({
               where: {
                 id:
-                  payment.id,
+                  currentPayment.id,
               },
 
               data: {
-                // Razorpay PAYMENT ID
+                // Razorpay payment ID
                 payment_id:
-                  data
-                    .razorpay_payment_id,
+                  data.razorpay_payment_id,
 
-                // Razorpay ORDER ID
+                // Razorpay order ID
                 transactionId:
-                  data
-                    .razorpay_order_id,
+                  storedOrderId,
 
                 status:
-                  PaymentStatus
-                    .COMPLETED,
+                  PaymentStatus.COMPLETED,
 
                 paidAt:
                   new Date(),
 
                 gatewayResponse: {
                   razorpay_order_id:
-                    data
-                      .razorpay_order_id,
+                    storedOrderId,
 
                   razorpay_payment_id:
-                    data
-                      .razorpay_payment_id,
+                    data.razorpay_payment_id,
 
                   razorpay_signature:
-                    data
-                      .razorpay_signature,
+                    data.razorpay_signature,
                 },
               },
             });
 
+          console.log(
+            "Payment completed:",
+            updatedPayment.id,
+          );
+
           let eventBooking =
             null;
 
-          // ===================================
+          // =====================================
           // EVENT BOOKING
-          // ===================================
+          // =====================================
 
           if (
-            updatedPayment
-              .purpose ===
-            PaymentPurpose
-              .EVENT_BOOKING
+            updatedPayment.purpose ===
+            PaymentPurpose.EVENT_BOOKING
           ) {
+            if (
+              !updatedPayment.referenceId
+            ) {
+              throw new Error(
+                "Event booking referenceId missing",
+              );
+            }
+
+            console.log(
+              "Confirming Event Booking:",
+              updatedPayment.referenceId,
+            );
+
             eventBooking =
               await confirmsEventBooking(
                 tx,
                 updatedPayment,
               );
+
+            console.log(
+              "Event Booking confirmed:",
+              eventBooking.id,
+            );
           }
 
           return {
@@ -2057,18 +2128,19 @@ export const verifyPaymentService =
               false,
           };
         },
-
         {
-          maxWait:
-            10000,
+          maxWait: 10000,
 
-          timeout:
-            30000,
+          timeout: 30000,
 
           isolationLevel:
             "Serializable",
         },
       );
+
+    // =========================================
+    // 7. RESPONSE
+    // =========================================
 
     return {
       success: true,

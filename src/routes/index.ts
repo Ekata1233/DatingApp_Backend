@@ -76,6 +76,8 @@ import globalAmountsRoutes from "../features/admin/setiings/global-amount/global
 import globalNotificationRoutes from "../features/notification/globalNotification/globalNotification.route"
 import userNotificationRoutes from "../features/notification/userNotification/userNotificationMute.route"
 import userBoostRoutes from "../features/boost/boost.routes"
+import payoutMethodRoutes from "../features/accountSettings/payout-method/payout-method.routes"
+import privacyControlsRoutes from "../features/accountSettings/privacy-controls/privacy-controls.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -102,9 +104,9 @@ router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes,datePlanUserBoostRoutes,compliRoutes,eventsRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes,datePlanUserBoostRoutes,compliRoutes,eventsRoutes,privacyControlsRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes,eventsRoutes)
+router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes,eventsRoutes,payoutMethodRoutes)
 router.use("/user",blockRoutes)
 router.use("/user",reportRoutes)
 router.use("/user",feedRoutes)

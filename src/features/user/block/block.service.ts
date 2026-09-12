@@ -1,5 +1,6 @@
 import { prisma } from "../../../prisma/prismaClient";
 
+import { getBlockedUserRecordsRepository } from "./block.repository";
 
 export const blockUserService = async (
   blockerId: string,
@@ -137,4 +138,132 @@ export const unblockUserService = async (
     isBlocked: false,
     message: "User unblocked successfully",
   };
+};
+
+
+
+
+
+export const getBlockedUsersService = async (
+  userId: string,
+) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
+
+  // ==========================================
+  // 1. GET USERS BLOCKED BY CURRENT USER
+  // ==========================================
+
+  const blockRecords =
+    await getBlockedUserRecordsRepository(
+      userId,
+    );
+
+  if (blockRecords.length === 0) {
+    return [];
+  }
+
+  // ==========================================
+  // 2. GET BLOCKED USER IDS
+  // ==========================================
+
+  const blockedUserIds =
+    blockRecords.map(
+      (item) => item.blockedId,
+    );
+
+  // ==========================================
+  // 3. GET BLOCKED USER DETAILS
+  // ==========================================
+
+  const users = await prisma.user.findMany({
+    where: {
+      id: {
+        in: blockedUserIds,
+      },
+
+      deleted_at: null,
+    },
+
+    select: {
+      id: true,
+      full_name: true,
+      phone_number: true,
+
+      photos: {
+        take: 1,
+      },
+    },
+  });
+
+  // ==========================================
+  // 4. CREATE USER MAP
+  // ==========================================
+
+  const userMap = new Map(
+    users.map((user) => [
+      user.id,
+      user,
+    ]),
+  );
+
+  // ==========================================
+  // 5. FINAL RESPONSE
+  // ==========================================
+
+  return blockRecords
+    .map((block) => {
+      const blockedUser =
+        userMap.get(block.blockedId);
+
+      if (!blockedUser) {
+        return null;
+      }
+
+      return {
+        blockId: block.id,
+
+        userId: blockedUser.id,
+
+        name:
+          blockedUser.full_name ??
+          maskPhoneNumber(
+            blockedUser.phone_number,
+          ),
+
+        phoneNumber:
+          blockedUser.phone_number,
+
+        profilePhoto:
+          blockedUser.photos?.[0] ??
+          null,
+
+        status: "Blocked",
+
+        blockedAt: block.createdAt,
+      };
+    })
+    .filter(Boolean);
+};
+
+// ==========================================
+// MASK PHONE
+// ==========================================
+
+const maskPhoneNumber = (
+  phone?: string | null,
+) => {
+  if (!phone) {
+    return "Unknown";
+  }
+
+  if (phone.length <= 4) {
+    return `Unknown ${phone}`;
+  }
+
+  return `Unknown ${phone.slice(
+    0,
+    3,
+  )}••••${phone.slice(-4)}`;
 };

@@ -708,7 +708,7 @@ model Prompt {
 model UserBlock {
   id        String   @id @default(uuid()) @db.Uuid
   blockerId String
-  blockedId String
+      String
   createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
