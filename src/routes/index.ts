@@ -73,6 +73,9 @@ import membershipRoutes from "../features/package/membership/membership.routes";
 import unmatchRoutes from "../features/match/match.routes"
 import supportRoutes from "../features/support/support.routes"
 import globalAmountsRoutes from "../features/admin/setiings/global-amount/globalAmount.routes"
+import globalNotificationRoutes from "../features/notification/globalNotification/globalNotification.route"
+import userNotificationRoutes from "../features/notification/userNotification/userNotificationMute.route"
+import userBoostRoutes from "../features/boost/boost.routes"
 import payoutMethodRoutes from "../features/accountSettings/payout-method/payout-method.routes"
 import privacyControlsRoutes from "../features/accountSettings/privacy-controls/privacy-controls.routes"
 const router = Router();
@@ -118,7 +121,7 @@ router.use("/user",lastActivityRoutes)
 //swipe routes
 router.use("/user", swipeRoutes,supportRoutes);
 //
-router.use("/boost", boostRoutes);
+router.use("/user", userBoostRoutes);
 //gift , compliment, rose NEW MATCHES
 router.use("/user", newMatchesRoutes)
 //
@@ -150,6 +153,8 @@ router.use("/user", engagementtRoutes);
 
 //NOTIFICATIONS
 router.use("/user", notificationRoutes);
+router.use("/user", globalNotificationRoutes)
+router.use("/user", userNotificationRoutes)
 //
 
 //ONBOARDING - DETAILS

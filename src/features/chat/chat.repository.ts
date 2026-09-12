@@ -1467,7 +1467,7 @@ export const chatRepository = {
 
               heroImage: true,
 
-              safetyFeatures: true,
+              featureTags: true,
               // =========================================
               // CURRENT USER EVENT BOOKING
               // =========================================

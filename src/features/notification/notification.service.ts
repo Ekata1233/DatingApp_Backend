@@ -7,6 +7,7 @@ import { incrementBadgeCount } from "./badge.service";
 import { createNotificationSettingRepository, findNotificationByIdRepository, getNotificationCountRepository, getNotificationSettingRepository, getNotificationsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository, updateNotificationSettingRepository } from "./notification.repository";
 import { CreateNotificationParams, NotificationCategory, notificationCategoryMap, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
+import { canSendPushNotification } from "./notification.helper";
 
 export const createNotification = async ({
   senderId,
@@ -16,6 +17,8 @@ export const createNotification = async ({
   message,
   data,
 }: CreateNotificationParams) => {
+
+
   const notification = await prisma.notification.create({
     data: {
       sender_id: senderId,
@@ -27,6 +30,8 @@ export const createNotification = async ({
     },
   });
 
+  console.log("notification : ", notification)
+
   // 🔥 REAL-TIME EMIT
   const io = getIO();
   io.to(receiverId).emit("new_notification", notification);
@@ -34,12 +39,34 @@ export const createNotification = async ({
   // Badge increment
   await incrementBadgeCount(receiverId);
 
-  // Push notification
-  await sendPushNotification(
-    receiverId,
-    type,
-    message
-  );
+  // ==========================================
+  // 4. CHECK PUSH PERMISSION
+  // ==========================================
+
+  const canSendPush =
+    await canSendPushNotification({
+      senderId,
+      receiverId,
+      type,
+    });
+
+  // ==========================================
+  // 5. SEND PUSH ONLY IF ALLOWED
+  // ==========================================
+
+  if (canSendPush) {
+    await sendPushNotification({
+      userId: receiverId,
+      type,
+      title,
+      body: message ?? "",
+      data,
+    });
+  } else {
+    console.log(
+      `Push notification skipped for receiver: ${receiverId}`,
+    );
+  }
 
   return notification;
 };
@@ -123,7 +150,7 @@ export const getNotificationsService = async (
   if (category !== "ALL") {
     types =
       notificationCategoryMap[
-        category
+      category
       ];
   }
 
@@ -182,27 +209,27 @@ export const getNotificationsService = async (
           sender:
             notification.sender
               ? {
-                  id:
-                    notification
-                      .sender.id,
+                id:
+                  notification
+                    .sender.id,
 
-                  name:
-                    notification
-                      .sender
-                      .full_name,
+                name:
+                  notification
+                    .sender
+                    .full_name,
 
-                  birthDate:
-                    notification
-                      .sender
-                      .birth_date,
+                birthDate:
+                  notification
+                    .sender
+                    .birth_date,
 
-                  photo:
-                    notification
-                      .sender
-                      .photos[0]
-                      ?.media_url ??
-                    null,
-                }
+                photo:
+                  notification
+                    .sender
+                    .photos[0]
+                    ?.media_url ??
+                  null,
+              }
               : null,
         }),
       ),
@@ -215,7 +242,7 @@ export const getNotificationsService = async (
       totalPages:
         Math.ceil(
           total /
-            safeLimit,
+          safeLimit,
         ),
     },
 

@@ -3,6 +3,7 @@
 import express from "express";
 import * as controller from "./notification.controller";
 import authMiddleware from "../../middleware/auth.middleware";
+import { testPushNotificationController } from "./test.service";
 
 const router = express.Router();
 
@@ -55,6 +56,12 @@ router.patch(
   "/notification/mute",
   authMiddleware,
   controller.updateNotificationSettingController,
+);
+
+
+router.post(
+  "/notification/test",
+  testPushNotificationController,
 );
 
 export default router;
