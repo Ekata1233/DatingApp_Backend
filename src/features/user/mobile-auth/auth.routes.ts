@@ -80,6 +80,9 @@ router.post(
 );
 
 router.post("/token/:userId", async (req, res) => {
+  // =====================================================
+  // ONLY ALLOW IN DEVELOPMENT
+  // =====================================================
 
   if (process.env.NODE_ENV !== "development") {
     return res.status(403).json({
@@ -90,6 +93,10 @@ router.post("/token/:userId", async (req, res) => {
 
   try {
     const { userId } = req.params;
+
+    // =====================================================
+    // FIND USER
+    // =====================================================
 
     const user = await prisma.user.findUnique({
       where: {
@@ -104,22 +111,92 @@ router.post("/token/:userId", async (req, res) => {
       });
     }
 
+    // =====================================================
+    // BLOCK DELETED ACCOUNT
+    // =====================================================
+
+    if (
+      user.account_status === "DELETED" ||
+      user.deleted_at !== null
+    ) {
+      return res.status(403).json({
+        success: false,
+        code: "ACCOUNT_DELETED",
+        message:
+          "This account has been deleted. Token cannot be generated.",
+      });
+    }
+
+    // =====================================================
+    // CHECK JWT SECRET
+    // =====================================================
+
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      return res.status(500).json({
+        success: false,
+        message: "JWT_SECRET is not configured",
+      });
+    }
+
+    // =====================================================
+    // CREATE SESSION EXPIRY
+    // =====================================================
+
+    const sessionExpiry = new Date();
+
+    sessionExpiry.setDate(
+      sessionExpiry.getDate() + 30,
+    );
+
+    // =====================================================
+    // CREATE USER SESSION
+    // =====================================================
+
+    const session = await prisma.userSession.create({
+      data: {
+        userId: user.id,
+        isActive: true,
+        expiresAt: sessionExpiry,
+      },
+    });
+
+    // =====================================================
+    // CREATE JWT
+    // IMPORTANT: userId + sessionId
+    // =====================================================
+
     const token = jwt.sign(
       {
         userId: user.id,
+        sessionId: session.id,
       },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       {
         expiresIn: "30d",
-      }
+      },
     );
 
-    return res.json({
+    // =====================================================
+    // RESPONSE
+    // =====================================================
+
+    return res.status(200).json({
       success: true,
-      token,
+      message: "Token generated successfully",
+      data: {
+        token,
+        sessionId: session.id,
+        account_status: user.account_status,
+      },
     });
+
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Generate Token Error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,

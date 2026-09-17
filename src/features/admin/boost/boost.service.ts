@@ -524,3 +524,52 @@ export const resetBoostFeaturesService = async (
     },
   });
 };
+
+export const getMyBoostService = async (
+  userId: string,
+  type?: BoostType
+) => {
+  const userBoost = await prisma.userBoost.findFirst({
+    where: {
+      user_id: userId,
+      is_active: true,
+
+      ...(type && {
+        Boost: {
+          is: {
+            name: type,
+          },
+        },
+      }),
+    },
+
+    orderBy: {
+      created_at: "desc",
+    },
+
+    select: {
+      remaining_boosts: true,
+      expires_at: true,
+
+      Boost: {
+        select: {
+          benefits: true,
+        },
+      },
+    },
+  });
+
+  if (!userBoost) {
+    return {
+      benefits: null,
+      remaining_boosts: 0,
+      expires_at: null,
+    };
+  }
+
+  return {
+    benefits: userBoost.Boost?.benefits ?? null,
+    remaining_boosts: userBoost.remaining_boosts,
+    expires_at: userBoost.expires_at,
+  };
+};

@@ -168,6 +168,66 @@ const authMiddleware = async (
     }
 
     /* =====================================================
+       CHECK USER ACCOUNT STATUS
+    ===================================================== */
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: decoded.userId,
+      },
+      select: {
+        id: true,
+        account_status: true,
+        deleted_at: true,
+      },
+    });
+
+    /* =====================================================
+       USER NOT FOUND
+    ===================================================== */
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        code: "USER_NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    /* =====================================================
+       BLOCK DELETED ACCOUNT
+    ===================================================== */
+
+    if (
+      user.account_status === "DELETED" ||
+      user.deleted_at !== null
+    ) {
+      return res.status(403).json({
+        success: false,
+        code: "ACCOUNT_DELETED",
+        message:
+          "This account has been deleted. You cannot access this account.",
+      });
+    }
+
+    /* =====================================================
+       IMPORTANT - DO NOT BLOCK PAUSED ACCOUNT
+    ===================================================== */
+
+    // PAUSED users are allowed through authentication.
+    //
+    // This is required because the paused user needs
+    // authentication to call:
+    //
+    // PATCH /api/user/account/resume
+    //
+    // Therefore:
+    //
+    // ACTIVE  -> allowed
+    // PAUSED  -> allowed
+    // DELETED -> blocked
+
+    /* =====================================================
        ATTACH AUTH USER
     ===================================================== */
 
@@ -177,7 +237,9 @@ const authMiddleware = async (
     };
 
     next();
+
   } catch (error: any) {
+
     if (
       error?.name ===
       "TokenExpiredError"

@@ -1,5 +1,5 @@
 import express from "express";
-import { createBoostController, createOrUpdateBoostFeaturesController, createOrUpdateBoostInfoController, deleteBoostInfoController, getAllBoostsController, getBoostFeaturesController, getBoostInfoController, getBoostsController, resetBoostFeaturesController } from "./boost.contoller";
+import { createBoostController, createOrUpdateBoostFeaturesController, createOrUpdateBoostInfoController, deleteBoostInfoController, getAllBoostsController, getBoostFeaturesController, getBoostInfoController, getBoostsController, getMyBoostController, resetBoostFeaturesController } from "./boost.contoller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = express.Router();
@@ -17,7 +17,7 @@ router.get("/boost/get-all",getBoostsController);
 
 // Create info first time
 // Update/replace info when same name already exists
-router.post("/info", createOrUpdateBoostInfoController);
+router.post("/boost/info", createOrUpdateBoostInfoController);
 
 // Get info
 router.get("/info/:name", getBoostInfoController);
@@ -43,6 +43,12 @@ router.get(
 router.delete(
   "/features/:name",
   resetBoostFeaturesController
+);
+
+router.get(
+  "/my-boost/boost_wallet",
+  authMiddleware,
+  getMyBoostController
 );
 
 export default router;

@@ -18,11 +18,25 @@ export const sendOtpController = async (
       data: result,
     });
   } catch (error: any) {
-    return res.status(400).json({
+
+  // =====================================================
+  // DELETED ACCOUNT
+  // =====================================================
+
+  if (error?.message === "ACCOUNT_DELETED") {
+    return res.status(403).json({
       success: false,
+      code: "ACCOUNT_DELETED",
       message:
-        error?.message || "Failed to send OTP",
+        "This account has been deleted. You cannot login with this account.",
     });
+  }
+
+  return res.status(400).json({
+    success: false,
+    message:
+      error?.message || "Failed to send OTP",
+  });
   }
 };
 
@@ -48,7 +62,22 @@ export const verifyOtpController = async (
       message: "OTP verified successfully",
       data: result,
     });
+
   } catch (error: any) {
+
+    // =====================================================
+    // DELETED ACCOUNT
+    // =====================================================
+
+    if (error?.message === "ACCOUNT_DELETED") {
+      return res.status(403).json({
+        success: false,
+        code: "ACCOUNT_DELETED",
+        message:
+          "This account has been deleted. You cannot login with this account.",
+      });
+    }
+
     return res.status(400).json({
       success: false,
       message:

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { boostFeaturesSchema, boostInfoSchema, createBoostSchema } from "./boost.validation";
-import { createBoostService, createOrUpdateBoostFeaturesService, createOrUpdateBoostInfoService, deleteBoostInfoService, getAllBoostsService, getBoostFeaturesService, getBoostInfoService, getBoostsService, resetBoostFeaturesService } from "./boost.service";
+import { createBoostService, createOrUpdateBoostFeaturesService, createOrUpdateBoostInfoService, deleteBoostInfoService, getAllBoostsService, getBoostFeaturesService, getBoostInfoService, getBoostsService, getMyBoostService, resetBoostFeaturesService } from "./boost.service";
 import { BoostType } from "@prisma/client";
 
 
@@ -383,6 +383,50 @@ export const resetBoostFeaturesController = async (
         message: "Boost not found",
       });
     }
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
+export const getMyBoostController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const type = req.query.type as BoostType | undefined;
+
+    if (
+      type &&
+      !Object.values(BoostType).includes(type)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid boost type. Use BOOST, PRIMETIME or SUPER",
+      });
+    }
+
+    const result = await getMyBoostService(userId, type);
+
+    return res.status(200).json({
+      success: true,
+      message: "Boost details fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Get My Boost Error:", error);
 
     return res.status(500).json({
       success: false,

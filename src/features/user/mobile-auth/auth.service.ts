@@ -138,16 +138,36 @@ export const sendOtp = async ({
   // CHECK WHETHER USER IS ALREADY REGISTERED
   // =========================================================
 
-  const existingUser = await prisma.user.findUnique({
-    where: {
-      phone_number: cleanedPhone,
-    },
-    select: {
-      id: true,
-    },
-  });
+ // =========================================================
+// CHECK WHETHER USER IS ALREADY REGISTERED
+// =========================================================
 
-  const userAlreadyRegister = !!existingUser;
+// Database stores number like +919876543210
+const formattedNumber = `+91${cleanedPhone}`;
+
+const existingUser = await prisma.user.findUnique({
+  where: {
+    phone_number: formattedNumber,
+  },
+  select: {
+    id: true,
+    account_status: true,
+    deleted_at: true,
+  },
+});
+
+// =========================================================
+// BLOCK DELETED ACCOUNT
+// =========================================================
+
+if (
+  existingUser?.account_status === "DELETED" ||
+  existingUser?.deleted_at !== null
+) {
+  throw new Error("ACCOUNT_DELETED");
+}
+
+const userAlreadyRegister = !!existingUser;
 
   // =========================================================
   // SEND OTP
@@ -389,7 +409,9 @@ const userSelect = {
   profile_completion: true,
   referralCode: true,
   created_at: true,
-
+account_status: true,
+  paused_at: true,
+  pause_reason: true,
   profile: {
     select: {
       country: true,
@@ -430,46 +452,54 @@ const handleVerifiedUser = async ({
        */
 
       const existingUser = await tx.user.findUnique({
-        where: {
-          phone_number: formattedNumber,
-        },
-      });
+  where: {
+    phone_number: formattedNumber,
+  },
+});
 
-      if (existingUser) {
-        /*
-         * IMPORTANT:
-         *
-         * Existing user means this is NOT registration.
-         *
-         * If your frontend currently expects true here,
-         * keep your old behavior. Otherwise false is correct.
-         */
-        isRegister = false;
+if (existingUser) {
 
-        /*
-         * Mark phone as verified
-         */
-        await tx.user.update({
-          where: {
-            id: existingUser.id,
-          },
-          data: {
-            is_phone_verified: true,
-          },
-        });
+  // =====================================================
+  // CHECK DELETED ACCOUNT
+  // =====================================================
 
-        /*
-         * Fetch user with profile
-         */
-        const userData = await tx.user.findUnique({
-          where: {
-            id: existingUser.id,
-          },
-          select: userSelect,
-        });
+  if (
+    existingUser.account_status === "DELETED" ||
+    existingUser.deleted_at !== null
+  ) {
+    throw new Error("ACCOUNT_DELETED");
+  }
 
-        return userData;
-      }
+  // =====================================================
+  // EXISTING USER LOGIN
+  // =====================================================
+
+  isRegister = false;
+
+  /*
+   * Mark phone as verified
+   */
+  await tx.user.update({
+    where: {
+      id: existingUser.id,
+    },
+    data: {
+      is_phone_verified: true,
+    },
+  });
+
+  /*
+   * Fetch user with profile
+   */
+  const userData = await tx.user.findUnique({
+    where: {
+      id: existingUser.id,
+    },
+    select: userSelect,
+  });
+
+  return userData;
+}
 
 
       /*
@@ -798,11 +828,18 @@ const handleVerifiedUser = async ({
      FINAL RESPONSE
   ========================================================= */
 
-  return {
-    user: result,
-    token,
-    is_register: isRegister,
-  }
+ return {
+  user: result,
+  token,
+  is_register: isRegister,
+
+  // Account status for frontend
+  account_status: result.account_status,
+
+  // Easy flag for Flutter
+  is_account_paused:
+    result.account_status === "PAUSED",
+};
 };
 
 export const logoutService = async (
