@@ -33,6 +33,9 @@ model User {
   updated_at                 DateTime              @updatedAt
   profile_completion         Int                   @default(0)
   looking_for_option         LookingForOption?
+  account_status             AccountStatus         @default(ACTIVE)
+  paused_at                  DateTime?
+  pause_reason               String?               @db.VarChar(255)
   answer                     UserAnswer[]
   matchesAsUser1             UserMatch[]           @relation("MatchUser1")
   matchesAsUser2             UserMatch[]           @relation("MatchUser2")
@@ -123,30 +126,35 @@ model User {
   privacySettings  UserPrivacySettings?
   blockedUsers     UserBlock[]          @relation("UserBlocker")
   blockedBy        UserBlock[]          @relation("UserBlocked")
+  BoostReachUser   BoostReachUser[]
 
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])
   @@index([created_at])
+  @@index([account_status])
+  @@index([deleted_at])
   @@map("users")
 }
 
+enum AccountStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
 model UserSession {
-  id     String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-
-  isActive Boolean @default(true)
-
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  isActive   Boolean   @default(true)
   deviceId   String?
   deviceName String?
   ipAddress  String?
   userAgent  String?
-
-  expiresAt DateTime
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  logoutAt  DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  logoutAt   DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -845,10 +853,12 @@ model Boost {
   // Existing fields
   whyBoostWorks     Json?
   boostVsSuperBoost Json?
+  benefits          Json?
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
   options           BoostOption[]
   userBoosts        UserBoost[]
+  usages            BoostUsage[]
 
   @@map("boosts")
 }
@@ -907,56 +917,169 @@ model UserBoost {
 model BoostUsage {
   id String @id @default(uuid()) @db.Uuid
 
-  user_boost_id String    @db.Uuid
-  user_id       String    @db.Uuid
-  duration      Int // minutes
-  started_at    DateTime  @default(now())
-  ended_at      DateTime?
-  is_active     Boolean   @default(true)
-
-  total_views     Int @default(0)
-  total_likes     Int @default(0)
-  total_interests Int @default(0)
-  total_reach     Int @default(0)
-
-  created_at DateTime @default(now())
-
-  userBoost   UserBoost    @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
-  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  boostEvents BoostEvent[]
+  user_boost_id      String                  @db.Uuid
+  user_id            String                  @db.Uuid
+  boost_id           String?                 @db.Uuid
+  boost_type         BoostType?
+  title              String?
+  display_name       String?
+  duration           Int // minutes
+  started_at         DateTime                @default(now())
+  ended_at           DateTime?
+  expected_end_at    DateTime
+  status             BoostUsageStatus        @default(ACTIVE)
+  is_active          Boolean                 @default(true)
+  total_impressions  Int                     @default(0)
+  total_views        Int                     @default(0)
+  total_likes        Int                     @default(0)
+  total_superlikes   Int                     @default(0)
+  total_interests    Int                     @default(0)
+  total_matches      Int                     @default(0)
+  total_reach        Int                     @default(0)
+  baseline_reach     Int                     @default(0)
+  baseline_views     Int                     @default(0)
+  baseline_likes     Int                     @default(0)
+  baseline_interests Int                     @default(0)
+  created_at         DateTime                @default(now())
+  updated_at         DateTime                @updatedAt
+  userBoost          UserBoost               @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
+  user               User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  boost              Boost?                  @relation(fields: [boost_id], references: [id])
+  boostEvents        BoostEvent[]
+  hourlyStats        BoostHourlyStats[]
+  demographicStats   BoostDemographicStats[]
+  reachUsers         BoostReachUser[]
 
   @@index([user_id])
   @@index([user_boost_id])
+  @@index([boost_id])
+  @@index([user_id, status])
+  @@index([user_id, started_at])
+  @@index([status, expected_end_at])
   @@map("boost_usages")
 }
 
 model UserBoostStats {
-  id              String @id @default(uuid()) @db.Uuid
-  user_id         String @unique @db.Uuid
-  total_views     Int    @default(0)
-  total_likes     Int    @default(0)
-  total_interests Int    @default(0)
-  total_reach     Int    @default(0)
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id                  String    @id @default(uuid()) @db.Uuid
+  user_id             String    @unique @db.Uuid
+  total_boosts        Int       @default(0)
+  total_impressions   Int       @default(0)
+  total_reach         Int       @default(0)
+  total_views         Int       @default(0)
+  total_likes         Int       @default(0)
+  total_superlikes    Int       @default(0)
+  total_interests     Int       @default(0)
+  total_matches       Int       @default(0)
+  total_boost_minutes Int       @default(0)
+  last_boost_at       DateTime?
+  user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("user_boost_stats")
 }
 
+model BoostHourlyStats {
+  id String @id @default(uuid()) @db.Uuid
+
+  boost_usage_id       String     @db.Uuid
+  hour                 DateTime
+  impressions          Int        @default(0)
+  reach                Int        @default(0)
+  views                Int        @default(0)
+  likes                Int        @default(0)
+  superlikes           Int        @default(0)
+  interests            Int        @default(0)
+  matches              Int        @default(0)
+  baseline_impressions Int        @default(0)
+  baseline_reach       Int        @default(0)
+  baseline_views       Int        @default(0)
+  baseline_likes       Int        @default(0)
+  created_at           DateTime   @default(now())
+  updated_at           DateTime   @updatedAt
+  boostUsage           BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+
+  @@unique([boost_usage_id, hour])
+  @@index([boost_usage_id])
+  @@index([boost_usage_id, hour])
+  @@map("boost_hourly_stats")
+}
+
+model BoostDemographicStats {
+  id             String               @id @default(uuid()) @db.Uuid
+  boost_usage_id String               @db.Uuid
+  type           BoostDemographicType
+  label          String
+  count          Int                  @default(0)
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @updatedAt
+  boostUsage     BoostUsage           @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+
+  @@unique([boost_usage_id, type, label])
+  @@index([boost_usage_id, type])
+  @@map("boost_demographic_stats")
+}
+
+model BoostReachUser {
+  id               String     @id @default(uuid()) @db.Uuid
+  boost_usage_id   String     @db.Uuid
+  actor_id         String     @db.Uuid
+  first_seen_at    DateTime   @default(now())
+  last_seen_at     DateTime   @default(now())
+  impression_count Int        @default(1)
+  boostUsage       BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+  actor            User       @relation(fields: [actor_id], references: [id], onDelete: Cascade)
+
+  @@unique([boost_usage_id, actor_id])
+  @@index([boost_usage_id])
+  @@index([actor_id])
+  @@map("boost_reach_users")
+}
+
+enum BoostDemographicType {
+  LOCATION
+  PROFESSION
+  RELIGION
+  COMMUNITY
+  AGE_GROUP
+  VERIFIED
+  GENDER
+}
+
+enum BoostUsageStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum BoostEventType {
+  IMPRESSION
+  PROFILE_VIEW
+  LIKE
+  SUPERLIKE
+  INTEREST
+  MATCH
+  PASS
+}
+
 model BoostEvent {
-  id             String     @id @default(uuid()) @db.Uuid
-  boost_usage_id String     @db.Uuid
-  user_id        String     @db.Uuid // boosted user
-  actor_id       String     @db.Uuid // who performed action
-  event_type     EventType
-  created_at     DateTime   @default(now())
-  boostUsage     BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
-  user           User       @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
-  actor          User       @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
+  id             String         @id @default(uuid()) @db.Uuid
+  boost_usage_id String         @db.Uuid
+  user_id        String         @db.Uuid // boosted user
+  actor_id       String         @db.Uuid // who performed action
+  event_type     BoostEventType
+  source         String?
+  metadata       Json?
+  created_at     DateTime       @default(now())
+  boostUsage     BoostUsage     @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
+  user           User           @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
+  actor          User           @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
 
   @@index([boost_usage_id])
   @@index([user_id])
   @@index([actor_id])
+  @@index([boost_usage_id, event_type])
+  @@index([boost_usage_id, actor_id])
+  @@index([boost_usage_id, event_type, created_at])
   @@index([created_at])
   @@map("boost_events")
 }

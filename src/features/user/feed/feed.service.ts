@@ -1,11 +1,12 @@
 
-import { Prisma } from "@prisma/client";
+import { BoostEventType, Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
+import { trackBoostEvent } from "../../boost/boost.tracker";
 
 // =========================
 // HELPERS
@@ -2842,16 +2843,42 @@ export const getFeedDetailsService = async (
 ): Promise<UserFeedResponse> => {
   const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
 
-  // 1. Check Redis
+  // =====================================================
+  // 1. PREVENT SELF PROFILE VIEW
+  // =====================================================
+
+  const shouldTrackProfileView =
+    userId !== currentUserId;
+
+  // =====================================================
+  // 2. CHECK REDIS
+  // =====================================================
+
   const cachedFeedDetails =
     await redis.get<UserFeedResponse>(CACHE_KEY);
 
   if (cachedFeedDetails) {
+
     console.log("✅ Feed Details from Redis");
+
+    // Track even when profile comes from Redis
+    // if (shouldTrackProfileView) {
+    //   await trackBoostEvent({
+    //     boostedUserId: userId,       // Profile owner
+    //     actorId: currentUserId,      // Person viewing profile
+    //     eventType: BoostEventType.PROFILE_VIEW,
+    //   });
+    // }
+
     return cachedFeedDetails;
   }
 
+  // =====================================================
+  // 3. GET PROFILE FROM DATABASE
+  // =====================================================
+
   console.log("📦 Feed Details from Database");
+    
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -2938,7 +2965,22 @@ export const getFeedDetailsService = async (
 
   console.log("💾 Feed Details cached");
 
-  // 5. Return response
+ // =====================================================
+  // 6. TRACK BOOST PROFILE VIEW
+  // =====================================================
+
+  // if (shouldTrackProfileView) {
+
+  //   await trackBoostEvent({
+  //     boostedUserId: userId,
+  //     actorId: currentUserId,
+  //     eventType: BoostEventType.PROFILE_VIEW,
+  //   });
+  // }
+
+  // =====================================================
+  // 7. RETURN
+  // =====================================================
   return response;
 };
 
