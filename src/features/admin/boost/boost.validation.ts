@@ -41,7 +41,7 @@ export const boostInfoSchema = z.object({
   name: z.enum(["BOOST", "PRIMETIME", "SUPER"]),
 
   whyBoostWorks: z.array(whyBoostWorksItemSchema),
-
+ benefits: z.any().optional(),
   boostVsSuperBoost: z.object({
     title: z.string(),
     features: z.array(boostVsSuperBoostFeatureSchema),

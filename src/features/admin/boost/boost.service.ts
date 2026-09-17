@@ -313,6 +313,7 @@ export const createOrUpdateBoostInfoService = async (
     },
 
     data: {
+       benefits: data.benefits,
       whyBoostWorks: data.whyBoostWorks,
       boostVsSuperBoost: data.boostVsSuperBoost,
     },
