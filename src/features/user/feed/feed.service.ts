@@ -103,7 +103,7 @@ const ORIENTATION_COL = "sexual_orientation";
 // =========================
 // CURSOR (keyset)
 // =========================
-type Cursor = { k: number; id: string ; mode?: FeedCursorMode; };
+type Cursor = { k: number; id: string; mode?: FeedCursorMode; };
 
 const encodeCursor = (c: Cursor): string =>
   Buffer.from(JSON.stringify(c)).toString("base64url");
@@ -797,197 +797,446 @@ const decodeCursor = (raw?: string | null): Cursor | null => {
 // };
 
 export const getFeedService = async ({
-    userId,
-    cursor,
-    limit,
-    filters,
-  }: FeedParams) => {
-    const pageLimit =
-      limit ?? DEFAULT_PAGE_LIMIT;
+  userId,
+  cursor,
+  limit,
+  filters,
+}: FeedParams) => {
+  const pageLimit =
+    limit ?? DEFAULT_PAGE_LIMIT;
 
-    const decodedCursor =
-      decodeCursor(
-        cursor as string | undefined,
-      );
+  const decodedCursor =
+    decodeCursor(
+      cursor as string | undefined,
+    );
 
-    const now = new Date();
+  const now = new Date();
 
-    // ========================================================
-    // CURRENT USER
-    // ========================================================
+  // ========================================================
+  // CURRENT USER
+  // ========================================================
 
-    const USER_CACHE_TTL =
-      60 * 10;
+  const USER_CACHE_TTL =
+    60 * 10;
 
-    const USER_CACHE_KEY =
-      `feed:user:${userId}`;
+  const USER_CACHE_KEY =
+    `feed:user:${userId}`;
 
-    const currentUserPromise =
-      async () => {
-        const cached =
-          await redis.get<any>(
-            USER_CACHE_KEY,
-          );
+  const currentUserPromise =
+    async () => {
+      const cached =
+        await redis.get<any>(
+          USER_CACHE_KEY,
+        );
 
-        if (cached) {
-          return cached;
-        }
+      if (cached) {
+        return cached;
+      }
 
-        const user =
-          await prisma.user.findUnique({
-            where: {
-              id: userId,
-            },
+      const user =
+        await prisma.user.findUnique({
+          where: {
+            id: userId,
+          },
 
-            select: {
-              id: true,
+          select: {
+            id: true,
 
-              gender: true,
+            gender: true,
 
-              profile: {
-                select: {
-                  interested_in: true,
+            profile: {
+              select: {
+                interested_in: true,
 
-                  sexual_orientation:
-                    true,
+                sexual_orientation:
+                  true,
 
-                  latitude: true,
+                latitude: true,
 
-                  longitude: true,
+                longitude: true,
 
-                  max_distance_km:
-                    true,
-                },
+                max_distance_km:
+                  true,
               },
             },
-          });
+          },
+        });
 
-        if (user) {
-          await redis.set(
-            USER_CACHE_KEY,
-            user,
-            {
-              ex: USER_CACHE_TTL,
-            },
-          );
-        }
-
-        return user;
-      };
-
-    // ========================================================
-    // DATE FORMAT
-    // ========================================================
-
-    const formatBirthDate = (
-      date:
-        | Date
-        | string
-        | null,
-    ): string | null => {
-      if (!date) {
-        return null;
+      if (user) {
+        await redis.set(
+          USER_CACHE_KEY,
+          user,
+          {
+            ex: USER_CACHE_TTL,
+          },
+        );
       }
 
-      const d =
-        new Date(date);
-
-      if (
-        isNaN(d.getTime())
-      ) {
-        return null;
-      }
-
-      const day =
-        String(
-          d.getDate(),
-        ).padStart(2, "0");
-
-      const month =
-        String(
-          d.getMonth() + 1,
-        ).padStart(2, "0");
-
-      const year =
-        d.getFullYear();
-
-      return `${day}-${month}-${year}`;
+      return user;
     };
 
-    // ========================================================
-    // DB HEALTH CHECK
-    // ========================================================
+  // ========================================================
+  // DATE FORMAT
+  // ========================================================
 
-    const start =
-      performance.now();
+  const formatBirthDate = (
+    date:
+      | Date
+      | string
+      | null,
+  ): string | null => {
+    if (!date) {
+      return null;
+    }
 
-    await prisma.$queryRaw`
+    const d =
+      new Date(date);
+
+    if (
+      isNaN(d.getTime())
+    ) {
+      return null;
+    }
+
+    const day =
+      String(
+        d.getDate(),
+      ).padStart(2, "0");
+
+    const month =
+      String(
+        d.getMonth() + 1,
+      ).padStart(2, "0");
+
+    const year =
+      d.getFullYear();
+
+    return `${day}-${month}-${year}`;
+  };
+
+  // ========================================================
+  // DB HEALTH CHECK
+  // ========================================================
+
+  const start =
+    performance.now();
+
+  await prisma.$queryRaw`
       SELECT 1;
     `;
 
-    console.log(
-      "SELECT 1:",
-      performance.now() - start,
-      "ms",
+  console.log(
+    "SELECT 1:",
+    performance.now() - start,
+    "ms",
+  );
+
+  // ========================================================
+  // LOAD CURRENT USER
+  // ========================================================
+
+  const start1 =
+    performance.now();
+
+  const [currentUser] =
+    await Promise.all([
+      currentUserPromise(),
+    ]);
+
+  console.log(
+    "current user:",
+    performance.now() - start1,
+    "ms",
+  );
+
+  if (
+    !currentUser ||
+    !currentUser.profile
+  ) {
+    throw new Error(
+      "User profile not found",
     );
+  }
 
-    // ========================================================
-    // LOAD CURRENT USER
-    // ========================================================
+  // ========================================================
+  // VIP PACKAGE CHECK
+  // ========================================================
 
-    const start1 =
-      performance.now();
+  const activeVipPackage =
+    await prisma.userPackage.findFirst(
+      {
+        where: {
+          user_id: userId,
 
-    const [currentUser] =
-      await Promise.all([
-        currentUserPromise(),
-      ]);
+          status: "ACTIVE",
 
-    console.log(
-      "current user:",
-      performance.now() - start1,
-      "ms",
-    );
+          package: {
+            name: {
+              in: [
+                "VIP",
+                "VIP_ELITE",
+              ],
+            },
+          },
 
-    if (
-      !currentUser ||
-      !currentUser.profile
-    ) {
-      throw new Error(
-        "User profile not found",
-      );
-    }
-
-    // ========================================================
-    // VIP PACKAGE CHECK
-    // ========================================================
-
-    const activeVipPackage =
-      await prisma.userPackage.findFirst(
-        {
-          where: {
-            user_id: userId,
-
-            status: "ACTIVE",
-
-            package: {
-              name: {
-                in: [
-                  "VIP",
-                  "VIP_ELITE",
-                ],
-              },
+          OR: [
+            {
+              endDate: null,
             },
 
-            OR: [
+            {
+              endDate: {
+                gt: new Date(),
+              },
+            },
+          ],
+        },
+
+        select: {
+          id: true,
+
+          package: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    );
+
+  const hasActiveVip =
+    !!activeVipPackage;
+
+  console.log(
+    "ACTIVE VIP PACKAGE:",
+    activeVipPackage,
+  );
+
+  console.log(
+    "HAS ACTIVE VIP/VIP_ELITE:",
+    hasActiveVip,
+  );
+
+  // ========================================================
+  // BASIC USER PREFERENCES
+  // ========================================================
+
+  const {
+    interested_in,
+    sexual_orientation,
+  } =
+    currentUser.profile;
+
+  const { gender } =
+    currentUser;
+
+  if (
+    !gender ||
+    !interested_in
+  ) {
+    throw new Error(
+      "Required fields missing",
+    );
+  }
+
+  const myGender =
+    gender.toUpperCase();
+
+  const myInterest =
+    interested_in.toUpperCase();
+
+  const myOrientation =
+    (
+      sexual_orientation ?? ""
+    ).toUpperCase();
+
+  // ========================================================
+  // SAFE COORDINATE HANDLING
+  // ========================================================
+
+  /**
+   * IMPORTANT
+   *
+   * Don't use:
+   *
+   * Number(null)
+   *
+   * because:
+   *
+   * Number(null) === 0
+   *
+   * which incorrectly creates:
+   *
+   * latitude = 0
+   * longitude = 0
+   */
+
+  const rawLatitude =
+    currentUser.profile
+      .latitude;
+
+  const rawLongitude =
+    currentUser.profile
+      .longitude;
+
+  const hasCurrentUserCoordinates =
+    rawLatitude !== null &&
+    rawLatitude !== undefined &&
+    rawLongitude !== null &&
+    rawLongitude !== undefined;
+
+  const myLatitude =
+    hasCurrentUserCoordinates
+      ? Number(rawLatitude)
+      : null;
+
+  const myLongitude =
+    hasCurrentUserCoordinates
+      ? Number(rawLongitude)
+      : null;
+
+  const validCurrentUserCoordinates =
+    myLatitude !== null &&
+    myLongitude !== null &&
+    Number.isFinite(
+      myLatitude,
+    ) &&
+    Number.isFinite(
+      myLongitude,
+    );
+
+  // ========================================================
+  // PRECOMPUTE MATCH FILTERS
+  // ========================================================
+
+  const genderFilter =
+    getGenderFromInterest(
+      myInterest,
+    );
+
+  const interestedInFilter =
+    ALL_INTEREST_VALUES.filter(
+      (v) =>
+        getGenderFromInterest(
+          v,
+        ).includes(
+          myGender,
+        ),
+    );
+
+  const orientationForward =
+    getOrientationCompatibility(
+      myOrientation,
+    );
+
+  const orientationReverse =
+    ALL_ORIENTATIONS.filter(
+      (orientation) =>
+        getOrientationCompatibility(
+          orientation,
+        ).includes(
+          myOrientation,
+        ),
+    );
+
+  if (
+    orientationForward.length ===
+    0 ||
+    orientationReverse.length ===
+    0
+  ) {
+    return {
+      users: [],
+      nextCursor: null,
+    };
+  }
+
+  // ========================================================
+  // VIP FILTER: AMBITION
+  // ========================================================
+
+  if (
+    filters?.ambitionIds &&
+    filters.ambitionIds
+      .length > 0
+  ) {
+    if (!hasActiveVip) {
+      return {
+        users: [],
+
+        nextCursor: null,
+
+        filterRestricted:
+          true,
+
+        message:
+          "Ambition filter is available only for VIP and VIP Elite users.",
+      };
+    }
+  }
+
+  // ========================================================
+  // VIP FILTER: FAMILY INCOME
+  // ========================================================
+
+  let familyIncomeIds:
+    number[] = [];
+
+  if (
+    filters?.familyIncomeMin !==
+    undefined ||
+    filters?.familyIncomeMax !==
+    undefined
+  ) {
+    if (!hasActiveVip) {
+      return {
+        users: [],
+
+        nextCursor: null,
+
+        filterRestricted:
+          true,
+
+        message:
+          "Family income filter is available only for VIP and VIP Elite users.",
+      };
+    }
+
+    const minAmount =
+      filters.familyIncomeMin ??
+      0;
+
+    const maxAmount =
+      filters.familyIncomeMax ??
+      Number.MAX_SAFE_INTEGER;
+
+    const matchingIncomeRanges =
+      await prisma.familyIncome.findMany(
+        {
+          where: {
+            active: true,
+
+            AND: [
               {
-                endDate: null,
+                minAmount: {
+                  lte: maxAmount,
+                },
               },
 
               {
-                endDate: {
-                  gt: new Date(),
-                },
+                OR: [
+                  {
+                    maxAmount:
+                      null,
+                  },
+
+                  {
+                    maxAmount:
+                    {
+                      gte: minAmount,
+                    },
+                  },
+                ],
               },
             ],
           },
@@ -995,449 +1244,200 @@ export const getFeedService = async ({
           select: {
             id: true,
 
-            package: {
-              select: {
-                name: true,
-              },
-            },
+            title: true,
+
+            minAmount: true,
+
+            maxAmount: true,
           },
         },
       );
 
-    const hasActiveVip =
-      !!activeVipPackage;
+    familyIncomeIds =
+      matchingIncomeRanges.map(
+        (income) =>
+          income.id,
+      );
 
     console.log(
-      "ACTIVE VIP PACKAGE:",
-      activeVipPackage,
+      "MATCHING FAMILY INCOME:",
+      matchingIncomeRanges,
     );
 
     console.log(
-      "HAS ACTIVE VIP/VIP_ELITE:",
-      hasActiveVip,
+      "MATCHING FAMILY INCOME IDS:",
+      familyIncomeIds,
     );
+  }
 
-    // ========================================================
-    // BASIC USER PREFERENCES
-    // ========================================================
+  // ========================================================
+  // VIP FILTER: NETWORKING INTENT
+  // ========================================================
 
-    const {
-      interested_in,
-      sexual_orientation,
-    } =
-      currentUser.profile;
-
-    const { gender } =
-      currentUser;
-
-    if (
-      !gender ||
-      !interested_in
-    ) {
-      throw new Error(
-        "Required fields missing",
-      );
-    }
-
-    const myGender =
-      gender.toUpperCase();
-
-    const myInterest =
-      interested_in.toUpperCase();
-
-    const myOrientation =
-      (
-        sexual_orientation ?? ""
-      ).toUpperCase();
-
-    // ========================================================
-    // SAFE COORDINATE HANDLING
-    // ========================================================
-
-    /**
-     * IMPORTANT
-     *
-     * Don't use:
-     *
-     * Number(null)
-     *
-     * because:
-     *
-     * Number(null) === 0
-     *
-     * which incorrectly creates:
-     *
-     * latitude = 0
-     * longitude = 0
-     */
-
-    const rawLatitude =
-      currentUser.profile
-        .latitude;
-
-    const rawLongitude =
-      currentUser.profile
-        .longitude;
-
-    const hasCurrentUserCoordinates =
-      rawLatitude !== null &&
-      rawLatitude !== undefined &&
-      rawLongitude !== null &&
-      rawLongitude !== undefined;
-
-    const myLatitude =
-      hasCurrentUserCoordinates
-        ? Number(rawLatitude)
-        : null;
-
-    const myLongitude =
-      hasCurrentUserCoordinates
-        ? Number(rawLongitude)
-        : null;
-
-    const validCurrentUserCoordinates =
-      myLatitude !== null &&
-      myLongitude !== null &&
-      Number.isFinite(
-        myLatitude,
-      ) &&
-      Number.isFinite(
-        myLongitude,
-      );
-
-    // ========================================================
-    // PRECOMPUTE MATCH FILTERS
-    // ========================================================
-
-    const genderFilter =
-      getGenderFromInterest(
-        myInterest,
-      );
-
-    const interestedInFilter =
-      ALL_INTEREST_VALUES.filter(
-        (v) =>
-          getGenderFromInterest(
-            v,
-          ).includes(
-            myGender,
-          ),
-      );
-
-    const orientationForward =
-      getOrientationCompatibility(
-        myOrientation,
-      );
-
-    const orientationReverse =
-      ALL_ORIENTATIONS.filter(
-        (orientation) =>
-          getOrientationCompatibility(
-            orientation,
-          ).includes(
-            myOrientation,
-          ),
-      );
-
-    if (
-      orientationForward.length ===
-        0 ||
-      orientationReverse.length ===
-        0
-    ) {
+  if (
+    filters?.networkingIntentIds &&
+    filters.networkingIntentIds
+      .length > 0
+  ) {
+    if (!hasActiveVip) {
       return {
         users: [],
+
         nextCursor: null,
+
+        filterRestricted:
+          true,
+
+        message:
+          "Networking Intent filter is available only for active VIP or VIP Elite users.",
       };
     }
+  }
 
-    // ========================================================
-    // VIP FILTER: AMBITION
-    // ========================================================
+  // ========================================================
+  // NORMAL FILTER QUERY
+  // Includes location when frontend provides location
+  // ========================================================
 
-    if (
-      filters?.ambitionIds &&
-      filters.ambitionIds
-        .length > 0
-    ) {
-      if (!hasActiveVip) {
-        return {
-          users: [],
-
-          nextCursor: null,
-
-          filterRestricted:
-            true,
-
-          message:
-            "Ambition filter is available only for VIP and VIP Elite users.",
-        };
-      }
-    }
-
-    // ========================================================
-    // VIP FILTER: FAMILY INCOME
-    // ========================================================
-
-    let familyIncomeIds:
-      number[] = [];
-
-    if (
-      filters?.familyIncomeMin !==
-        undefined ||
-      filters?.familyIncomeMax !==
-        undefined
-    ) {
-      if (!hasActiveVip) {
-        return {
-          users: [],
-
-          nextCursor: null,
-
-          filterRestricted:
-            true,
-
-          message:
-            "Family income filter is available only for VIP and VIP Elite users.",
-        };
-      }
-
-      const minAmount =
-        filters.familyIncomeMin ??
-        0;
-
-      const maxAmount =
-        filters.familyIncomeMax ??
-        Number.MAX_SAFE_INTEGER;
-
-      const matchingIncomeRanges =
-        await prisma.familyIncome.findMany(
-          {
-            where: {
-              active: true,
-
-              AND: [
-                {
-                  minAmount: {
-                    lte: maxAmount,
-                  },
-                },
-
-                {
-                  OR: [
-                    {
-                      maxAmount:
-                        null,
-                    },
-
-                    {
-                      maxAmount:
-                        {
-                          gte: minAmount,
-                        },
-                    },
-                  ],
-                },
-              ],
-            },
-
-            select: {
-              id: true,
-
-              title: true,
-
-              minAmount: true,
-
-              maxAmount: true,
-            },
-          },
-        );
-
-      familyIncomeIds =
-        matchingIncomeRanges.map(
-          (income) =>
-            income.id,
-        );
-
-      console.log(
-        "MATCHING FAMILY INCOME:",
-        matchingIncomeRanges,
-      );
-
-      console.log(
-        "MATCHING FAMILY INCOME IDS:",
+  const filterQuery =
+    filters
+      ? buildFilterQuery({
+        ...filters,
         familyIncomeIds,
-      );
-    }
+      })
+      : {
+        where: {},
+      };
 
-    // ========================================================
-    // VIP FILTER: NETWORKING INTENT
-    // ========================================================
+  console.log(
+    "NORMAL FILTER QUERY:",
+    JSON.stringify(
+      filterQuery,
+      null,
+      2,
+    ),
+  );
 
-    if (
-      filters?.networkingIntentIds &&
-      filters.networkingIntentIds
-        .length > 0
-    ) {
-      if (!hasActiveVip) {
-        return {
-          users: [],
-
-          nextCursor: null,
-
-          filterRestricted:
-            true,
-
-          message:
-            "Networking Intent filter is available only for active VIP or VIP Elite users.",
-        };
-      }
-    }
-
-    // ========================================================
-    // NORMAL FILTER QUERY
-    // Includes location when frontend provides location
-    // ========================================================
-
-    const filterQuery =
-      filters
-        ? buildFilterQuery({
-            ...filters,
-            familyIncomeIds,
-          })
-        : {
-            where: {},
-          };
-
-    console.log(
-      "NORMAL FILTER QUERY:",
-      JSON.stringify(
-        filterQuery,
-        null,
-        2,
+  const userFilters =
+    Object.fromEntries(
+      Object.entries(
+        filterQuery.where ||
+        {},
+      ).filter(
+        ([key]) =>
+          key !== "profile",
       ),
     );
 
-    const userFilters =
-      Object.fromEntries(
-        Object.entries(
-          filterQuery.where ||
-            {},
-        ).filter(
-          ([key]) =>
-            key !== "profile",
-        ),
-      );
+  const profileFilters =
+    filterQuery.where
+      ?.profile?.is || {};
 
-    const profileFilters =
-      filterQuery.where
-        ?.profile?.is || {};
+  // ========================================================
+  // MANUAL LOCATION CHECK
+  // ========================================================
 
-    // ========================================================
-    // MANUAL LOCATION CHECK
-    // ========================================================
+  const hasManualLocationFilter =
+    !!filters?.location
+      ?.city ||
+    !!filters?.location
+      ?.state ||
+    !!filters?.location
+      ?.country;
 
-    const hasManualLocationFilter =
-      !!filters?.location
-        ?.city ||
-      !!filters?.location
-        ?.state ||
-      !!filters?.location
-        ?.country;
+  // ========================================================
+  // DISTANCE
+  // ========================================================
 
-    // ========================================================
-    // DISTANCE
-    // ========================================================
+  const distanceKm =
+    filters?.distanceKm ??
+    currentUser.profile
+      .max_distance_km ??
+    50;
 
-    const distanceKm =
-      filters?.distanceKm ??
-      currentUser.profile
-        .max_distance_km ??
-      50;
+  // ========================================================
+  // FALLBACK FILTER QUERY
+  // IMPORTANT:
+  //
+  // Remove ONLY:
+  // - location
+  // - distanceKm
+  //
+  // Keep:
+  // - age
+  // - height
+  // - interests
+  // - languages
+  // - education
+  // - profession
+  // - zodiac
+  // - lifestyle
+  // - ambition
+  // - income
+  // - networking
+  // - etc.
+  // ========================================================
 
-    // ========================================================
-    // FALLBACK FILTER QUERY
-    // IMPORTANT:
-    //
-    // Remove ONLY:
-    // - location
-    // - distanceKm
-    //
-    // Keep:
-    // - age
-    // - height
-    // - interests
-    // - languages
-    // - education
-    // - profession
-    // - zodiac
-    // - lifestyle
-    // - ambition
-    // - income
-    // - networking
-    // - etc.
-    // ========================================================
+  let fallbackFilterQuery:
+    any = {
+    where: {},
+  };
 
-    let fallbackFilterQuery:
-      any = {
-      where: {},
-    };
+  if (filters) {
+    const {
+      location:
+      _ignoredLocation,
 
-    if (filters) {
-      const {
-        location:
-          _ignoredLocation,
+      distanceKm:
+      _ignoredDistance,
 
-        distanceKm:
-          _ignoredDistance,
+      ...filtersWithoutLocation
+    } = filters;
 
-        ...filtersWithoutLocation
-      } = filters;
+    fallbackFilterQuery =
+      buildFilterQuery({
+        ...filtersWithoutLocation,
 
-      fallbackFilterQuery =
-        buildFilterQuery({
-          ...filtersWithoutLocation,
+        familyIncomeIds,
+      });
+  }
 
-          familyIncomeIds,
-        });
-    }
+  console.log(
+    "FALLBACK FILTER QUERY:",
+    JSON.stringify(
+      fallbackFilterQuery,
+      null,
+      2,
+    ),
+  );
 
-    console.log(
-      "FALLBACK FILTER QUERY:",
-      JSON.stringify(
-        fallbackFilterQuery,
-        null,
-        2,
+  const fallbackUserFilters =
+    Object.fromEntries(
+      Object.entries(
+        fallbackFilterQuery
+          .where || {},
+      ).filter(
+        ([key]) =>
+          key !== "profile",
       ),
     );
 
-    const fallbackUserFilters =
-      Object.fromEntries(
-        Object.entries(
-          fallbackFilterQuery
-            .where || {},
-        ).filter(
-          ([key]) =>
-            key !== "profile",
-        ),
-      );
+  const fallbackProfileFilters =
+    fallbackFilterQuery
+      .where?.profile?.is ||
+    {};
 
-    const fallbackProfileFilters =
-      fallbackFilterQuery
-        .where?.profile?.is ||
-      {};
+  // ========================================================
+  // SQL MATCH CONDITIONS
+  // ========================================================
 
-    // ========================================================
-    // SQL MATCH CONDITIONS
-    // ========================================================
+  const orientCol =
+    Prisma.raw(
+      `${ORIENTATION_TABLE}.${ORIENTATION_COL}`,
+    );
 
-    const orientCol =
-      Prisma.raw(
-        `${ORIENTATION_TABLE}.${ORIENTATION_COL}`,
-      );
-
-    const matchConditions =
-      Prisma.sql`
+  const matchConditions =
+    Prisma.sql`
         u.deleted_at IS NULL
 
         AND u.id <> ${userId}::uuid
@@ -1469,8 +1469,8 @@ export const getFeedService = async ({
           ANY(
             ARRAY[
               ${Prisma.join(
-                genderFilter,
-              )}
+      genderFilter,
+    )}
             ]::text[]
           )
 
@@ -1478,8 +1478,8 @@ export const getFeedService = async ({
           ANY(
             ARRAY[
               ${Prisma.join(
-                interestedInFilter,
-              )}
+      interestedInFilter,
+    )}
             ]::text[]
           )
 
@@ -1487,8 +1487,8 @@ export const getFeedService = async ({
           ANY(
             ARRAY[
               ${Prisma.join(
-                orientationForward,
-              )}
+      orientationForward,
+    )}
             ]::text[]
           )
 
@@ -1496,167 +1496,167 @@ export const getFeedService = async ({
           ANY(
             ARRAY[
               ${Prisma.join(
-                orientationReverse,
-              )}
+      orientationReverse,
+    )}
             ]::text[]
           )
       `;
 
-    // ========================================================
-    // REUSABLE SELECT
-    // ========================================================
+  // ========================================================
+  // REUSABLE SELECT
+  // ========================================================
 
-    const userSelect = {
-      id: true,
+  const userSelect = {
+    id: true,
 
-      full_name: true,
+    full_name: true,
 
-      birth_date: true,
+    birth_date: true,
 
-      height: true,
+    height: true,
 
-      created_at: true,
+    created_at: true,
 
-      last_active_at: true,
+    last_active_at: true,
 
-      profile: {
-        select: {
-          city: true,
+    profile: {
+      select: {
+        city: true,
 
-          state: true,
+        state: true,
 
-          country: true,
+        country: true,
 
-          area: true,
+        area: true,
 
-          latitude: true,
+        latitude: true,
 
-          longitude: true,
-        },
+        longitude: true,
       },
+    },
 
-      eduWork: {
-        select: {
-          professionId: true,
+    eduWork: {
+      select: {
+        professionId: true,
 
-          profession: {
-            select: {
-              id: true,
+        profession: {
+          select: {
+            id: true,
 
-              name: true,
-            },
+            name: true,
           },
         },
       },
+    },
 
-      photos: {
-        select: {
-          id: true,
+    photos: {
+      select: {
+        id: true,
 
-          media_url: true,
+        media_url: true,
 
-          media_type: true,
+        media_type: true,
 
-          order: true,
+        order: true,
 
-          is_primary: true,
-        },
-
-        orderBy: {
-          order:
-            "asc" as const,
-        },
-
-        take: 1,
+        is_primary: true,
       },
-    };
 
-    // ========================================================
-    // PAGINATION VARIABLES
-    // ========================================================
+      orderBy: {
+        order:
+          "asc" as const,
+      },
 
-    const batchSize =
-      Math.max(
-        Math.ceil(
-          pageLimit *
-            OVERFETCH,
-        ),
-        30,
-      );
+      take: 1,
+    },
+  };
 
-    const collected:
-      any[] = [];
+  // ========================================================
+  // PAGINATION VARIABLES
+  // ========================================================
 
-    const meterById =
-      new Map<
-        string,
-        number
-      >();
+  const batchSize =
+    Math.max(
+      Math.ceil(
+        pageLimit *
+        OVERFETCH,
+      ),
+      30,
+    );
 
-    let nextCursor:
-      string | null = null;
+  const collected:
+    any[] = [];
 
-    let filledCursor:
+  const meterById =
+    new Map<
+      string,
+      number
+    >();
+
+  let nextCursor:
+    string | null = null;
+
+  let filledCursor:
+    Cursor | null =
+    null;
+
+  let locationFallbackUsed =
+    decodedCursor?.mode ===
+    "FALLBACK";
+
+  // ========================================================
+  // NORMAL LOCATION SEARCH
+  // ========================================================
+
+  /**
+   * If cursor says FALLBACK,
+   * DON'T retry location.
+   *
+   * We already know frontend
+   * is paging through fallback
+   * results.
+   */
+
+  const shouldRunNormalLocationSearch =
+    decodedCursor?.mode !==
+    "FALLBACK";
+
+  if (
+    shouldRunNormalLocationSearch
+  ) {
+    let cursorState:
       Cursor | null =
-      null;
+      decodedCursor;
 
-    let locationFallbackUsed =
-      decodedCursor?.mode ===
-      "FALLBACK";
-
-    // ========================================================
-    // NORMAL LOCATION SEARCH
-    // ========================================================
-
-    /**
-     * If cursor says FALLBACK,
-     * DON'T retry location.
-     *
-     * We already know frontend
-     * is paging through fallback
-     * results.
-     */
-
-    const shouldRunNormalLocationSearch =
-      decodedCursor?.mode !==
-      "FALLBACK";
+    // ======================================================
+    // CASE 1:
+    // MANUAL CITY / STATE / COUNTRY
+    // ======================================================
 
     if (
-      shouldRunNormalLocationSearch
+      hasManualLocationFilter
     ) {
-      let cursorState:
-        Cursor | null =
-        decodedCursor;
+      console.log(
+        "LOCATION MODE: MANUAL CITY/STATE/COUNTRY",
+      );
 
-      // ======================================================
-      // CASE 1:
-      // MANUAL CITY / STATE / COUNTRY
-      // ======================================================
-
-      if (
-        hasManualLocationFilter
+      for (
+        let round = 0;
+        round < MAX_ROUNDS &&
+        collected.length <
+        pageLimit;
+        round++
       ) {
-        console.log(
-          "LOCATION MODE: MANUAL CITY/STATE/COUNTRY",
-        );
+        const candidateStart =
+          performance.now();
 
-        for (
-          let round = 0;
-          round < MAX_ROUNDS &&
-          collected.length <
-            pageLimit;
-          round++
-        ) {
-          const candidateStart =
-            performance.now();
-
-          const rows =
-            await prisma.$queryRaw<
-              {
-                id: string;
-                sort_val: number;
-              }[]
-            >`
+        const rows =
+          await prisma.$queryRaw<
+            {
+              id: string;
+              sort_val: number;
+            }[]
+          >`
               SELECT
                 u.id,
 
@@ -1674,9 +1674,8 @@ export const getFeedService = async ({
               WHERE
                 ${matchConditions}
 
-                ${
-                  cursorState
-                    ? Prisma.sql`
+                ${cursorState
+              ? Prisma.sql`
                         AND (
                           (
                             EXTRACT(
@@ -1696,8 +1695,8 @@ export const getFeedService = async ({
                           )
                         )
                       `
-                    : Prisma.empty
-                }
+              : Prisma.empty
+            }
 
               ORDER BY
                 sort_val DESC,
@@ -1706,579 +1705,10 @@ export const getFeedService = async ({
               LIMIT ${batchSize};
             `;
 
-          console.log(
-            `MANUAL LOCATION candidate round ${round}:`,
-            performance.now() -
-              candidateStart,
-            "ms",
-            "rows:",
-            rows.length,
-          );
-
-          if (
-            rows.length === 0
-          ) {
-            break;
-          }
-
-          const idOrder =
-            rows.map(
-              (row) =>
-                row.id,
-            );
-
-          const hydrateStart =
-            performance.now();
-
-          /**
-           * IMPORTANT:
-           *
-           * This is where actual:
-           *
-           * city = Pune
-           * state = Maharashtra
-           * country = India
-           *
-           * is applied through
-           * buildFilterQuery().
-           */
-
-          const hydrated =
-            await prisma.user.findMany(
-              {
-                where: {
-                  id: {
-                    in: idOrder,
-                  },
-
-                  ...userFilters,
-
-                  ...(Object.keys(
-                    profileFilters,
-                  ).length > 0
-                    ? {
-                        profile: {
-                          is: profileFilters,
-                        },
-                      }
-                    : {}),
-                },
-
-                select:
-                  userSelect,
-              },
-            );
-
-          console.log(
-            `MANUAL LOCATION hydration round ${round}:`,
-            performance.now() -
-              hydrateStart,
-            "ms",
-            "users:",
-            hydrated.length,
-          );
-
-          const byId =
-            new Map(
-              hydrated.map(
-                (user) => [
-                  user.id,
-                  user,
-                ],
-              ),
-            );
-
-          let pageFilled =
-            false;
-
-          for (
-            const row of rows
-          ) {
-            const user =
-              byId.get(
-                row.id,
-              );
-
-            if (!user) {
-              continue;
-            }
-
-            collected.push(
-              user,
-            );
-
-            if (
-              collected.length ===
-              pageLimit
-            ) {
-              filledCursor = {
-                k: Number(
-                  row.sort_val,
-                ),
-
-                id: row.id,
-
-                mode:
-                  "LOCATION",
-              };
-
-              pageFilled =
-                true;
-
-              break;
-            }
-          }
-
-          if (pageFilled) {
-            break;
-          }
-
-          const tail =
-            rows[
-              rows.length -
-                1
-            ];
-
-          cursorState = {
-            k: Number(
-              tail.sort_val,
-            ),
-
-            id: tail.id,
-
-            mode:
-              "LOCATION",
-          };
-
-          if (
-            rows.length <
-            batchSize
-          ) {
-            break;
-          }
-        }
-      }
-
-      // ======================================================
-      // CASE 2:
-      // DISTANCE / LAT / LNG
-      // ======================================================
-
-      else if (
-        validCurrentUserCoordinates
-      ) {
         console.log(
-          "LOCATION MODE: DISTANCE",
-          `${distanceKm} KM`,
-        );
-
-        const me =
-          Prisma.sql`
-            ST_SetSRID(
-              ST_MakePoint(
-                ${myLongitude},
-                ${myLatitude}
-              ),
-              4326
-            )::geography
-          `;
-
-        for (
-          let round = 0;
-          round < MAX_ROUNDS &&
-          collected.length <
-            pageLimit;
-          round++
-        ) {
-          const candidateStart =
-            performance.now();
-
-          const rows =
-            await prisma.$queryRaw<
-              {
-                id: string;
-                sort_val: number;
-              }[]
-            >`
-              SELECT
-                u.id,
-
-                (
-                  p.location::geography
-                  <-> ${me}
-                )::float8
-                  AS sort_val
-
-              FROM users u
-
-              JOIN user_profiles p
-                ON p.user_id = u.id
-
-              WHERE
-                ${matchConditions}
-
-                AND p.location
-                  IS NOT NULL
-
-                AND ST_DWithin(
-                  p.location::geography,
-                  ${me},
-                  ${distanceKm * 1000}
-                )
-
-                ${
-                  cursorState
-                    ? Prisma.sql`
-                        AND (
-                          (
-                            p.location::geography
-                            <-> ${me}
-                          ) > ${cursorState.k}
-
-                          OR (
-                            (
-                              p.location::geography
-                              <-> ${me}
-                            ) = ${cursorState.k}
-
-                            AND u.id >
-                              ${cursorState.id}::uuid
-                          )
-                        )
-                      `
-                    : Prisma.empty
-                }
-
-              ORDER BY
-                p.location::geography
-                  <-> ${me} ASC,
-
-                u.id ASC
-
-              LIMIT ${batchSize};
-            `;
-
-          console.log(
-            `DISTANCE candidate round ${round}:`,
-            performance.now() -
-              candidateStart,
-            "ms",
-            "rows:",
-            rows.length,
-          );
-
-          if (
-            rows.length === 0
-          ) {
-            break;
-          }
-
-          for (
-            const row of rows
-          ) {
-            meterById.set(
-              row.id,
-              Number(
-                row.sort_val,
-              ),
-            );
-          }
-
-          const idOrder =
-            rows.map(
-              (row) =>
-                row.id,
-            );
-
-          const hydrateStart =
-            performance.now();
-
-          const hydrated =
-            await prisma.user.findMany(
-              {
-                where: {
-                  id: {
-                    in: idOrder,
-                  },
-
-                  ...userFilters,
-
-                  ...(Object.keys(
-                    profileFilters,
-                  ).length > 0
-                    ? {
-                        profile: {
-                          is: profileFilters,
-                        },
-                      }
-                    : {}),
-                },
-
-                select:
-                  userSelect,
-              },
-            );
-
-          console.log(
-            `DISTANCE hydration round ${round}:`,
-            performance.now() -
-              hydrateStart,
-            "ms",
-            "users:",
-            hydrated.length,
-          );
-
-          const byId =
-            new Map(
-              hydrated.map(
-                (user) => [
-                  user.id,
-                  user,
-                ],
-              ),
-            );
-
-          let pageFilled =
-            false;
-
-          for (
-            const row of rows
-          ) {
-            const user =
-              byId.get(
-                row.id,
-              );
-
-            if (!user) {
-              continue;
-            }
-
-            collected.push(
-              user,
-            );
-
-            if (
-              collected.length ===
-              pageLimit
-            ) {
-              filledCursor = {
-                k: Number(
-                  row.sort_val,
-                ),
-
-                id: row.id,
-
-                mode:
-                  "LOCATION",
-              };
-
-              pageFilled =
-                true;
-
-              break;
-            }
-          }
-
-          if (pageFilled) {
-            break;
-          }
-
-          const tail =
-            rows[
-              rows.length -
-                1
-            ];
-
-          cursorState = {
-            k: Number(
-              tail.sort_val,
-            ),
-
-            id: tail.id,
-
-            mode:
-              "LOCATION",
-          };
-
-          if (
-            rows.length <
-            batchSize
-          ) {
-            break;
-          }
-        }
-      } else {
-        /**
-         * Current user has no
-         * latitude / longitude.
-         *
-         * Don't query (0,0).
-         *
-         * Directly go to fallback.
-         */
-
-        console.log(
-          "CURRENT USER HAS NO VALID LAT/LNG. SKIPPING DISTANCE AND USING FALLBACK.",
-        );
-      }
-    }
-
-    // ========================================================
-    // LOCATION FALLBACK
-    // ========================================================
-
-    /**
-     * Run fallback when:
-     *
-     * 1. manual location returned 0
-     *
-     * OR
-     *
-     * 2. distance returned 0
-     *
-     * OR
-     *
-     * 3. current user has no lat/lng
-     *
-     * OR
-     *
-     * 4. previous cursor was already
-     *    in FALLBACK mode.
-     */
-
-    if (
-      collected.length === 0
-    ) {
-      locationFallbackUsed =
-        true;
-
-      console.log(
-        "====================================",
-      );
-
-      console.log(
-        "NO USERS FOUND WITH LOCATION.",
-      );
-
-      console.log(
-        "RUNNING FALLBACK WITHOUT LOCATION/DISTANCE.",
-      );
-
-      console.log(
-        "ALL OTHER FILTERS ARE STILL ACTIVE.",
-      );
-
-      console.log(
-        "====================================",
-      );
-
-      /**
-       * If we already returned
-       * fallback page 1,
-       * page 2 should continue
-       * using its fallback cursor.
-       *
-       * Otherwise fallback starts
-       * fresh.
-       */
-
-      let fallbackCursorState:
-        Cursor | null =
-        decodedCursor?.mode ===
-        "FALLBACK"
-          ? decodedCursor
-          : null;
-
-      // clear distance because
-      // fallback users may not have it
-      meterById.clear();
-
-      for (
-        let round = 0;
-        round < MAX_ROUNDS &&
-        collected.length <
-          pageLimit;
-        round++
-      ) {
-        const candidateStart =
-          performance.now();
-
-        /**
-         * IMPORTANT:
-         *
-         * NO:
-         *
-         * ST_DWithin()
-         *
-         * NO:
-         *
-         * city/state/country
-         *
-         * Only base compatibility
-         * conditions here.
-         */
-
-        const rows =
-          await prisma.$queryRaw<
-            {
-              id: string;
-              sort_val: number;
-            }[]
-          >`
-            SELECT
-              u.id,
-
-              (
-                EXTRACT(
-                  EPOCH FROM u.created_at
-                ) * 1000
-              )::float8
-                AS sort_val
-
-            FROM users u
-
-            JOIN user_profiles p
-              ON p.user_id = u.id
-
-            WHERE
-              ${matchConditions}
-
-              ${
-                fallbackCursorState
-                  ? Prisma.sql`
-                      AND (
-                        (
-                          EXTRACT(
-                            EPOCH FROM u.created_at
-                          ) * 1000
-                        ) < ${fallbackCursorState.k}
-
-                        OR (
-                          (
-                            EXTRACT(
-                              EPOCH FROM u.created_at
-                            ) * 1000
-                          ) = ${fallbackCursorState.k}
-
-                          AND u.id <
-                            ${fallbackCursorState.id}::uuid
-                        )
-                      )
-                    `
-                  : Prisma.empty
-              }
-
-            ORDER BY
-              sort_val DESC,
-              u.id DESC
-
-            LIMIT ${batchSize};
-          `;
-
-        console.log(
-          `FALLBACK candidate round ${round}:`,
+          `MANUAL LOCATION candidate round ${round}:`,
           performance.now() -
-            candidateStart,
+          candidateStart,
           "ms",
           "rows:",
           rows.length,
@@ -2300,14 +1730,16 @@ export const getFeedService = async ({
           performance.now();
 
         /**
-         * Here we're using:
+         * IMPORTANT:
          *
-         * fallbackUserFilters
-         * +
-         * fallbackProfileFilters
+         * This is where actual:
          *
-         * Therefore location is gone,
-         * but every other filter stays.
+         * city = Pune
+         * state = Maharashtra
+         * country = India
+         *
+         * is applied through
+         * buildFilterQuery().
          */
 
         const hydrated =
@@ -2318,17 +1750,16 @@ export const getFeedService = async ({
                   in: idOrder,
                 },
 
-                ...fallbackUserFilters,
+                ...userFilters,
 
                 ...(Object.keys(
-                  fallbackProfileFilters,
+                  profileFilters,
                 ).length > 0
                   ? {
-                      profile: {
-                        is:
-                          fallbackProfileFilters,
-                      },
-                    }
+                    profile: {
+                      is: profileFilters,
+                    },
+                  }
                   : {}),
               },
 
@@ -2338,9 +1769,9 @@ export const getFeedService = async ({
           );
 
         console.log(
-          `FALLBACK hydration round ${round}:`,
+          `MANUAL LOCATION hydration round ${round}:`,
           performance.now() -
-            hydrateStart,
+          hydrateStart,
           "ms",
           "users:",
           hydrated.length,
@@ -2387,7 +1818,7 @@ export const getFeedService = async ({
               id: row.id,
 
               mode:
-                "FALLBACK",
+                "LOCATION",
             };
 
             pageFilled =
@@ -2403,21 +1834,20 @@ export const getFeedService = async ({
 
         const tail =
           rows[
-            rows.length -
-              1
+          rows.length -
+          1
           ];
 
-        fallbackCursorState =
-          {
-            k: Number(
-              tail.sort_val,
-            ),
+        cursorState = {
+          k: Number(
+            tail.sort_val,
+          ),
 
-            id: tail.id,
+          id: tail.id,
 
-            mode:
-              "FALLBACK",
-          };
+          mode:
+            "LOCATION",
+        };
 
         if (
           rows.length <
@@ -2428,414 +1858,994 @@ export const getFeedService = async ({
       }
     }
 
-    // ========================================================
-    // STILL NO USERS
-    // ========================================================
+    // ======================================================
+    // CASE 2:
+    // DISTANCE / LAT / LNG
+    // ======================================================
 
-    if (
-      collected.length === 0
+    else if (
+      validCurrentUserCoordinates
     ) {
-      return {
-        users: [],
-
-        nextCursor: null,
-
-        locationFallbackUsed,
-      };
-    }
-
-    // ========================================================
-    // PAGE
-    // ========================================================
-
-    const page =
-      collected.slice(
-        0,
-        pageLimit,
+      console.log(
+        "LOCATION MODE: DISTANCE",
+        `${distanceKm} KM`,
       );
 
-    if (filledCursor) {
-      nextCursor =
-        encodeCursor(
-          filledCursor,
+      const me =
+        Prisma.sql`
+            ST_SetSRID(
+              ST_MakePoint(
+                ${myLongitude},
+                ${myLatitude}
+              ),
+              4326
+            )::geography
+          `;
+
+      for (
+        let round = 0;
+        round < MAX_ROUNDS &&
+        collected.length <
+        pageLimit;
+        round++
+      ) {
+        const candidateStart =
+          performance.now();
+
+        const rows =
+          await prisma.$queryRaw<
+            {
+              id: string;
+              sort_val: number;
+            }[]
+          >`
+              SELECT
+                u.id,
+
+                (
+                  p.location::geography
+                  <-> ${me}
+                )::float8
+                  AS sort_val
+
+              FROM users u
+
+              JOIN user_profiles p
+                ON p.user_id = u.id
+
+              WHERE
+                ${matchConditions}
+
+                AND p.location
+                  IS NOT NULL
+
+                AND ST_DWithin(
+                  p.location::geography,
+                  ${me},
+                  ${distanceKm * 1000}
+                )
+
+                ${cursorState
+              ? Prisma.sql`
+                        AND (
+                          (
+                            p.location::geography
+                            <-> ${me}
+                          ) > ${cursorState.k}
+
+                          OR (
+                            (
+                              p.location::geography
+                              <-> ${me}
+                            ) = ${cursorState.k}
+
+                            AND u.id >
+                              ${cursorState.id}::uuid
+                          )
+                        )
+                      `
+              : Prisma.empty
+            }
+
+              ORDER BY
+                p.location::geography
+                  <-> ${me} ASC,
+
+                u.id ASC
+
+              LIMIT ${batchSize};
+            `;
+
+        console.log(
+          `DISTANCE candidate round ${round}:`,
+          performance.now() -
+          candidateStart,
+          "ms",
+          "rows:",
+          rows.length,
         );
-    }
 
-    const candidateIds =
-      page.map(
-        (user) =>
-          user.id,
-      );
+        if (
+          rows.length === 0
+        ) {
+          break;
+        }
 
-    // ========================================================
-    // BOOSTS
-    // ========================================================
+        for (
+          const row of rows
+        ) {
+          meterById.set(
+            row.id,
+            Number(
+              row.sort_val,
+            ),
+          );
+        }
 
-    const boostStart =
-      performance.now();
+        const idOrder =
+          rows.map(
+            (row) =>
+              row.id,
+          );
 
-    const boostQuery =
-      await prisma.boostUsage.findMany(
-        {
-          where: {
-            user_id: {
-              in: candidateIds,
+        const hydrateStart =
+          performance.now();
+
+        const hydrated =
+          await prisma.user.findMany(
+            {
+              where: {
+                id: {
+                  in: idOrder,
+                },
+
+                ...userFilters,
+
+                ...(Object.keys(
+                  profileFilters,
+                ).length > 0
+                  ? {
+                    profile: {
+                      is: profileFilters,
+                    },
+                  }
+                  : {}),
+              },
+
+              select:
+                userSelect,
             },
+          );
 
-            is_active: true,
+        console.log(
+          `DISTANCE hydration round ${round}:`,
+          performance.now() -
+          hydrateStart,
+          "ms",
+          "users:",
+          hydrated.length,
+        );
 
-            ended_at: {
-              gt: now,
-            },
-          },
+        const byId =
+          new Map(
+            hydrated.map(
+              (user) => [
+                user.id,
+                user,
+              ],
+            ),
+          );
 
-          select: {
-            user_id: true,
-          },
-        },
-      );
+        let pageFilled =
+          false;
 
-    console.log(
-      "boosts:",
-      performance.now() -
-        boostStart,
-      "ms",
-    );
-
-    const boostedUserIds =
-      new Set(
-        boostQuery.map(
-          (boost) =>
-            boost.user_id,
-        ),
-      );
-
-    // ========================================================
-    // PRESENCE
-    // ========================================================
-
-    const presenceStart =
-      performance.now();
-
-    const presenceMap =
-      await getUsersPresence(
-        candidateIds,
-      );
-
-    console.log(
-      "presence:",
-      performance.now() -
-        presenceStart,
-      "ms",
-    );
-
-    // ========================================================
-    // COMPATIBILITY SCORE
-    // ========================================================
-
-    const compatibilityStart =
-      performance.now();
-
-    const compatibilityScores =
-      await prisma.userCompatibility.findMany(
-        {
-          where: {
-            userId,
-
-            targetUserId: {
-              in: candidateIds,
-            },
-          },
-
-          select: {
-            targetUserId: true,
-
-            score: true,
-
-            percentage: true,
-          },
-        },
-      );
-
-    console.log(
-      "compatibility scores:",
-      performance.now() -
-        compatibilityStart,
-      "ms",
-    );
-
-    const compatibilityMap =
-      new Map(
-        compatibilityScores.map(
-          (compatibility) => [
-            compatibility.targetUserId,
-            compatibility,
-          ],
-        ),
-      );
-
-    // ========================================================
-    // ENRICH USERS
-    // ========================================================
-
-    const nowMs =
-      Date.now();
-
-    const boostWindow =
-      NEW_USER_BOOST_HOURS *
-      60 *
-      60 *
-      1000;
-
-    const enriched =
-      page.map(
-        (user) => {
-          const presence =
-            presenceMap[
-              user.id
-            ];
-
-          const meters =
-            meterById.get(
-              user.id,
+        for (
+          const row of rows
+        ) {
+          const user =
+            byId.get(
+              row.id,
             );
 
-          const compat =
-            compatibilityMap.get(
-              user.id,
-            );
+          if (!user) {
+            continue;
+          }
 
-          const matchScore =
-            compat?.percentage ??
-            0;
+          collected.push(
+            user,
+          );
 
-          const compatibilityScore =
-            compat?.score ?? 0;
-
-          return {
-            id: user.id,
-
-            full_name:
-              user.full_name,
-
-            birth_date:
-              formatBirthDate(
-                user.birth_date,
+          if (
+            collected.length ===
+            pageLimit
+          ) {
+            filledCursor = {
+              k: Number(
+                row.sort_val,
               ),
 
-            age: calculateAge(
+              id: row.id,
+
+              mode:
+                "LOCATION",
+            };
+
+            pageFilled =
+              true;
+
+            break;
+          }
+        }
+
+        if (pageFilled) {
+          break;
+        }
+
+        const tail =
+          rows[
+          rows.length -
+          1
+          ];
+
+        cursorState = {
+          k: Number(
+            tail.sort_val,
+          ),
+
+          id: tail.id,
+
+          mode:
+            "LOCATION",
+        };
+
+        if (
+          rows.length <
+          batchSize
+        ) {
+          break;
+        }
+      }
+    } else {
+      /**
+       * Current user has no
+       * latitude / longitude.
+       *
+       * Don't query (0,0).
+       *
+       * Directly go to fallback.
+       */
+
+      console.log(
+        "CURRENT USER HAS NO VALID LAT/LNG. SKIPPING DISTANCE AND USING FALLBACK.",
+      );
+    }
+  }
+
+  // ========================================================
+  // LOCATION FALLBACK
+  // ========================================================
+
+  /**
+   * Run fallback when:
+   *
+   * 1. manual location returned 0
+   *
+   * OR
+   *
+   * 2. distance returned 0
+   *
+   * OR
+   *
+   * 3. current user has no lat/lng
+   *
+   * OR
+   *
+   * 4. previous cursor was already
+   *    in FALLBACK mode.
+   */
+
+  if (
+    collected.length === 0
+  ) {
+    locationFallbackUsed =
+      true;
+
+    console.log(
+      "====================================",
+    );
+
+    console.log(
+      "NO USERS FOUND WITH LOCATION.",
+    );
+
+    console.log(
+      "RUNNING FALLBACK WITHOUT LOCATION/DISTANCE.",
+    );
+
+    console.log(
+      "ALL OTHER FILTERS ARE STILL ACTIVE.",
+    );
+
+    console.log(
+      "====================================",
+    );
+
+    /**
+     * If we already returned
+     * fallback page 1,
+     * page 2 should continue
+     * using its fallback cursor.
+     *
+     * Otherwise fallback starts
+     * fresh.
+     */
+
+    let fallbackCursorState:
+      Cursor | null =
+      decodedCursor?.mode ===
+        "FALLBACK"
+        ? decodedCursor
+        : null;
+
+    // clear distance because
+    // fallback users may not have it
+    meterById.clear();
+
+    for (
+      let round = 0;
+      round < MAX_ROUNDS &&
+      collected.length <
+      pageLimit;
+      round++
+    ) {
+      const candidateStart =
+        performance.now();
+
+      /**
+       * IMPORTANT:
+       *
+       * NO:
+       *
+       * ST_DWithin()
+       *
+       * NO:
+       *
+       * city/state/country
+       *
+       * Only base compatibility
+       * conditions here.
+       */
+
+      const rows =
+        await prisma.$queryRaw<
+          {
+            id: string;
+            sort_val: number;
+          }[]
+        >`
+            SELECT
+              u.id,
+
+              (
+                EXTRACT(
+                  EPOCH FROM u.created_at
+                ) * 1000
+              )::float8
+                AS sort_val
+
+            FROM users u
+
+            JOIN user_profiles p
+              ON p.user_id = u.id
+
+            WHERE
+              ${matchConditions}
+
+              ${fallbackCursorState
+            ? Prisma.sql`
+                      AND (
+                        (
+                          EXTRACT(
+                            EPOCH FROM u.created_at
+                          ) * 1000
+                        ) < ${fallbackCursorState.k}
+
+                        OR (
+                          (
+                            EXTRACT(
+                              EPOCH FROM u.created_at
+                            ) * 1000
+                          ) = ${fallbackCursorState.k}
+
+                          AND u.id <
+                            ${fallbackCursorState.id}::uuid
+                        )
+                      )
+                    `
+            : Prisma.empty
+          }
+
+            ORDER BY
+              sort_val DESC,
+              u.id DESC
+
+            LIMIT ${batchSize};
+          `;
+
+      console.log(
+        `FALLBACK candidate round ${round}:`,
+        performance.now() -
+        candidateStart,
+        "ms",
+        "rows:",
+        rows.length,
+      );
+
+      if (
+        rows.length === 0
+      ) {
+        break;
+      }
+
+      const idOrder =
+        rows.map(
+          (row) =>
+            row.id,
+        );
+
+      const hydrateStart =
+        performance.now();
+
+      /**
+       * Here we're using:
+       *
+       * fallbackUserFilters
+       * +
+       * fallbackProfileFilters
+       *
+       * Therefore location is gone,
+       * but every other filter stays.
+       */
+
+      const hydrated =
+        await prisma.user.findMany(
+          {
+            where: {
+              id: {
+                in: idOrder,
+              },
+
+              ...fallbackUserFilters,
+
+              ...(Object.keys(
+                fallbackProfileFilters,
+              ).length > 0
+                ? {
+                  profile: {
+                    is:
+                      fallbackProfileFilters,
+                  },
+                }
+                : {}),
+            },
+
+            select:
+              userSelect,
+          },
+        );
+
+      console.log(
+        `FALLBACK hydration round ${round}:`,
+        performance.now() -
+        hydrateStart,
+        "ms",
+        "users:",
+        hydrated.length,
+      );
+
+      const byId =
+        new Map(
+          hydrated.map(
+            (user) => [
+              user.id,
+              user,
+            ],
+          ),
+        );
+
+      let pageFilled =
+        false;
+
+      for (
+        const row of rows
+      ) {
+        const user =
+          byId.get(
+            row.id,
+          );
+
+        if (!user) {
+          continue;
+        }
+
+        collected.push(
+          user,
+        );
+
+        if (
+          collected.length ===
+          pageLimit
+        ) {
+          filledCursor = {
+            k: Number(
+              row.sort_val,
+            ),
+
+            id: row.id,
+
+            mode:
+              "FALLBACK",
+          };
+
+          pageFilled =
+            true;
+
+          break;
+        }
+      }
+
+      if (pageFilled) {
+        break;
+      }
+
+      const tail =
+        rows[
+        rows.length -
+        1
+        ];
+
+      fallbackCursorState =
+      {
+        k: Number(
+          tail.sort_val,
+        ),
+
+        id: tail.id,
+
+        mode:
+          "FALLBACK",
+      };
+
+      if (
+        rows.length <
+        batchSize
+      ) {
+        break;
+      }
+    }
+  }
+
+  // ========================================================
+  // STILL NO USERS
+  // ========================================================
+
+  if (
+    collected.length === 0
+  ) {
+    return {
+      users: [],
+
+      nextCursor: null,
+
+      locationFallbackUsed,
+    };
+  }
+
+  // ========================================================
+  // PAGE
+  // ========================================================
+
+  const page =
+    collected.slice(
+      0,
+      pageLimit,
+    );
+
+  if (filledCursor) {
+    nextCursor =
+      encodeCursor(
+        filledCursor,
+      );
+  }
+
+  const candidateIds =
+    page.map(
+      (user) =>
+        user.id,
+    );
+
+  // ========================================================
+  // BOOSTS
+  // ========================================================
+
+  const boostStart =
+    performance.now();
+
+  const boostQuery =
+    await prisma.boostUsage.findMany(
+      {
+        where: {
+          user_id: {
+            in: candidateIds,
+          },
+
+          is_active: true,
+
+          ended_at: {
+            gt: now,
+          },
+        },
+
+        select: {
+          user_id: true,
+        },
+      },
+    );
+
+  console.log(
+    "boosts:",
+    performance.now() -
+    boostStart,
+    "ms",
+  );
+
+  const boostedUserIds =
+    new Set(
+      boostQuery.map(
+        (boost) =>
+          boost.user_id,
+      ),
+    );
+
+  // ========================================================
+  // PRESENCE
+  // ========================================================
+
+  const presenceStart =
+    performance.now();
+
+  const presenceMap =
+    await getUsersPresence(
+      candidateIds,
+    );
+
+  console.log(
+    "presence:",
+    performance.now() -
+    presenceStart,
+    "ms",
+  );
+
+  // ========================================================
+  // COMPATIBILITY SCORE
+  // ========================================================
+
+  const compatibilityStart =
+    performance.now();
+
+  const compatibilityScores =
+    await prisma.userCompatibility.findMany(
+      {
+        where: {
+          userId,
+
+          targetUserId: {
+            in: candidateIds,
+          },
+        },
+
+        select: {
+          targetUserId: true,
+
+          score: true,
+
+          percentage: true,
+        },
+      },
+    );
+
+  console.log(
+    "compatibility scores:",
+    performance.now() -
+    compatibilityStart,
+    "ms",
+  );
+
+  const compatibilityMap =
+    new Map(
+      compatibilityScores.map(
+        (compatibility) => [
+          compatibility.targetUserId,
+          compatibility,
+        ],
+      ),
+    );
+
+  // ========================================================
+  // ENRICH USERS
+  // ========================================================
+
+  const nowMs =
+    Date.now();
+
+  const boostWindow =
+    NEW_USER_BOOST_HOURS *
+    60 *
+    60 *
+    1000;
+
+  const enriched =
+    page.map(
+      (user) => {
+        const presence =
+          presenceMap[
+          user.id
+          ];
+
+        const meters =
+          meterById.get(
+            user.id,
+          );
+
+        const compat =
+          compatibilityMap.get(
+            user.id,
+          );
+
+        const matchScore =
+          compat?.percentage ??
+          0;
+
+        const compatibilityScore =
+          compat?.score ?? 0;
+
+        return {
+          id: user.id,
+
+          full_name:
+            user.full_name,
+
+          birth_date:
+            formatBirthDate(
               user.birth_date,
             ),
 
-            height:
-              user.height,
+          age: calculateAge(
+            user.birth_date,
+          ),
 
-            created_at:
-              user.created_at,
+          height:
+            user.height,
 
-            last_active_at:
-              user.last_active_at,
+          created_at:
+            user.created_at,
 
-            profile: {
-              city:
-                user.profile
-                  ?.city ||
-                null,
+          last_active_at:
+            user.last_active_at,
 
-              state:
-                user.profile
-                  ?.state ||
-                null,
-
-              country:
-                user.profile
-                  ?.country ||
-                null,
-
-              latitude:
-                user.profile
-                  ?.latitude ||
-                null,
-
-              longitude:
-                user.profile
-                  ?.longitude ||
-                null,
-            },
-
-            eduWork: {
-              professionId:
-                user.eduWork
-                  ?.professionId ||
-                null,
-
-              profession:
-                user.eduWork
-                  ?.profession ||
-                null,
-            },
-
-            photos:
-              user.photos ||
-              [],
-
-            matchScore,
-
-            compatibilityScore,
-
-            /**
-             * Distance is available
-             * only when actual
-             * distance mode was used.
-             *
-             * For:
-             *
-             * manual city mode
-             * fallback mode
-             *
-             * distance is null.
-             */
-
-            distanceKm:
-              meters != null
-                ? Math.round(
-                    (
-                      meters /
-                      1000
-                    ) *
-                      100,
-                  ) / 100
-                : null,
-
-            trust:
-              STATIC_TRUST,
-
-            replyTime:
-              STATIC_REPLY_TIME,
-
-            isOnline:
-              presence?.isOnline ||
-              false,
-
-            lastActiveAt:
-              presence?.lastActiveAt ||
+          profile: {
+            city:
+              user.profile
+                ?.city ||
               null,
 
-            lastSeen:
-              formatLastSeen(
-                presence?.lastActiveAt,
-              ),
+            state:
+              user.profile
+                ?.state ||
+              null,
 
-            isBoosted:
-              boostedUserIds.has(
-                user.id,
-              ),
-          };
-        },
-      );
+            country:
+              user.profile
+                ?.country ||
+              null,
 
-    // ========================================================
-    // SORT RETURNED PAGE
-    // ========================================================
+            latitude:
+              user.profile
+                ?.latitude ||
+              null,
 
-    const sortedUsers =
-      enriched.sort(
-        (a, b) => {
-          const aActivity =
-            a.lastActiveAt
-              ?.getTime() ||
-            0;
+            longitude:
+              user.profile
+                ?.longitude ||
+              null,
+          },
 
-          const bActivity =
-            b.lastActiveAt
-              ?.getTime() ||
-            0;
+          eduWork: {
+            professionId:
+              user.eduWork
+                ?.professionId ||
+              null,
 
-          const aCreated =
-            a.created_at
-              ? new Date(
-                  a.created_at,
-                ).getTime()
-              : 0;
+            profession:
+              user.eduWork
+                ?.profession ||
+              null,
+          },
 
-          const bCreated =
-            b.created_at
-              ? new Date(
-                  b.created_at,
-                ).getTime()
-              : 0;
+          photos:
+            user.photos ||
+            [],
 
-          const aIsNew =
-            nowMs -
-              aCreated <
-            boostWindow;
+          matchScore,
 
-          const bIsNew =
-            nowMs -
-              bCreated <
-            boostWindow;
+          compatibilityScore,
 
-          // 1. BOOSTED FIRST
-          if (
-            a.isBoosted !==
-            b.isBoosted
-          ) {
-            return a.isBoosted
-              ? -1
-              : 1;
-          }
+          /**
+           * Distance is available
+           * only when actual
+           * distance mode was used.
+           *
+           * For:
+           *
+           * manual city mode
+           * fallback mode
+           *
+           * distance is null.
+           */
 
-          // 2. NEW USERS
-          if (
-            aIsNew !==
-            bIsNew
-          ) {
-            return aIsNew
-              ? -1
-              : 1;
-          }
+          distanceKm:
+            meters != null
+              ? Math.round(
+                (
+                  meters /
+                  1000
+                ) *
+                100,
+              ) / 100
+              : null,
 
-          // 3. MATCH SCORE
-          if (
-            a.matchScore !==
-            b.matchScore
-          ) {
-            return (
-              b.matchScore -
-              a.matchScore
-            );
-          }
+          trust:
+            STATIC_TRUST,
 
-          // 4. ACTIVE USERS
+          replyTime:
+            STATIC_REPLY_TIME,
+
+          isOnline:
+            presence?.isOnline ||
+            false,
+
+          lastActiveAt:
+            presence?.lastActiveAt ||
+            null,
+
+          lastSeen:
+            formatLastSeen(
+              presence?.lastActiveAt,
+            ),
+
+          isBoosted:
+            boostedUserIds.has(
+              user.id,
+            ),
+        };
+      },
+    );
+
+  // ========================================================
+  // SORT RETURNED PAGE
+  // ========================================================
+
+  const sortedUsers =
+    enriched.sort(
+      (a, b) => {
+        const aActivity =
+          a.lastActiveAt
+            ?.getTime() ||
+          0;
+
+        const bActivity =
+          b.lastActiveAt
+            ?.getTime() ||
+          0;
+
+        const aCreated =
+          a.created_at
+            ? new Date(
+              a.created_at,
+            ).getTime()
+            : 0;
+
+        const bCreated =
+          b.created_at
+            ? new Date(
+              b.created_at,
+            ).getTime()
+            : 0;
+
+        const aIsNew =
+          nowMs -
+          aCreated <
+          boostWindow;
+
+        const bIsNew =
+          nowMs -
+          bCreated <
+          boostWindow;
+
+        // 1. BOOSTED FIRST
+        if (
+          a.isBoosted !==
+          b.isBoosted
+        ) {
+          return a.isBoosted
+            ? -1
+            : 1;
+        }
+
+        // 2. NEW USERS
+        if (
+          aIsNew !==
+          bIsNew
+        ) {
+          return aIsNew
+            ? -1
+            : 1;
+        }
+
+        // 3. MATCH SCORE
+        if (
+          a.matchScore !==
+          b.matchScore
+        ) {
           return (
-            bActivity -
-            aActivity
+            b.matchScore -
+            a.matchScore
           );
-        },
-      );
+        }
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+        // 4. ACTIVE USERS
+        return (
+          bActivity -
+          aActivity
+        );
+      },
+    );
 
-    return {
-      users: sortedUsers,
+  // ========================================================
+  // TRACK BOOST IMPRESSIONS
+  // ========================================================
 
-      nextCursor,
+  const boostedVisibleUsers = sortedUsers.filter(
+    (feedUser) =>
+      feedUser.isBoosted &&
+      feedUser.id !== userId
+  );
 
-      /**
-       * false:
-       * users came from preferred
-       * city/distance.
-       *
-       * true:
-       * location produced zero
-       * users, so location was
-       * removed.
-       */
-      locationFallbackUsed,
-    };
+  Promise.all(
+    boostedVisibleUsers.map((feedUser) =>
+      trackBoostEvent({
+        targetUserId: feedUser.id,
+        actorId: userId,
+        type: "IMPRESSION", // see note below
+      })
+    )
+  ).catch((error) => {
+    console.error(
+      "Boost impression tracking error:",
+      error
+    );
+  });
+
+  // ========================================================
+  // RESPONSE
+  // ========================================================
+
+  return {
+    users: sortedUsers,
+    nextCursor,
+    locationFallbackUsed,
   };
+};
 
 export const getFeedDetailsService = async (
   userId: string,
@@ -2862,13 +2872,13 @@ export const getFeedDetailsService = async (
     console.log("✅ Feed Details from Redis");
 
     // Track even when profile comes from Redis
-    // if (shouldTrackProfileView) {
-    //   await trackBoostEvent({
-    //     boostedUserId: userId,       // Profile owner
-    //     actorId: currentUserId,      // Person viewing profile
-    //     eventType: BoostEventType.PROFILE_VIEW,
-    //   });
-    // }
+    if (shouldTrackProfileView) {
+      await trackBoostEvent({
+        targetUserId: userId,       // Profile owner
+        actorId: currentUserId,      // Person viewing profile
+        type: "PROFILE_VIEW",
+      });
+    }
 
     return cachedFeedDetails;
   }
@@ -2878,7 +2888,7 @@ export const getFeedDetailsService = async (
   // =====================================================
 
   console.log("📦 Feed Details from Database");
-    
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -2965,18 +2975,18 @@ export const getFeedDetailsService = async (
 
   console.log("💾 Feed Details cached");
 
- // =====================================================
+  // =====================================================
   // 6. TRACK BOOST PROFILE VIEW
   // =====================================================
 
-  // if (shouldTrackProfileView) {
+  if (shouldTrackProfileView) {
 
-  //   await trackBoostEvent({
-  //     boostedUserId: userId,
-  //     actorId: currentUserId,
-  //     eventType: BoostEventType.PROFILE_VIEW,
-  //   });
-  // }
+    await trackBoostEvent({
+      targetUserId: userId,
+      actorId: currentUserId,
+      type: "PROFILE_VIEW",
+    });
+  }
 
   // =====================================================
   // 7. RETURN
@@ -3020,7 +3030,7 @@ const transformUserData = (user: any): UserFeedResponse => {
     fullName: user.full_name,
     age: age,
     gender: user.gender,
-    phone_number:user.phone_number,
+    phone_number: user.phone_number,
 
     // Static values
     matchScore: STATIC_MATCH_SCORE,

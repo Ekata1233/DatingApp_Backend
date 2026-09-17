@@ -7,6 +7,7 @@ import {
   checkReverseLike,
   checkReverseLikeRedis,
 } from "./swipe.repository";
+import { trackBoostEvent } from "../boost/boost.tracker";
 
 export const handleSwipe = async (data: {
   swiperId: string;
@@ -55,6 +56,14 @@ export const handleSwipe = async (data: {
 
     // Cache (do not fail request if Redis is down)
     cacheSwipe(swiperId, targetUserId).catch(console.error);
+    // ==========================================
+    // BOOST ANALYTICS - PASS
+    // ==========================================
+    trackBoostEvent({
+      targetUserId,
+      actorId: swiperId,
+      type: "PASS",
+    }).catch(console.error);
 
     return { matched: false };
   }
@@ -120,6 +129,19 @@ export const handleSwipe = async (data: {
     cacheSwipe(swiperId, targetUserId).catch(console.error);
     console.log("after cacge transaction : ")
     console.log("before notification swipe transaction : ")
+
+    // ==========================================
+    // BOOST ANALYTICS
+    // ==========================================
+
+    trackBoostEvent({
+      targetUserId,
+      actorId: swiperId,
+      type:
+        action === "SUPERLIKE"
+          ? "SUPERLIKE"
+          : "LIKE",
+    }).catch(console.error);
 
     // Fire-and-forget notification
     createNotification({
@@ -242,6 +264,26 @@ export const handleSwipe = async (data: {
     targetUserId,
     action,
   });
+
+  // ============================================================
+  // BOOST ANALYTICS - MATCH
+  // Check both users because either user can have active boost
+  // ============================================================
+
+  Promise.all([
+    trackBoostEvent({
+      targetUserId,
+      actorId: swiperId,
+      type: "MATCH",
+    }),
+
+    trackBoostEvent({
+      targetUserId: swiperId,
+      actorId: targetUserId,
+      type: "MATCH",
+    }),
+  ]).catch(console.error);
+
   // ------------------------------------------------------------
   // Fire-and-forget match notifications
   // ------------------------------------------------------------

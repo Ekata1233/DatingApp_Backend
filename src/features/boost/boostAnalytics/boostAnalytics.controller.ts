@@ -1,4 +1,5 @@
 import { getBoostHistoryService, getBoostPerformanceService } from "./boostAnalytics.service";
+import { Request, Response } from "express";
 
 export const getBoostHistoryController = async (
   req: Request,
@@ -48,40 +49,34 @@ export const getBoostPerformanceController = async (
   res: Response
 ) => {
   try {
+    const userId = (req as any).user.id;
+    const usageId = req.params.usageId as string;
 
-    const userId = req.user!.id;
-    const { usageId } = req.params;
-
-    const data =
-      await getBoostPerformanceService(
-        userId,
-        usageId
-      );
+    const data = await getBoostPerformanceService(
+      userId,
+      usageId
+    );
 
     return res.status(200).json({
       success: true,
-      message:
-        "Boost performance fetched successfully",
+      message: "Boost performance fetched successfully",
       data,
     });
 
   } catch (error: any) {
 
-    if (
-      error.message ===
-      "BOOST_USAGE_NOT_FOUND"
-    ) {
+    if (error.message === "BOOST_USAGE_NOT_FOUND") {
       return res.status(404).json({
         success: false,
-        message:
-          "Boost report not found",
+        message: "Boost report not found",
       });
     }
 
+    console.error("Boost Performance Error:", error);
+
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch boost performance",
+      message: "Failed to fetch boost performance",
     });
   }
 };
