@@ -99,7 +99,10 @@ export const activateBoostService = async (userId: string, user_boost_id: string
         user_id: userId,
         duration,
         started_at: now,
-        ended_at: endTime,
+
+        expected_end_at: endTime, // ✅ required field
+
+        ended_at: null,
         is_active: true,
       },
     });
