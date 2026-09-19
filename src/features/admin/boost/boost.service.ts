@@ -529,47 +529,60 @@ export const getMyBoostService = async (
   userId: string,
   type?: BoostType
 ) => {
-  const userBoost = await prisma.userBoost.findFirst({
+  const boostType = type ?? BoostType.BOOST;
+
+  // =====================================================
+  // 1. GET BOOST MASTER DATA
+  //    This does NOT depend on UserBoost
+  // =====================================================
+  const boost = await prisma.boost.findUnique({
     where: {
-      user_id: userId,
-      is_active: true,
-
-      ...(type && {
-        Boost: {
-          is: {
-            name: type,
-          },
-        },
-      }),
+      name: boostType,
     },
-
-    orderBy: {
-      created_at: "desc",
-    },
-
     select: {
-      remaining_boosts: true,
-      expires_at: true,
-
-      Boost: {
-        select: {
-          benefits: true,
-        },
-      },
+      id: true,
+      name: true,
+      benefits: true,
     },
   });
 
-  if (!userBoost) {
-    return {
-      benefits: null,
-      remaining_boosts: 0,
-      expires_at: null,
-    };
+  if (!boost) {
+    throw new Error(`Boost type ${boostType} not found`);
   }
 
+  // =====================================================
+  // 2. CHECK IF USER HAS THIS BOOST
+  //    SUPER may not exist here, and that's OK
+  // =====================================================
+  const userBoost = await prisma.userBoost.findFirst({
+    where: {
+      user_id: userId,
+      boostId: boost.id,
+      is_active: true,
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+    select: {
+      id: true,
+      remaining_boosts: true,
+      expires_at: true,
+    },
+  });
+
+  // =====================================================
+  // 3. ALWAYS RETURN BENEFITS FROM BOOST TABLE
+  // =====================================================
   return {
-    benefits: userBoost.Boost?.benefits ?? null,
-    remaining_boosts: userBoost.remaining_boosts,
-    expires_at: userBoost.expires_at,
+    user_boost_id: userBoost?.id ?? null,
+
+    name: boost.name,
+
+    // Always comes from Boost table
+    benefits: boost.benefits ?? null,
+
+    // Comes from UserBoost only if available
+    remaining_boosts: userBoost?.remaining_boosts ?? 0,
+    expires_at: userBoost?.expires_at ?? null,
   };
 };
