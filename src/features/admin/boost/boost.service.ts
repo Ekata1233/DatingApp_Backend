@@ -531,10 +531,7 @@ export const getMyBoostService = async (
 ) => {
   const boostType = type ?? BoostType.BOOST;
 
-  // =====================================================
-  // 1. GET BOOST MASTER DATA
-  //    This does NOT depend on UserBoost
-  // =====================================================
+  // 1. Get Boost information
   const boost = await prisma.boost.findUnique({
     where: {
       name: boostType,
@@ -550,15 +547,11 @@ export const getMyBoostService = async (
     throw new Error(`Boost type ${boostType} not found`);
   }
 
-  // =====================================================
-  // 2. CHECK IF USER HAS THIS BOOST
-  //    SUPER may not exist here, and that's OK
-  // =====================================================
+  // 2. Get user's BOOST wallet
   const userBoost = await prisma.userBoost.findFirst({
     where: {
       user_id: userId,
       boostId: boost.id,
-      is_active: true,
     },
     orderBy: {
       created_at: "desc",
@@ -567,22 +560,20 @@ export const getMyBoostService = async (
       id: true,
       remaining_boosts: true,
       expires_at: true,
+      is_active: true,
     },
   });
 
-  // =====================================================
-  // 3. ALWAYS RETURN BENEFITS FROM BOOST TABLE
-  // =====================================================
+  console.log("Boost:", boost.name);
+  console.log("User Boost:", userBoost);
+
+  // 3. Return Boost benefits and wallet information
   return {
     user_boost_id: userBoost?.id ?? null,
-
     name: boost.name,
-
-    // Always comes from Boost table
     benefits: boost.benefits ?? null,
-
-    // Comes from UserBoost only if available
     remaining_boosts: userBoost?.remaining_boosts ?? 0,
     expires_at: userBoost?.expires_at ?? null,
+    is_active: userBoost?.is_active ?? false,
   };
 };
