@@ -40,6 +40,7 @@ import connectPostgres, { connectDB } from "./config/db";
 import { prisma } from "./prisma/prismaClient";
 import http from "http";
 import { initializeSocket } from "./config/socket";
+import { startBoostExpiryJob } from "./jobs/boostExpiry.job";
 
 const PORT = process.env.PORT || 4000;
 
@@ -59,6 +60,7 @@ const startServer = async () => {
      * Initialize Socket.IO
      */
     initializeSocket(server);
+    startBoostExpiryJob();
 
     server.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);

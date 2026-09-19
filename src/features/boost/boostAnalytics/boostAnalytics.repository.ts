@@ -178,6 +178,44 @@ export const upsertReachUserRepository = async (
 // HISTORY
 // =====================================================
 
+// export const getBoostHistoryRepository = async (
+//   userId: string,
+//   skip: number,
+//   take: number
+// ) => {
+//   return prisma.boostUsage.findMany({
+//     where: {
+//       user_id: userId,
+
+//       status: {
+//         in: [
+//           BoostUsageStatus.ACTIVE,
+//           BoostUsageStatus.COMPLETED,
+//           BoostUsageStatus.EXPIRED,
+//           BoostUsageStatus.CANCELLED,
+//         ],
+//       },
+//     },
+
+//     include: {
+//       boost: {
+//         select: {
+//           id: true,
+//           name: true,
+//           title: true,
+//         },
+//       },
+//     },
+
+//     orderBy: {
+//       started_at: "desc",
+//     },
+
+//     skip,
+//     take,
+//   });
+// };
+
 export const getBoostHistoryRepository = async (
   userId: string,
   skip: number,
@@ -186,13 +224,6 @@ export const getBoostHistoryRepository = async (
   return prisma.boostUsage.findMany({
     where: {
       user_id: userId,
-      status: {
-        in: [
-          BoostUsageStatus.COMPLETED,
-          BoostUsageStatus.EXPIRED,
-          BoostUsageStatus.CANCELLED,
-        ],
-      },
     },
 
     include: {

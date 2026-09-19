@@ -2468,44 +2468,83 @@ export const getFeedService = async ({
   // BOOSTS
   // ========================================================
 
-  const boostStart =
-    performance.now();
+  const boostStart = performance.now();
 
-  const boostQuery =
-    await prisma.boostUsage.findMany(
-      {
-        where: {
-          user_id: {
-            in: candidateIds,
-          },
-
-          is_active: true,
-
-          ended_at: {
-            gt: now,
-          },
+  const activeBoostUsages =
+    await prisma.boostUsage.findMany({
+      where: {
+        user_id: {
+          in: candidateIds,
         },
 
-        select: {
-          user_id: true,
+        is_active: true,
+
+        status: "ACTIVE",
+
+        started_at: {
+          lte: now,
+        },
+
+        expected_end_at: {
+          gt: now,
         },
       },
-    );
+
+      select: {
+        id: true,
+        user_id: true,
+        boost_id: true,
+        boost_type: true,
+        duration: true,
+        started_at: true,
+        expected_end_at: true,
+
+        boost: {
+          select: {
+            id: true,
+            name: true,
+            title: true,
+            boostDuration: true,
+            visibilityMultiplier: true,
+          },
+        },
+      },
+
+      orderBy: {
+        started_at: "desc",
+      },
+    });
 
   console.log(
     "boosts:",
-    performance.now() -
-    boostStart,
+    performance.now() - boostStart,
     "ms",
   );
 
-  const boostedUserIds =
-    new Set(
-      boostQuery.map(
-        (boost) =>
-          boost.user_id,
-      ),
-    );
+
+  // ========================================================
+  // CREATE ACTIVE BOOST MAP
+  // ========================================================
+
+  const activeBoostMap = new Map<
+    string,
+    (typeof activeBoostUsages)[number]
+  >();
+
+  for (const usage of activeBoostUsages) {
+    // If somehow multiple ACTIVE usages exist,
+    // keep latest one because query is ordered DESC.
+    if (!activeBoostMap.has(usage.user_id)) {
+      activeBoostMap.set(
+        usage.user_id,
+        usage,
+      );
+    }
+  }
+
+  const boostedUserIds = new Set(
+    activeBoostMap.keys(),
+  );
 
   // ========================================================
   // PRESENCE
@@ -2608,6 +2647,38 @@ export const getFeedService = async ({
 
         const compatibilityScore =
           compat?.score ?? 0;
+
+        // ====================================================
+        // ACTIVE BOOST INFORMATION
+        // ====================================================
+
+        const activeBoost =
+          activeBoostMap.get(user.id);
+
+        const isBoosted =
+          !!activeBoost;
+
+        const boostType =
+          activeBoost?.boost_type ??
+          activeBoost?.boost?.name ??
+          null;
+
+        const boostEndsAt =
+          activeBoost?.expected_end_at ??
+          null;
+
+        const boostStartedAt =
+          activeBoost?.started_at ??
+          null;
+
+        const boostDuration =
+          activeBoost?.duration ??
+          activeBoost?.boost?.boostDuration ??
+          null;
+
+        const visibilityMultiplier =
+          activeBoost?.boost?.visibilityMultiplier ??
+          1;
 
         return {
           id: user.id,
@@ -2723,10 +2794,36 @@ export const getFeedService = async ({
               presence?.lastActiveAt,
             ),
 
-          isBoosted:
-            boostedUserIds.has(
-              user.id,
-            ),
+          // ================================================
+          // DYNAMIC BOOST DATA
+          // ================================================
+
+          isBoosted,
+
+          boost: isBoosted
+            ? {
+              usageId:
+                activeBoost!.id,
+
+              type:
+                boostType,
+
+              title:
+                activeBoost!.boost?.title ??
+                null,
+
+              durationMinutes:
+                boostDuration,
+
+              visibilityMultiplier,
+
+              startedAt:
+                boostStartedAt,
+
+              endsAt:
+                boostEndsAt,
+            }
+            : null,
         };
       },
     );

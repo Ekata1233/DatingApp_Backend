@@ -244,28 +244,29 @@ export const getBoostHistoryService = async (
 
       boostType:
         item.boost_type ??
-        item.boost?.name,
+        item.boost?.name ??
+        null,
 
       title:
         item.display_name ??
         item.title ??
-        item.boost?.title,
+        item.boost?.title ??
+        "Boost",
 
       status: item.status,
 
       startedAt: item.started_at,
       endedAt: item.ended_at,
+      expectedEndAt: item.expected_end_at,
 
       duration: item.duration,
 
       reach: item.total_reach,
-
+      impressions: item.total_impressions,
       views: item.total_views,
-
       likes: item.total_likes,
-
+      superLikes: item.total_superlikes,
       interests: item.total_interests,
-
       matches: item.total_matches,
     })),
   };
@@ -291,14 +292,14 @@ export const getBoostPerformanceService = async (
   const remainingSeconds =
     usage.status === "ACTIVE"
       ? Math.max(
-          0,
-          Math.floor(
-            (
-              usage.expected_end_at.getTime() -
-              now.getTime()
-            ) / 1000
-          )
+        0,
+        Math.floor(
+          (
+            usage.expected_end_at.getTime() -
+            now.getTime()
+          ) / 1000
         )
+      )
       : 0;
 
   // -----------------------------------------
@@ -308,23 +309,23 @@ export const getBoostPerformanceService = async (
   const reachIncrease =
     usage.baseline_reach > 0
       ? Math.round(
-          (
-            (usage.total_reach -
-              usage.baseline_reach) /
-            usage.baseline_reach
-          ) * 100
-        )
+        (
+          (usage.total_reach -
+            usage.baseline_reach) /
+          usage.baseline_reach
+        ) * 100
+      )
       : 0;
 
   const interestIncrease =
     usage.baseline_interests > 0
       ? Math.round(
-          (
-            (usage.total_interests -
-              usage.baseline_interests) /
-            usage.baseline_interests
-          ) * 100
-        )
+        (
+          (usage.total_interests -
+            usage.baseline_interests) /
+          usage.baseline_interests
+        ) * 100
+      )
       : 0;
 
   return {

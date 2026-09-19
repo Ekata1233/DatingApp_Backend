@@ -103,6 +103,8 @@
 
 import { BoostEventType } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
+import { getHourBucket, incrementHourlyStats } from "./boostAnalytics/boostHourlyStat.helper";
+import { getActorDemographics, saveActorDemographics } from "./boostAnalytics/boostDemographics.helper";
 
 // ============================================================
 // TYPES
@@ -159,6 +161,8 @@ const fieldMap: Partial<
   INTEREST: "total_interests",
   MATCH: "total_matches",
 };
+
+
 
 // ============================================================
 // TRACK BOOST EVENT
@@ -263,6 +267,18 @@ export const trackBoostEvent = async ({
   // Reach       +1
   // ==========================================================
 
+  const hour =
+    getHourBucket(now);
+
+  let actor = null;
+
+  if (type === "IMPRESSION") {
+    actor =
+      await getActorDemographics(
+        actorId
+      );
+  }
+
   if (type === "IMPRESSION") {
     await prisma.$transaction(async (tx) => {
       // ------------------------------------------------------
@@ -314,6 +330,17 @@ export const trackBoostEvent = async ({
           total_impressions: 1,
         },
       });
+
+      // ==============================================
+      // HOURLY IMPRESSION
+      // ==============================================
+
+      await incrementHourlyStats(
+        tx,
+        activeBoost.id,
+        hour,
+        "impressions"
+      );
 
       // ------------------------------------------------------
       // D. CHECK WHETHER ACTOR IS ALREADY IN REACH
@@ -381,6 +408,46 @@ export const trackBoostEvent = async ({
             total_reach: 1,
           },
         });
+        // ============================================
+        // HOURLY UNIQUE REACH
+        // ============================================
+
+        await tx.boostHourlyStats.upsert({
+          where: {
+            boost_usage_id_hour: {
+              boost_usage_id:
+                activeBoost.id,
+
+              hour,
+            },
+          },
+
+          update: {
+            reach: {
+              increment: 1,
+            },
+          },
+
+          create: {
+            boost_usage_id:
+              activeBoost.id,
+
+            hour,
+
+            reach: 1,
+          },
+        });
+
+        // ============================================
+        // DEMOGRAPHICS
+        // ONLY FIRST REACH
+        // ============================================
+
+        await saveActorDemographics(
+          tx,
+          activeBoost.id,
+          actor
+        );
       } else {
         // ----------------------------------------------------
         // SAME ACTOR SAW PROFILE AGAIN
