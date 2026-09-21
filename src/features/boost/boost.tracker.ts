@@ -364,9 +364,7 @@ export const trackBoostEvent = async ({
           data: {
             boost_usage_id: activeBoost.id,
             actor_id: actorId,
-
             impression_count: 1,
-
             first_seen_at: now,
             last_seen_at: now,
           },
