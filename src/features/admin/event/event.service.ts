@@ -61,9 +61,6 @@ export const updateEventHost = async (
     throw new Error("Event not found");
   }
 
-
- 
-
   // 3. Check Event Partner
   const eventPartner = await prisma.eventPartner.findFirst({
     where: {
@@ -146,8 +143,6 @@ export const updateEventVenue = async (
     throw new Error("Event not found");
   }
 
-
-
   // 3. Validate event date
   const eventDate = new Date(payload.eventDate);
 
@@ -215,19 +210,14 @@ export const updateEventTickets = async (
     throw new Error("Event not found");
   }
 
-
   // Calculate discounted prices
-  const discountMultiplier =
-    1 - payload.discountPercentage / 100;
+  const discountMultiplier = 1 - payload.discountPercentage / 100;
 
-  const menDiscountedPrice =
-    payload.menEntryPrice * discountMultiplier;
+  const menDiscountedPrice = payload.menEntryPrice * discountMultiplier;
 
-  const womenDiscountedPrice =
-    payload.womenEntryPrice * discountMultiplier;
+  const womenDiscountedPrice = payload.womenEntryPrice * discountMultiplier;
 
-  const otherDiscountedPrice =
-    payload.otherEntryPrice * discountMultiplier;
+  const otherDiscountedPrice = payload.otherEntryPrice * discountMultiplier;
 
   const event = await prisma.event.update({
     where: {
@@ -315,7 +305,6 @@ export const updateEventExperience = async (
   // ==========================================
   // 2. DON'T ALLOW LIVE EVENT EDIT
   // ==========================================
-
 
   // ==========================================
   // 3. UPDATE EVERYTHING IN ONE TRANSACTION
@@ -408,30 +397,30 @@ export const updateEventExperience = async (
       },
     });
 
-   if (payload.itinerary.length > 0) {
-  await tx.eventItinerary.createMany({
-    data: payload.itinerary.map((item, index) => ({
-      eventId,
+    if (payload.itinerary.length > 0) {
+      await tx.eventItinerary.createMany({
+        data: payload.itinerary.map((item, index) => ({
+          eventId,
 
-      date: item.date,
-      dayNumber: item.dayNumber,
+          date: item.date,
+          dayNumber: item.dayNumber,
 
-      time: item.time,
-      title: item.title,
-      description: item.description,
-      icon: item.icon,
+          time: item.time,
+          title: item.title,
+          description: item.description,
+          icon: item.icon,
 
-      location: item.location,
-      elevation: item.elevation,
-      distance: item.distance,
+          location: item.location,
+          elevation: item.elevation,
+          distance: item.distance,
 
-      accommodation: item.accommodation,
-      meals: item.meals,
+          accommodation: item.accommodation,
+          meals: item.meals,
 
-      sortOrder: item.sortOrder ?? index,
-    })),
-  });
-}
+          sortOrder: item.sortOrder ?? index,
+        })),
+      });
+    }
 
     // ----------------------------------------
     // WHY SHOULD COME
@@ -547,8 +536,6 @@ export const updateEventSafety = async (
   // 2. DON'T ALLOW LIVE EVENT EDIT
   // ==========================================
 
- 
-
   // ==========================================
   // 3. TRANSACTION
   // ==========================================
@@ -600,29 +587,29 @@ export const updateEventSafety = async (
     }
 
     // ----------------------------------------
-// DELETE OLD FAQs
-// ----------------------------------------
+    // DELETE OLD FAQs
+    // ----------------------------------------
 
-await tx.eventFAQ.deleteMany({
-  where: {
-    eventId,
-  },
-});
+    await tx.eventFAQ.deleteMany({
+      where: {
+        eventId,
+      },
+    });
 
-// ----------------------------------------
-// CREATE NEW FAQs
-// ----------------------------------------
+    // ----------------------------------------
+    // CREATE NEW FAQs
+    // ----------------------------------------
 
-if (payload.faqs && payload.faqs.length > 0) {
-  await tx.eventFAQ.createMany({
-    data: payload.faqs.map((faq, index) => ({
-      eventId,
-      question: faq.question,
-      answer: faq.answer,
-      displayOrder: faq.displayOrder ?? index,
-    })),
-  });
-}
+    if (payload.faqs && payload.faqs.length > 0) {
+      await tx.eventFAQ.createMany({
+        data: payload.faqs.map((faq, index) => ({
+          eventId,
+          question: faq.question,
+          answer: faq.answer,
+          displayOrder: faq.displayOrder ?? index,
+        })),
+      });
+    }
     // ----------------------------------------
     // GET UPDATED EVENT
     // ----------------------------------------
@@ -647,10 +634,10 @@ if (payload.faqs && payload.faqs.length > 0) {
 
         safetyFeatures: true,
         faqs: {
-      orderBy: {
-        displayOrder: "asc",
-      },
-    },
+          orderBy: {
+            displayOrder: "asc",
+          },
+        },
       },
     });
   });
@@ -763,61 +750,49 @@ export const publishEvent = async (eventId: string) => {
   // 7. CHECK TICKET DETAILS
   // ==========================================
 
- if (event.totalCapacity === null) {
-  missingFields.push("totalCapacity");
-}
+  if (event.totalCapacity === null) {
+    missingFields.push("totalCapacity");
+  }
 
-if (event.menCapacity === null) {
-  missingFields.push("menCapacity");
-}
+  if (event.menCapacity === null) {
+    missingFields.push("menCapacity");
+  }
 
-if (event.womenCapacity === null) {
-  missingFields.push("womenCapacity");
-}
+  if (event.womenCapacity === null) {
+    missingFields.push("womenCapacity");
+  }
 
-if (event.otherCapacity === null) {
-  missingFields.push("otherCapacity");
-}
+  if (event.otherCapacity === null) {
+    missingFields.push("otherCapacity");
+  }
 
-if (event.menEntryPrice === null) {
-  missingFields.push("menEntryPrice");
-}
+  if (event.menEntryPrice === null) {
+    missingFields.push("menEntryPrice");
+  }
 
-if (event.womenEntryPrice === null) {
-  missingFields.push("womenEntryPrice");
-}
+  if (event.womenEntryPrice === null) {
+    missingFields.push("womenEntryPrice");
+  }
 
-if (event.otherEntryPrice === null) {
-  missingFields.push("otherEntryPrice");
-}
+  if (event.otherEntryPrice === null) {
+    missingFields.push("otherEntryPrice");
+  }
 
-if (event.discountPercentage === null) {
-  missingFields.push("discountPercentage");
-}
+  if (event.discountPercentage === null) {
+    missingFields.push("discountPercentage");
+  }
 
-if (event.menDiscountedPrice === null) {
-  missingFields.push("menDiscountedPrice");
-}
+  if (event.menDiscountedPrice === null) {
+    missingFields.push("menDiscountedPrice");
+  }
 
-if (event.womenDiscountedPrice === null) {
-  missingFields.push("womenDiscountedPrice");
-}
+  if (event.womenDiscountedPrice === null) {
+    missingFields.push("womenDiscountedPrice");
+  }
 
-if (event.otherDiscountedPrice === null) {
-  missingFields.push("otherDiscountedPrice");
-}
-
-if (event.minAge === null) {
-  missingFields.push("minAge");
-}
-
-if (event.maxAge === null) {
-  missingFields.push("maxAge");
-}
-
-if (!event.eventIntent) {
-  missingFields.push("eventIntent");
-}
+  if (event.otherDiscountedPrice === null) {
+    missingFields.push("otherDiscountedPrice");
+  }
 
   if (event.minAge === null) {
     missingFields.push("minAge");
@@ -827,7 +802,17 @@ if (!event.eventIntent) {
     missingFields.push("maxAge");
   }
 
-  
+  if (!event.eventIntent) {
+    missingFields.push("eventIntent");
+  }
+
+  if (event.minAge === null) {
+    missingFields.push("minAge");
+  }
+
+  if (event.maxAge === null) {
+    missingFields.push("maxAge");
+  }
 
   if (!event.eventIntent) {
     missingFields.push("eventIntent");
@@ -948,28 +933,28 @@ if (!event.eventIntent) {
       fullAddress: true,
 
       // ========================================
-// TICKETS
-// ========================================
+      // TICKETS
+      // ========================================
 
-totalCapacity: true,
+      totalCapacity: true,
 
-menCapacity: true,
-womenCapacity: true,
-otherCapacity: true,
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
 
-menEntryPrice: true,
-womenEntryPrice: true,
-otherEntryPrice: true,
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
 
-discountPercentage: true,
+      discountPercentage: true,
 
-menDiscountedPrice: true,
-womenDiscountedPrice: true,
-otherDiscountedPrice: true,
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
 
-minAge: true,
-maxAge: true,
-eventIntent: true,
+      minAge: true,
+      maxAge: true,
+      eventIntent: true,
 
       heroImage: true,
       aboutEvent: true,
@@ -1022,68 +1007,57 @@ const getEventBookingStats = async (
 
   const now = new Date();
 
-  const last24Hours = new Date(
-    now.getTime() - 24 * 60 * 60 * 1000,
-  );
+  const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   // ========================================
   // CONFIRMED BOOKED TICKETS
   // ========================================
 
-  const confirmedBookings =
-    await prisma.eventBooking.aggregate({
-      where: {
-        eventId,
-        status: "CONFIRMED",
-      },
+  const confirmedBookings = await prisma.eventBooking.aggregate({
+    where: {
+      eventId,
+      status: "CONFIRMED",
+    },
 
-      _sum: {
-        ticketCount: true,
-      },
-    });
+    _sum: {
+      ticketCount: true,
+    },
+  });
 
-  const bookedCount =
-    confirmedBookings._sum.ticketCount ?? 0;
+  const bookedCount = confirmedBookings._sum.ticketCount ?? 0;
 
   // ========================================
   // CONFIRMED TICKETS BOOKED IN LAST 24 HOURS
   // ========================================
 
-  const confirmedLast24Hours =
-    await prisma.eventBooking.aggregate({
-      where: {
-        eventId,
-        status: "CONFIRMED",
-        createdAt: {
-          gte: last24Hours,
-        },
+  const confirmedLast24Hours = await prisma.eventBooking.aggregate({
+    where: {
+      eventId,
+      status: "CONFIRMED",
+      createdAt: {
+        gte: last24Hours,
       },
+    },
 
-      _sum: {
-        ticketCount: true,
-      },
-    });
+    _sum: {
+      ticketCount: true,
+    },
+  });
 
-  const bookedLast24Hours =
-    confirmedLast24Hours._sum.ticketCount ?? 0;
+  const bookedLast24Hours = confirmedLast24Hours._sum.ticketCount ?? 0;
 
   // ========================================
   // SPOTS LEFT
   // ========================================
 
-  const spotsLeft = Math.max(
-    totalCapacity - bookedCount,
-    0,
-  );
+  const spotsLeft = Math.max(totalCapacity - bookedCount, 0);
 
   // ========================================
   // BOOKING PERCENTAGE
   // ========================================
 
   const bookingPercentage = Math.min(
-    Math.round(
-      (bookedCount / totalCapacity) * 100,
-    ),
+    Math.round((bookedCount / totalCapacity) * 100),
     100,
   );
 
@@ -1091,8 +1065,7 @@ const getEventBookingStats = async (
   // FILLING FAST
   // ========================================
 
-  const fillingFast =
-    spotsLeft <= Math.ceil(totalCapacity * 0.15);
+  const fillingFast = spotsLeft <= Math.ceil(totalCapacity * 0.15);
 
   // ========================================
   // RESPONSE
@@ -1111,15 +1084,11 @@ const getEventBookingStats = async (
 
     fillingFast,
 
-    fillingFastText: fillingFast
-      ? `Only ${spotsLeft} spots left`
-      : null,
+    fillingFastText: fillingFast ? `Only ${spotsLeft} spots left` : null,
 
-    bookingSummary:
-      `${bookedCount} of ${totalCapacity} spots booked`,
+    bookingSummary: `${bookedCount} of ${totalCapacity} spots booked`,
 
-    last24HoursText:
-      `${bookedLast24Hours} people booked in the last 24 hours`,
+    last24HoursText: `${bookedLast24Hours} people booked in the last 24 hours`,
   };
 };
 //get apis
@@ -1211,36 +1180,36 @@ export const getAllEvents = async () => {
       // ========================================
 
       itinerary: {
-  orderBy: [
-    {
-      dayNumber: "asc",
-    },
-    {
-      sortOrder: "asc",
-    },
-  ],
+        orderBy: [
+          {
+            dayNumber: "asc",
+          },
+          {
+            sortOrder: "asc",
+          },
+        ],
 
-  select: {
-    id: true,
+        select: {
+          id: true,
 
-    date: true,
-    dayNumber: true,
+          date: true,
+          dayNumber: true,
 
-    time: true,
-    title: true,
-    description: true,
-    icon: true,
+          time: true,
+          title: true,
+          description: true,
+          icon: true,
 
-    location: true,
-    elevation: true,
-    distance: true,
+          location: true,
+          elevation: true,
+          distance: true,
 
-    accommodation: true,
-    meals: true,
+          accommodation: true,
+          meals: true,
 
-    sortOrder: true,
-  },
-},
+          sortOrder: true,
+        },
+      },
 
       // ========================================
       // STEP 5 - WHY SHOULD COME
@@ -1280,13 +1249,11 @@ export const getAllEvents = async () => {
 // GET EVENT LIST - MOBILE
 // ========================================
 
-
-
 export const getEventList = async (
   eventType?: Type,
   dateFilter?: "TODAY" | "THIS_WEEKEND" | "THIS_MONTH",
   freeOnly?: boolean,
-  userGender?: Gender
+  userGender?: Gender,
 ) => {
   const now = new Date();
 
@@ -1322,15 +1289,7 @@ export const getEventList = async (
 
   // THIS MONTH
   if (dateFilter === "THIS_MONTH") {
-    dateFrom = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-      0,
-      0,
-      0,
-      0
-    );
+    dateFrom = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
 
     dateTo = new Date(
       now.getFullYear(),
@@ -1339,7 +1298,7 @@ export const getEventList = async (
       23,
       59,
       59,
-      999
+      999,
     );
   }
   let genderCapacityFilter = {};
@@ -1405,7 +1364,9 @@ export const getEventList = async (
       id: true,
       eventType: true,
       title: true,
-
+      city: true,
+      latitude: true,
+      longitude: true,
       eventDate: true,
       startTime: true,
       endTime: true,
@@ -1454,14 +1415,14 @@ export const getEventList = async (
     events.map(async (event) => {
       const bookingStats = await getEventBookingStats(
         event.id,
-        event.totalCapacity
+        event.totalCapacity,
       );
 
       return {
         ...event,
         ...bookingStats,
       };
-    })
+    }),
   );
 
   return eventsWithBookingStats;
@@ -1505,19 +1466,19 @@ export const getEventDetails = async (eventId: string) => {
 
       totalCapacity: true,
 
-menCapacity: true,
-womenCapacity: true,
-otherCapacity: true,
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
 
-menEntryPrice: true,
-womenEntryPrice: true,
-otherEntryPrice: true,
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
 
-discountPercentage: true,
+      discountPercentage: true,
 
-menDiscountedPrice: true,
-womenDiscountedPrice: true,
-otherDiscountedPrice: true,
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
 
       // ========================================
       // LOCATION
@@ -1570,37 +1531,37 @@ otherDiscountedPrice: true,
         },
       },
 
-     itinerary: {
-  orderBy: [
-    {
-      dayNumber: "asc",
-    },
-    {
-      sortOrder: "asc",
-    },
-  ],
+      itinerary: {
+        orderBy: [
+          {
+            dayNumber: "asc",
+          },
+          {
+            sortOrder: "asc",
+          },
+        ],
 
-  select: {
-    id: true,
+        select: {
+          id: true,
 
-    date: true,
-    dayNumber: true,
+          date: true,
+          dayNumber: true,
 
-    time: true,
-    title: true,
-    description: true,
-    icon: true,
+          time: true,
+          title: true,
+          description: true,
+          icon: true,
 
-    location: true,
-    elevation: true,
-    distance: true,
+          location: true,
+          elevation: true,
+          distance: true,
 
-    accommodation: true,
-    meals: true,
+          accommodation: true,
+          meals: true,
 
-    sortOrder: true,
-  },
-},
+          sortOrder: true,
+        },
+      },
 
       // ========================================
       // SAFETY
@@ -1612,17 +1573,14 @@ otherDiscountedPrice: true,
           title: true,
         },
       },
-faqs: {
-  orderBy: {
-    
-  },
-  select: {
-    id: true,
-    question: true,
-    answer: true,
-   
-  },
-},
+      faqs: {
+        orderBy: {},
+        select: {
+          id: true,
+          question: true,
+          answer: true,
+        },
+      },
       // ========================================
       // TERMS
       // ========================================
@@ -1634,15 +1592,15 @@ faqs: {
       // ========================================
 
       eventPartner: {
-  select: {
-    id: true,
-    businessName: true,
-    businessType: true,
-    contactPerson: true,
-    logo: true,
-    city: true,
-  },
-},
+        select: {
+          id: true,
+          businessName: true,
+          businessType: true,
+          contactPerson: true,
+          logo: true,
+          city: true,
+        },
+      },
     },
   });
 
@@ -1654,28 +1612,21 @@ faqs: {
   // STATIC VALUES FOR NOW
   // ==========================================
 
-  const bookingStats =
-  await getEventBookingStats(
+  const bookingStats = await getEventBookingStats(
     event.id,
     event.totalCapacity,
   );
 
-return {
-  ...event,
+  return {
+    ...event,
 
-  bookingStats,
+    bookingStats,
+  };
 };
-};
-
-
-
-
 
 type CheckoutTicketType = "MEN" | "WOMEN" | "OTHER";
 
-const getTicketTypeFromGender = (
-  gender: Gender | null,
-): CheckoutTicketType => {
+const getTicketTypeFromGender = (gender: Gender | null): CheckoutTicketType => {
   switch (gender) {
     case Gender.MEN:
       return "MEN";
@@ -1687,10 +1638,6 @@ const getTicketTypeFromGender = (
       return "OTHER";
   }
 };
-
-
-
-
 
 export const getEventCheckoutDetails = async (
   eventId: string,
@@ -1744,34 +1691,28 @@ export const getEventCheckoutDetails = async (
   }
 
   if (event.status !== "LIVE") {
-    throw new Error(
-      "This event is not available for booking",
-    );
+    throw new Error("This event is not available for booking");
   }
 
   // ==========================================
   // 2. GLOBAL AMOUNT
   // ==========================================
 
-  const globalAmount =
-    await prisma.globalAmount.findFirst({
-      orderBy: {
-        createdAt: "desc",
-      },
+  const globalAmount = await prisma.globalAmount.findFirst({
+    orderBy: {
+      createdAt: "desc",
+    },
 
-      select: {
-        gst: true,
-        eventPlatformFee: true,
-      },
-    });
+    select: {
+      gst: true,
+      eventPlatformFee: true,
+    },
+  });
 
-  const gstPercentage =
-    globalAmount?.gst ??
-    new Prisma.Decimal(0);
+  const gstPercentage = globalAmount?.gst ?? new Prisma.Decimal(0);
 
   const eventPlatformFee =
-    globalAmount?.eventPlatformFee ??
-    new Prisma.Decimal(0);
+    globalAmount?.eventPlatformFee ?? new Prisma.Decimal(0);
 
   // ==========================================
   // 3. AVAILABLE TICKET OPTIONS
@@ -1784,9 +1725,7 @@ export const getEventCheckoutDetails = async (
 
       capacity: event.menCapacity ?? 0,
 
-      entryPrice:
-        event.menEntryPrice?.toFixed(2) ??
-        "0.00",
+      entryPrice: event.menEntryPrice?.toFixed(2) ?? "0.00",
 
       discountedPrice:
         event.menDiscountedPrice?.toFixed(2) ??
@@ -1800,9 +1739,7 @@ export const getEventCheckoutDetails = async (
 
       capacity: event.womenCapacity ?? 0,
 
-      entryPrice:
-        event.womenEntryPrice?.toFixed(2) ??
-        "0.00",
+      entryPrice: event.womenEntryPrice?.toFixed(2) ?? "0.00",
 
       discountedPrice:
         event.womenDiscountedPrice?.toFixed(2) ??
@@ -1816,9 +1753,7 @@ export const getEventCheckoutDetails = async (
 
       capacity: event.otherCapacity ?? 0,
 
-      entryPrice:
-        event.otherEntryPrice?.toFixed(2) ??
-        "0.00",
+      entryPrice: event.otherEntryPrice?.toFixed(2) ?? "0.00",
 
       discountedPrice:
         event.otherDiscountedPrice?.toFixed(2) ??
@@ -1827,83 +1762,57 @@ export const getEventCheckoutDetails = async (
     },
   ].filter((ticket) => ticket.capacity > 0);
 
-  const availableTicketTypes =
-    ticketOptions.map(
-      (ticket) => ticket.ticketType,
-    );
+  const availableTicketTypes = ticketOptions.map((ticket) => ticket.ticketType);
 
   // ==========================================
   // 4. DEFAULT / SELECTED TICKET
   // ==========================================
 
-  const selectedTicket =
-    ticketType
-      ? ticketOptions.find(
-          (item) =>
-            item.ticketType === ticketType,
-        )
-      : ticketOptions[0];
+  const selectedTicket = ticketType
+    ? ticketOptions.find((item) => item.ticketType === ticketType)
+    : ticketOptions[0];
 
   if (!selectedTicket) {
-    throw new Error(
-      "No ticket type is available for this event",
-    );
+    throw new Error("No ticket type is available for this event");
   }
 
   // ==========================================
   // 5. VALIDATE TICKET COUNT
   // ==========================================
 
-  if (
-    !Number.isInteger(ticketCount) ||
-    ticketCount < 1
-  ) {
-    throw new Error(
-      "Ticket count must be at least 1",
-    );
+  if (!Number.isInteger(ticketCount) || ticketCount < 1) {
+    throw new Error("Ticket count must be at least 1");
   }
 
   // ==========================================
   // 6. CALCULATE ORIGINAL AMOUNT
   // ==========================================
 
-  const originalUnitPrice =
-    new Prisma.Decimal(
-      selectedTicket.entryPrice,
-    );
+  const originalUnitPrice = new Prisma.Decimal(selectedTicket.entryPrice);
 
-  const discountedUnitPrice =
-    new Prisma.Decimal(
-      selectedTicket.discountedPrice,
-    );
+  const discountedUnitPrice = new Prisma.Decimal(
+    selectedTicket.discountedPrice,
+  );
 
-  const originalTicketAmount =
-    originalUnitPrice.mul(ticketCount);
+  const originalTicketAmount = originalUnitPrice.mul(ticketCount);
 
   // ==========================================
   // 7. TICKET AMOUNT
   // ==========================================
 
-  const ticketAmount =
-    discountedUnitPrice.mul(ticketCount);
+  const ticketAmount = discountedUnitPrice.mul(ticketCount);
 
   // ==========================================
   // 8. DISCOUNT AMOUNT
   // ==========================================
 
-  const discountAmount =
-    originalTicketAmount.minus(
-      ticketAmount,
-    );
+  const discountAmount = originalTicketAmount.minus(ticketAmount);
 
   // ==========================================
   // 9. PLATFORM FEE
   // ==========================================
 
-  const platformFee =
-    new Prisma.Decimal(
-      eventPlatformFee,
-    );
+  const platformFee = new Prisma.Decimal(eventPlatformFee);
 
   // ==========================================
   // 10. COUPON DISCOUNT
@@ -1916,35 +1825,25 @@ export const getEventCheckoutDetails = async (
     For now:
   */
 
-  const couponDiscount =
-    new Prisma.Decimal(0);
+  const couponDiscount = new Prisma.Decimal(0);
 
   // ==========================================
   // 11. TAXABLE AMOUNT
   // ==========================================
 
-  const taxableAmount =
-    ticketAmount
-      .plus(platformFee)
-      .minus(couponDiscount);
+  const taxableAmount = ticketAmount.plus(platformFee).minus(couponDiscount);
 
   // ==========================================
   // 12. GST
   // ==========================================
 
-  const gstAmount =
-    taxableAmount
-      .mul(gstPercentage)
-      .div(100);
+  const gstAmount = taxableAmount.mul(gstPercentage).div(100);
 
   // ==========================================
   // 13. TOTAL AMOUNT
   // ==========================================
 
-  const totalAmount =
-    taxableAmount.plus(
-      gstAmount,
-    );
+  const totalAmount = taxableAmount.plus(gstAmount);
 
   // ==========================================
   // 14. RESPONSE
@@ -1969,15 +1868,11 @@ export const getEventCheckoutDetails = async (
     },
 
     pricing: {
-      discountPercentage:
-        event.discountPercentage?.toFixed(2) ??
-        "0.00",
+      discountPercentage: event.discountPercentage?.toFixed(2) ?? "0.00",
 
-      gstPercentage:
-        gstPercentage.toFixed(2),
+      gstPercentage: gstPercentage.toFixed(2),
 
-      eventPlatformFee:
-        eventPlatformFee.toFixed(2),
+      eventPlatformFee: eventPlatformFee.toFixed(2),
     },
 
     ticketOptions,
@@ -1985,34 +1880,25 @@ export const getEventCheckoutDetails = async (
     availableTicketTypes,
 
     bookingPreview: {
-      ticketType:
-        selectedTicket.ticketType,
+      ticketType: selectedTicket.ticketType,
 
       ticketCount,
 
-      originalTicketAmount:
-        originalTicketAmount.toFixed(2),
+      originalTicketAmount: originalTicketAmount.toFixed(2),
 
-      ticketAmount:
-        ticketAmount.toFixed(2),
+      ticketAmount: ticketAmount.toFixed(2),
 
-      platformFee:
-        platformFee.toFixed(2),
+      platformFee: platformFee.toFixed(2),
 
-      gstAmount:
-        gstAmount.toFixed(2),
+      gstAmount: gstAmount.toFixed(2),
 
-      discountAmount:
-        discountAmount.toFixed(2),
+      discountAmount: discountAmount.toFixed(2),
 
-      couponCode:
-        couponCode ?? null,
+      couponCode: couponCode ?? null,
 
-      couponDiscount:
-        couponDiscount.toFixed(2),
+      couponDiscount: couponDiscount.toFixed(2),
 
-      totalAmount:
-        totalAmount.toFixed(2),
+      totalAmount: totalAmount.toFixed(2),
     },
   };
 };
@@ -2027,205 +1913,141 @@ export const calculateEventCheckout = async (
   tickets: TicketInput[],
   couponCode?: string,
 ) => {
-  const event =
-    await prisma.event.findUnique({
-      where: {
-        id: eventId,
-      },
+  const event = await prisma.event.findUnique({
+    where: {
+      id: eventId,
+    },
 
-      select: {
-        id: true,
-        title: true,
+    select: {
+      id: true,
+      title: true,
 
-        menCapacity: true,
-        womenCapacity: true,
-        otherCapacity: true,
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
 
-        menEntryPrice: true,
-        womenEntryPrice: true,
-        otherEntryPrice: true,
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
 
-        menDiscountedPrice: true,
-        womenDiscountedPrice: true,
-        otherDiscountedPrice: true,
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
 
-        discountPercentage: true,
-      },
-    });
+      discountPercentage: true,
+    },
+  });
 
   if (!event) {
     throw new Error("Event not found");
   }
 
-  const globalAmount =
-    await prisma.globalAmount.findFirst({
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+  const globalAmount = await prisma.globalAmount.findFirst({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-  const gstPercentage =
-    globalAmount?.gst ??
-    new Prisma.Decimal(0);
+  const gstPercentage = globalAmount?.gst ?? new Prisma.Decimal(0);
 
-  const platformFee =
-    globalAmount?.eventPlatformFee ??
-    new Prisma.Decimal(0);
+  const platformFee = globalAmount?.eventPlatformFee ?? new Prisma.Decimal(0);
 
-  let originalTicketAmount =
-    new Prisma.Decimal(0);
+  let originalTicketAmount = new Prisma.Decimal(0);
 
-  let ticketAmount =
-    new Prisma.Decimal(0);
+  let ticketAmount = new Prisma.Decimal(0);
 
   let ticketCount = 0;
 
   const ticketBreakdown = [];
 
   for (const ticket of tickets) {
-    const quantity =
-      Number(ticket.quantity);
+    const quantity = Number(ticket.quantity);
 
-    if (
-      !Number.isInteger(quantity) ||
-      quantity < 1
-    ) {
-      throw new Error(
-        "Invalid ticket quantity",
-      );
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new Error("Invalid ticket quantity");
     }
 
     let capacity = 0;
 
-    let originalPrice =
-      new Prisma.Decimal(0);
+    let originalPrice = new Prisma.Decimal(0);
 
-    let finalPrice =
-      new Prisma.Decimal(0);
+    let finalPrice = new Prisma.Decimal(0);
 
     if (ticket.ticketType === "MEN") {
-      capacity =
-        event.menCapacity ?? 0;
+      capacity = event.menCapacity ?? 0;
 
       if (capacity <= 0) {
-        throw new Error(
-          "Men tickets are not available",
-        );
+        throw new Error("Men tickets are not available");
       }
 
-      originalPrice =
-        event.menEntryPrice ??
-        new Prisma.Decimal(0);
+      originalPrice = event.menEntryPrice ?? new Prisma.Decimal(0);
 
-      finalPrice =
-        event.menDiscountedPrice ??
-        originalPrice;
+      finalPrice = event.menDiscountedPrice ?? originalPrice;
     }
 
     if (ticket.ticketType === "WOMEN") {
-      capacity =
-        event.womenCapacity ?? 0;
+      capacity = event.womenCapacity ?? 0;
 
       if (capacity <= 0) {
-        throw new Error(
-          "Women tickets are not available",
-        );
+        throw new Error("Women tickets are not available");
       }
 
-      originalPrice =
-        event.womenEntryPrice ??
-        new Prisma.Decimal(0);
+      originalPrice = event.womenEntryPrice ?? new Prisma.Decimal(0);
 
-      finalPrice =
-        event.womenDiscountedPrice ??
-        originalPrice;
+      finalPrice = event.womenDiscountedPrice ?? originalPrice;
     }
 
     if (ticket.ticketType === "OTHER") {
-      capacity =
-        event.otherCapacity ?? 0;
+      capacity = event.otherCapacity ?? 0;
 
       if (capacity <= 0) {
-        throw new Error(
-          "Other tickets are not available",
-        );
+        throw new Error("Other tickets are not available");
       }
 
-      originalPrice =
-        event.otherEntryPrice ??
-        new Prisma.Decimal(0);
+      originalPrice = event.otherEntryPrice ?? new Prisma.Decimal(0);
 
-      finalPrice =
-        event.otherDiscountedPrice ??
-        originalPrice;
+      finalPrice = event.otherDiscountedPrice ?? originalPrice;
     }
 
-    const originalAmount =
-      originalPrice.mul(quantity);
+    const originalAmount = originalPrice.mul(quantity);
 
-    const amount =
-      finalPrice.mul(quantity);
+    const amount = finalPrice.mul(quantity);
 
-    originalTicketAmount =
-      originalTicketAmount.plus(
-        originalAmount,
-      );
+    originalTicketAmount = originalTicketAmount.plus(originalAmount);
 
-    ticketAmount =
-      ticketAmount.plus(amount);
+    ticketAmount = ticketAmount.plus(amount);
 
     ticketCount += quantity;
 
     ticketBreakdown.push({
-      ticketType:
-        ticket.ticketType,
+      ticketType: ticket.ticketType,
 
       quantity,
 
-      originalUnitPrice:
-        originalPrice.toFixed(2),
+      originalUnitPrice: originalPrice.toFixed(2),
 
-      unitPrice:
-        finalPrice.toFixed(2),
+      unitPrice: finalPrice.toFixed(2),
 
-      originalAmount:
-        originalAmount.toFixed(2),
+      originalAmount: originalAmount.toFixed(2),
 
-      amount:
-        amount.toFixed(2),
+      amount: amount.toFixed(2),
     });
   }
 
-  const discountAmount =
-    originalTicketAmount.minus(
-      ticketAmount,
-    );
+  const discountAmount = originalTicketAmount.minus(ticketAmount);
 
   // For now
-  const couponDiscount =
-    couponCode
-      ? new Prisma.Decimal(100)
-      : new Prisma.Decimal(0);
+  const couponDiscount = couponCode
+    ? new Prisma.Decimal(100)
+    : new Prisma.Decimal(0);
 
-  const subtotal =
-    ticketAmount.plus(
-      platformFee,
-    );
+  const subtotal = ticketAmount.plus(platformFee);
 
-  const gstAmount =
-    subtotal
-      .mul(gstPercentage)
-      .div(100);
+  const gstAmount = subtotal.mul(gstPercentage).div(100);
 
-  const totalBeforeCoupon =
-    subtotal.plus(
-      gstAmount,
-    );
+  const totalBeforeCoupon = subtotal.plus(gstAmount);
 
-  const totalAmount =
-    totalBeforeCoupon.minus(
-      couponDiscount,
-    );
+  const totalAmount = totalBeforeCoupon.minus(couponDiscount);
 
   return {
     eventId,
@@ -2234,31 +2056,22 @@ export const calculateEventCheckout = async (
 
     ticketBreakdown,
 
-    originalTicketAmount:
-      originalTicketAmount.toFixed(2),
+    originalTicketAmount: originalTicketAmount.toFixed(2),
 
-    ticketAmount:
-      ticketAmount.toFixed(2),
+    ticketAmount: ticketAmount.toFixed(2),
 
-    discountAmount:
-      discountAmount.toFixed(2),
+    discountAmount: discountAmount.toFixed(2),
 
-    platformFee:
-      platformFee.toFixed(2),
+    platformFee: platformFee.toFixed(2),
 
-    gstPercentage:
-      gstPercentage.toFixed(2),
+    gstPercentage: gstPercentage.toFixed(2),
 
-    gstAmount:
-      gstAmount.toFixed(2),
+    gstAmount: gstAmount.toFixed(2),
 
-    couponCode:
-      couponCode ?? null,
+    couponCode: couponCode ?? null,
 
-    couponDiscount:
-      couponDiscount.toFixed(2),
+    couponDiscount: couponDiscount.toFixed(2),
 
-    totalAmount:
-      totalAmount.toFixed(2),
+    totalAmount: totalAmount.toFixed(2),
   };
 };
