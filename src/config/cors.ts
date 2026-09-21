@@ -6,7 +6,8 @@ const allowedOrigins = [
   "https://www.welvors.com",
   "https://welvors.com",
   "https://stay-bea-panel.vercel.app",
-  "https://uatoneapi.payu.in"
+  "https://uatoneapi.payu.in",
+  "https://api.welvors.com"
 ];
 
 const corsOptions: CorsOptions = {

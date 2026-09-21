@@ -34,6 +34,11 @@ export const incrementHourlyStats = async (
   hour: Date,
   field: HourlyCounter
 ) => {
+
+  console.log("boost use id : ", boostUsageId)
+    console.log("boost hour : ", hour)
+  console.log("boost field : ", field)
+
   await tx.boostHourlyStats.upsert({
     where: {
       boost_usage_id_hour: {

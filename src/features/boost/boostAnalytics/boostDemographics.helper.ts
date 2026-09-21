@@ -7,11 +7,16 @@ export const incrementDemographic = async (
   type: BoostDemographicType,
   label: string | null | undefined
 ) => {
-  if (!label) {
+
+  console.log("boost use id : ", boostUsageId);
+  console.log("boost type : ", type);
+  console.log("boost label : ", label);
+
+  if (label === null || label === undefined) {
     return;
   }
 
-  const cleanLabel = label.trim();
+  const cleanLabel = String(label).trim();
 
   if (!cleanLabel) {
     return;
@@ -93,7 +98,7 @@ export const getAgeGroup = (
     (
       month === 0 &&
       today.getUTCDate() <
-        birthDate.getUTCDate()
+      birthDate.getUTCDate()
     )
   ) {
     age--;
@@ -132,14 +137,14 @@ export const saveActorDemographics = async (
       tx,
       boostUsageId,
       BoostDemographicType.PROFESSION,
-      actor.eduWork?.profession
+      actor.eduWork?.profession?.name
     ),
 
     incrementDemographic(
       tx,
       boostUsageId,
       BoostDemographicType.RELIGION,
-      actor.profile?.religion
+      actor.profile?.religion?.name
     ),
 
     incrementDemographic(
