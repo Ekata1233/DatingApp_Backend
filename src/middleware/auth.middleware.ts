@@ -238,39 +238,40 @@ const authMiddleware = async (
 
     next();
 
-  } catch (error: any) {
+  }catch (error: any) {
 
-    if (
-      error?.name ===
-      "TokenExpiredError"
-    ) {
-      return res.status(401).json({
-        success: false,
-        message: "Token expired",
-      });
-    }
+  console.error("========== AUTH ERROR ==========");
 
-    if (
-      error?.name ===
-      "JsonWebTokenError"
-    ) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token",
-      });
-    }
+  console.error("Error Name:", error?.name);
 
-    console.error(
-      "Auth Middleware Error:",
-      error,
-    );
+  console.error("Error Message:", error?.message);
 
+  console.error("Error Code:", error?.code);
+
+  console.error("Error Stack:", error?.stack);
+
+  console.error("===============================");
+
+  if (error?.name === "TokenExpiredError") {
     return res.status(401).json({
       success: false,
-      message:
-        "Invalid or expired token",
+      message: "Token expired",
     });
   }
+
+  if (error?.name === "JsonWebTokenError") {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid token",
+    });
+  }
+
+  // Unexpected server or database error
+  return res.status(500).json({
+    success: false,
+    message: "Internal authentication error",
+  });
+}
 };
 
 export default authMiddleware;

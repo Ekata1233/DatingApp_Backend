@@ -529,47 +529,51 @@ export const getMyBoostService = async (
   userId: string,
   type?: BoostType
 ) => {
-  const userBoost = await prisma.userBoost.findFirst({
+  const boostType = type ?? BoostType.BOOST;
+
+  // 1. Get Boost information
+  const boost = await prisma.boost.findUnique({
     where: {
-      user_id: userId,
-      is_active: true,
-
-      ...(type && {
-        Boost: {
-          is: {
-            name: type,
-          },
-        },
-      }),
+      name: boostType,
     },
-
-    orderBy: {
-      created_at: "desc",
-    },
-
     select: {
-      remaining_boosts: true,
-      expires_at: true,
-
-      Boost: {
-        select: {
-          benefits: true,
-        },
-      },
+      id: true,
+      name: true,
+      benefits: true,
     },
   });
 
-  if (!userBoost) {
-    return {
-      benefits: null,
-      remaining_boosts: 0,
-      expires_at: null,
-    };
+  if (!boost) {
+    throw new Error(`Boost type ${boostType} not found`);
   }
 
+  // 2. Get user's BOOST wallet
+  const userBoost = await prisma.userBoost.findFirst({
+    where: {
+      user_id: userId,
+      boostId: boost.id,
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+    select: {
+      id: true,
+      remaining_boosts: true,
+      expires_at: true,
+      is_active: true,
+    },
+  });
+
+  console.log("Boost:", boost.name);
+  console.log("User Boost:", userBoost);
+
+  // 3. Return Boost benefits and wallet information
   return {
-    benefits: userBoost.Boost?.benefits ?? null,
-    remaining_boosts: userBoost.remaining_boosts,
-    expires_at: userBoost.expires_at,
+    user_boost_id: userBoost?.id ?? null,
+    name: boost.name,
+    benefits: boost.benefits ?? null,
+    remaining_boosts: userBoost?.remaining_boosts ?? 0,
+    expires_at: userBoost?.expires_at ?? null,
+    is_active: userBoost?.is_active ?? false,
   };
 };

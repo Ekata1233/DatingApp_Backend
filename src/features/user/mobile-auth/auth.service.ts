@@ -145,9 +145,16 @@ export const sendOtp = async ({
 // Database stores number like +919876543210
 const formattedNumber = `+91${cleanedPhone}`;
 
-const existingUser = await prisma.user.findUnique({
+const existingUser = await prisma.user.findFirst({
   where: {
     phone_number: formattedNumber,
+
+    // Ignore old deleted accounts
+    account_status: {
+      not: "DELETED",
+    },
+
+    deleted_at: null,
   },
   select: {
     id: true,
@@ -155,17 +162,6 @@ const existingUser = await prisma.user.findUnique({
     deleted_at: true,
   },
 });
-
-// =========================================================
-// BLOCK DELETED ACCOUNT
-// =========================================================
-
-if (
-  existingUser?.account_status === "DELETED" ||
-  existingUser?.deleted_at !== null
-) {
-  throw new Error("ACCOUNT_DELETED");
-}
 
 const userAlreadyRegister = !!existingUser;
 
@@ -451,27 +447,22 @@ const handleVerifiedUser = async ({
        * =====================================================
        */
 
-      const existingUser = await tx.user.findUnique({
+const existingUser = await tx.user.findFirst({
   where: {
     phone_number: formattedNumber,
+
+    // Only find account that is not deleted
+    account_status: {
+      not: "DELETED",
+    },
+
+    deleted_at: null,
   },
 });
 
 if (existingUser) {
-
   // =====================================================
-  // CHECK DELETED ACCOUNT
-  // =====================================================
-
-  if (
-    existingUser.account_status === "DELETED" ||
-    existingUser.deleted_at !== null
-  ) {
-    throw new Error("ACCOUNT_DELETED");
-  }
-
-  // =====================================================
-  // EXISTING USER LOGIN
+  // EXISTING ACTIVE / PAUSED USER LOGIN
   // =====================================================
 
   isRegister = false;
