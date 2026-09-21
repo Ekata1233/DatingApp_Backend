@@ -429,7 +429,7 @@ export const getAllEventsController = async (
   }
 };
 
-//get for mobile card
+// Get events for mobile card 
 export const getEventListController = async (
   req: Request,
   res: Response,
@@ -446,41 +446,13 @@ export const getEventListController = async (
 
     const freeOnly = req.query.freeOnly === "true";
 
-    // Get logged-in user from token
-    const userId = (req as any).user?.id;
-  
-    
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    // Get user's gender
-    const user = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-      select: {
-        gender: true,
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
     const events = await EventService.getEventList(
       eventType && eventType !== "ALL"
         ? (eventType as Type)
         : undefined,
       dateFilter,
       freeOnly,
-      user.gender ?? undefined
+      undefined
     );
 
     return res.status(200).json({

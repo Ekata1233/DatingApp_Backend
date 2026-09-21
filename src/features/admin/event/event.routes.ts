@@ -40,7 +40,7 @@ router.get(
 );
 router.get(
   "/events/get",
-   authMiddleware,
+   
   getEventListController
 );
 router.get(
