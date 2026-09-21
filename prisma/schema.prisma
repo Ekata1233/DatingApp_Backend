@@ -128,6 +128,10 @@ model User {
   blockedBy        UserBlock[]          @relation("UserBlocked")
   BoostReachUser   BoostReachUser[]
 
+  //verification
+  verifications        UserVerification[]
+  governmentIdAttempts GovernmentIdAttempt[]
+
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])
@@ -713,6 +717,96 @@ model Prompt {
   @@index([categoryId])
   @@index([active])
   @@map("prompts")
+}
+
+enum VerificationType {
+  GOVERNMENT_ID
+  FACE_VERIFICATION
+  VIDEO_VERIFICATION
+  EDUCATION_VERIFICATION
+  PROFESSIONAL_VERIFICATION
+  CRIMINAL_BACKGROUND_CHECK
+  EMERGENCY_CONTACT
+  INCOME_VERIFICATION
+}
+
+enum VerificationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  VERIFIED
+  REJECTED
+  EXPIRED
+  LOCKED
+}
+
+enum GovernmentIdType {
+  AADHAAR
+  PAN
+  DRIVING_LICENSE
+}
+
+model UserVerification {
+  id               String             @id @default(uuid()) @db.Uuid
+  userId           String             @db.Uuid
+  type             VerificationType
+  status           VerificationStatus @default(NOT_STARTED)
+  points           Int                @default(0)
+  maxPoints        Int
+  governmentIdType GovernmentIdType?
+  startedAt        DateTime?
+  verifiedAt       DateTime?
+  expiresAt        DateTime?
+  provider         String?
+  providerRef      String?
+  rejectionReason  String?
+  metadata         Json?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  attempts GovernmentIdAttempt[]
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@map("user_verifications")
+}
+
+enum GovernmentIdAttemptStatus {
+  INITIATING
+  PENDING
+  AUTHORIZED
+  DENIED
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+
+model GovernmentIdAttempt {
+  id                String                    @id @default(uuid()) @db.Uuid
+  userId            String                    @db.Uuid
+  verificationId    String                    @db.Uuid
+  documentType      GovernmentIdType
+  status            GovernmentIdAttemptStatus @default(INITIATING)
+  transactionId     String?                   @unique
+  referenceId       String                    @unique
+  callbackStateHash String                    @unique
+  providerRequestId String?
+  consentGivenAt    DateTime
+  authorizedAt      DateTime?
+  completedAt       DateTime?
+  expiresAt         DateTime?
+  failureReason     String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([verificationId, status])
+  @@map("government_id_attempts")
 }
 
 model UserBlock {

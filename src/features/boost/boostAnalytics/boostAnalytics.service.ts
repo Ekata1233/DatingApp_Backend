@@ -22,6 +22,12 @@ interface TrackBoostEventInput {
   eventType: BoostEventType;
 }
 
+type DemographicRecord = {
+  type: BoostDemographicType;
+  label: string;
+  count: number;
+};
+
 const getHourStart = () => {
   const date = new Date();
 
@@ -328,6 +334,15 @@ export const getBoostPerformanceService = async (
       )
       : 0;
 
+        // -----------------------------------------
+  // NEW: Calculate demographic percentages
+  // -----------------------------------------
+
+  const demographics =
+    calculateDemographicPercentages(
+      usage.demographicStats
+    );
+
   return {
 
     id: usage.id,
@@ -415,7 +430,79 @@ export const getBoostPerformanceService = async (
         })
       ),
 
-    demographics:
-      usage.demographicStats,
+    demographics,
   };
+};
+
+
+export const calculateDemographicPercentages = (
+  demographics: DemographicRecord[]
+) => {
+  type DemographicItem = DemographicRecord & {
+    percentage: number;
+  };
+
+  type DemographicGroup = {
+    total: number;
+    top: DemographicItem | null;
+    items: DemographicItem[];
+  };
+
+  const result: Record<
+    string,
+    DemographicGroup
+  > = {};
+
+  // Initialize all demographic categories
+  for (const type of Object.values(BoostDemographicType)) {
+    result[type.toLowerCase()] = {
+      total: 0,
+      top: null,
+      items: [],
+    };
+  }
+
+  // Step 1: Calculate total count for each type
+  for (const item of demographics) {
+    const key = item.type.toLowerCase();
+
+    result[key].total += item.count;
+  }
+
+  // Step 2: Calculate percentage for each label
+  for (const item of demographics) {
+    const key = item.type.toLowerCase();
+
+    const total = result[key].total;
+
+    const percentage =
+      total > 0
+        ? Number(
+            (
+              (item.count / total) *
+              100
+            ).toFixed(2)
+          )
+        : 0;
+
+    result[key].items.push({
+      type: item.type,
+      label: item.label,
+      count: item.count,
+      percentage,
+    });
+  }
+
+  // Step 3: Sort and select top category
+  for (const group of Object.values(result)) {
+    group.items.sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.label.localeCompare(b.label)
+    );
+
+    group.top = group.items[0] ?? null;
+  }
+
+  return result;
 };

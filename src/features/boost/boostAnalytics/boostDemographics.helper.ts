@@ -171,3 +171,136 @@ export const saveActorDemographics = async (
     ),
   ]);
 };
+
+// =====================================================
+// 5. CALCULATE DEMOGRAPHIC PERCENTAGES
+// =====================================================
+
+type DemographicRecord = {
+  type: BoostDemographicType;
+  label: string;
+  count: number;
+};
+
+export const calculateDemographicPercentages = (
+  demographics: DemographicRecord[]
+) => {
+  // Total count for each demographic type
+  const totals: Record<string, number> = {};
+
+  for (const item of demographics) {
+    totals[item.type] =
+      (totals[item.type] || 0) + item.count;
+  }
+
+  // Calculate percentage for every label
+  return demographics.map((item) => {
+    const total = totals[item.type] || 0;
+
+    const percentage =
+      total > 0
+        ? Number(
+          (
+            (item.count / total) *
+            100
+          ).toFixed(2)
+        )
+        : 0;
+
+    return {
+      type: item.type,
+      label: item.label,
+      count: item.count,
+      percentage,
+    };
+  });
+};
+
+// =====================================================
+// 6. GET FORMATTED BOOST DEMOGRAPHICS
+// =====================================================
+
+export const getFormattedBoostDemographics = async (
+  boostUsageId: string
+) => {
+  // Fetch demographic counts from database
+  const demographics =
+    await prisma.boostDemographicStats.findMany({
+      where: {
+        boost_usage_id: boostUsageId,
+      },
+
+      select: {
+        type: true,
+        label: true,
+        count: true,
+      },
+
+      orderBy: [
+        {
+          type: "asc",
+        },
+        {
+          count: "desc",
+        },
+        {
+          label: "asc",
+        },
+      ],
+    });
+
+  // Calculate percentages
+  const calculated =
+    calculateDemographicPercentages(
+      demographics
+    );
+
+  type DemographicItem =
+    (typeof calculated)[number];
+
+  type DemographicGroup = {
+    total: number;
+    top: DemographicItem | null;
+    items: DemographicItem[];
+  };
+
+  const result: Record<
+    string,
+    DemographicGroup
+  > = {};
+
+  // Initialize all demographic types
+  for (
+    const type of Object.values(
+      BoostDemographicType
+    )
+  ) {
+    result[type.toLowerCase()] = {
+      total: 0,
+      top: null,
+      items: [],
+    };
+  }
+
+  // Group records by demographic type
+  for (const item of calculated) {
+    const key = item.type.toLowerCase();
+
+    result[key].total += item.count;
+
+    result[key].items.push(item);
+  }
+
+  // Sort each category and select top value
+  for (const group of Object.values(result)) {
+    group.items.sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.label.localeCompare(b.label)
+    );
+
+    group.top = group.items[0] || null;
+  }
+
+  return result;
+};

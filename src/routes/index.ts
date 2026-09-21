@@ -80,6 +80,7 @@ import payoutMethodRoutes from "../features/accountSettings/payout-method/payout
 import privacyControlsRoutes from "../features/accountSettings/privacy-controls/privacy-controls.routes"
 import accountRoutes from "../features/accountSettings/account/account.routes"
 import boostAnalyticsRoutes from "../features/boost/boostAnalytics/boostAnalytics.routes"
+import governmentIdVerifcationRoute from "../features/verification/government_id/government-id.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -185,5 +186,9 @@ router.use("/user", unmatchRoutes)
 
 //BOOST ANALYTICS
 router.use("/user", boostAnalyticsRoutes)
+//
+
+//USER VERIFICATION
+router.use("/user", governmentIdVerifcationRoute)
 //
 export default router;
