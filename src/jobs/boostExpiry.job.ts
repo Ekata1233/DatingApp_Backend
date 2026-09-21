@@ -20,5 +20,5 @@ export const startBoostExpiryJob = () => {
     }
   });
 
-  console.log("Boost expiry job started");
+  console.log("✅ Boost expiry job started");
 };
