@@ -49,7 +49,7 @@ export const generateCCRVReport = async (
 
   const response = await axios.post(
 
-    `${GRIDLINES_BASE_URL}/generate-report`,
+    `${GRIDLINES_BASE_URL}/ccrv-api/generate-report`,
 
     payload,
 

@@ -9,6 +9,7 @@ import { prisma } from "../../../prisma/prismaClient";
 import {
   verifyFaceWithGridlines,
 } from "./face-match.provider";
+import { getGovernmentIdPhoto } from "../government_id/government-id-photo.service";
 
 const FACE_POINTS = 5;
 
@@ -102,7 +103,8 @@ export const verifyUserFaceService = async (
   // 6. Retrieve authenticated Government ID photo
   const governmentPhoto =
     await getGovernmentIdPhoto(
-      governmentId.governmentIdPhotoKey
+      governmentId.governmentIdPhotoKey,
+      userId
     );
 
   if (

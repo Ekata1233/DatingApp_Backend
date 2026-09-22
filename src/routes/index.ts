@@ -81,66 +81,68 @@ import privacyControlsRoutes from "../features/accountSettings/privacy-controls/
 import accountRoutes from "../features/accountSettings/account/account.routes"
 import boostAnalyticsRoutes from "../features/boost/boostAnalytics/boostAnalytics.routes"
 import governmentIdVerifcationRoute from "../features/verification/government_id/government-id.routes"
+import criminalBackgroundVerification from "../features/verification/criminal_background/ccrv.routes"
+import faceMatchVerification from "../features/verification/face_match/face-verification.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
-router.use("/sexual-orientation",sexualOrientationRoutes)
-router.use("/lifestyle",lifestyleRoutes)
-router.use("/lookingFor",lookingForRoutes)
-router.use("/realYouMatters",realYouMattersRoutes)
-router.use("/thingsYouLove",thingsYouLoveRoutes)
+router.use("/sexual-orientation", sexualOrientationRoutes)
+router.use("/lifestyle", lifestyleRoutes)
+router.use("/lookingFor", lookingForRoutes)
+router.use("/realYouMatters", realYouMattersRoutes)
+router.use("/thingsYouLove", thingsYouLoveRoutes)
 router.use("/religion", religionRoutes);
 router.use("/education", educationRoutes);
 router.use("/workDetails", workDetailsRoutes);
 router.use("/interestHobbies", interestHobbiesRoutes);
 router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
-router.use("/package",packageRoutes)
-router.use("/intention",intentionRoutes)
-router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambitionRoutes,salaryRangeRoutes,promptRoutes,familyProfileRoutes,languageRoutes,waitlistRoutes,referEarnRoute,giftsRoutes,complimentRoutes,eventRoutes,employeeRoutes,employeesRoutes,purchaseRoutes,boostRoutes,reportRoutes,supportRoutes,globalAmountsRoutes);
+router.use("/package", packageRoutes)
+router.use("/intention", intentionRoutes)
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes);
 
 
 
-router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute,eventPartnerRoutes);
-router.use("/user",waitlistRoutes,userRoutes)
+router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, eventPartnerRoutes);
+router.use("/user", waitlistRoutes, userRoutes)
 router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,giftRoutes,datePlanUserBoostRoutes,compliRoutes,eventsRoutes,privacyControlsRoutes,accountRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes)
 
-router.use("/user",mobileAuthRoutes,googleAuthRoutes,userManageRoutes,profileRoutes,referralRoutes,userWaitlistRoutes,roseRoutes ,editProfileRoutes,compliRoutes,eventsRoutes,payoutMethodRoutes)
-router.use("/user",blockRoutes)
-router.use("/user",reportRoutes)
-router.use("/user",feedRoutes)
-router.use("/user",detailsRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes, eventsRoutes, payoutMethodRoutes)
+router.use("/user", blockRoutes)
+router.use("/user", reportRoutes)
+router.use("/user", feedRoutes)
+router.use("/user", detailsRoutes)
 
 
 
 //last seen & online status 
-router.use("/user",lastActivityRoutes)
+router.use("/user", lastActivityRoutes)
 //end of presence handling
 
 //swipe routes
-router.use("/user", swipeRoutes,supportRoutes);
+router.use("/user", swipeRoutes, supportRoutes);
 //
 router.use("/user", userBoostRoutes);
 //gift , compliment, rose NEW MATCHES
 router.use("/user", newMatchesRoutes)
 //
 
-router.use("/user", dateNowRoutes,myPlanRoutes);
+router.use("/user", dateNowRoutes, myPlanRoutes);
 
 router.use("/user", purchaseStoreRoutes);
 
 router.use(
   "/admin/date-now",
-  dateNowAdminRoutes,datePlanBoostRoutes
+  dateNowAdminRoutes, datePlanBoostRoutes
 );
 router.use("/user/date-now", dateNowAdminRoutes);
 
 router.use('/payments', paymentRoutes);
-router.use('/revenue', giftsRoutes,complimentRoutes);
+router.use('/revenue', giftsRoutes, complimentRoutes);
 
 router.use("/user/chat", chatRoutes);
 
@@ -161,11 +163,11 @@ router.use("/user", userNotificationRoutes)
 //
 
 //ONBOARDING - DETAILS
-router.use("/user",onboardingRoutes);
+router.use("/user", onboardingRoutes);
 //
 
 //RELATIONSHIP TAG
-router.use("/user", relationshipTagRoutes); 
+router.use("/user", relationshipTagRoutes);
 //
 
 //MY BALANCE
@@ -189,6 +191,7 @@ router.use("/user", boostAnalyticsRoutes)
 //
 
 //USER VERIFICATION
-router.use("/user", governmentIdVerifcationRoute)
+router.use("/user", criminalBackgroundVerification, faceMatchVerification)
+router.use("/verification/user", governmentIdVerifcationRoute)
 //
 export default router;
