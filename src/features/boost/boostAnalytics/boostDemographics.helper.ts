@@ -151,7 +151,7 @@ export const saveActorDemographics = async (
       tx,
       boostUsageId,
       BoostDemographicType.COMMUNITY,
-      actor.profile?.community
+      actor.profile?.community?.name
     ),
 
     incrementDemographic(
