@@ -47,32 +47,48 @@ export const applyReferral = async (
 ) => {
   return await prisma.$transaction(async (tx) => {
 
+    // -----------------------------------------
+    // 1. Normalize referral code
+    // -----------------------------------------
+
     referralCode = referralCode.trim().toUpperCase();
+
+    // -----------------------------------------
+    // 2. Find current user
+    // -----------------------------------------
 
     const currentUser = await tx.user.findUnique({
       where: {
-        id: userId
-      }
+        id: userId,
+      },
     });
 
     if (!currentUser) {
       throw new Error("User not found.");
     }
 
+    // -----------------------------------------
+    // 3. Check referral already applied
+    // -----------------------------------------
+
     const alreadyApplied = await tx.userReferral.findUnique({
       where: {
-        referredUserId: userId
-      }
+        referredUserId: userId,
+      },
     });
 
     if (alreadyApplied) {
       throw new Error("Referral already applied.");
     }
 
+    // -----------------------------------------
+    // 4. Find referrer
+    // -----------------------------------------
+
     const referrer = await tx.user.findUnique({
       where: {
-        referralCode
-      }
+        referralCode,
+      },
     });
 
     if (!referrer) {
@@ -83,18 +99,27 @@ export const applyReferral = async (
       throw new Error("Referral code is inactive.");
     }
 
+    // -----------------------------------------
+    // 5. Prevent self referral
+    // -----------------------------------------
+
     if (referrer.id === currentUser.id) {
       throw new Error(
         "You cannot use your own referral code."
       );
     }
 
-    const reverseReferral = await tx.userReferral.findFirst({
-      where: {
-        referrerId: userId,
-        referredUserId: referrer.id
-      }
-    });
+    // -----------------------------------------
+    // 6. Prevent reverse referral
+    // -----------------------------------------
+
+    const reverseReferral =
+      await tx.userReferral.findFirst({
+        where: {
+          referrerId: userId,
+          referredUserId: referrer.id,
+        },
+      });
 
     if (reverseReferral) {
       throw new Error(
@@ -102,21 +127,220 @@ export const applyReferral = async (
       );
     }
 
-    await tx.userReferral.create({
+    // -----------------------------------------
+    // 7. Create referral record
+    // EXISTING CODE
+    // -----------------------------------------
+
+    const referral = await tx.userReferral.create({
       data: {
         referrerId: referrer.id,
         referredUserId: userId,
-        status: "PENDING"
-      }
+        status: "PENDING",
+      },
     });
+
+    // =========================================
+    // NEW CODE STARTS HERE
+    // =========================================
+
+    // -----------------------------------------
+    // 8. Get reward configuration
+    // -----------------------------------------
+
+    const rewardConfig =
+      await tx.rewardConfig.findFirst();
+
+    if (!rewardConfig) {
+      throw new Error(
+        "Reward configuration not found."
+      );
+    }
+
+    const signupReward = new Prisma.Decimal(
+      rewardConfig.signupReward
+    );
+
+    if (signupReward.lessThan(0)) {
+      throw new Error(
+        "Invalid signup reward configuration."
+      );
+    }
+
+    // -----------------------------------------
+    // 9. Find referrer's wallet
+    // -----------------------------------------
+
+    const wallet = await tx.wallet.findUnique({
+      where: {
+        userId: referrer.id,
+      },
+    });
+
+    if (!wallet) {
+      throw new Error(
+        "Referrer wallet not found."
+      );
+    }
+
+    // -----------------------------------------
+    // 10. Calculate wallet balance
+    // -----------------------------------------
+
+    const balanceBefore = new Prisma.Decimal(
+      wallet.balance
+    );
+
+    const balanceAfter =
+      balanceBefore.plus(signupReward);
+
+    console.log(
+      "Referral signup reward:",
+      signupReward.toString()
+    );
+
+    console.log(
+      "Balance before:",
+      balanceBefore.toString()
+    );
+
+    console.log(
+      "Balance after:",
+      balanceAfter.toString()
+    );
+
+    // -----------------------------------------
+    // 11. Update referrer's wallet
+    // -----------------------------------------
+
+    await tx.wallet.update({
+      where: {
+        id: wallet.id,
+      },
+      data: {
+        balance: {
+          increment: signupReward,
+        },
+      },
+    });
+
+    // -----------------------------------------
+    // 12. Create wallet transaction
+    // -----------------------------------------
+
+    await tx.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+
+        amount: signupReward,
+
+        balanceBefore: balanceBefore,
+
+        balanceAfter: balanceAfter,
+
+        type: TransactionType.REWARD,
+
+        status: TransactionStatus.SUCCESS,
+
+        source:
+          TransactionSource.REFERRAL_SIGNUP,
+
+        referenceId: referral.id,
+
+        description:
+          "Referral signup reward",
+      },
+    });
+
+    // -----------------------------------------
+    // 13. Update referral status
+    // -----------------------------------------
+
+    await tx.userReferral.update({
+      where: {
+        id: referral.id,
+      },
+      data: {
+        signupReward: signupReward,
+
+        rewardedAt: new Date(),
+
+        status:
+          ReferralStatus.SIGNUP_REWARDED,
+      },
+    });
+
+    // -----------------------------------------
+    // 14. Get referral statistics
+    // -----------------------------------------
+
+    const referralStats =
+      await tx.userReferralStats.findUnique({
+        where: {
+          userId: referrer.id,
+        },
+      });
+
+    // -----------------------------------------
+    // 15. Update referral statistics
+    // -----------------------------------------
+
+    await tx.userReferralStats.upsert({
+      where: {
+        userId: referrer.id,
+      },
+
+      update: {
+        joinedUsers: {
+          increment: 1,
+        },
+
+        rewardedUsers: {
+          increment: 1,
+        },
+
+        totalCoinsEarned: {
+          increment: Number(signupReward),
+        },
+
+        pendingRewards:
+          referralStats &&
+          referralStats.pendingRewards > 0
+            ? {
+                decrement: 1,
+              }
+            : undefined,
+      },
+
+      create: {
+        userId: referrer.id,
+
+        totalInvites: 1,
+
+        joinedUsers: 1,
+
+        rewardedUsers: 1,
+
+        totalCoinsEarned:
+          Number(signupReward),
+
+        pendingRewards: 0,
+      },
+    });
+
+    // =========================================
+    // NEW CODE ENDS HERE
+    // =========================================
 
     return {
       success: true,
-      message: "Referral applied successfully."
-    };
 
+      message:
+        "Referral applied successfully.",
+
+    };
   });
-}
+};
 
 export const getReferralDashboard = async (
   userId: string,
