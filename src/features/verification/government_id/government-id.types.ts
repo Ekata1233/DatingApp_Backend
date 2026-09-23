@@ -1,4 +1,5 @@
 import { GovernmentIdType } from "@prisma/client";
+import { GovernmentDocumentAddress } from "./government-id.provider";
 
 export interface VerifiedGovernmentDocument {
   transactionConfirmed: boolean;
@@ -15,5 +16,5 @@ export interface VerifiedGovernmentDocument {
 
   portraitBuffer: Buffer | null;
 
-  address: string;
+  address: GovernmentDocumentAddress;
 }

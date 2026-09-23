@@ -131,7 +131,7 @@ model User {
   //verification
   verifications           UserVerification[]
   governmentIdAttempts    GovernmentIdAttempt[]
-  employmentVerifications EmploymentVerification[]
+  employmentVerifications EmploymentVerification?
 
   @@index([phone_number])
   @@index([google_id])
@@ -767,8 +767,8 @@ model UserVerification {
   updatedAt            DateTime           @updatedAt
 
   attempts                GovernmentIdAttempt[]
-  employmentVerifications EmploymentVerification[]
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employmentVerifications EmploymentVerification?
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
   @@index([userId])
@@ -815,7 +815,7 @@ model GovernmentIdAttempt {
 
 model EmploymentVerification {
   id                 String                       @id @default(uuid()) @db.Uuid
-  userId             String                       @db.Uuid
+  userId             String                       @unique @db.Uuid
   verificationId     String                       @unique @db.Uuid
   companyName        String
   joiningDate        DateTime
