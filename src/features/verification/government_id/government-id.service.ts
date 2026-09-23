@@ -573,26 +573,51 @@ export const completeGovernmentIdService = async (
     attempt.documentType
   );
 
-  // 7. Require a portrait if your verification
-  // workflow depends on Government ID photo matching.
+
+  // ==========================================
+  // 7. VALIDATE GOVERNMENT ID PORTRAIT
+  // ==========================================
+
   const portrait = document.portraitBuffer;
 
+  // Aadhaar requires a portrait.
+  // PAN and DL can proceed without a portrait.
+
   if (
-    !portrait ||
-    !Buffer.isBuffer(portrait) ||
-    portrait.length === 0
-  ) {
+    attempt.documentType === GovernmentIdType.AADHAAR &&
+    (
+      !portrait ||
+      !Buffer.isBuffer(portrait) ||
+      portrait.length === 0
+    )) {
     throw new Error(
-      "GOVERNMENT_ID_PORTRAIT_NOT_AVAILABLE"
+      "AADHAAR_PORTRAIT_NOT_AVAILABLE"
     );
   }
 
-  // 8. Upload portrait to private storage
-  const photoKey =
-    await uploadGovernmentIdPhoto(
-      userId,
-      portrait
-    );
+  // ==========================================
+  // 8. UPLOAD PORTRAIT IF AVAILABLE
+  // ==========================================
+
+  let photoKey: string | null = null;
+
+  if (portrait != null) {
+
+    if (
+      !Buffer.isBuffer(portrait) ||
+      portrait.length === 0
+    ) {
+      throw new Error(
+        "INVALID_GOVERNMENT_ID_PORTRAIT"
+      );
+    }
+
+    photoKey =
+      await uploadGovernmentIdPhoto(
+        userId,
+        portrait
+      );
+  }
 
   try {
     // 9. Atomically finalize verification
@@ -649,8 +674,7 @@ export const completeGovernmentIdService = async (
               governmentIdType:
                 attempt.documentType,
 
-              governmentIdPhotoKey:
-                photoKey,
+              governmentIdPhotoKey: photoKey,
 
               points: 10,
 
@@ -682,16 +706,26 @@ export const completeGovernmentIdService = async (
       }
     );
 
+  
   } catch (error) {
-    // Database update failed.
-    // Remove the newly uploaded portrait.
-    try {
-      await deleteGovernmentIdPhoto(photoKey);
-    } catch (cleanupError) {
-      console.error(
-        "Government ID portrait cleanup failed",
-        cleanupError
-      );
+
+    // Delete only a newly uploaded portrait.
+
+    if (photoKey) {
+
+      try {
+
+        await deleteGovernmentIdPhoto(
+          photoKey
+        );
+
+      } catch (cleanupError) {
+
+        console.error(
+          "Government ID portrait cleanup failed",
+          cleanupError
+        );
+      }
     }
 
     throw error;
@@ -713,78 +747,123 @@ export const fetchGovernmentEAadhaar = async (
         headers: {
           "X-Transaction-ID": transactionId,
           "X-Reference-ID": referenceId,
+          "X-Auth-Type": "API-Key",
         },
       }
     );
 
     const result = response.data;
 
-    const responseCode = String(
+    const providerCode = String(
       result?.data?.code ?? ""
     );
 
-    // Successful E-Aadhaar retrieval
-    if (responseCode === "1011") {
-      const aadhaar =
-        result?.data?.eaadhaar;
+    const responsePath = result?.path;
 
-      if (
-        !aadhaar ||
-        typeof aadhaar !== "object" ||
-        Array.isArray(aadhaar)
-      ) {
-        throw new Error(
-          "INVALID_EAADHAAR_RESPONSE"
-        );
-      }
+    const responseTransactionId =
+      result?.data?.transaction_id;
 
-      return aadhaar;
-    }
+    const eaadhaar = result?.data?.eaadhaar;
 
-    // Aadhaar not linked
-    if (responseCode === "1009") {
+    console.log("GRIDLINES EAADHAAR DIAGNOSTICS:", {
+      httpStatus: response.status,
+      responsePath,
+      providerCode,
+      providerMessage: result?.data?.message,
+      transactionMatches:
+        responseTransactionId === transactionId,
+      hasEAadhaar: eaadhaar != null,
+      requestId: result?.request_id,
+    });
+
+    // 1. Validate provider response code.
+    //
+    // 1011: Documented E-Aadhaar success.
+    // 1008: Observed issued-file success response
+    //       from the E-Aadhaar endpoint.
+    //
+    // Confirm the 1008 behavior with Gridlines
+    // before treating it as a permanent contract.
+
+    const acceptedCodes = ["1011", "1008"];
+
+    if (!acceptedCodes.includes(providerCode)) {
       throw new Error(
-        "AADHAAR_NOT_LINKED"
+        `EAADHAAR_FETCH_FAILED: ${providerCode}`
       );
     }
 
-    // Aadhaar unavailable
-    if (responseCode === "1010") {
+    // 2. Validate the response endpoint.
+
+    if (
+      responsePath !== "/digilocker/eaadhaar" &&
+      responsePath !== "/eaadhaar"
+    ) {
       throw new Error(
-        "AADHAAR_NOT_AVAILABLE"
+        "EAADHAAR_RESPONSE_ENDPOINT_MISMATCH"
       );
     }
 
-    // Session expired
-    if (responseCode === "1001") {
+    // 3. Validate transaction ID.
+
+    if (
+      responseTransactionId !== transactionId
+    ) {
       throw new Error(
-        "DIGILOCKER_SESSION_EXPIRED"
+        "EAADHAAR_TRANSACTION_MISMATCH"
       );
     }
 
-    // User consent unavailable
-    if (responseCode === "1018") {
+    // 4. Ensure the response contains data.
+
+    if (
+      !eaadhaar ||
+      typeof eaadhaar !== "object" ||
+      Array.isArray(eaadhaar) ||
+      Object.keys(eaadhaar).length === 0
+    ) {
       throw new Error(
-        "AADHAAR_CONSENT_NOT_AVAILABLE"
+        "EAADHAAR_DOCUMENT_DATA_MISSING"
       );
     }
 
-    throw new Error(
-      "EAADHAAR_FETCH_FAILED"
-    );
+    // 5. Return the actual E-Aadhaar data.
+    //
+    // Do not mark the user VERIFIED here.
+
+    return result.data;
 
   } catch (error: unknown) {
 
     if (axios.isAxiosError(error)) {
+      const providerError = error.response?.data;
+
       console.error(
-        "GRIDLINES EAADHAAR ERROR:",
+        "GRIDLINES EAADHAAR API ERROR:",
         {
-          status: error.response?.status,
-          code:
-            error.response?.data?.error?.code,
-          message:
-            error.response?.data?.error?.message,
+          httpStatus: error.response?.status,
+
+          providerCode:
+            providerError?.error?.code ??
+            providerError?.data?.code,
+
+          providerMessage:
+            providerError?.error?.message ??
+            providerError?.data?.message,
+
+          requestId:
+            providerError?.request_id,
+
+          networkCode: error.code,
         }
+      );
+
+    } else {
+      console.error(
+        "EAADHAAR FETCH ERROR:",
+        error instanceof Error
+          ? error.message
+          : "Unknown error"
       );
     }
 
@@ -792,20 +871,85 @@ export const fetchGovernmentEAadhaar = async (
   }
 };
 
-export const fetchGovernmentIssuedFile = async (
+// export const fetchGovernmentIssuedFile = async (
+//   transactionId: string,
+//   referenceId: string,
+//   fileUri: string
+// ) => {
+//   const response = await gridlinesClient.post(
+//     "/digilocker/issued-file",
+//     {
+//       file_uri: fileUri,
+//       format: "JSON",
+//     },
+//     {
+//       headers: {
+//         "X-Transaction-ID": transactionId,
+//         "X-Reference-ID": referenceId,
+//       },
+//     }
+//   );
+
+//   const result = response.data;
+
+//   const code = String(
+//     result?.data?.code ?? ""
+//   );
+
+//   if (code === "1007") {
+//     throw new Error(
+//       "GOVERNMENT_DOCUMENT_NOT_FOUND"
+//     );
+//   }
+
+//   if (code === "1001") {
+//     throw new Error(
+//       "DIGILOCKER_SESSION_EXPIRED"
+//     );
+//   }
+
+//   if (code === "1017") {
+//     throw new Error(
+//       "DOCUMENT_CONSENT_NOT_AVAILABLE"
+//     );
+//   }
+
+//   if (code !== "1008") {
+//     throw new Error(
+//       "GOVERNMENT_DOCUMENT_FETCH_FAILED"
+//     );
+//   }
+
+//   const document =
+//     result?.data?.document;
+
+//   if (
+//     !document ||
+//     typeof document !== "object" ||
+//     Array.isArray(document)
+//   ) {
+//     throw new Error(
+//       "INVALID_GOVERNMENT_DOCUMENT_RESPONSE"
+//     );
+//   }
+
+//   return document;
+// };
+
+
+export const fetchGovernmentIssuedFiles = async (
   transactionId: string,
-  referenceId: string,
-  fileUri: string
+  referenceId: string
 ) => {
-  const response = await gridlinesClient.post(
-    "/digilocker/issued-file",
-    {
-      file_uri: fileUri,
-      format: "JSON",
-    },
+
+  const response = await gridlinesClient.get(
+    "/digilocker/issued-files",
     {
       headers: {
+        "X-Auth-Type": "API-Key",
+
         "X-Transaction-ID": transactionId,
+
         "X-Reference-ID": referenceId,
       },
     }
@@ -813,31 +957,85 @@ export const fetchGovernmentIssuedFile = async (
 
   const result = response.data;
 
-  const code = String(
-    result?.data?.code ?? ""
+  // Check provider transaction
+
+  const responseTransactionId =
+    result?.data?.transaction_id ??
+    result?.transaction_id;
+
+  if (
+    responseTransactionId !== transactionId
+  ) {
+    throw new Error(
+      "ISSUED_FILES_TRANSACTION_MISMATCH"
+    );
+  }
+
+  // Log only non-sensitive diagnostics.
+
+  console.log(
+    "GRIDLINES ISSUED FILES DIAGNOSTICS:",
+    {
+      httpStatus: response.status,
+
+      providerCode:
+        result?.data?.code,
+
+      providerMessage:
+        result?.data?.message,
+
+      dataFields:
+        result?.data &&
+          typeof result.data === "object"
+          ? Object.keys(result.data)
+          : [],
+    }
   );
 
-  if (code === "1007") {
+  return result.data;
+};
+
+
+export const fetchGovernmentIssuedFile = async (
+  transactionId: string,
+  referenceId: string,
+  fileUri: string
+) => {
+
+  const response = await gridlinesClient.post(
+    "/digilocker/issued-file",
+    {
+      file_uri: fileUri,
+
+      format: "JSON",
+    },
+    {
+      headers: {
+        "X-Auth-Type": "API-Key",
+
+        "X-Transaction-ID": transactionId,
+
+        "X-Reference-ID": referenceId,
+      },
+    }
+  );
+
+  const result = response.data;
+
+  if (
+    String(result?.data?.code) !== "1008"
+  ) {
     throw new Error(
-      "GOVERNMENT_DOCUMENT_NOT_FOUND"
+      "PAN_DOCUMENT_FETCH_FAILED"
     );
   }
 
-  if (code === "1001") {
+  if (
+    result?.data?.transaction_id !==
+    transactionId
+  ) {
     throw new Error(
-      "DIGILOCKER_SESSION_EXPIRED"
-    );
-  }
-
-  if (code === "1017") {
-    throw new Error(
-      "DOCUMENT_CONSENT_NOT_AVAILABLE"
-    );
-  }
-
-  if (code !== "1008") {
-    throw new Error(
-      "GOVERNMENT_DOCUMENT_FETCH_FAILED"
+      "PAN_TRANSACTION_MISMATCH"
     );
   }
 
@@ -850,9 +1048,14 @@ export const fetchGovernmentIssuedFile = async (
     Array.isArray(document)
   ) {
     throw new Error(
-      "INVALID_GOVERNMENT_DOCUMENT_RESPONSE"
+      "PAN_DOCUMENT_NOT_AVAILABLE"
     );
   }
+
+  console.log(
+    "PAN DOCUMENT FIELDS:",
+    Object.keys(document)
+  );
 
   return document;
 };

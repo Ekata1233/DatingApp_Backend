@@ -20,6 +20,7 @@ export interface VerifiedGovernmentDocument {
   // NEW FIELD
 
   portraitBuffer: Buffer | null;
+  address: string;
 
 }
 

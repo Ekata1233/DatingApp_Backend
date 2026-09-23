@@ -14,4 +14,6 @@ export interface VerifiedGovernmentDocument {
   dateOfBirth: Date;
 
   portraitBuffer: Buffer | null;
+
+  address: string;
 }
