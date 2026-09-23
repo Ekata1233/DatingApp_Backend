@@ -7,6 +7,7 @@ import {
 
 import { prisma } from "../../../prisma/prismaClient";
 
+import { EmploymentVerificationStatus } from "@prisma/client";
 import {
   EmploymentMethod,
   LatestEmploymentRecord,

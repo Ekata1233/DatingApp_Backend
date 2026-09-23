@@ -3,6 +3,13 @@ import {
 } from "@prisma/client";
 import imagekit from "../../../utils/imagekit";
 
+export interface GovernmentDocumentAddress {
+  country?: string;
+  state?: string;
+  city?: string;
+  area?: string;
+}
+
 export interface VerifiedGovernmentDocument {
 
   transactionConfirmed: boolean;
@@ -16,11 +23,8 @@ export interface VerifiedGovernmentDocument {
   verifiedName: string;
 
   dateOfBirth: Date;
-
-  // NEW FIELD
-
   portraitBuffer: Buffer | null;
-  address: string;
+  address?: GovernmentDocumentAddress;
 
 }
 

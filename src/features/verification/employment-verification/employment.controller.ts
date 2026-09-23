@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 
 import {
+  EmploymentFile,
   mobileEmploymentSchema,
   uanEmploymentSchema,
 } from "./employment.validation";
@@ -12,6 +13,7 @@ import {
   getMyEmploymentVerificationService,
   getEmploymentVerificationDetailsAdminService,
   reviewEmploymentVerificationService,
+  getEmploymentVerificationsAdminService,
 } from "./employment.service";
 interface EmploymentRequestFiles {
   employmentId?: EmploymentFile | EmploymentFile[];
