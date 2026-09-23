@@ -10,7 +10,7 @@ import {
 import { EditProfileResponse } from "./editProfile.types";
 import { redis } from "../../../../lib/redis";
 import { queueMatchScoreCalculation } from "../../../../queues/match-score.queue";
-import { clearFeedUserCache } from "../../user.helper";
+import { clearFeedUserCache, clearUserFeedDetailsCache } from "../../user.helper";
 import { getProfileRoom } from "../../../chat/profile/profile.socket";
 import { getIO } from "../../../../config/socket";
 import { chatRepository } from "../../../chat/chat.repository";
