@@ -13,7 +13,7 @@ const router = Router();
 // Generate criminal background report
 
 router.post(
-  "/generate",
+  "/criminal-background/generate",
   authMiddleware,
   generateCCRVController
 );
@@ -21,7 +21,7 @@ router.post(
 // Fetch criminal background report
 
 router.get(
-  "/fetch",
+  "/criminal-background/fetch",
   authMiddleware,
   fetchCCRVController
 );

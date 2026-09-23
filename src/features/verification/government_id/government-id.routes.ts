@@ -14,29 +14,39 @@ const router = Router();
 
 // Start DigiLocker verification
 router.post(
-  "verification/government-id/init",
+  "/government-id/init",
   authMiddleware,
   initGovernmentIdController
 );
 
 // Gridlines redirects here after authorization
 router.get(
-  "verification/government-id/callback",
+  "/government-id/callback",
   governmentIdCallbackController
 );
 
 // Fetch and verify selected Government ID
 router.post(
-  "verification/government-id/complete",
+  "/government-id/complete",
   authMiddleware,
   completeGovernmentIdController
 );
 
 // Get current verification status
 router.get(
-  "verification/government-id/status",
+  "/government-id/status",
   authMiddleware,
   getGovernmentIdStatusController
+);
+
+router.get(
+  "/government-id/test",
+  (req, res) => {
+    return res.status(200).json({
+      success: true,
+      message: "Government ID API working",
+    });
+  }
 );
 
 export default router;

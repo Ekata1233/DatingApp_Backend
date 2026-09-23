@@ -129,8 +129,9 @@ model User {
   BoostReachUser   BoostReachUser[]
 
   //verification
-  verifications        UserVerification[]
-  governmentIdAttempts GovernmentIdAttempt[]
+  verifications           UserVerification[]
+  governmentIdAttempts    GovernmentIdAttempt[]
+  employmentVerifications EmploymentVerification[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -752,6 +753,7 @@ model UserVerification {
   status               VerificationStatus @default(NOT_STARTED)
   points               Int                @default(0)
   maxPoints            Int
+  verifiedName         String?
   governmentIdType     GovernmentIdType?
   governmentIdPhotoKey String?
   startedAt            DateTime?
@@ -764,8 +766,9 @@ model UserVerification {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  attempts GovernmentIdAttempt[]
-  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts                GovernmentIdAttempt[]
+  employmentVerifications EmploymentVerification[]
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
   @@index([userId])
@@ -808,6 +811,41 @@ model GovernmentIdAttempt {
   @@index([userId, createdAt])
   @@index([verificationId, status])
   @@map("government_id_attempts")
+}
+
+model EmploymentVerification {
+  id                 String                       @id @default(uuid()) @db.Uuid
+  userId             String                       @db.Uuid
+  verificationId     String                       @unique @db.Uuid
+  companyName        String
+  joiningDate        DateTime
+  isCurrentlyWorking Boolean                      @default(true)
+  employmentIdUrl    String
+  salarySlipUrl      String
+  bankStatementUrl   String
+  status             EmploymentVerificationStatus @default(NOT_STARTED)
+  reviewedBy         String?                      @db.Uuid
+  reviewedAt         DateTime?
+  verifiedAt         DateTime?
+  rejectionReason    String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([verificationId])
+  @@index([status])
+}
+
+enum EmploymentVerificationStatus {
+  NOT_STARTED
+  PENDING
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
 }
 
 model UserBlock {

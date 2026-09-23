@@ -1,47 +1,113 @@
-import { GovernmentIdType } from "@prisma/client";
+import {
+  GovernmentIdType,
+} from "@prisma/client";
+import imagekit from "../../../utils/imagekit";
 
-export type VerifiedGovernmentDocument = {
+export interface VerifiedGovernmentDocument {
+
+  transactionConfirmed: boolean;
+
+  documentAccessConfirmed: boolean;
+
+  isAuthentic: boolean;
+
   documentType: GovernmentIdType;
 
   verifiedName: string;
 
   dateOfBirth: Date;
 
-  // Provider-confirmed, issuer-backed document
-  isAuthentic: boolean;
+  // NEW FIELD
 
-  // Result of provider-side transaction validation
-  transactionConfirmed: boolean;
+  portraitBuffer: Buffer | null;
+  address: string;
 
-  // Whether the selected document was retrieved
-  // through the authorized DigiLocker transaction
-  documentAccessConfirmed: boolean;
-};
+}
+
+// ------------------------------------------
+// Fetch verified document from Gridlines
+// ------------------------------------------
 
 export const fetchAndVerifyGovernmentDocument = async (
   transactionId: string,
   documentType: GovernmentIdType
 ): Promise<VerifiedGovernmentDocument> => {
 
-  // TODO: Integrate the corresponding Gridlines
-  // document API using the saved transactionId.
-  //
-  // AADHAAR:
-  //   Fetch E-Aadhaar
-  //
-  // PAN:
-  //   Pull PAN or Fetch Issued File
-  //
-  // DRIVING_LICENSE:
-  //   Fetch Issued Files and Fetch Issued File
-  //
-  // Confirm transaction authorization server-side.
-  // Validate the document's issuer and document type.
-  // Extract verified name and date of birth.
-  //
-  // Never accept these fields from the Flutter app.
+  if (!transactionId) {
+    throw new Error(
+      "GRIDLINES_TRANSACTION_ID_REQUIRED"
+    );
+  }
+
+  switch (documentType) {
+
+    case GovernmentIdType.AADHAAR:
+      // TODO:
+      // Call the documented Gridlines
+      // E-Aadhaar retrieval API.
+      //
+      // Verify the authorized transaction,
+      // document issuer and document type.
+      //
+      // Extract verified identity fields
+      // and portrait if supplied.
+      break;
+
+    case GovernmentIdType.PAN:
+      // TODO:
+      // Call the documented Gridlines
+      // PAN document retrieval API.
+      //
+      // Validate the document and
+      // extract the available identity data.
+      break;
+
+    case GovernmentIdType.DRIVING_LICENSE:
+      // TODO:
+      // Call the documented Gridlines
+      // Driving Licence retrieval API.
+      //
+      // Validate the issuer and document.
+      break;
+
+    default:
+      throw new Error(
+        "UNSUPPORTED_GOVERNMENT_ID_TYPE"
+      );
+  }
+
+  // Do not return fabricated identity data
+  // or mark verification successful.
 
   throw new Error(
     `GRIDLINES_DOCUMENT_API_NOT_CONFIGURED: ${documentType}`
   );
+};
+
+// ------------------------------------------
+// Delete Government ID photo from ImageKit
+// ------------------------------------------
+
+export const deleteGovernmentIdPhoto = async (
+  photoKey: string
+): Promise<void> => {
+  if (!photoKey) {
+    throw new Error(
+      "GOVERNMENT_ID_PHOTO_KEY_REQUIRED"
+    );
+  }
+
+  try {
+    await imagekit.deleteFile(photoKey);
+
+  } catch (error: any) {
+    console.error(
+      "Government ID photo deletion failed:",
+      error.message
+    );
+
+    throw new Error(
+      "GOVERNMENT_ID_PHOTO_DELETE_FAILED"
+    );
+  }
 };

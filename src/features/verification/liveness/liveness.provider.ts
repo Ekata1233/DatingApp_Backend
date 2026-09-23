@@ -1,7 +1,7 @@
 
 import { randomUUID } from "crypto";
+import { gridlinesClient } from "../../../utils/gridlines.client";
 
-import { gridlinesClient } from "./gridlines.client";
 
 export interface LivenessResult {
   isLive: boolean;

@@ -7,11 +7,12 @@ import {
 import { GovernmentIdType, VerificationType } from "@prisma/client";
 
 import {
-    completeGovernmentIdService,
-    handleGovernmentIdCallback,
+  completeGovernmentIdService,
+  handleGovernmentIdCallback,
   initGovernmentIdService,
 } from "./government-id.service";
 import { prisma } from "../../../prisma/prismaClient";
+import axios from "axios";
 
 export const initGovernmentIdController = async (
   req: Request,
@@ -19,6 +20,10 @@ export const initGovernmentIdController = async (
   next: NextFunction
 ) => {
   try {
+    // -----------------------------------------
+    // 1. Get authenticated user
+    // -----------------------------------------
+
     const userId = (req as any).user?.id;
 
     if (!userId) {
@@ -28,18 +33,47 @@ export const initGovernmentIdController = async (
       });
     }
 
-    const { documentType, consent } = req.body;
+    // -----------------------------------------
+    // 2. Validate request body
+    // -----------------------------------------
 
     if (
+      !req.body ||
+      typeof req.body !== "object" ||
+      Array.isArray(req.body)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Request body is required",
+        example: {
+          documentType: "AADHAAR",
+          consent: true,
+        },
+      });
+    }
+
+    const { documentType, consent } = req.body;
+
+    // -----------------------------------------
+    // 3. Validate Government ID type
+    // -----------------------------------------
+
+    if (
+      typeof documentType !== "string" ||
       !Object.values(GovernmentIdType).includes(
-        documentType
+        documentType as GovernmentIdType
       )
     ) {
       return res.status(400).json({
         success: false,
         message: "Invalid Government ID type",
+        allowedTypes: Object.values(GovernmentIdType),
       });
     }
+
+    // -----------------------------------------
+    // 4. Validate user consent
+    // -----------------------------------------
 
     if (consent !== true) {
       return res.status(400).json({
@@ -48,21 +82,59 @@ export const initGovernmentIdController = async (
       });
     }
 
+    // -----------------------------------------
+    // 5. Initialize Government ID verification
+    // -----------------------------------------
+
     const result = await initGovernmentIdService(
       userId,
-      documentType,
+      documentType as GovernmentIdType,
       consent
     );
 
+    // -----------------------------------------
+    // 6. Return successful response
+    // -----------------------------------------
+
     return res.status(200).json({
       success: true,
-      message:
-        "DigiLocker authorization URL generated",
+      message: "DigiLocker authorization URL generated",
       data: result,
     });
 
-  } catch (error) {
-    next(error);
+  } catch (error: unknown) {
+
+    // -----------------------------------------
+    // 7. Handle external API errors
+    // -----------------------------------------
+
+    if (axios.isAxiosError(error)) {
+
+      const providerStatus = error.response?.status;
+
+      console.error("Government ID Provider Error:", {
+        status: providerStatus,
+        data: error.response?.data,
+      });
+
+      return res.status(502).json({
+        success: false,
+        message:
+          "Government ID verification provider rejected the request",
+        errorCode: "GOVERNMENT_ID_PROVIDER_ERROR",
+      });
+    }
+
+    // -----------------------------------------
+    // 8. Handle other errors
+    // -----------------------------------------
+
+    console.error(
+      "Government ID Initialization Error:",
+      error
+    );
+
+    return next(error);
   }
 };
 
@@ -135,15 +207,17 @@ export const completeGovernmentIdController = async (
       });
     }
 
-    const { attemptId } = req.body;
+const { attemptId } = req.body ?? {};
 
     if (
       typeof attemptId !== "string" ||
-      !attemptId
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        attemptId
+      )
     ) {
       return res.status(400).json({
         success: false,
-        message: "attemptId is required",
+        message: "Valid attemptId is required",
       });
     }
 

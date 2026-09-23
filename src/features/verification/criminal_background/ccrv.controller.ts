@@ -18,6 +18,7 @@ import {
     Prisma,
     VerificationStatus,
 } from "@prisma/client";
+import axios from "axios";
 
 // -----------------------------------------
 // Helpers
@@ -377,11 +378,21 @@ export const generateCCRVController = async (
         });
 
     } catch (error: any) {
-
-        console.error(
-            "Generate CCRV Error:",
-            error
-        );
+        if (axios.isAxiosError(error)) {
+            console.error("Gridlines API Error:", {
+                status: error.response?.status,
+                error: error.response?.data?.error,
+                requestId: error.response?.data?.request_id,
+                message: error.response?.data?.message,
+            });
+        } else {
+            console.error(
+                "Generate CCRV Error:",
+                error instanceof Error
+                    ? error.message
+                    : "Unknown error"
+            );
+        }
 
         return res.status(500).json({
             success: false,
