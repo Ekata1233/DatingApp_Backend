@@ -81,6 +81,7 @@ import privacyControlsRoutes from "../features/accountSettings/privacy-controls/
 import accountRoutes from "../features/accountSettings/account/account.routes"
 import boostAnalyticsRoutes from "../features/boost/boostAnalytics/boostAnalytics.routes"
 import governmentIdVerifcationRoute from "../features/verification/government_id/government-id.routes"
+import employementVerificationRoutes from "../features/verification/employment-verification/employment.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -102,7 +103,7 @@ router.use("/admin",professionRoutes,employmentTypeRoutes,ExperienceRoutes,ambit
 
 
 router.use("/onboarding",professionRoutes,employmentTypeRoutes,ExperienceRoutes,intentionRoutes,interestRoutes,ambitionRoutes,salaryRangeRoutes,languageRoutes,promptRoutes,referEarnRoute,eventPartnerRoutes);
-router.use("/user",waitlistRoutes,userRoutes)
+router.use("/user",waitlistRoutes,userRoutes,employementVerificationRoutes)
 router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
