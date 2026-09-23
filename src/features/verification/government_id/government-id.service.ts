@@ -12,6 +12,7 @@ import { gridlinesClient } from "../../../utils/gridlines.client";
 import { deleteGovernmentIdPhoto, fetchAndVerifyGovernmentDocument } from "./government-id.provider";
 import axios from "axios";
 import { uploadGovernmentIdPhoto } from "./government-id.storage";
+import { getVerifiedGovernmentDocument, validateGovernmentIdentity } from "./government-id.helper";
 
 
 const hashState = (value: string) =>
@@ -470,9 +471,7 @@ export const completeGovernmentIdService = async (
   userId: string,
   attemptId: string
 ) => {
-
-  // 1. Fetch the user's verification attempt
-
+  // 1. Find the attempt and its verification
   const attempt =
     await prisma.governmentIdAttempt.findFirst({
       where: {
@@ -490,24 +489,37 @@ export const completeGovernmentIdService = async (
     );
   }
 
+  // 2. Idempotent success
   if (
     attempt.status ===
-      GovernmentIdAttemptStatus.VERIFIED &&
+    GovernmentIdAttemptStatus.VERIFIED &&
     attempt.verification.status ===
-      VerificationStatus.VERIFIED
+    VerificationStatus.VERIFIED
   ) {
     return {
+      verificationId: attempt.verificationId,
+      documentType: attempt.documentType,
       status: "VERIFIED",
       points: attempt.verification.points,
     };
   }
 
+  // 3. Validate current attempt
   if (
     attempt.status !==
     GovernmentIdAttemptStatus.AUTHORIZED
   ) {
     throw new Error(
       "DIGILOCKER_AUTHORIZATION_REQUIRED"
+    );
+  }
+
+  if (
+    attempt.expiresAt &&
+    attempt.expiresAt <= new Date()
+  ) {
+    throw new Error(
+      "VERIFICATION_ATTEMPT_EXPIRED"
     );
   }
 
@@ -518,224 +530,329 @@ export const completeGovernmentIdService = async (
   }
 
   if (
+    attempt.verification.userId !== userId ||
+    attempt.verification.type !==
+    VerificationType.GOVERNMENT_ID ||
     attempt.verification.providerRef !==
-    attempt.transactionId
+    attempt.transactionId ||
+    attempt.verification.status !==
+    VerificationStatus.IN_PROGRESS
   ) {
     throw new Error(
       "VERIFICATION_ATTEMPT_MISMATCH"
     );
   }
 
-  // 2. Fetch and verify document using Gridlines
+  // 4. Fetch the registered user's identity
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      full_name: true,
+      birth_date: true,
+    },
+  });
 
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  // 5. Retrieve and normalize provider document
   const document =
-    await fetchAndVerifyGovernmentDocument(
-      attempt.transactionId,
-      attempt.documentType
-    );
+    await getVerifiedGovernmentDocument({
+      transactionId: attempt.transactionId,
+      referenceId: attempt.referenceId,
+      documentType: attempt.documentType,
+    });
 
-  // 3. Validate provider result
+  // 6. Validate identity and minimum age
+  validateGovernmentIdentity(
+    document,
+    user,
+    attempt.documentType
+  );
 
-  if (
-    !document.transactionConfirmed ||
-    !document.documentAccessConfirmed ||
-    !document.isAuthentic ||
-    document.documentType !==
-      attempt.documentType ||
-    !document.verifiedName ||
-    !document.dateOfBirth ||
-    Number.isNaN(
-      document.dateOfBirth.getTime()
-    )
-  ) {
-    throw new Error(
-      "DOCUMENT_VERIFICATION_FAILED"
-    );
-  }
-
-  // 4. Check age (18+)
-
-  const today = new Date();
-
-  let age =
-    today.getUTCFullYear() -
-    document.dateOfBirth.getUTCFullYear();
-
-  const monthDifference =
-    today.getUTCMonth() -
-    document.dateOfBirth.getUTCMonth();
+  // 7. Require a portrait if your verification
+  // workflow depends on Government ID photo matching.
+  const portrait = document.portraitBuffer;
 
   if (
-    monthDifference < 0 ||
-    (
-      monthDifference === 0 &&
-      today.getUTCDate() <
-        document.dateOfBirth.getUTCDate()
-    )
-  ) {
-    age--;
-  }
-
-  if (age < 18) {
-    throw new Error(
-      "USER_BELOW_MINIMUM_AGE"
-    );
-  }
-
-  // 5. Validate the verified identity
-  // against the registered user.
-
-  // IMPORTANT:
-  // Implement your approved name and DOB
-  // matching policy here before continuing.
-  //
-  // Do not automatically approve mismatched
-  // identities.
-
-  // ==========================================
-  // NEW CODE STARTS HERE
-  // ==========================================
-
-  // 6. Get the Government ID portrait
-  // from the verified Gridlines document.
-
-  const governmentPortraitBuffer =
-    document.portraitBuffer;
-
-  if (
-    !governmentPortraitBuffer ||
-    !Buffer.isBuffer(
-      governmentPortraitBuffer
-    ) ||
-    governmentPortraitBuffer.length === 0
+    !portrait ||
+    !Buffer.isBuffer(portrait) ||
+    portrait.length === 0
   ) {
     throw new Error(
       "GOVERNMENT_ID_PORTRAIT_NOT_AVAILABLE"
     );
   }
 
-  // 7. Upload Government ID portrait
-  // to private ImageKit storage.
-
+  // 8. Upload portrait to private storage
   const photoKey =
     await uploadGovernmentIdPhoto(
       userId,
-      governmentPortraitBuffer
+      portrait
     );
 
-  // ==========================================
-  // EXISTING PRISMA TRANSACTION
-  // ==========================================
-
   try {
+    // 9. Atomically finalize verification
+    return await prisma.$transaction(
+      async (tx) => {
+        const now = new Date();
 
-    // 8. Update verification atomically
-
-    const result =
-      await prisma.$transaction(
-        async (tx) => {
-
-          const updated =
-            await tx.userVerification.updateMany({
-
-              where: {
-                id:
-                  attempt.verificationId,
-
-                userId,
-
-                type:
-                  VerificationType.GOVERNMENT_ID,
-
-                status:
-                  VerificationStatus.IN_PROGRESS,
-
-                providerRef:
-                  attempt.transactionId,
-              },
-
-              data: {
-
-                status:
-                  VerificationStatus.VERIFIED,
-
-                points: 10,
-
-                verifiedAt:
-                  new Date(),
-
-                rejectionReason:
-                  null,
-
-                // NEW: Save ImageKit file ID
-
-                governmentIdPhotoKey:
-                  photoKey,
-
-                governmentIdType:
-                  attempt.documentType,
-
-              },
-            });
-
-          if (updated.count !== 1) {
-            throw new Error(
-              "VERIFICATION_STATE_CHANGED"
-            );
-          }
-
-          await tx.governmentIdAttempt.update({
-
+        // Claim the authorized attempt.
+        // Only one concurrent completion can
+        // transition this attempt to VERIFIED.
+        const updatedAttempt =
+          await tx.governmentIdAttempt.updateMany({
             where: {
               id: attempt.id,
+              userId,
+              status:
+                GovernmentIdAttemptStatus.AUTHORIZED,
+              transactionId: attempt.transactionId,
+              OR: [
+                { expiresAt: null },
+                { expiresAt: { gt: now } },
+              ],
             },
-
             data: {
               status:
                 GovernmentIdAttemptStatus.VERIFIED,
-
-              completedAt:
-                new Date(),
+              completedAt: now,
+              failureReason: null,
             },
           });
 
-          return {
-            verificationId:
-              attempt.verificationId,
-
-            documentType:
-              attempt.documentType,
-
-            status: "VERIFIED",
-
-            points: 10,
-          };
-
+        if (updatedAttempt.count !== 1) {
+          throw new Error(
+            "VERIFICATION_ATTEMPT_STATE_CHANGED"
+          );
         }
-      );
 
-    return result;
+        const updatedVerification =
+          await tx.userVerification.updateMany({
+            where: {
+              id: attempt.verificationId,
+              userId,
+              type:
+                VerificationType.GOVERNMENT_ID,
+              status:
+                VerificationStatus.IN_PROGRESS,
+              providerRef:
+                attempt.transactionId,
+            },
+            data: {
+              status:
+                VerificationStatus.VERIFIED,
+
+              governmentIdType:
+                attempt.documentType,
+
+              governmentIdPhotoKey:
+                photoKey,
+
+              points: 10,
+
+              verifiedAt: now,
+
+              rejectionReason: null,
+            },
+          });
+
+        if (updatedVerification.count !== 1) {
+          throw new Error(
+            "VERIFICATION_STATE_CHANGED"
+          );
+        }
+
+        return {
+          verificationId:
+            attempt.verificationId,
+
+          attemptId: attempt.id,
+
+          documentType:
+            attempt.documentType,
+
+          status: "VERIFIED",
+
+          points: 10,
+        };
+      }
+    );
 
   } catch (error) {
-
-    // NEW: If database update fails,
-    // remove the newly uploaded image.
-
+    // Database update failed.
+    // Remove the newly uploaded portrait.
     try {
-
-      await deleteGovernmentIdPhoto(
-        photoKey
-      );
-
+      await deleteGovernmentIdPhoto(photoKey);
     } catch (cleanupError) {
-
       console.error(
-        "Government ID photo cleanup failed",
+        "Government ID portrait cleanup failed",
         cleanupError
       );
-
     }
 
     throw error;
   }
+};
+
+export const fetchGovernmentEAadhaar = async (
+  transactionId: string,
+  referenceId: string
+) => {
+  try {
+    const response = await gridlinesClient.get(
+      "/digilocker/eaadhaar",
+      {
+        params: {
+          json: true,
+        },
+
+        headers: {
+          "X-Transaction-ID": transactionId,
+          "X-Reference-ID": referenceId,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    const responseCode = String(
+      result?.data?.code ?? ""
+    );
+
+    // Successful E-Aadhaar retrieval
+    if (responseCode === "1011") {
+      const aadhaar =
+        result?.data?.eaadhaar;
+
+      if (
+        !aadhaar ||
+        typeof aadhaar !== "object" ||
+        Array.isArray(aadhaar)
+      ) {
+        throw new Error(
+          "INVALID_EAADHAAR_RESPONSE"
+        );
+      }
+
+      return aadhaar;
+    }
+
+    // Aadhaar not linked
+    if (responseCode === "1009") {
+      throw new Error(
+        "AADHAAR_NOT_LINKED"
+      );
+    }
+
+    // Aadhaar unavailable
+    if (responseCode === "1010") {
+      throw new Error(
+        "AADHAAR_NOT_AVAILABLE"
+      );
+    }
+
+    // Session expired
+    if (responseCode === "1001") {
+      throw new Error(
+        "DIGILOCKER_SESSION_EXPIRED"
+      );
+    }
+
+    // User consent unavailable
+    if (responseCode === "1018") {
+      throw new Error(
+        "AADHAAR_CONSENT_NOT_AVAILABLE"
+      );
+    }
+
+    throw new Error(
+      "EAADHAAR_FETCH_FAILED"
+    );
+
+  } catch (error: unknown) {
+
+    if (axios.isAxiosError(error)) {
+      console.error(
+        "GRIDLINES EAADHAAR ERROR:",
+        {
+          status: error.response?.status,
+          code:
+            error.response?.data?.error?.code,
+          message:
+            error.response?.data?.error?.message,
+        }
+      );
+    }
+
+    throw error;
+  }
+};
+
+export const fetchGovernmentIssuedFile = async (
+  transactionId: string,
+  referenceId: string,
+  fileUri: string
+) => {
+  const response = await gridlinesClient.post(
+    "/digilocker/issued-file",
+    {
+      file_uri: fileUri,
+      format: "JSON",
+    },
+    {
+      headers: {
+        "X-Transaction-ID": transactionId,
+        "X-Reference-ID": referenceId,
+      },
+    }
+  );
+
+  const result = response.data;
+
+  const code = String(
+    result?.data?.code ?? ""
+  );
+
+  if (code === "1007") {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_NOT_FOUND"
+    );
+  }
+
+  if (code === "1001") {
+    throw new Error(
+      "DIGILOCKER_SESSION_EXPIRED"
+    );
+  }
+
+  if (code === "1017") {
+    throw new Error(
+      "DOCUMENT_CONSENT_NOT_AVAILABLE"
+    );
+  }
+
+  if (code !== "1008") {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_FETCH_FAILED"
+    );
+  }
+
+  const document =
+    result?.data?.document;
+
+  if (
+    !document ||
+    typeof document !== "object" ||
+    Array.isArray(document)
+  ) {
+    throw new Error(
+      "INVALID_GOVERNMENT_DOCUMENT_RESPONSE"
+    );
+  }
+
+  return document;
 };

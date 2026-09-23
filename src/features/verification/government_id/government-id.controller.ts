@@ -207,15 +207,17 @@ export const completeGovernmentIdController = async (
       });
     }
 
-    const { attemptId } = req.body;
+const { attemptId } = req.body ?? {};
 
     if (
       typeof attemptId !== "string" ||
-      !attemptId
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        attemptId
+      )
     ) {
       return res.status(400).json({
         success: false,
-        message: "attemptId is required",
+        message: "Valid attemptId is required",
       });
     }
 

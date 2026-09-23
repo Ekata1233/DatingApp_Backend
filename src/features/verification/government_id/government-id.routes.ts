@@ -39,4 +39,14 @@ router.get(
   getGovernmentIdStatusController
 );
 
+router.get(
+  "/government-id/test",
+  (req, res) => {
+    return res.status(200).json({
+      success: true,
+      message: "Government ID API working",
+    });
+  }
+);
+
 export default router;
