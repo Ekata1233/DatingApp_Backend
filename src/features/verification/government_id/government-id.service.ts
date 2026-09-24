@@ -471,13 +471,18 @@ export const completeGovernmentIdService = async (
   userId: string,
   attemptId: string
 ) => {
-  // 1. Find the attempt and its verification
+
+  // ==========================================
+  // 1. Find verification attempt
+  // ==========================================
+
   const attempt =
     await prisma.governmentIdAttempt.findFirst({
       where: {
         id: attemptId,
         userId,
       },
+
       include: {
         verification: true,
       },
@@ -489,22 +494,41 @@ export const completeGovernmentIdService = async (
     );
   }
 
+  // ==========================================
   // 2. Idempotent success
+  // ==========================================
+
   if (
     attempt.status ===
     GovernmentIdAttemptStatus.VERIFIED &&
     attempt.verification.status ===
     VerificationStatus.VERIFIED
   ) {
+
     return {
-      verificationId: attempt.verificationId,
-      documentType: attempt.documentType,
+      verificationId:
+        attempt.verificationId,
+
+      attemptId:
+        attempt.id,
+
+      documentType:
+        attempt.documentType,
+
+      verifiedName:
+        attempt.verification.verifiedName,
+
       status: "VERIFIED",
-      points: attempt.verification.points,
+
+      points:
+        attempt.verification.points,
     };
   }
 
+  // ==========================================
   // 3. Validate current attempt
+  // ==========================================
+
   if (
     attempt.status !==
     GovernmentIdAttemptStatus.AUTHORIZED
@@ -543,60 +567,61 @@ export const completeGovernmentIdService = async (
     );
   }
 
-  // 4. Fetch the registered user's identity
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-    select: {
-      full_name: true,
-      birth_date: true,
-    },
-  });
+  // ==========================================
+  // 4. Fetch government document
+  // ==========================================
 
-  if (!user) {
-    throw new Error("USER_NOT_FOUND");
-  }
-
-  // 5. Retrieve and normalize provider document
   const document =
     await getVerifiedGovernmentDocument({
-      transactionId: attempt.transactionId,
-      referenceId: attempt.referenceId,
-      documentType: attempt.documentType,
+      transactionId:
+        attempt.transactionId,
+
+      referenceId:
+        attempt.referenceId,
+
+      documentType:
+        attempt.documentType,
     });
 
-  // 6. Validate identity and minimum age
-  validateGovernmentIdentity(
-    document,
-    user,
-    attempt.documentType
-  );
-
-
   // ==========================================
-  // 7. VALIDATE GOVERNMENT ID PORTRAIT
+  // 5. Validate government identity
   // ==========================================
 
-  const portrait = document.portraitBuffer;
+  const governmentIdentity =
+    validateGovernmentIdentity(
+      document,
+      attempt.documentType
+    );
 
-  // Aadhaar requires a portrait.
-  // PAN and DL can proceed without a portrait.
+  const {
+    verifiedName,
+    birthDate,
+    gender,
+  } = governmentIdentity;
+
+  // ==========================================
+  // 6. Validate government ID portrait
+  // ==========================================
+
+  const portrait =
+    document.portraitBuffer;
 
   if (
-    attempt.documentType === GovernmentIdType.AADHAAR &&
+    attempt.documentType ===
+    GovernmentIdType.AADHAAR &&
     (
       !portrait ||
       !Buffer.isBuffer(portrait) ||
       portrait.length === 0
-    )) {
+    )
+  ) {
     throw new Error(
       "AADHAAR_PORTRAIT_NOT_AVAILABLE"
     );
   }
 
   // ==========================================
-  // 8. UPLOAD PORTRAIT IF AVAILABLE
+  // 7. Upload portrait if available
   // ==========================================
 
   let photoKey: string | null = null;
@@ -620,61 +645,101 @@ export const completeGovernmentIdService = async (
   }
 
   try {
-    // 9. Atomically finalize verification
+
+    // ==========================================
+    // 8. Atomically finalize verification
+    // ==========================================
+
     return await prisma.$transaction(
       async (tx) => {
+
         const now = new Date();
 
-        // Claim the authorized attempt.
-        // Only one concurrent completion can
-        // transition this attempt to VERIFIED.
+        // --------------------------------------
+        // 8.1 Claim authorized attempt
+        // --------------------------------------
+
         const updatedAttempt =
           await tx.governmentIdAttempt.updateMany({
+
             where: {
               id: attempt.id,
+
               userId,
+
               status:
                 GovernmentIdAttemptStatus.AUTHORIZED,
-              transactionId: attempt.transactionId,
+
+              transactionId:
+                attempt.transactionId,
+
               OR: [
-                { expiresAt: null },
-                { expiresAt: { gt: now } },
+                {
+                  expiresAt: null,
+                },
+                {
+                  expiresAt: {
+                    gt: now,
+                  },
+                },
               ],
             },
+
             data: {
               status:
                 GovernmentIdAttemptStatus.VERIFIED,
+
               completedAt: now,
+
               failureReason: null,
             },
           });
 
-        if (updatedAttempt.count !== 1) {
+        if (
+          updatedAttempt.count !== 1
+        ) {
           throw new Error(
             "VERIFICATION_ATTEMPT_STATE_CHANGED"
           );
         }
 
+        // --------------------------------------
+        // 8.2 Update UserVerification
+        // --------------------------------------
+
         const updatedVerification =
           await tx.userVerification.updateMany({
+
             where: {
-              id: attempt.verificationId,
+              id:
+                attempt.verificationId,
+
               userId,
+
               type:
                 VerificationType.GOVERNMENT_ID,
+
               status:
                 VerificationStatus.IN_PROGRESS,
+
               providerRef:
                 attempt.transactionId,
             },
+
             data: {
+
               status:
                 VerificationStatus.VERIFIED,
+
+              // Save government document name
+              verifiedName:
+                verifiedName,
 
               governmentIdType:
                 attempt.documentType,
 
-              governmentIdPhotoKey: photoKey,
+              governmentIdPhotoKey:
+                photoKey,
 
               points: 10,
 
@@ -684,32 +749,84 @@ export const completeGovernmentIdService = async (
             },
           });
 
-        if (updatedVerification.count !== 1) {
+        if (
+          updatedVerification.count !== 1
+        ) {
           throw new Error(
             "VERIFICATION_STATE_CHANGED"
           );
         }
 
+        // --------------------------------------
+        // 8.3 Update user's DOB and gender
+        // --------------------------------------
+
+        const updatedUser =
+          await tx.user.updateMany({
+
+            where: {
+              id: userId,
+            },
+
+            data: {
+
+              // Government document DOB
+              birth_date:
+                birthDate,
+
+              // Government document gender
+              gender:
+                gender,
+
+              // full_name is NOT updated
+            },
+          });
+
+        if (
+          updatedUser.count !== 1
+        ) {
+          throw new Error(
+            "USER_NOT_FOUND"
+          );
+        }
+
+        // ======================================
+        // 9. Return verification result
+        // ======================================
+
         return {
+
           verificationId:
             attempt.verificationId,
 
-          attemptId: attempt.id,
+          attemptId:
+            attempt.id,
 
           documentType:
             attempt.documentType,
+
+          verifiedName:
+            verifiedName,
+
+          birthDate:
+            birthDate,
+
+          gender:
+            gender,
 
           status: "VERIFIED",
 
           points: 10,
         };
+
       }
     );
 
-  
   } catch (error) {
 
-    // Delete only a newly uploaded portrait.
+    // ==========================================
+    // 10. Cleanup newly uploaded portrait
+    // ==========================================
 
     if (photoKey) {
 

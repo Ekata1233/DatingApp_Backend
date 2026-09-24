@@ -23,6 +23,7 @@ export interface VerifiedGovernmentDocument {
   verifiedName: string;
 
   dateOfBirth: Date;
+  verifiedGender: string;
   portraitBuffer: Buffer | null;
   address?: GovernmentDocumentAddress;
 
