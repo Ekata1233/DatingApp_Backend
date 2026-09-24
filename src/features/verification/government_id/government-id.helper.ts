@@ -1,4 +1,4 @@
-import { GovernmentIdType } from "@prisma/client";
+import { Gender, GovernmentIdType } from "@prisma/client";
 import { VerifiedGovernmentDocument } from "./government-id.provider";
 import { fetchGovernmentEAadhaar, fetchGovernmentIssuedFile, fetchGovernmentIssuedFiles } from "./government-id.service";
 
@@ -248,11 +248,19 @@ export const getVerifiedGovernmentDocument = async (
             );
         }
 
-        const dateOfBirth =
-            parseAadhaarDateOfBirth(
-                poi.dob
-            );
+        const dateOfBirth = parseAadhaarDateOfBirth(poi.dob);
 
+
+        const verifiedGender =
+            typeof poi.gender === "string"
+                ? poi.gender.trim().toUpperCase()
+                : "";
+
+        if (!verifiedGender) {
+            throw new Error(
+                "AADHAAR_GENDER_MISSING"
+            );
+        }
         // =====================================
         // 6. Extract Aadhaar photograph
         // =====================================
@@ -321,7 +329,7 @@ export const getVerifiedGovernmentDocument = async (
             verifiedName,
 
             dateOfBirth,
-
+            verifiedGender,
             portraitBuffer,
         };
     }
@@ -454,6 +462,18 @@ export const getVerifiedGovernmentDocument = async (
             );
         }
 
+
+        const verifiedGender =
+            typeof person.gender === "string"
+                ? person.gender.trim().toUpperCase()
+                : "";
+
+        if (!verifiedGender) {
+            throw new Error(
+                "PAN_GENDER_MISSING"
+            );
+        }
+
         // =====================================
         // 6. EXTRACT DATE OF BIRTH
         // =====================================
@@ -574,7 +594,7 @@ export const getVerifiedGovernmentDocument = async (
             verifiedName,
 
             dateOfBirth,
-
+            verifiedGender,
             portraitBuffer,
 
             address,
@@ -586,366 +606,377 @@ export const getVerifiedGovernmentDocument = async (
     // =====================================
 
 
-if ( attempt.documentType === GovernmentIdType.DRIVING_LICENSE) {
+    if (attempt.documentType === GovernmentIdType.DRIVING_LICENSE) {
 
-  // =====================================
-  // 1. FETCH ISSUED FILES
-  // =====================================
+        // =====================================
+        // 1. FETCH ISSUED FILES
+        // =====================================
 
-  const issuedFiles =
-    await fetchGovernmentIssuedFiles(
-      attempt.transactionId,
-      attempt.referenceId
-    );
-
-  if (
-    String(issuedFiles?.code) !== "1006"
-  ) {
-    throw new Error(
-      "ISSUED_FILES_FETCH_FAILED"
-    );
-  }
-
-  if (
-    issuedFiles?.transaction_id !==
-    attempt.transactionId
-  ) {
-    throw new Error(
-      "ISSUED_FILES_TRANSACTION_MISMATCH"
-    );
-  }
-
-  const documents =
-    issuedFiles?.issued_files;
-
-  if (!Array.isArray(documents)) {
-    throw new Error(
-      "ISSUED_FILES_INVALID_RESPONSE"
-    );
-  }
-
-  // =====================================
-  // 2. FIND DRIVING LICENCE
-  // =====================================
-
-  const drivingLicenceDocuments =
-    documents.filter((file: any) => {
-
-      const documentType =
-        String(file?.doc_type ?? "")
-          .trim()
-          .toUpperCase();
-
-      const issuer =
-        String(file?.issuer ?? "")
-          .trim()
-          .toUpperCase();
-
-      return (
-        documentType === "DRVLC" &&
-        issuer ===
-          "MINISTRY OF ROAD TRANSPORT AND HIGHWAYS" &&
-        typeof file?.uri === "string" &&
-        file.uri.trim().length > 0
-      );
-    });
-
-  if (
-    drivingLicenceDocuments.length === 0
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_DOCUMENT_NOT_FOUND"
-    );
-  }
-
-  if (
-    drivingLicenceDocuments.length > 1
-  ) {
-    throw new Error(
-      "MULTIPLE_DRIVING_LICENSE_DOCUMENTS_FOUND"
-    );
-  }
-
-  const drivingLicenceFile =
-    drivingLicenceDocuments[0];
-
-  // =====================================
-  // 3. FETCH DRIVING LICENCE DOCUMENT
-  // =====================================
-
-  const drivingLicenceDocument =
-    await fetchGovernmentIssuedFile(
-      attempt.transactionId,
-      attempt.referenceId,
-      drivingLicenceFile.uri
-    );
-
-  if (
-    !drivingLicenceDocument ||
-    typeof drivingLicenceDocument !== "object" ||
-    Array.isArray(drivingLicenceDocument)
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_DOCUMENT_NOT_AVAILABLE"
-    );
-  }
-
-  // =====================================
-  // 4. EXTRACT IDENTITY DETAILS
-  // =====================================
-
-  const person =
-    drivingLicenceDocument?.IssuedTo?.Person;
-
-  const licenceData =
-    drivingLicenceDocument
-      ?.CertificateData
-      ?.DrivingLicense;
-
-  if (
-    !person ||
-    typeof person !== "object" ||
-    Array.isArray(person)
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_PERSON_DATA_MISSING"
-    );
-  }
-
-  if (
-    !licenceData ||
-    typeof licenceData !== "object" ||
-    Array.isArray(licenceData)
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_CERTIFICATE_DATA_MISSING"
-    );
-  }
-
-  // =====================================
-  // 5. EXTRACT NAME
-  // =====================================
-
-  const verifiedName =
-    typeof person.name === "string"
-      ? person.name.trim()
-      : "";
-
-  if (
-    verifiedName.length < 2
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_NAME_MISSING"
-    );
-  }
-
-  // =====================================
-  // 6. EXTRACT DATE OF BIRTH
-  // =====================================
-
-  const dateOfBirth =
-    parseDrivingLicenseDate(
-      person.dob
-    );
-
-  // =====================================
-  // 7. VALIDATE LICENCE STATUS
-  // =====================================
-
-  const licenceStatus =
-    String(
-      drivingLicenceDocument.status ?? ""
-    )
-      .trim()
-      .toUpperCase();
-
-  // IMPORTANT:
-  // Confirm the accepted status values
-  // in your provider's documentation.
-  //
-  // Do not assume an unknown status
-  // means the licence is active.
-
-  if (
-    !["ACTIVE", "VALID"].includes(
-      licenceStatus
-    )
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_NOT_ACTIVE"
-    );
-  }
-
-  // =====================================
-  // 8. VALIDATE LICENCE EXPIRY
-  // =====================================
-
-  const expiryDate =
-    parseDrivingLicenseDate(
-      drivingLicenceDocument.expiryDate
-    );
-
-  const now = new Date();
-
-  const todayUTC = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate()
-  );
-
-  if (
-    expiryDate.getTime() < todayUTC
-  ) {
-    throw new Error(
-      "DRIVING_LICENSE_EXPIRED"
-    );
-  }
-
-  // =====================================
-  // 9. EXTRACT ADDRESS
-  // =====================================
-
-  const personAddress =
-    person.Address;
-
-  const address =
-    personAddress &&
-    typeof personAddress === "object" &&
-    !Array.isArray(personAddress)
-      ? {
-
-          country:
-            typeof personAddress.country === "string"
-              ? personAddress.country.trim()
-              : undefined,
-
-          state:
-            typeof personAddress.state === "string"
-              ? personAddress.state.trim()
-              : undefined,
-
-          city:
-            typeof personAddress.vtc === "string"
-              ? personAddress.vtc.trim()
-              : undefined,
-
-          area:
-            typeof personAddress.locality === "string"
-              ? personAddress.locality.trim()
-              : undefined,
-
-        }
-      : undefined;
-
-  // =====================================
-  // 10. EXTRACT PHOTOGRAPH
-  // =====================================
-
-  // Your response contains:
-  //
-  // Person.Photo: {
-  //   format: "...",
-  //   "": "..."
-  // }
-  //
-  // The empty-string key may contain
-  // base64 image data.
-  //
-  // Validate the actual value before
-  // decoding it.
-
-  let portraitBuffer: Buffer | null = null;
-
-  const photo = person.Photo;
-
-  if (
-    photo &&
-    typeof photo === "object" &&
-    !Array.isArray(photo)
-  ) {
-
-    const photoData = photo[""];
-
-    if (
-      typeof photoData === "string" &&
-      photoData.trim().length > 0
-    ) {
-
-      const base64Data =
-        photoData
-          .replace(
-            /^data:image\/(?:jpeg|jpg|png);base64,/i,
-            ""
-          )
-          .replace(/\s/g, "");
-
-      if (
-        /^[A-Za-z0-9+/]+={0,2}$/.test(
-          base64Data
-        ) &&
-        base64Data.length % 4 === 0
-      ) {
-
-        const decoded =
-          Buffer.from(
-            base64Data,
-            "base64"
-          );
+        const issuedFiles =
+            await fetchGovernmentIssuedFiles(
+                attempt.transactionId,
+                attempt.referenceId
+            );
 
         if (
-          decoded.length > 0 &&
-          decoded.length <= 5 * 1024 * 1024
+            String(issuedFiles?.code) !== "1006"
         ) {
-          portraitBuffer = decoded;
+            throw new Error(
+                "ISSUED_FILES_FETCH_FAILED"
+            );
         }
-      }
+
+        if (
+            issuedFiles?.transaction_id !==
+            attempt.transactionId
+        ) {
+            throw new Error(
+                "ISSUED_FILES_TRANSACTION_MISMATCH"
+            );
+        }
+
+        const documents =
+            issuedFiles?.issued_files;
+
+        if (!Array.isArray(documents)) {
+            throw new Error(
+                "ISSUED_FILES_INVALID_RESPONSE"
+            );
+        }
+
+        // =====================================
+        // 2. FIND DRIVING LICENCE
+        // =====================================
+
+        const drivingLicenceDocuments =
+            documents.filter((file: any) => {
+
+                const documentType =
+                    String(file?.doc_type ?? "")
+                        .trim()
+                        .toUpperCase();
+
+                const issuer =
+                    String(file?.issuer ?? "")
+                        .trim()
+                        .toUpperCase();
+
+                return (
+                    documentType === "DRVLC" &&
+                    issuer ===
+                    "MINISTRY OF ROAD TRANSPORT AND HIGHWAYS" &&
+                    typeof file?.uri === "string" &&
+                    file.uri.trim().length > 0
+                );
+            });
+
+        if (
+            drivingLicenceDocuments.length === 0
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_DOCUMENT_NOT_FOUND"
+            );
+        }
+
+        if (
+            drivingLicenceDocuments.length > 1
+        ) {
+            throw new Error(
+                "MULTIPLE_DRIVING_LICENSE_DOCUMENTS_FOUND"
+            );
+        }
+
+        const drivingLicenceFile =
+            drivingLicenceDocuments[0];
+
+        // =====================================
+        // 3. FETCH DRIVING LICENCE DOCUMENT
+        // =====================================
+
+        const drivingLicenceDocument =
+            await fetchGovernmentIssuedFile(
+                attempt.transactionId,
+                attempt.referenceId,
+                drivingLicenceFile.uri
+            );
+
+        if (
+            !drivingLicenceDocument ||
+            typeof drivingLicenceDocument !== "object" ||
+            Array.isArray(drivingLicenceDocument)
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_DOCUMENT_NOT_AVAILABLE"
+            );
+        }
+
+        // =====================================
+        // 4. EXTRACT IDENTITY DETAILS
+        // =====================================
+
+        const person =
+            drivingLicenceDocument?.IssuedTo?.Person;
+
+        const licenceData =
+            drivingLicenceDocument
+                ?.CertificateData
+                ?.DrivingLicense;
+
+        if (
+            !person ||
+            typeof person !== "object" ||
+            Array.isArray(person)
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_PERSON_DATA_MISSING"
+            );
+        }
+
+        if (
+            !licenceData ||
+            typeof licenceData !== "object" ||
+            Array.isArray(licenceData)
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_CERTIFICATE_DATA_MISSING"
+            );
+        }
+
+        // =====================================
+        // 5. EXTRACT NAME
+        // =====================================
+
+        const verifiedName =
+            typeof person.name === "string"
+                ? person.name.trim()
+                : "";
+
+        if (
+            verifiedName.length < 2
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_NAME_MISSING"
+            );
+        }
+
+
+        const verifiedGender =
+            typeof person.gender === "string"
+                ? person.gender.trim().toUpperCase()
+                : "";
+
+        if (!verifiedGender) {
+            throw new Error(
+                "DRIVING_LICENSE_GENDER_MISSING"
+            );
+        }
+        // =====================================
+        // 6. EXTRACT DATE OF BIRTH
+        // =====================================
+
+        const dateOfBirth =
+            parseDrivingLicenseDate(
+                person.dob
+            );
+
+        // =====================================
+        // 7. VALIDATE LICENCE STATUS
+        // =====================================
+
+        const licenceStatus =
+            String(
+                drivingLicenceDocument.status ?? ""
+            )
+                .trim()
+                .toUpperCase();
+
+        // IMPORTANT:
+        // Confirm the accepted status values
+        // in your provider's documentation.
+        //
+        // Do not assume an unknown status
+        // means the licence is active.
+
+        if (
+            !["ACTIVE", "VALID"].includes(
+                licenceStatus
+            )
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_NOT_ACTIVE"
+            );
+        }
+
+        // =====================================
+        // 8. VALIDATE LICENCE EXPIRY
+        // =====================================
+
+        const expiryDate =
+            parseDrivingLicenseDate(
+                drivingLicenceDocument.expiryDate
+            );
+
+        const now = new Date();
+
+        const todayUTC = Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate()
+        );
+
+        if (
+            expiryDate.getTime() < todayUTC
+        ) {
+            throw new Error(
+                "DRIVING_LICENSE_EXPIRED"
+            );
+        }
+
+        // =====================================
+        // 9. EXTRACT ADDRESS
+        // =====================================
+
+        const personAddress =
+            person.Address;
+
+        const address =
+            personAddress &&
+                typeof personAddress === "object" &&
+                !Array.isArray(personAddress)
+                ? {
+
+                    country:
+                        typeof personAddress.country === "string"
+                            ? personAddress.country.trim()
+                            : undefined,
+
+                    state:
+                        typeof personAddress.state === "string"
+                            ? personAddress.state.trim()
+                            : undefined,
+
+                    city:
+                        typeof personAddress.vtc === "string"
+                            ? personAddress.vtc.trim()
+                            : undefined,
+
+                    area:
+                        typeof personAddress.locality === "string"
+                            ? personAddress.locality.trim()
+                            : undefined,
+
+                }
+                : undefined;
+
+        // =====================================
+        // 10. EXTRACT PHOTOGRAPH
+        // =====================================
+
+        // Your response contains:
+        //
+        // Person.Photo: {
+        //   format: "...",
+        //   "": "..."
+        // }
+        //
+        // The empty-string key may contain
+        // base64 image data.
+        //
+        // Validate the actual value before
+        // decoding it.
+
+        let portraitBuffer: Buffer | null = null;
+
+        const photo = person.Photo;
+
+        if (
+            photo &&
+            typeof photo === "object" &&
+            !Array.isArray(photo)
+        ) {
+
+            const photoData = photo[""];
+
+            if (
+                typeof photoData === "string" &&
+                photoData.trim().length > 0
+            ) {
+
+                const base64Data =
+                    photoData
+                        .replace(
+                            /^data:image\/(?:jpeg|jpg|png);base64,/i,
+                            ""
+                        )
+                        .replace(/\s/g, "");
+
+                if (
+                    /^[A-Za-z0-9+/]+={0,2}$/.test(
+                        base64Data
+                    ) &&
+                    base64Data.length % 4 === 0
+                ) {
+
+                    const decoded =
+                        Buffer.from(
+                            base64Data,
+                            "base64"
+                        );
+
+                    if (
+                        decoded.length > 0 &&
+                        decoded.length <= 5 * 1024 * 1024
+                    ) {
+                        portraitBuffer = decoded;
+                    }
+                }
+            }
+        }
+
+        // =====================================
+        // 11. VALIDATE DOCUMENT AUTHENTICITY
+        // =====================================
+
+        // A valid licence status, expiry date,
+        // and Signature object do not prove
+        // cryptographic authenticity.
+        //
+        // Replace this placeholder with a
+        // trusted provider assurance or
+        // digital-signature verification result.
+
+        const isAuthentic = true;
+
+        if (!isAuthentic) {
+            throw new Error(
+                "DRIVING_LICENSE_AUTHENTICITY_VERIFICATION_REQUIRED"
+            );
+        }
+
+        // =====================================
+        // 12. RETURN VERIFIED DOCUMENT
+        // =====================================
+
+        return {
+
+            transactionConfirmed: true,
+
+            documentAccessConfirmed: true,
+
+            isAuthentic,
+
+            documentType:
+                GovernmentIdType.DRIVING_LICENSE,
+
+            verifiedName,
+
+            dateOfBirth,
+            verifiedGender,
+            portraitBuffer,
+
+            address,
+        };
     }
-  }
-
-  // =====================================
-  // 11. VALIDATE DOCUMENT AUTHENTICITY
-  // =====================================
-
-  // A valid licence status, expiry date,
-  // and Signature object do not prove
-  // cryptographic authenticity.
-  //
-  // Replace this placeholder with a
-  // trusted provider assurance or
-  // digital-signature verification result.
-
-  const isAuthentic = true;
-
-  if (!isAuthentic) {
-    throw new Error(
-      "DRIVING_LICENSE_AUTHENTICITY_VERIFICATION_REQUIRED"
-    );
-  }
-
-  // =====================================
-  // 12. RETURN VERIFIED DOCUMENT
-  // =====================================
-
-  return {
-
-    transactionConfirmed: true,
-
-    documentAccessConfirmed: true,
-
-    isAuthentic,
-
-    documentType:
-      GovernmentIdType.DRIVING_LICENSE,
-
-    verifiedName,
-
-    dateOfBirth,
-
-    portraitBuffer,
-
-    address,
-  };
-}
 
     throw new Error(
         "UNSUPPORTED_GOVERNMENT_ID_TYPE"
@@ -960,22 +991,6 @@ const normalizeGovernmentIdName = (
         .trim()
         .replace(/\s+/g, " ")
         .toLowerCase();
-};
-
-const isSameDateOfBirth = (
-    first: Date,
-    second: Date
-): boolean => {
-    return (
-        first.getUTCFullYear() ===
-        second.getUTCFullYear() &&
-
-        first.getUTCMonth() ===
-        second.getUTCMonth() &&
-
-        first.getUTCDate() ===
-        second.getUTCDate()
-    );
 };
 
 const getAgeFromDateOfBirth = (
@@ -1012,217 +1027,223 @@ const getAgeFromDateOfBirth = (
     return age;
 };
 
-export const validateGovernmentIdentity = (
-    document: VerifiedGovernmentDocument,
-
-    user: {
-        full_name: string | null;
-        birth_date: Date | null;
-    },
-
-    expectedDocumentType: GovernmentIdType): void => {
-
-    // =====================================
-    // 1. Validate provider confirmation
-    // =====================================
-
-    if (
-        !document.transactionConfirmed ||
-        !document.documentAccessConfirmed ||
-        !document.isAuthentic
-    ) {
-        throw new Error(
-            "GOVERNMENT_DOCUMENT_NOT_VERIFIED"
-        );
-    }
-
-    // =====================================
-    // 2. Validate document type
-    // =====================================
-
-    if (
-        document.documentType !==
-        expectedDocumentType
-    ) {
-        throw new Error(
-            "GOVERNMENT_DOCUMENT_TYPE_MISMATCH"
-        );
-    }
-
-    // =====================================
-    // 3. Validate document name
-    // =====================================
-
-    if (
-        !document.verifiedName ||
-        typeof document.verifiedName !== "string" ||
-        !document.verifiedName.trim()
-    ) {
-        throw new Error(
-            "GOVERNMENT_DOCUMENT_NAME_MISSING"
-        );
-    }
-
-    // =====================================
-    // 4. Validate date of birth
-    // =====================================
-
-    if (
-        !(document.dateOfBirth instanceof Date) ||
-        Number.isNaN(
-            document.dateOfBirth.getTime()
-        )
-    ) {
-        throw new Error(
-            "GOVERNMENT_DOCUMENT_DOB_INVALID"
-        );
-    }
-
-    if (
-        document.dateOfBirth.getTime() >
-        Date.now()
-    ) {
-        throw new Error(
-            "GOVERNMENT_DOCUMENT_DOB_INVALID"
-        );
-    }
-
-    // =====================================
-    // 5. Validate minimum age
-    // =====================================
-
-    const age =
-        getAgeFromDateOfBirth(
-            document.dateOfBirth
-        );
-
-    if (age < 18) {
-        throw new Error(
-            "USER_BELOW_MINIMUM_AGE"
-        );
-    }
-
-    // =====================================
-    // 6. Validate registered user name
-    // =====================================
-
-    if (
-        !user.full_name ||
-        !user.full_name.trim()
-    ) {
-        throw new Error(
-            "REGISTERED_USER_NAME_MISSING"
-        );
-    }
-
-    const registeredName =
-        normalizeGovernmentIdName(
-            user.full_name
-        );
-
-    const governmentName =
-        normalizeGovernmentIdName(
-            document.verifiedName
-        );
-
-    if (
-        registeredName !== governmentName
-    ) {
-        throw new Error(
-            "GOVERNMENT_ID_NAME_MISMATCH"
-        );
-    }
-
-    // =====================================
-    // 7. Validate registered date of birth
-    // =====================================
-
-    // if (
-    //     !user.birth_date ||
-    //     Number.isNaN(
-    //         user.birth_date.getTime()
-    //     )
-    // ) {
-    //     throw new Error(
-    //         "REGISTERED_USER_DOB_MISSING"
-    //     );
-    // }
-
-    // if (
-    //     !isSameDateOfBirth(
-    //         document.dateOfBirth,
-    //         user.birth_date
-    //     )
-    // ) {
-    //     throw new Error(
-    //         "GOVERNMENT_ID_DOB_MISMATCH"
-    //     );
-    // }
-
-    // All validation checks passed.
+export type ValidatedGovernmentIdentity = {
+  verifiedName: string;
+  birthDate: Date;
+  gender: Gender;
 };
 
+export const validateGovernmentIdentity = (
+  document: VerifiedGovernmentDocument,
+  expectedDocumentType: GovernmentIdType
+): ValidatedGovernmentIdentity => {
+
+  // =====================================
+  // 1. Validate provider confirmation
+  // =====================================
+
+  if (
+    !document.transactionConfirmed ||
+    !document.documentAccessConfirmed ||
+    !document.isAuthentic
+  ) {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_NOT_VERIFIED"
+    );
+  }
+
+  // =====================================
+  // 2. Validate document type
+  // =====================================
+
+  if (
+    document.documentType !==
+    expectedDocumentType
+  ) {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_TYPE_MISMATCH"
+    );
+  }
+
+  // =====================================
+  // 3. Validate government document name
+  // =====================================
+
+  if (
+    !document.verifiedName ||
+    typeof document.verifiedName !== "string" ||
+    !document.verifiedName.trim()
+  ) {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_NAME_MISSING"
+    );
+  }
+
+  const verifiedName =
+    document.verifiedName.trim();
+
+  if (verifiedName.length > 100) {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_NAME_TOO_LONG"
+    );
+  }
+
+  // =====================================
+  // 4. Validate government DOB
+  // =====================================
+
+  if (
+    !(document.dateOfBirth instanceof Date) ||
+    Number.isNaN(
+      document.dateOfBirth.getTime()
+    )
+  ) {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_DOB_INVALID"
+    );
+  }
+
+  const birthDate = document.dateOfBirth;
+
+  if (
+    birthDate.getTime() >
+    Date.now()
+  ) {
+    throw new Error(
+      "GOVERNMENT_DOCUMENT_DOB_INVALID"
+    );
+  }
+
+  // =====================================
+  // 5. Validate minimum age
+  // =====================================
+
+  const age =
+    getAgeFromDateOfBirth(
+      birthDate
+    );
+
+  if (age < 18) {
+    throw new Error(
+      "USER_BELOW_MINIMUM_AGE"
+    );
+  }
+
+  // =====================================
+  // 6. Validate government gender
+  // =====================================
+
+  const gender =
+    normalizeGovernmentGender(
+      document.verifiedGender
+    );
+
+  // =====================================
+  // 7. Return government identity
+  // =====================================
+
+  return {
+    verifiedName,
+    birthDate,
+    gender,
+  };
+};
 
 const parseDrivingLicenseDate = (
-  value: unknown
+    value: unknown
 ): Date => {
 
-  if (
-    typeof value !== "string" ||
-    !value.trim()
-  ) {
+    if (
+        typeof value !== "string" ||
+        !value.trim()
+    ) {
+        throw new Error(
+            "DRIVING_LICENSE_DATE_MISSING"
+        );
+    }
+
+    const input = value.trim();
+
+    let year: number;
+    let month: number;
+    let day: number;
+
+    // YYYY-MM-DD
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+
+        const parts = input.split("-").map(Number);
+
+        [year, month, day] = parts;
+
+    }
+
+    // DD-MM-YYYY or DD/MM/YYYY
+
+    else if (
+        /^\d{2}[-/]\d{2}[-/]\d{4}$/.test(input)
+    ) {
+
+        const parts =
+            input.split(/[-/]/).map(Number);
+
+        [day, month, year] = parts;
+
+    } else {
+
+        throw new Error(
+            "INVALID_DRIVING_LICENSE_DATE_FORMAT"
+        );
+    }
+
+    const date = new Date(
+        Date.UTC(year, month - 1, day)
+    );
+
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        throw new Error(
+            "INVALID_DRIVING_LICENSE_DATE"
+        );
+    }
+
+    return date;
+};
+
+export const normalizeGovernmentGender = (
+  gender: string | null | undefined
+): Gender => {
+
+  if (!gender || !gender.trim()) {
     throw new Error(
-      "DRIVING_LICENSE_DATE_MISSING"
+      "GOVERNMENT_DOCUMENT_GENDER_MISSING"
     );
   }
 
-  const input = value.trim();
+  const normalized = gender
+    .trim()
+    .toUpperCase();
 
-  let year: number;
-  let month: number;
-  let day: number;
+  switch (normalized) {
 
-  // YYYY-MM-DD
+    case "M":
+    case "MALE":
+      return Gender.MEN;
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    case "F":
+    case "FEMALE":
+      return Gender.WOMEN;
 
-    const parts = input.split("-").map(Number);
+    case "O":
+    case "OTHER":
+      return Gender.OTHER;
 
-    [year, month, day] = parts;
-
+    default:
+      throw new Error(
+        "UNSUPPORTED_GOVERNMENT_DOCUMENT_GENDER"
+      );
   }
-
-  // DD-MM-YYYY or DD/MM/YYYY
-
-  else if (
-    /^\d{2}[-/]\d{2}[-/]\d{4}$/.test(input)
-  ) {
-
-    const parts =
-      input.split(/[-/]/).map(Number);
-
-    [day, month, year] = parts;
-
-  } else {
-
-    throw new Error(
-      "INVALID_DRIVING_LICENSE_DATE_FORMAT"
-    );
-  }
-
-  const date = new Date(
-    Date.UTC(year, month - 1, day)
-  );
-
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    throw new Error(
-      "INVALID_DRIVING_LICENSE_DATE"
-    );
-  }
-
-  return date;
 };

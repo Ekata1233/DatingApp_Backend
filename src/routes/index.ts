@@ -83,6 +83,9 @@ import boostAnalyticsRoutes from "../features/boost/boostAnalytics/boostAnalytic
 import governmentIdVerifcationRoute from "../features/verification/government_id/government-id.routes"
 import criminalBackgroundVerification from "../features/verification/criminal_background/ccrv.routes"
 import faceMatchVerification from "../features/verification/face_match/face-verification.routes"
+import roseTopUpRoutes from "../features/rose/rose-purchase/rose-purchase.routes"
+import complimentTopUpRoutes from "../features/compliment/compliment-purchase/compliment-purchase.routes"
+
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -193,5 +196,9 @@ router.use("/user", boostAnalyticsRoutes)
 //USER VERIFICATION
 router.use("/user", criminalBackgroundVerification, faceMatchVerification)
 router.use("/verification/user", governmentIdVerifcationRoute)
+//
+
+//ROSE , COMPLIMENT TOP UP BY WALLET
+router.use("/user", roseTopUpRoutes, complimentTopUpRoutes)
 //
 export default router;

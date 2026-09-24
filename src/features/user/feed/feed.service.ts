@@ -1439,9 +1439,8 @@ export const getFeedService = async ({
   const matchConditions =
     Prisma.sql`
         u.deleted_at IS NULL
-
+        AND u.account_status = 'ACTIVE'::"AccountStatus"
         AND u.id <> ${userId}::uuid
-
         AND NOT EXISTS (
           SELECT 1
           FROM swipes s
@@ -1751,6 +1750,8 @@ export const getFeedService = async ({
                 },
 
                 ...userFilters,
+                account_status: "ACTIVE",
+                deleted_at: null,
 
                 ...(Object.keys(
                   profileFilters,
@@ -1998,7 +1999,8 @@ export const getFeedService = async ({
                 id: {
                   in: idOrder,
                 },
-
+                account_status: "ACTIVE",
+                deleted_at: null,
                 ...userFilters,
 
                 ...(Object.keys(
@@ -2314,7 +2316,8 @@ export const getFeedService = async ({
               id: {
                 in: idOrder,
               },
-
+              account_status: "ACTIVE",
+              deleted_at: null,
               ...fallbackUserFilters,
 
               ...(Object.keys(
