@@ -1,178 +1,3 @@
-// // utils/profileScore.ts
-
-// import { QuestionScreen } from "@prisma/client";
-// import { PROFILE_WEIGHTS } from "../config/profileCompletion";
-// import { prisma } from "../prisma/prismaClient";
-
-// export const calculateProfileScore = async (userId: string) => {
-//   const user = await prisma.user.findUnique({
-//     where: { id: userId },
-//   });
-
-//   const profile = await prisma.userProfile.findUnique({
-//     where: { user_id: userId },
-//   });
-
-//   const photos = await prisma.userPhoto.count({
-//     where: { user_id: userId },
-//   });
-
-//   const questionCounts = await prisma.question.groupBy({
-//   by: ["screen"],
-//   _count: {
-//     id: true,
-//   },
-// });
-
-//   const answers = await prisma.userAnswer.findMany({
-//     where: { user_id: userId },
-//     include: {
-//       question: {
-//         select: {
-//         category: true,
-//         screen: true, // ✅ ADD THIS
-//       },
-//       },
-//     },
-//   });
-
-//   const userBio = await prisma.userBio.findUnique({
-//     where: { user_id: userId },
-//     select: { bio: true },
-//   });
-
-//   // -------------------------------
-//   // BASIC DETAILS
-//   // -------------------------------
-//   let basicScore = 0;
-//   if (user?.full_name) basicScore += 2;
-//   if (user?.email) basicScore += 2;
-//   if (user?.birth_date) basicScore += 2;
-//   if (user?.height) basicScore += 2;
-//   if (user?.gender) basicScore += 2;
-//    if (user?.gender_option) basicScore += 2;
-
-//   // max = 
-//   basicScore = Math.min(basicScore, PROFILE_WEIGHTS.basic_details);
-
-//   // -------------------------------
-//   // LOCATION
-//   // -------------------------------
-//   const locationScore =
-//     profile?.latitude && profile?.longitude ? PROFILE_WEIGHTS.location : 0;
-
-//   // -------------------------------
-//   // ADDRESS
-//   // -------------------------------
-//   const addressFields = [profile?.country, profile?.state, profile?.city];
-//   const addressFilled = addressFields.filter(Boolean).length;
-
-//   const addressScore =
-//     (addressFilled / 3) * PROFILE_WEIGHTS.address;
-
-//   // -------------------------------
-//   // INTERESTED IN
-//   // -------------------------------
-//   const interestedScore =
-//     profile?.interested_in && profile?.sexual_orientation
-//       ? PROFILE_WEIGHTS.interested_in
-//       : 0;
-
-//   // -------------------------------
-//   // QUESTIONS (group by category)
-//   // -------------------------------
-// const lifestyleAnswers = new Set(
-//   answers
-//     .filter((a) => a.question.screen === QuestionScreen.LIFESTYLE)
-//     .map((a) => a.question_id)
-// ).size;
-
-// const realYouAnswers = new Set(
-//   answers
-//     .filter((a) => a.question.screen === QuestionScreen.REAL_U_MATTERS)
-//     .map((a) => a.question_id)
-// ).size;
-
-// const thingsYouLoveAnswers = new Set(
-//   answers
-//     .filter((a) => a.question.screen === QuestionScreen.THINGS_U_LOVE)
-//     .map((a) => a.question_id)
-// ).size;
-
-
-
-// const screenTotals = questionCounts.reduce((acc, item) => {
-//   acc[item.screen] = item._count.id;
-//   return acc;
-// }, {} as Record<QuestionScreen, number>);
-
-// const TOTAL_LIFESTYLE = screenTotals[QuestionScreen.LIFESTYLE] || 0;
-
-// const TOTAL_REALYOU =
-//   screenTotals[QuestionScreen.REAL_U_MATTERS] || 0;
-
-// const TOTAL_THINGS_YOU_LOVE =
-//   (screenTotals[QuestionScreen.THINGS_U_LOVE] || 0);
-
-
-// const lifestyleScore =
-//   TOTAL_LIFESTYLE > 0
-//     ? (lifestyleAnswers / TOTAL_LIFESTYLE) * PROFILE_WEIGHTS.lifestyle
-//     : 0;
-
-// const realYouScore =
-//   TOTAL_REALYOU > 0
-//     ? (realYouAnswers / TOTAL_REALYOU) * PROFILE_WEIGHTS.real_you
-//     : 0;
-
-// const thingsYouLoveScore =
-//   TOTAL_THINGS_YOU_LOVE > 0
-//     ? (thingsYouLoveAnswers / TOTAL_THINGS_YOU_LOVE) *
-//       PROFILE_WEIGHTS.things_you_love
-//     : 0;
-
-
-//   // -------------------------------
-//   // PHOTOS
-//   // -------------------------------
-//   const photoScore =
-//     (Math.min(photos, 5) / 5) * PROFILE_WEIGHTS.photos;
-
-//   // -------------------------------
-//   // BIO
-//   // -------------------------------
-//   const bioText = userBio?.bio || "";
-
-// let bioScore = 0;
-
-// if (bioText.length >= 80) {
-//   bioScore = PROFILE_WEIGHTS.bio; // full
-// } else if (bioText.length >= 30) {
-//   bioScore = PROFILE_WEIGHTS.bio * 0.7;
-// } else if (bioText.length > 0) {
-//   bioScore = PROFILE_WEIGHTS.bio * 0.4;
-// }
-
-
-//   // -------------------------------
-//   // FINAL SCORE
-//   // -------------------------------
-//   const totalScore =
-//     basicScore +
-//     locationScore +
-//     addressScore +
-//     interestedScore +
-//     lifestyleScore +
-//     realYouScore +
-//     thingsYouLoveScore +
-//     photoScore +
-//     bioScore;
-
-//   return Math.round(totalScore);
-// };
-
-// utils/profileScore.ts
-
 import { QuestionScreen } from "@prisma/client";
 import { prisma } from "../prisma/prismaClient";
 import { PROFILE_WEIGHTS } from "../config/profileCompletion";
@@ -184,6 +9,7 @@ export const calculateProfileScore = async (userId: string) => {
     education,
     family,
     userBio,
+    userAbout,
     photosCount,
     promptsCount,
     answers,
@@ -222,6 +48,10 @@ export const calculateProfileScore = async (userId: string) => {
       where: { user_id: userId },
     }),
 
+    prisma.userAbout.findUnique({
+      where: { user_id: userId },
+    }),
+
     prisma.userPhoto.count({
       where: { user_id: userId },
     }),
@@ -247,14 +77,6 @@ export const calculateProfileScore = async (userId: string) => {
   let score = 0;
 
   // =========================================================
-  // PHONE VERIFICATION
-  // =========================================================
-
-  if (user?.is_phone_verified) {
-    score += PROFILE_WEIGHTS.PHONE_VERIFICATION;
-  }
-
-  // =========================================================
   // BASIC INFO (15)
   // =========================================================
 
@@ -276,40 +98,37 @@ export const calculateProfileScore = async (userId: string) => {
   if (user?.gender_option)
     score += PROFILE_WEIGHTS.BASIC_INFO.GENDER_OPTION;
 
+  if (userAbout?.maritalStatus)
+    score += PROFILE_WEIGHTS.BASIC_INFO.MARITAL_STATUS;
+
+  if (userAbout?.zodiac)
+    score += PROFILE_WEIGHTS.BASIC_INFO.ZODIAC;
+
   if (user?.intentionId)
-    score += PROFILE_WEIGHTS.PROFILE.INTENTION;
+    score += PROFILE_WEIGHTS.INTENTION.INTENTION;
 
   // =========================================================
   // PROFILE (13)
   // =========================================================
 
   if (profile?.religionId)
-    score += PROFILE_WEIGHTS.PROFILE.RELIGION;
+    score += PROFILE_WEIGHTS.BASIC_INFO.RELIGION;
 
   if (profile?.communityId)
-    score += PROFILE_WEIGHTS.PROFILE.COMMUNITY;
+    score += PROFILE_WEIGHTS.BASIC_INFO.COMMUNITY;
 
   if (profile?.interested_in)
-    score += PROFILE_WEIGHTS.PROFILE.INTERESTED_IN;
+    score += PROFILE_WEIGHTS.INTERESTED_IN.INTERESTED_IN;
 
   if (profile?.sexual_orientation)
-    score += PROFILE_WEIGHTS.PROFILE.SEXUAL_ORIENTATION;
-
-  if (profile?.country)
-    score += PROFILE_WEIGHTS.PROFILE.COUNTRY;
-
-  if (profile?.state)
-    score += PROFILE_WEIGHTS.PROFILE.STATE;
-
-  if (profile?.city)
-    score += PROFILE_WEIGHTS.PROFILE.CITY;
+    score += PROFILE_WEIGHTS.INTERESTED_IN.SEXUAL_ORIENTATION;
 
 
   if (profile?.latitude && profile?.longitude)
-    score += PROFILE_WEIGHTS.PROFILE.LOCATION_COORDINATES;
+    score += PROFILE_WEIGHTS.LOCATION.LOCATION_COORDINATES;
 
   if (profile?.languages.length) {
-    score += PROFILE_WEIGHTS.PROFILE.LANGUAGES;
+    score += PROFILE_WEIGHTS.BASIC_INFO.LANGUAGES;
   }
 
   // =========================================================
@@ -373,9 +192,6 @@ export const calculateProfileScore = async (userId: string) => {
 
   if (family?.siblings?.some((sibling) => sibling.siblingTypeId))
     score += PROFILE_WEIGHTS.FAMILY.SIBLING_RELATION;
-
-  if (family?.siblings?.some((sibling) => sibling.occupationId))
-    score += PROFILE_WEIGHTS.FAMILY.SIBLING_OCCUPATION;
 
   if (family?.familyHomeId)
     score += PROFILE_WEIGHTS.FAMILY.FAMILY_CITY;
