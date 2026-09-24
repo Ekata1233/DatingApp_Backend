@@ -84,7 +84,8 @@ import governmentIdVerifcationRoute from "../features/verification/government_id
 import criminalBackgroundVerification from "../features/verification/criminal_background/ccrv.routes"
 import faceMatchVerification from "../features/verification/face_match/face-verification.routes"
 import employementVerificationRoutes from "../features/verification/employment-verification/employment.routes"
-
+import employementAdminVerificationRoutes from "../features/verification/employment-verification/employmentadmin.route"
+import boostPurchaseWallet from "../features/boost/boost-purchase/boost-purchase.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -101,7 +102,7 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes);
 
 
 
@@ -111,7 +112,7 @@ router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes,boostPurchaseWallet)
 
 router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes, eventsRoutes, payoutMethodRoutes)
 router.use("/user", blockRoutes)

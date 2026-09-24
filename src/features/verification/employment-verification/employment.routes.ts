@@ -35,13 +35,13 @@ router.get(
   getEmploymentStatusController
 );
 router.post(
-  "/submit",
+  "/employment-verification/submit",
   authMiddleware,
   submitEmploymentVerificationController
 );
 
 router.get(
-  "/my-verification",
+  "/employment-verification/my-verification",
   authMiddleware,
   getMyEmploymentVerificationController
 );

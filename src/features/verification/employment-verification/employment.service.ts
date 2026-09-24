@@ -861,7 +861,6 @@ export const getEmploymentVerificationDetailsAdminService =
   
 export const reviewEmploymentVerificationService = async (
   employmentId: string,
-  adminId: string,
   action: "APPROVE" | "REJECT",
   rejectionReason?: string
 ) => {
@@ -901,14 +900,14 @@ export const reviewEmploymentVerificationService = async (
           },
         },
         data: {
-          status: approved ? "VERIFIED" : "REJECTED",
-          reviewedBy: adminId,
-          reviewedAt: now,
-          verifiedAt: approved ? now : null,
-          rejectionReason: approved
-            ? null
-            : rejectionReason!.trim(),
-        },
+  status: approved ? "VERIFIED" : "REJECTED",
+  reviewedBy: null,
+  reviewedAt: now,
+  verifiedAt: approved ? now : null,
+  rejectionReason: approved
+    ? null
+    : rejectionReason!.trim(),
+},
       });
 
     if (updated.count !== 1) {

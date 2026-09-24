@@ -14,17 +14,17 @@ import {
 const router = Router();
 
 router.get(
-  "/get-all",
+  "/employment-verification/get-all",
   getEmploymentVerificationsAdminController
 );
 
 router.get(
-  "/:id",
+  "/employment-verification/:id",
   getEmploymentVerificationDetailsAdminController
 );
 
 router.patch(
-  "/:id/review",
+  "/employment-verification/:id/review",
   reviewEmploymentVerificationController
 );
 

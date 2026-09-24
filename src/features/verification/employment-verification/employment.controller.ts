@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from "express";
 
 import {
   EmploymentFile,
+  employmentIdSchema,
+  employmentReviewSchema,
+  employmentVerificationSchema,
   mobileEmploymentSchema,
   uanEmploymentSchema,
 } from "./employment.validation";
@@ -15,6 +18,7 @@ import {
   reviewEmploymentVerificationService,
   getEmploymentVerificationsAdminService,
 } from "./employment.service";
+import { EmploymentVerificationStatus } from "@prisma/client";
 interface EmploymentRequestFiles {
   employmentId?: EmploymentFile | EmploymentFile[];
   salarySlip?: EmploymentFile | EmploymentFile[];
@@ -448,21 +452,13 @@ export const getEmploymentVerificationDetailsAdminController =
   };
 
   
+
 export const reviewEmploymentVerificationController = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const adminId = (req as any).user?.id;
-
-    if (!adminId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
     const employmentId = req.params.id as string;
 
     const parsedId =
@@ -490,7 +486,6 @@ export const reviewEmploymentVerificationController = async (
     const result =
       await reviewEmploymentVerificationService(
         parsedId.data,
-        adminId,
         parsed.data.action,
         parsed.data.rejectionReason
       );
@@ -503,17 +498,22 @@ export const reviewEmploymentVerificationController = async (
           : "Employment verification rejected successfully",
       data: result,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "INTERNAL_SERVER_ERROR";
+
     const errorStatus: Record<string, number> = {
       VERIFICATION_NOT_FOUND: 404,
       VERIFICATION_ALREADY_REVIEWED: 409,
       REJECTION_REASON_REQUIRED: 400,
     };
 
-    if (errorStatus[error.message]) {
-      return res.status(errorStatus[error.message]).json({
+    if (errorStatus[message]) {
+      return res.status(errorStatus[message]).json({
         success: false,
-        message: error.message,
+        message,
       });
     }
 
