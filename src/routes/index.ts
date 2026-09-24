@@ -86,7 +86,9 @@ import faceMatchVerification from "../features/verification/face_match/face-veri
 import roseTopUpRoutes from "../features/rose/rose-purchase/rose-purchase.routes"
 import complimentTopUpRoutes from "../features/compliment/compliment-purchase/compliment-purchase.routes"
 import datePlanTopUpRoutes from "../features/dateNow/date-plan-purchase/date-plan-purchase.routes"
-
+import employementVerificationRoutes from "../features/verification/employment-verification/employment.routes"
+import employementAdminVerificationRoutes from "../features/verification/employment-verification/employmentadmin.route"
+import boostPurchaseWallet from "../features/boost/boost-purchase/boost-purchase.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -103,17 +105,17 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes);
 
 
 
 router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, eventPartnerRoutes);
-router.use("/user", waitlistRoutes, userRoutes)
+router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes)
 router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes,boostPurchaseWallet)
 
 router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes, eventsRoutes, payoutMethodRoutes)
 router.use("/user", blockRoutes)
