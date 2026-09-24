@@ -85,6 +85,7 @@ import criminalBackgroundVerification from "../features/verification/criminal_ba
 import faceMatchVerification from "../features/verification/face_match/face-verification.routes"
 import roseTopUpRoutes from "../features/rose/rose-purchase/rose-purchase.routes"
 import complimentTopUpRoutes from "../features/compliment/compliment-purchase/compliment-purchase.routes"
+import datePlanTopUpRoutes from "../features/dateNow/date-plan-purchase/date-plan-purchase.routes"
 
 const router = Router();
 
@@ -199,6 +200,6 @@ router.use("/verification/user", governmentIdVerifcationRoute)
 //
 
 //ROSE , COMPLIMENT TOP UP BY WALLET
-router.use("/user", roseTopUpRoutes, complimentTopUpRoutes)
+router.use("/user", roseTopUpRoutes, complimentTopUpRoutes,datePlanTopUpRoutes)
 //
 export default router;
