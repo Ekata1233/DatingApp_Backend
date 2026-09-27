@@ -267,6 +267,36 @@ const syncCompanyName = async (
   };
 };
 
+
+// ============================================
+// FETCH UAN ONLY (mobile → UAN list, no Fetch Latest)
+// Returns the raw Gridlines response.
+// ============================================
+
+export const fetchUANByMobileService = async (
+  userId: string,
+  mobileNumber: string
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { phone_number: true, is_phone_verified: true, account_status: true },
+  });
+
+  if (!user) throw new Error("USER_NOT_FOUND");
+  if (user.account_status !== "ACTIVE") throw new Error("ACCOUNT_NOT_ACTIVE");
+  if (!user.is_phone_verified || !user.phone_number) {
+    throw new Error("PHONE_VERIFICATION_REQUIRED");
+  }
+
+  const registeredMobile = normalizeMobile(user.phone_number);
+  const requestedMobile = normalizeMobile(mobileNumber);
+
+  if (!/^[6-9]\d{9}$/.test(requestedMobile)) throw new Error("INVALID_MOBILE_NUMBER");
+  if (registeredMobile !== requestedMobile) throw new Error("MOBILE_NUMBER_DOES_NOT_MATCH");
+
+  // Raw Gridlines response — request_id, transaction_id, data.uan_list, etc.
+  return fetchUANByMobile(requestedMobile, randomUUID());
+};
 // ============================================
 // VERIFY EMPLOYMENT SERVICE
 // ============================================

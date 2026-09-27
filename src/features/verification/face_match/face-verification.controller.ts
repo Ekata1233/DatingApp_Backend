@@ -12,6 +12,7 @@ import { VerificationType } from "@prisma/client";
 import {
   verifyUserFaceService,
 } from "./face-verification.service";
+import { UploadedFile } from "express-fileupload";
 
 export const verifyFaceController = async (
   req: Request,
@@ -28,39 +29,29 @@ export const verifyFaceController = async (
       });
     }
 
-    // Selfie from Flutter multipart form-data
-    const selfie = req.file;
-
-    if (!selfie) {
-      return res.status(400).json({
-        success: false,
-        message: "Selfie image is required",
-      });
-    }
-
-    const consent = req.body.consent === "true";
+    const consent =
+      req.body.consent === true ||
+      req.body.consent === "true";
 
     if (!consent) {
       return res.status(400).json({
         success: false,
-        message: "Face verification consent is required",
+        message:
+          "Face verification consent is required",
       });
     }
 
-    const result = await verifyUserFaceService(
-      userId,
-      selfie.buffer,
-      consent
-    );
+    const result =
+      await verifyUserFaceService(
+        userId,
+        consent
+      );
 
     return res.status(200).json({
       success: true,
-
       message: result.message,
-
       data: result,
     });
-
   } catch (error) {
     next(error);
   }

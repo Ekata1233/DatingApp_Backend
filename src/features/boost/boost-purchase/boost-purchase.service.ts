@@ -182,34 +182,89 @@ export const purchaseBoostWithWalletService = async (
       // 9. Credit purchased Boosts
       // -----------------------------------------
 
-      const now = new Date();
+      // -----------------------------------------
+// 9. Credit purchased Boosts
+// -----------------------------------------
 
-      const userBoost = await tx.userBoost.create({
-        data: {
-          user_id: userId,
+const now = new Date();
 
-          boostId: boostOption.boost_id,
+// Find existing wallet Boost balance
+// IMPORTANT:
+// Match by user + boostId, NOT boost_option_id.
+//
+// Example:
+// User buys "5 Boosts" first,
+// then later buys "10 Boosts".
+// Both belong to BOOST, so they should accumulate.
+const existingUserBoost = await tx.userBoost.findFirst({
+  where: {
+    user_id: userId,
+    boostId: boostOption.boost_id,
+    is_active: true,
+  },
+  orderBy: {
+    created_at: "desc",
+  },
+});
 
-          boost_option_id: boostOption.id,
+let userBoost;
 
-          total_boosts: boostOption.boostCount,
+if (existingUserBoost) {
+  // ---------------------------------------
+  // Existing Boost balance -> ADD new boosts
+  // ---------------------------------------
 
-          remaining_boosts:
-            boostOption.boostCount,
+  userBoost = await tx.userBoost.update({
+    where: {
+      id: existingUserBoost.id,
+    },
+    data: {
+      total_boosts: {
+        increment: boostOption.boostCount,
+      },
 
-          weeklyLimit: 0,
+      remaining_boosts: {
+        increment: boostOption.boostCount,
+      },
 
-          last_reset_at: now,
+      // Keep latest purchased option reference
+      boost_option_id: boostOption.id,
 
-          next_reset_at: now,
+      is_active: true,
+    },
+  });
+} else {
+  // ---------------------------------------
+  // First purchase -> Create UserBoost
+  // ---------------------------------------
 
-          start_at: now,
+  userBoost = await tx.userBoost.create({
+    data: {
+      user_id: userId,
 
-          expires_at: null,
+      boostId: boostOption.boost_id,
 
-          is_active: true,
-        },
-      });
+      boost_option_id: boostOption.id,
+
+      total_boosts: boostOption.boostCount,
+
+      remaining_boosts:
+        boostOption.boostCount,
+
+      weeklyLimit: 0,
+
+      last_reset_at: now,
+
+      next_reset_at: now,
+
+      start_at: now,
+
+      expires_at: null,
+
+      is_active: true,
+    },
+  });
+}
 
       // -----------------------------------------
       // 10. Return purchase details

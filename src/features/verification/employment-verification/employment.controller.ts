@@ -17,6 +17,7 @@ import {
   getEmploymentVerificationDetailsAdminService,
   reviewEmploymentVerificationService,
   getEmploymentVerificationsAdminService,
+  fetchUANByMobileService,
 } from "./employment.service";
 import { EmploymentVerificationStatus } from "@prisma/client";
 interface EmploymentRequestFiles {
@@ -131,8 +132,10 @@ const handleEmploymentError = (error: unknown, res: Response) => {
 };
 
 // ============================================
-// OPTION 1: MOBILE → UAN → LATEST EMPLOYMENT
+// ============================================
+// OPTION 1: MOBILE → FETCH UAN ONLY
 // POST /employment/verify/mobile
+// Returns the raw Gridlines fetch-uan response.
 // ============================================
 
 export const verifyEmploymentByMobileController = async (
@@ -155,11 +158,10 @@ export const verifyEmploymentByMobileController = async (
       });
     }
 
-    const result = await verifyEmploymentService({
+    const result = await fetchUANByMobileService(
       userId,
-      method: "MOBILE",
-      value: validation.data.mobile_number,
-    });
+      validation.data.mobile_number
+    );
 
     return res.status(200).json(result);
   } catch (error: unknown) {

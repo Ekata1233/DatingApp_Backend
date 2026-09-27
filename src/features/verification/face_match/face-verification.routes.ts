@@ -15,15 +15,14 @@ const router = Router();
 
 // POST - Verify selfie with Government ID photo
 router.post(
-  "/face/verify",
+  "/verification/face/verify",
   authMiddleware,
-  faceUpload.single("selfie"),
   verifyFaceController
 );
 
 // GET - Current face verification status
 router.get(
-  "/face/status",
+  "/verification/face/status",
   authMiddleware,
   getFaceVerificationStatusController
 );
