@@ -1,3 +1,4 @@
+console.log("🚀 Match score worker file loaded");
 import { Worker, Job } from "bullmq";
 
 import {
@@ -55,6 +56,29 @@ export const matchScoreWorker =
       concurrency: 5,
     },
   );
+
+  // =====================================================
+// WORKER EVENTS
+// =====================================================
+
+// Redis connection + worker ready
+matchScoreWorker.on("ready", () => {
+  console.log(
+    "🟢 Match score worker ready",
+  );
+});
+
+
+// Worker picked a job
+matchScoreWorker.on("active", (job) => {
+  console.log(
+    "🟡 Match score worker picked job",
+    {
+      jobId: job.id,
+      userId: job.data.userId,
+    },
+  );
+});
 
 matchScoreWorker.on(
   "completed",

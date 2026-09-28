@@ -5,6 +5,8 @@ import cors from "cors";
 import compression from "compression";
 import fileUpload from "express-fileupload"; // ✅ correct import
 import routes from "./routes";
+// ✅ START BULLMQ WORKER
+import "./workers/match-score.worker";
 
 const app = express();
 

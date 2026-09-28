@@ -9,8 +9,7 @@ import {
 } from "./match-score.cache";
 import { calculateMatchScore } from "../../utils/matchScore.constants";
 
-export const calculateUserMatchScores =
-  async (userId: string) => {
+export const calculateUserMatchScores = async (userId: string) => {
 
     console.log(
       `🧮 Starting match calculation for ${userId}`,
