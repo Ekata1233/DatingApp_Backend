@@ -17,7 +17,7 @@ router.get(
 );
 
 router.post(
-  "/auto-renew/turn-off",
+  "/membership-plan/auto-renew/turn-off",
   authMiddleware,
   turnOffAutoRenewController
 );

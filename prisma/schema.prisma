@@ -1407,6 +1407,9 @@ model UserPackage {
   endDate               DateTime?
   status                PackageStatus @default(ACTIVE)
   autoRenew             Boolean       @default(false)
+  // Auto-renew cancellation
+  autoRenewCancelReason String?
+  autoRenewCancelledAt  DateTime?
   paymentId             String?       @db.Uuid
   payment               Payment?      @relation(fields: [paymentId], references: [id])
   currentPackageId      String?       @db.Uuid

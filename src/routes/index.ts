@@ -91,6 +91,7 @@ import employementAdminVerificationRoutes from "../features/verification/employm
 import boostPurchaseWallet from "../features/boost/boost-purchase/boost-purchase.routes"
 import trustVerifyRoutes from "../features/verification/verification.routes"
 import trustScoreRoutes from "../features/verification/trust-score/trust-score.routes"
+import packageTopUpRoutes from "../features/package/package-purchase/package-purchase.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -206,6 +207,6 @@ router.use("/user", trustScoreRoutes)
 //
 
 //ROSE , COMPLIMENT TOP UP BY WALLET
-router.use("/user", roseTopUpRoutes, complimentTopUpRoutes,datePlanTopUpRoutes)
+router.use("/user", roseTopUpRoutes, complimentTopUpRoutes,datePlanTopUpRoutes, packageTopUpRoutes)
 //
 export default router;
