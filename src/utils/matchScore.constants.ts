@@ -227,7 +227,7 @@ export function calculateMatchScore(me: any, user: any) {
         profileCompletenessScore(user)
     );
 
-    const MAX_SCORE = 150;
+    const MAX_SCORE = 186;
 
     return {
         score,
