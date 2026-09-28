@@ -1,3 +1,4 @@
+import { prisma } from "../../../prisma/prismaClient";
 import {
   findCurrentMembership,
   findMembershipHistory,
@@ -632,5 +633,70 @@ export const getMembershipInvoiceService = async (
       pdfUrl:
         `/api/user/membership-plan/invoice/${membership.id}/pdf`,
     },
+  };
+};
+
+export const turnOffAutoRenewService = async (
+  userId: string,
+  reason: string
+) => {
+  // Find user's current active package
+  const userPackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: "ACTIVE",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      package: true,
+      price: true,
+    },
+  });
+
+  if (!userPackage) {
+    throw new Error("ACTIVE_PACKAGE_NOT_FOUND");
+  }
+
+  // Auto-renew already disabled
+  if (!userPackage.autoRenew) {
+    throw new Error("AUTO_RENEW_ALREADY_DISABLED");
+  }
+
+  const updatedPackage = await prisma.userPackage.update({
+    where: {
+      id: userPackage.id,
+    },
+    data: {
+      autoRenew: false,
+      autoRenewCancelReason: reason,
+      autoRenewCancelledAt: new Date(),
+    },
+    include: {
+      package: true,
+      price: true,
+    },
+  });
+
+  return {
+    userPackageId: updatedPackage.id,
+
+    package: {
+      id: updatedPackage.package.id,
+      name: updatedPackage.package.name,
+    },
+
+    autoRenew: updatedPackage.autoRenew,
+
+    cancellationReason:
+      updatedPackage.autoRenewCancelReason,
+
+    cancelledAt:
+      updatedPackage.autoRenewCancelledAt,
+
+    // Subscription itself remains active
+    status: updatedPackage.status,
+    accessUntil: updatedPackage.endDate,
   };
 };

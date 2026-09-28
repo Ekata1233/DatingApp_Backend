@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getMembershipInvoiceController, getMembershipPlanController } from "./membership.controller";
+import { getMembershipInvoiceController, getMembershipPlanController, turnOffAutoRenewController } from "./membership.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = Router();
@@ -14,6 +14,12 @@ router.get(
   "/membership-plan/invoice/:userPackageId",
   authMiddleware,
   getMembershipInvoiceController,
+);
+
+router.post(
+  "/auto-renew/turn-off",
+  authMiddleware,
+  turnOffAutoRenewController
 );
 
 export default router;

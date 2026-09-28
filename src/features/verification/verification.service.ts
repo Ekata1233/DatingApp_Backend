@@ -1,227 +1,546 @@
-// import { gridlinesClient } from "../../utils/gridlines.client";
+import {
+  VerificationStatus,
+  VerificationType,
+} from "@prisma/client";
 
-// export const sendAadhaarOtp = async (
-//   userId: string,
-//   aadhaarNumber: string
-// ) => {
-//   if (!/^\d{12}$/.test(aadhaarNumber)) {
-//     throw new Error(
-//       "Aadhaar number must contain 12 digits"
-//     );
-//   }
+import {
+  getEarnedPoints,
+  getSectionStatus,
+  getVerificationAction,
+  getVerificationStatus,
+  TRUST_POINTS,
+  TRUST_SCORE_TOTAL,
+  VERIFICATION_CONFIG,
+} from "./verification.helper";
+import { prisma } from "../../prisma/prismaClient";
 
-//   const referenceId =
-//     crypto.randomUUID();
+export const getTrustVerificationStatusService = async (
+  userId: string
+) => {
+  // --------------------------------------------------
+  // 1. Fetch user + location + all verification records
+  // --------------------------------------------------
 
-//   const response =
-//     await gridlinesClient.post(
-//       process.env
-//         .GRIDLINES_AADHAAR_GENERATE_OTP_URL!,
-//       {
-//         aadhaar_number: aadhaarNumber,
-//         consent: "Y",
-//       },
-//       {
-//         headers: {
-//           "X-Reference-ID": referenceId,
-//         },
-//       }
-//     );
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
 
-//   const transactionId =
-//     response.data?.data?.transaction_id ??
-//     response.data?.transaction_id;
+    select: {
+      id: true,
+      email: true,
+      phone_number: true,
+      is_phone_verified: true,
 
-//   if (!transactionId) {
-//     throw new Error(
-//       response.data?.message ||
-//         "Unable to send Aadhaar OTP"
-//     );
-//   }
+      profile: {
+        select: {
+          latitude: true,
+          longitude: true,
+        },
+      },
 
-//   const verification =
-//     await prisma.identityVerification.create({
-//       data: {
-//         userId,
+      verifications: {
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          points: true,
+          maxPoints: true,
+          verifiedAt: true,
+          expiresAt: true,
+          rejectionReason: true,
+        },
+      },
+    },
+  });
 
-//         method: "AADHAAR_OTP",
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
 
-//         documentType: "AADHAAR",
+  // --------------------------------------------------
+  // 2. Convert verification array into Map
+  // --------------------------------------------------
 
-//         status: "OTP_SENT",
+  const verificationMap = new Map(
+    user.verifications.map((verification) => [
+      verification.type,
+      verification,
+    ])
+  );
 
-//         transactionId,
+  // --------------------------------------------------
+  // 3. Helper for UserVerification based items
+  // --------------------------------------------------
 
-//         requestId:
-//           response.data?.request_id ?? null,
+  const buildVerificationItem = (
+    type: VerificationType
+  ) => {
+    const verification =
+      verificationMap.get(type);
 
-//         referenceId,
-//       },
-//     });
+    const config =
+      VERIFICATION_CONFIG[type];
 
-//   return {
-//     verificationId:
-//       verification.id,
+    const status =
+      getVerificationStatus(
+        verification?.status
+      );
 
-//     transactionId,
-//   };
-// };
+    const earnedPoints =
+      getEarnedPoints(
+        status,
+        config.points
+      );
 
-// export const verifyAadhaarOtp = async (
-//   userId: string,
-//   verificationId: string,
-//   otp: string
-// ) => {
-//   const verification =
-//     await prisma.identityVerification.findFirst({
-//       where: {
-//         id: verificationId,
-//         userId,
-//         method: "AADHAAR_OTP",
-//         status: "OTP_SENT",
-//       },
-//     });
+    return {
+      type,
+      title: config.title,
+      points: config.points,
+      earnedPoints,
+      status,
+      action:
+        getVerificationAction(status),
+    };
+  };
 
-//   if (!verification) {
-//     throw new Error(
-//       "Aadhaar verification session not found"
-//     );
-//   }
+  // ==================================================
+  // BASIC VERIFICATION
+  // ==================================================
 
-//   if (!verification.transactionId) {
-//     throw new Error(
-//       "Transaction ID missing"
-//     );
-//   }
+  /**
+   * IMPORTANT:
+   *
+   * Currently your User model only contains
+   * is_phone_verified.
+   *
+   * There is no is_email_verified field.
+   *
+   * So here we're considering Mobile & Email complete
+   * when:
+   *
+   * - phone is verified
+   * - email exists
+   *
+   * If you later add is_email_verified,
+   * update this condition.
+   */
 
-//   const response =
-//     await gridlinesClient.post(
-//       process.env
-//         .GRIDLINES_AADHAAR_SUBMIT_OTP_URL!,
-//       {
-//         transaction_id:
-//           verification.transactionId,
+  const mobileEmailVerified =
+    user.is_phone_verified === true &&
+    !!user.email;
 
-//         otp,
+  /**
+   * As requested:
+   * Location verification checks ONLY lat/lng.
+   */
 
-//         consent: "Y",
-//       },
-//       {
-//         headers: {
-//           "X-Reference-ID":
-//             verification.referenceId ||
-//             crypto.randomUUID(),
-//         },
-//       }
-//     );
+  const locationVerified =
+    user.profile?.latitude != null &&
+    user.profile?.longitude != null;
 
-//   /*
-//    * Adapt this according to the exact
-//    * Gridlines Submit OTP response.
-//    */
-//   const aadhaarData =
-//     response.data?.data;
+  const basicItems = [
+    {
+      type: "MOBILE_EMAIL",
+      title: "Mobile & Email Verification",
+      description:
+        "Prevents mass fake signups and builds baseline trust",
 
-//   if (!aadhaarData) {
-//     throw new Error(
-//       response.data?.message ||
-//         "Aadhaar verification failed"
-//     );
-//   }
+      points: TRUST_POINTS.MOBILE_EMAIL,
 
-//   const user =
-//     await prisma.user.findUnique({
-//       where: {
-//         id: userId,
-//       },
-//       select: {
-//         full_name: true,
-//         birth_date: true,
-//       },
-//     });
+      earnedPoints:
+        mobileEmailVerified
+          ? TRUST_POINTS.MOBILE_EMAIL
+          : 0,
 
-//   if (!user) {
-//     throw new Error(
-//       "User not found"
-//     );
-//   }
+      status:
+        mobileEmailVerified
+          ? "VERIFIED"
+          : "NOT_STARTED",
 
-//   const aadhaarName =
-//     aadhaarData.name ?? null;
+      action: mobileEmailVerified
+        ? null
+        : "VERIFY",
+    },
 
-//   const aadhaarDob =
-//     aadhaarData.dob ?? null;
+    {
+      type: "BASIC_LOCATION",
+      title: "Basic Location Check",
+      description:
+        "Confirm city-level authenticity",
 
-//   const nameMatched =
-//     user.full_name &&
-//     aadhaarName
-//       ? normalizeName(
-//           user.full_name
-//         ) ===
-//         normalizeName(
-//           aadhaarName
-//         )
-//       : null;
+      points: TRUST_POINTS.BASIC_LOCATION,
 
-//   let dobMatched: boolean | null =
-//     null;
+      earnedPoints:
+        locationVerified
+          ? TRUST_POINTS.BASIC_LOCATION
+          : 0,
 
-//   let ageVerified: boolean | null =
-//     null;
+      status:
+        locationVerified
+          ? "VERIFIED"
+          : "NOT_STARTED",
 
-//   if (aadhaarDob) {
-//     const dob =
-//       parseAadhaarDob(
-//         aadhaarDob
-//       );
+      action: locationVerified
+        ? null
+        : "VERIFY",
+    },
+  ];
 
-//     if (dob) {
-//       if (user.birth_date) {
-//         dobMatched =
-//           isSameDate(
-//             user.birth_date,
-//             dob
-//           );
-//       }
+  const basicCompleted =
+    basicItems.filter(
+      (item) =>
+        item.status === "VERIFIED"
+    ).length;
 
-//       ageVerified =
-//         calculateAge(dob) >= 18;
-//     }
-//   }
+  const basicEarnedPoints =
+    basicItems.reduce(
+      (sum, item) =>
+        sum + item.earnedPoints,
+      0
+    );
 
-//   const updated =
-//     await prisma.identityVerification.update({
-//       where: {
-//         id: verification.id,
-//       },
-//       data: {
-//         status:
-//           ageVerified === false
-//             ? "FAILED"
-//             : "VERIFIED",
+  const basicSection = {
+    key: "BASIC",
+    number: "01",
 
-//         nameMatched,
+    title: "Basic Verification",
 
-//         dobMatched,
+    subtitle:
+      "Auto-verified on signup · Everyone",
 
-//         ageVerified,
+    status: getSectionStatus(
+      basicCompleted,
+      basicItems.length
+    ),
 
-//         verifiedAt:
-//           ageVerified === false
-//             ? null
-//             : new Date(),
-//       },
-//     });
+    earnedPoints: basicEarnedPoints,
+    maxPoints: 20,
 
-//   return {
-//     verificationId:
-//       updated.id,
+    completed: basicCompleted,
+    total: basicItems.length,
 
-//     status:
-//       updated.status,
+    items: basicItems,
+  };
 
-//     nameMatched,
-//     dobMatched,
-//     ageVerified,
-//   };
-// };
+  // ==================================================
+  // IDENTITY VERIFICATION
+  // ==================================================
+
+  const identityItems = [
+    buildVerificationItem(
+      VerificationType.GOVERNMENT_ID
+    ),
+
+    buildVerificationItem(
+      VerificationType.FACE_VERIFICATION
+    ),
+
+    buildVerificationItem(
+      VerificationType.VIDEO_VERIFICATION
+    ),
+  ];
+
+  const identityCompleted =
+    identityItems.filter(
+      (item) =>
+        item.status ===
+        VerificationStatus.VERIFIED
+    ).length;
+
+  const identityEarnedPoints =
+    identityItems.reduce(
+      (sum, item) =>
+        sum + item.earnedPoints,
+      0
+    );
+
+  const identitySection = {
+    key: "IDENTITY",
+    number: "02",
+
+    title: "Identity Verification",
+
+    subtitle:
+      "Real person, real face · +20 pts",
+
+    status: getSectionStatus(
+      identityCompleted,
+      identityItems.length
+    ),
+
+    earnedPoints:
+      identityEarnedPoints,
+
+    maxPoints: 20,
+
+    completed:
+      identityCompleted,
+
+    total:
+      identityItems.length,
+
+    items:
+      identityItems,
+  };
+
+  // ==================================================
+  // HIGH TRUST
+  // ==================================================
+
+  const highTrustItems = [
+    buildVerificationItem(
+      VerificationType.EDUCATION_VERIFICATION
+    ),
+
+    buildVerificationItem(
+      VerificationType.PROFESSIONAL_VERIFICATION
+    ),
+  ];
+
+  const highTrustCompleted =
+    highTrustItems.filter(
+      (item) =>
+        item.status ===
+        VerificationStatus.VERIFIED
+    ).length;
+
+  const highTrustEarnedPoints =
+    highTrustItems.reduce(
+      (sum, item) =>
+        sum + item.earnedPoints,
+      0
+    );
+
+  const highTrustSection = {
+    key: "HIGH_TRUST",
+    number: "03",
+
+    title:
+      "High Trust Verification",
+
+    subtitle:
+      "Stops catfishing & bots · +30 pts",
+
+    status: getSectionStatus(
+      highTrustCompleted,
+      highTrustItems.length
+    ),
+
+    earnedPoints:
+      highTrustEarnedPoints,
+
+    /**
+     * Keeping 30 because this is the response
+     * format you requested.
+     *
+     * Current visible items only total 15.
+     */
+    maxPoints: 30,
+
+    completed:
+      highTrustCompleted,
+
+    /**
+     * You requested total: 4, although currently
+     * only two items exist.
+     */
+    total: 4,
+
+    items:
+      highTrustItems,
+  };
+
+  // ==================================================
+  // PLATINUM
+  // ==================================================
+
+  /**
+   * You can change this condition later.
+   *
+   * For now Platinum unlocks when all currently
+   * displayed High Trust items are VERIFIED.
+   */
+
+  const platinumUnlocked =
+    highTrustCompleted ===
+    highTrustItems.length;
+
+  const platinumTypes = [
+    VerificationType.CRIMINAL_BACKGROUND_CHECK,
+    VerificationType.EMERGENCY_CONTACT,
+    VerificationType.INCOME_VERIFICATION,
+  ];
+
+  const platinumItems =
+    platinumTypes.map((type) => {
+      const item =
+        buildVerificationItem(type);
+
+      /**
+       * Force LOCKED for dashboard display until
+       * Platinum has been unlocked.
+       */
+      if (!platinumUnlocked) {
+        return {
+          ...item,
+          earnedPoints: 0,
+          status: "LOCKED" as const,
+          action: null,
+        };
+      }
+
+      return item;
+    });
+
+  const platinumCompleted =
+    platinumItems.filter(
+      (item) =>
+        item.status ===
+        VerificationStatus.VERIFIED
+    ).length;
+
+  const platinumEarnedPoints =
+    platinumItems.reduce(
+      (sum, item) =>
+        sum + item.earnedPoints,
+      0
+    );
+
+  const platinumSection = {
+    key: "PLATINUM",
+    number: "04",
+
+    title:
+      "Platinum Verification",
+
+    subtitle:
+      "For serious long-term · +26 pts",
+
+    status: getSectionStatus(
+      platinumCompleted,
+      platinumItems.length,
+      !platinumUnlocked
+    ),
+
+    earnedPoints:
+      platinumEarnedPoints,
+
+    maxPoints: 26,
+
+    completed:
+      platinumCompleted,
+
+    total:
+      platinumItems.length,
+
+    items:
+      platinumItems,
+  };
+
+  // ==================================================
+  // TOTAL TRUST SCORE
+  // ==================================================
+
+  const earned =
+    basicEarnedPoints +
+    identityEarnedPoints +
+    highTrustEarnedPoints +
+    platinumEarnedPoints;
+
+  /**
+   * Never allow score above 100.
+   */
+  const safeEarned = Math.min(
+    earned,
+    TRUST_SCORE_TOTAL
+  );
+
+  const remaining = Math.max(
+    TRUST_SCORE_TOTAL -
+      safeEarned,
+    0
+  );
+
+  const percentage =
+    Math.round(
+      (safeEarned /
+        TRUST_SCORE_TOTAL) *
+        100
+    );
+
+  // ==================================================
+  // NEXT RECOMMENDED VERIFICATION
+  // ==================================================
+
+  /**
+   * Recommended verification order.
+   *
+   * Change this array whenever product priority changes.
+   */
+
+  const recommendationOrder: VerificationType[] = [
+    VerificationType.GOVERNMENT_ID,
+    VerificationType.FACE_VERIFICATION,
+    VerificationType.VIDEO_VERIFICATION,
+    VerificationType.EDUCATION_VERIFICATION,
+    VerificationType.PROFESSIONAL_VERIFICATION,
+
+    ...(platinumUnlocked
+      ? [
+          VerificationType.CRIMINAL_BACKGROUND_CHECK,
+          VerificationType.EMERGENCY_CONTACT,
+          VerificationType.INCOME_VERIFICATION,
+        ]
+      : []),
+  ];
+
+  let nextRecommended: {
+    type: VerificationType;
+    title: string;
+    points: number;
+  } | null = null;
+
+  for (const type of recommendationOrder) {
+    const verification =
+      verificationMap.get(type);
+
+    if (
+      verification?.status !==
+      VerificationStatus.VERIFIED
+    ) {
+      nextRecommended = {
+        type,
+        title:
+          VERIFICATION_CONFIG[type]
+            .title,
+        points:
+          VERIFICATION_CONFIG[type]
+            .points,
+      };
+
+      break;
+    }
+  }
+
+  // ==================================================
+  // FINAL RESPONSE DATA
+  // ==================================================
+
+  return {
+    trustScore: {
+      earned: safeEarned,
+      total: TRUST_SCORE_TOTAL,
+      remaining,
+      percentage,
+      nextRecommended,
+    },
+
+    sections: [
+      basicSection,
+      identitySection,
+      highTrustSection,
+      platinumSection,
+    ],
+  };
+};

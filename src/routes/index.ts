@@ -89,6 +89,8 @@ import datePlanTopUpRoutes from "../features/dateNow/date-plan-purchase/date-pla
 import employementVerificationRoutes from "../features/verification/employment-verification/employment.routes"
 import employementAdminVerificationRoutes from "../features/verification/employment-verification/employmentadmin.route"
 import boostPurchaseWallet from "../features/boost/boost-purchase/boost-purchase.routes"
+import trustVerifyRoutes from "../features/verification/verification.routes"
+import trustScoreRoutes from "../features/verification/trust-score/trust-score.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -199,6 +201,8 @@ router.use("/user", boostAnalyticsRoutes)
 //USER VERIFICATION
 router.use("/user", criminalBackgroundVerification, faceMatchVerification)
 router.use("/verification/user", governmentIdVerifcationRoute)
+router.use("/user", trustVerifyRoutes)
+router.use("/user", trustScoreRoutes)
 //
 
 //ROSE , COMPLIMENT TOP UP BY WALLET
