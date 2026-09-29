@@ -257,7 +257,7 @@ export const purchasePackageWithWalletService = async (
 
             status: PackageStatus.ACTIVE,
 
-            autoRenew: false,
+            autoRenew: true,
 
             currentPackageId:
               selectedPackage.id,
