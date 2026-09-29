@@ -15,7 +15,7 @@ import {
 } from "./education.validation";
 import { EducationFile, EducationFiles } from "./education.type";
 import { recalculateTrustScore } from "../trust-score/trust-score.service";
-const EDUCATION_VERIFICATION_POINTS = 10;
+const EDUCATION_VERIFICATION_POINTS = 12;
 const uploadEducationDocument = async (
   userId: string,
   file: EducationFile,
