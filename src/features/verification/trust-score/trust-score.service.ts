@@ -73,6 +73,68 @@ const safeMetadata = (verification: any) => {
   >;
 };
 
+const maskPhoneNumber = (
+  phone?: string | null
+): string | null => {
+  if (!phone) return null;
+
+  // Remove spaces/hyphens
+  const cleaned = phone.replace(/[\s-]/g, "");
+
+  // Indian mobile example:
+  // +919876543210 -> +91 ••••• ••210
+
+  let countryCode = "";
+  let number = cleaned;
+
+  if (cleaned.startsWith("+91")) {
+    countryCode = "+91";
+    number = cleaned.slice(3);
+  } else if (
+    cleaned.startsWith("91") &&
+    cleaned.length === 12
+  ) {
+    countryCode = "+91";
+    number = cleaned.slice(2);
+  }
+
+  if (number.length < 3) {
+    return "••••••";
+  }
+
+  const lastThree = number.slice(-3);
+
+  return `${countryCode ? `${countryCode} ` : ""
+    }••••• ••${lastThree}`;
+};
+
+const maskEmail = (
+  email?: string | null
+): string | null => {
+  if (!email) return null;
+
+  const [username, domain] = email.split("@");
+
+  if (!username || !domain) {
+    return "••••••";
+  }
+
+  // Example:
+  // aanya@gmail.com -> aa•••@gmail.com
+
+  const visibleLength = Math.min(
+    2,
+    username.length
+  );
+
+  const visible = username.slice(
+    0,
+    visibleLength
+  );
+
+  return `${visible}•••@${domain}`;
+};
+
 export const getPublicTrustScoreService = async (
   viewerUserId: string,
   profileUserId: string
@@ -160,7 +222,7 @@ export const getPublicTrustScoreService = async (
         maxPoints: true,
 
         governmentIdType: true,
-
+        verifiedName: true,
         startedAt: true,
         verifiedAt: true,
         expiresAt: true,
@@ -417,15 +479,17 @@ export const getPublicTrustScoreService = async (
         {
           label: "Mobile",
           value: mobileVerified
-            ? "Verified"
+            ? maskPhoneNumber(user.phone_number)
             : "Not verified",
         },
+
         {
           label: "Email",
           value: emailVerified
-            ? "Verified"
+            ? maskEmail(user.email)
             : "Not verified",
         },
+
         {
           label: "Status",
           value: mobileEmailVerified
@@ -514,41 +578,46 @@ export const getPublicTrustScoreService = async (
         governmentId.status
       )
         ? [
-            {
-              label: "Document",
-              value: formatGovernmentIdType(
-                governmentId.governmentIdType
-              ),
-            },
+          {
+            label: "Document",
+            value: formatGovernmentIdType(
+              governmentId.governmentIdType
+            ),
+          },
+          {
+            label: "Name on ID",
+            value:
+              governmentId?.verifiedName ??
+              "Verified",
+          },
+          {
+            label: "Age on ID",
+            value:
+              governmentMetadata.age ??
+              (user.birth_date
+                ? `${calculateAge(
+                  user.birth_date
+                )} years`
+                : null),
+          },
 
-            {
-              label: "Age on ID",
-              value:
-                governmentMetadata.age ??
-                (user.birth_date
-                  ? `${calculateAge(
-                      user.birth_date
-                    )} years`
-                  : null),
-            },
+          {
+            label: "Gender",
+            value:
+              governmentMetadata.gender ??
+              user.gender ??
+              null,
+          },
 
-            {
-              label: "Gender",
-              value:
-                governmentMetadata.gender ??
-                user.gender ??
-                null,
-            },
-
-            {
-              label: "Profile details match",
-              value:
-                governmentMetadata.profileMatched ===
+          {
+            label: "Profile details match",
+            value:
+              governmentMetadata.profileMatched ===
                 false
-                  ? "No"
-                  : "Yes",
-            },
-          ].filter((item) => item.value)
+                ? "No"
+                : "Yes",
+          },
+        ].filter((item) => item.value)
         : [],
     });
   }
@@ -573,24 +642,24 @@ export const getPublicTrustScoreService = async (
 
       details: isVerified(face.status)
         ? [
-            {
-              label: "Match with ID",
-              value:
-                faceMetadata.matchPercentage !=
+          {
+            label: "Match with ID",
+            value:
+              faceMetadata.matchPercentage !=
                 null
-                  ? `${faceMetadata.matchPercentage}% match`
-                  : "Matched",
-            },
+                ? `${faceMetadata.matchPercentage}% match`
+                : "Matched",
+          },
 
-            {
-              label: "Profile photos",
-              value:
-                faceMetadata.samePerson ===
+          {
+            label: "Profile photos",
+            value:
+              faceMetadata.samePerson ===
                 false
-                  ? "Not matched"
-                  : "Same person",
-            },
-          ]
+                ? "Not matched"
+                : "Same person",
+          },
+        ]
         : [],
     });
   }
@@ -616,22 +685,22 @@ export const getPublicTrustScoreService = async (
 
       details: isVerified(video.status)
         ? [
-            {
-              label: "Liveness",
-              value:
-                videoMetadata.livenessResult ??
-                "Real person, live",
-            },
+          {
+            label: "Liveness",
+            value:
+              videoMetadata.livenessResult ??
+              "Real person, live",
+          },
 
-            {
-              label: "Gestures",
-              value:
-                videoMetadata.gesturesCompleted !=
+          {
+            label: "Gestures",
+            value:
+              videoMetadata.gesturesCompleted !=
                 null
-                  ? `${videoMetadata.gesturesCompleted} completed`
-                  : "Completed",
-            },
-          ]
+                ? `${videoMetadata.gesturesCompleted} completed`
+                : "Completed",
+          },
+        ]
         : [],
     });
   }
@@ -663,27 +732,27 @@ export const getPublicTrustScoreService = async (
 
       details: isVerified(education.status)
         ? [
-            {
-              label: "Degree",
-              value:
-                educationMetadata.degree ??
-                null,
-            },
+          {
+            label: "Degree",
+            value:
+              educationMetadata.degree ??
+              null,
+          },
 
-            {
-              label: "College",
-              value:
-                educationMetadata.college ??
-                null,
-            },
+          {
+            label: "College",
+            value:
+              educationMetadata.college ??
+              null,
+          },
 
-            {
-              label: "Passing year",
-              value:
-                educationMetadata.passingYear ??
-                null,
-            },
-          ].filter((item) => item.value)
+          {
+            label: "Passing year",
+            value:
+              educationMetadata.passingYear ??
+              null,
+          },
+        ].filter((item) => item.value)
         : [],
     });
   }
@@ -709,39 +778,39 @@ export const getPublicTrustScoreService = async (
 
       details: isVerified(profession.status)
         ? [
-            {
-              label: "Company",
-              value:
-                professionMetadata.companyName ??
-                null,
-            },
+          {
+            label: "Company",
+            value:
+              professionMetadata.companyName ??
+              null,
+          },
 
-            {
-              label: "Designation",
-              value:
-                professionMetadata.designation ??
-                null,
-            },
+          {
+            label: "Designation",
+            value:
+              professionMetadata.designation ??
+              null,
+          },
 
-            {
-              label: "Joining date",
-              value:
-                professionMetadata.joiningDate ??
-                null,
-            },
+          {
+            label: "Joining date",
+            value:
+              professionMetadata.joiningDate ??
+              null,
+          },
 
-            {
-              label: "Currently working",
-              value:
-                professionMetadata.isCurrentlyWorking ===
+          {
+            label: "Currently working",
+            value:
+              professionMetadata.isCurrentlyWorking ===
                 true
-                  ? "Yes"
-                  : professionMetadata.isCurrentlyWorking ===
-                    false
+                ? "Yes"
+                : professionMetadata.isCurrentlyWorking ===
+                  false
                   ? "No"
                   : null,
-            },
-          ].filter((item) => item.value)
+          },
+        ].filter((item) => item.value)
         : [],
     });
   }
@@ -771,36 +840,36 @@ export const getPublicTrustScoreService = async (
        */
       details: isVerified(income.status)
         ? [
-            {
-              label: "Income bracket",
-              value:
-                incomeMetadata.incomeBracket ??
-                null,
-            },
+          {
+            label: "Income bracket",
+            value:
+              incomeMetadata.incomeBracket ??
+              null,
+          },
 
-            {
-              label: "Matches declared",
-              value:
-                incomeMetadata.matchesDeclared ===
+          {
+            label: "Matches declared",
+            value:
+              incomeMetadata.matchesDeclared ===
                 true
-                  ? "Yes"
-                  : incomeMetadata.matchesDeclared ===
-                    false
+                ? "Yes"
+                : incomeMetadata.matchesDeclared ===
+                  false
                   ? "No"
                   : null,
-            },
+          },
 
-            {
-              label: "Sources verified",
-              value:
-                incomeMetadata.sourcesVerified !=
+          {
+            label: "Sources verified",
+            value:
+              incomeMetadata.sourcesVerified !=
                 null
-                  ? String(
-                      incomeMetadata.sourcesVerified
-                    )
-                  : null,
-            },
-          ].filter((item) => item.value)
+                ? String(
+                  incomeMetadata.sourcesVerified
+                )
+                : null,
+          },
+        ].filter((item) => item.value)
         : [],
     });
   }
@@ -832,27 +901,27 @@ export const getPublicTrustScoreService = async (
 
       details: isVerified(criminal.status)
         ? [
-            {
-              label: "Court records",
-              value:
-                criminalMetadata.courtRecords ??
-                "No records found",
-            },
+          {
+            label: "Court records",
+            value:
+              criminalMetadata.courtRecords ??
+              "No records found",
+          },
 
-            {
-              label: "Police records",
-              value:
-                criminalMetadata.policeRecords ??
-                "No records found",
-            },
+          {
+            label: "Police records",
+            value:
+              criminalMetadata.policeRecords ??
+              "No records found",
+          },
 
-            {
-              label: "Result",
-              value:
-                criminalMetadata.result ??
-                "No records found in checked sources",
-            },
-          ]
+          {
+            label: "Result",
+            value:
+              criminalMetadata.result ??
+              "No records found in checked sources",
+          },
+        ]
         : [],
     });
   }
@@ -881,11 +950,11 @@ export const getPublicTrustScoreService = async (
         emergencyContact.status
       )
         ? [
-            {
-              label: "Status",
-              value: "Verified",
-            },
-          ]
+          {
+            label: "Status",
+            value: "Verified",
+          },
+        ]
         : [],
     });
   }
@@ -928,11 +997,11 @@ export const getPublicTrustScoreService = async (
 
       status:
         completed === items.length &&
-        items.length > 0
+          items.length > 0
           ? "VERIFIED"
           : completed > 0
-          ? "PARTIALLY_VERIFIED"
-          : "NOT_VERIFIED",
+            ? "PARTIALLY_VERIFIED"
+            : "NOT_VERIFIED",
 
       earnedPoints: sectionEarnedPoints,
       maxPoints,
@@ -972,9 +1041,8 @@ export const getPublicTrustScoreService = async (
       badge,
 
       description:
-        `A higher Trust Score means more of ${
-          user.full_name?.split(" ")[0] ??
-          "this user's"
+        `A higher Trust Score means more of ${user.full_name?.split(" ")[0] ??
+        "this user's"
         } identity and profile information has been independently checked.`,
     },
 

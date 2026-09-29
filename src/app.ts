@@ -2,6 +2,7 @@ import corsMiddleware from "./config/cors";
 import { swaggerSpec } from "./config/swagger";
 import express from "express";
 import cors from "cors";
+import os from "os";
 import compression from "compression";
 import fileUpload from "express-fileupload"; // ✅ correct import
 import routes from "./routes";
@@ -43,9 +44,9 @@ app.use(
   fileUpload({
     useTempFiles: false,
     limits: {
-      fileSize: 30 * 1024 * 1024, // 30 MB
+      fileSize: 30 * 1024 * 1024,
     },
-  }),
+  })
 );
 
 app.get("/api-docs", (req, res) => {

@@ -92,6 +92,8 @@ import boostPurchaseWallet from "../features/boost/boost-purchase/boost-purchase
 import trustVerifyRoutes from "../features/verification/verification.routes"
 import trustScoreRoutes from "../features/verification/trust-score/trust-score.routes"
 import packageTopUpRoutes from "../features/package/package-purchase/package-purchase.routes"
+import matchAnalysisRoutes from "../features/match/match-analysis/match-analysis.routes"
+import videoVerification from "../features/verification/video-verification/video-verification.routes"
 import educationAdminVefication from "../features/verification/education/educationadmin.routes"
 import educationVefication from "../features/verification/education/education.routes"
 const router = Router();
@@ -202,7 +204,7 @@ router.use("/user", boostAnalyticsRoutes)
 //
 
 //USER VERIFICATION
-router.use("/user", criminalBackgroundVerification, faceMatchVerification)
+router.use("/user", criminalBackgroundVerification, faceMatchVerification, videoVerification)
 router.use("/verification/user", governmentIdVerifcationRoute)
 router.use("/user", trustVerifyRoutes)
 router.use("/user", trustScoreRoutes)
@@ -211,4 +213,7 @@ router.use("/user", trustScoreRoutes)
 //ROSE , COMPLIMENT TOP UP BY WALLET
 router.use("/user", roseTopUpRoutes, complimentTopUpRoutes,datePlanTopUpRoutes, packageTopUpRoutes)
 //
+
+//MATCH ANALYSIS
+router.use("/user", matchAnalysisRoutes)
 export default router;

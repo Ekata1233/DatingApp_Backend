@@ -14,7 +14,7 @@ import {
   validateEducationFile,
 } from "./education.validation";
 import { EducationFile, EducationFiles } from "./education.type";
-
+const EDUCATION_VERIFICATION_POINTS = 10;
 const uploadEducationDocument = async (
   userId: string,
   file: EducationFile,
