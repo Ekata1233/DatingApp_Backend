@@ -1513,7 +1513,7 @@ export const getFeedService = async ({
     birth_date: true,
 
     height: true,
-
+    trust_score: true,
     created_at: true,
 
     last_active_at: true,
@@ -2778,8 +2778,7 @@ export const getFeedService = async ({
               ) / 100
               : null,
 
-          trust:
-            STATIC_TRUST,
+          trust:user.trust_score ?? 0,
 
           replyTime:
             STATIC_REPLY_TIME,
@@ -3134,7 +3133,7 @@ const transformUserData = (user: any): UserFeedResponse => {
 
     // Static values
     matchScore: STATIC_MATCH_SCORE,
-    trust: STATIC_TRUST,
+    trust: user.trust_score ?? 0,
     replyTime: STATIC_REPLY_TIME,
 
     // Basic Info
