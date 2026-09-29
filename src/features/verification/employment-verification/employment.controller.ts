@@ -99,6 +99,10 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
     status: 502,
     message: "Unable to complete employment verification with the provider.",
   },
+    GOVERNMENT_ID_VERIFICATION_REQUIRED: {
+    status: 400,
+    message: "Please complete government ID verification before employment verification.",
+  },
 };
 
 const handleEmploymentError = (error: unknown, res: Response) => {

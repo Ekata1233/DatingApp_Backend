@@ -75,7 +75,33 @@ const normalizeCompany = (value: string | null | undefined): string => {
   );
   return withoutSuffixes.replace(/[^A-Z0-9]/g, "");
 };
+// ============================================
+// NAME MATCH (EPFO name vs government-ID verifiedName)
+// ============================================
 
+const normalizeName = (value: string | null | undefined): string =>
+  (value ?? "")
+    .toUpperCase()
+    .replace(/\b(MR|MRS|MS|SHRI|SMT|KUMARI|DR)\b\.?/g, " ")
+    .replace(/[^A-Z ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Exact match after normalisation, OR every word of the ID name appears in
+ * the EPFO name (handles middle-name / order differences like
+ * "SATISH KADAM" vs "KADAM SATISH RAMESH").
+ */
+const namesMatch = (epfoName: string | null | undefined, verifiedName: string): boolean => {
+  const a = normalizeName(epfoName);
+  const b = normalizeName(verifiedName);
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  const aTokens = new Set(a.split(" "));
+  const bTokens = b.split(" ").filter((t) => t.length > 1);
+  return bTokens.length > 0 && bTokens.every((t) => aTokens.has(t));
+};
 const companyNamesMatch = (
   epfoName: string,
   profileName: string | null | undefined
@@ -362,6 +388,17 @@ export const verifyEmploymentService = async ({
       employmentFound: true,
       uan: (metadata.latestEmployment as { uan?: string })?.uan ?? null,
       latestEmployment: metadata.latestEmployment ?? null,
+        governmentIdName:
+      metadata.governmentIdName ?? null,
+
+    epfoName:
+      metadata.epfoName ?? null,
+
+    nameMatches:
+      metadata.nameMatches ?? null,
+
+    verifiedName:
+      metadata.verifiedName ?? null,
       companyMatches: metadata.companyMatches ?? null,
       companyNameUpdated: metadata.companyNameUpdated ?? false,
       points: existing.points,
@@ -474,7 +511,39 @@ export const verifyEmploymentService = async ({
     uan: latest.uan,
     ...toEmploymentSummary(latest.record),
   };
+  // ------------------------------------------
+  // 6b. NAME MATCH AGAINST GOVERNMENT-ID verifiedName
+  // ------------------------------------------
 
+  const idVerification = await prisma.userVerification.findFirst({
+    where: {
+      userId,
+      status: VerificationStatus.VERIFIED,
+      verifiedName: { not: null },
+      type: { not: VERIFICATION_TYPE },
+    },
+    select: { verifiedName: true, type: true },
+  });
+
+  if (!idVerification?.verifiedName) {
+    throw new Error("GOVERNMENT_ID_VERIFICATION_REQUIRED");
+  }
+
+  const nameMatches = namesMatch(latest.record.name, idVerification.verifiedName);
+
+  if (!nameMatches) {
+    return rejectVerification(
+      userId,
+      method,
+      "The name on this employment record does not match your verified ID. Please use your own UAN.",
+      {
+        resultCode: GRIDLINES_CODES.LATEST_EMPLOYMENT_FETCHED,
+        nameMatches: false,
+        uanNumbers: maskedUANs,
+      },
+      providerRef
+    );
+  }
   // ------------------------------------------
   // 7. MATCH / UPDATE COMPANY NAME IN UserEduWork
   // ------------------------------------------
@@ -502,6 +571,10 @@ export const verifyEmploymentService = async ({
       employmentFound: true,
       uanNumbers: maskedUANs,
       latestEmployment,
+        governmentIdName: idVerification.verifiedName,
+  epfoName: latest.record.name ?? null,
+      nameMatches: true,
+      verifiedName: idVerification.verifiedName,
       companyMatches: company.companyMatches,
       companyNameUpdated: company.companyNameUpdated,
       previousCompanyName: company.previousCompanyName,
@@ -523,6 +596,10 @@ export const verifyEmploymentService = async ({
     employmentFound: true,
     uan: latest.uan,
     latestEmployment,
+    governmentIdName: idVerification.verifiedName,
+  epfoName: latest.record.name ?? null,
+    nameMatches: true,
+    verifiedName: idVerification.verifiedName,
     companyMatches: company.companyMatches,
     companyNameUpdated: company.companyNameUpdated,
     previousCompanyName: company.previousCompanyName,
