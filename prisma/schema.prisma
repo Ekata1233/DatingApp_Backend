@@ -28,6 +28,7 @@ model User {
   device_token               String?
   referralCode               String?               @unique @db.VarChar(20)
   badge_count                Int                   @default(0)
+  trust_score                Int                   @default(0)
   deleted_at                 DateTime?
   created_at                 DateTime              @default(now())
   updated_at                 DateTime              @updatedAt
@@ -132,6 +133,7 @@ model User {
   verifications           UserVerification[]
   governmentIdAttempts    GovernmentIdAttempt[]
   employmentVerifications EmploymentVerification?
+  educationVerifications  EducationVerification[]
 
   @@index([phone_number])
   @@index([google_id])
@@ -768,6 +770,7 @@ model UserVerification {
 
   attempts                GovernmentIdAttempt[]
   employmentVerifications EmploymentVerification?
+  educationVerification   EducationVerification?
   user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
@@ -846,6 +849,33 @@ enum EmploymentVerificationStatus {
   VERIFIED
   REJECTED
   EXPIRED
+}
+
+model EducationVerification {
+  id                  String             @id @default(uuid()) @db.Uuid
+  userId              String             @db.Uuid
+  verificationId      String             @unique @db.Uuid
+  institutionName     String
+  degreeName          String
+  fieldOfStudy        String?
+  startYear           Int?
+  graduationYear      Int?
+  isCurrentlyStudying Boolean            @default(false)
+  certificateUrl      String
+  marksheetUrl        String?
+  status              VerificationStatus @default(NOT_STARTED)
+  reviewedBy          String?            @db.Uuid
+  reviewedAt          DateTime?
+  verifiedAt          DateTime?
+  rejectionReason     String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }
 
 model UserBlock {
