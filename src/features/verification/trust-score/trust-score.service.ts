@@ -136,6 +136,959 @@ const maskEmail = (
   return `${visible}•••@${domain}`;
 };
 
+// export const getPublicTrustScoreService = async (
+//   viewerUserId: string,
+//   profileUserId: string
+// ) => {
+//   /**
+//    * viewerUserId  = User A
+//    * profileUserId = User B
+//    */
+
+//   if (viewerUserId === profileUserId) {
+//     // You can remove this check if users are allowed
+//     // to open their own public trust screen.
+//   }
+
+//   // ---------------------------------------------------
+//   // 1. Get profile user
+//   // ---------------------------------------------------
+
+//   const user = await prisma.user.findFirst({
+//     where: {
+//       id: profileUserId,
+
+//       // Keep inactive accounts hidden.
+//       account_status: "ACTIVE",
+//       deleted_at: null,
+//     },
+
+//     select: {
+//       id: true,
+//       full_name: true,
+//       email: true,
+//       phone_number: true,
+//       is_phone_verified: true,
+//       birth_date: true,
+//       gender: true,
+
+//       profile: {
+//         select: {
+//           city: true,
+//           state: true,
+//           area: true,
+//         },
+//       },
+
+//       photos: {
+//         where: {
+//           media_type: "IMAGE",
+//         },
+//         orderBy: [
+//           {
+//             is_primary: "desc",
+//           },
+//           {
+//             order: "asc",
+//           },
+//         ],
+//         take: 1,
+
+//         select: {
+//           media_url: true,
+//         },
+//       },
+//     },
+//   });
+
+//   if (!user) {
+//     throw new Error("USER_NOT_FOUND");
+//   }
+
+//   // ---------------------------------------------------
+//   // 2. Get all verification records of User B
+//   // ---------------------------------------------------
+
+//   const verifications =
+//     await prisma.userVerification.findMany({
+//       where: {
+//         userId: profileUserId,
+//       },
+
+//       select: {
+//         id: true,
+//         type: true,
+//         status: true,
+//         points: true,
+//         maxPoints: true,
+
+//         governmentIdType: true,
+//         verifiedName: true,
+//         startedAt: true,
+//         verifiedAt: true,
+//         expiresAt: true,
+
+//         provider: true,
+
+//         // IMPORTANT:
+//         // metadata is used internally to build SAFE values.
+//         // Never return metadata directly.
+//         metadata: true,
+//       },
+//     });
+
+//   // ---------------------------------------------------
+//   // 3. Find individual verification records
+//   // ---------------------------------------------------
+
+//   const governmentId = getVerification(
+//     verifications,
+//     VerificationType.GOVERNMENT_ID
+//   );
+
+//   const face = getVerification(
+//     verifications,
+//     VerificationType.FACE_VERIFICATION
+//   );
+
+//   const video = getVerification(
+//     verifications,
+//     VerificationType.VIDEO_VERIFICATION
+//   );
+
+//   const education = getVerification(
+//     verifications,
+//     VerificationType.EDUCATION_VERIFICATION
+//   );
+
+//   const profession = getVerification(
+//     verifications,
+//     VerificationType.PROFESSIONAL_VERIFICATION
+//   );
+
+//   const income = getVerification(
+//     verifications,
+//     VerificationType.INCOME_VERIFICATION
+//   );
+
+//   const criminal = getVerification(
+//     verifications,
+//     VerificationType.CRIMINAL_BACKGROUND_CHECK
+//   );
+
+//   const emergencyContact = getVerification(
+//     verifications,
+//     VerificationType.EMERGENCY_CONTACT
+//   );
+
+//   // ---------------------------------------------------
+//   // 4. Metadata
+//   // ---------------------------------------------------
+
+//   const governmentMetadata =
+//     safeMetadata(governmentId);
+
+//   const faceMetadata = safeMetadata(face);
+
+//   const videoMetadata = safeMetadata(video);
+
+//   const educationMetadata =
+//     safeMetadata(education);
+
+//   const professionMetadata =
+//     safeMetadata(profession);
+
+//   const incomeMetadata = safeMetadata(income);
+
+//   const criminalMetadata =
+//     safeMetadata(criminal);
+
+//   // ---------------------------------------------------
+//   // 5. Basic verification
+//   // ---------------------------------------------------
+
+//   /**
+//    * Your UI says:
+//    *
+//    * Mobile & Email
+//    * Location
+//    *
+//    * These are required but have no trust points.
+//    */
+
+//   const mobileVerified =
+//     user.is_phone_verified === true;
+
+//   /**
+//    * Change this when you have a proper
+//    * is_email_verified field.
+//    *
+//    * Right now email presence is NOT the same as
+//    * email verification.
+//    */
+//   const emailVerified = Boolean(user.email);
+
+//   const mobileEmailVerified =
+//     mobileVerified && emailVerified;
+
+//   const locationVerified = Boolean(
+//     user.profile?.city && user.profile?.state
+//   );
+
+//   // ---------------------------------------------------
+//   // 6. Score
+//   // ---------------------------------------------------
+
+//   const pointBasedVerifications = [
+//     governmentId,
+//     face,
+//     video,
+//     education,
+//     profession,
+//     income,
+//     criminal,
+//     emergencyContact,
+//   ].filter(Boolean);
+
+//   const earnedPoints =
+//     pointBasedVerifications.reduce(
+//       (total, verification) => {
+//         if (!isVerified(verification.status)) {
+//           return total;
+//         }
+
+//         return total + (verification.points ?? 0);
+//       },
+//       0
+//     );
+
+//   const maxScore = 100;
+
+//   const trustScore = Math.min(
+//     earnedPoints,
+//     maxScore
+//   );
+
+//   // ---------------------------------------------------
+//   // 7. Total checks
+//   // ---------------------------------------------------
+
+//   const checks = [
+//     {
+//       verified: mobileEmailVerified,
+//     },
+//     {
+//       verified: locationVerified,
+//     },
+//     {
+//       verified: isVerified(
+//         governmentId?.status
+//       ),
+//     },
+//     {
+//       verified: isVerified(face?.status),
+//     },
+//     {
+//       verified: isVerified(video?.status),
+//     },
+//     {
+//       verified: isVerified(
+//         education?.status
+//       ),
+//     },
+//     {
+//       verified: isVerified(
+//         profession?.status
+//       ),
+//     },
+//     {
+//       verified: isVerified(income?.status),
+//     },
+//     {
+//       verified: isVerified(
+//         criminal?.status
+//       ),
+//     },
+//     {
+//       verified: isVerified(
+//         emergencyContact?.status
+//       ),
+//     },
+//   ];
+
+//   const totalChecks = checks.length;
+
+//   const verifiedChecks = checks.filter(
+//     (check) => check.verified
+//   ).length;
+
+//   // ---------------------------------------------------
+//   // 8. Badge
+//   // ---------------------------------------------------
+
+//   let badge = {
+//     key: "BASIC",
+//     title: "Basic verified",
+//   };
+
+//   if (trustScore >= 90) {
+//     badge = {
+//       key: "PLATINUM",
+//       title: "Platinum verified",
+//     };
+//   } else if (trustScore >= 70) {
+//     badge = {
+//       key: "GOLD",
+//       title: "Gold verified",
+//     };
+//   } else if (trustScore >= 40) {
+//     badge = {
+//       key: "SILVER",
+//       title: "Silver verified",
+//     };
+//   }
+
+//   // ---------------------------------------------------
+//   // 9. BASIC section
+//   // ---------------------------------------------------
+
+//   const basicItems = [
+//     {
+//       type: "MOBILE_EMAIL",
+
+//       title: "Mobile & Email",
+
+//       description:
+//         "Confirmed real contact details",
+
+//       required: true,
+
+//       points: 0,
+
+//       status: mobileEmailVerified
+//         ? "VERIFIED"
+//         : "NOT_VERIFIED",
+
+//       verifiedAt: null,
+
+//       verifiedBy:
+//         mobileEmailVerified
+//           ? "OTP + email link"
+//           : null,
+
+//       details: [
+//         {
+//           label: "Mobile",
+//           value: mobileVerified
+//             ? maskPhoneNumber(user.phone_number)
+//             : "Not verified",
+//         },
+
+//         {
+//           label: "Email",
+//           value: emailVerified
+//             ? maskEmail(user.email)
+//             : "Not verified",
+//         },
+
+//         {
+//           label: "Status",
+//           value: mobileEmailVerified
+//             ? "Both active"
+//             : "Verification incomplete",
+//         },
+//       ],
+//     },
+
+//     {
+//       type: "LOCATION",
+
+//       title: "Location check",
+
+//       description:
+//         "City-level authenticity confirmed",
+
+//       required: true,
+
+//       points: 0,
+
+//       status: locationVerified
+//         ? "VERIFIED"
+//         : "NOT_VERIFIED",
+
+//       verifiedAt: null,
+
+//       verifiedBy: locationVerified
+//         ? "Profile location"
+//         : null,
+
+//       details: [
+//         {
+//           label: "City",
+//           value:
+//             [
+//               user.profile?.city,
+//               user.profile?.state,
+//             ]
+//               .filter(Boolean)
+//               .join(", ") || null,
+//         },
+
+//         {
+//           label: "Area",
+//           value: user.profile?.area ?? null,
+//         },
+
+//         {
+//           label: "Matches profile",
+//           value: locationVerified
+//             ? "Yes"
+//             : "Not verified",
+//         },
+//       ].filter((item) => item.value),
+//     },
+//   ];
+
+//   // ---------------------------------------------------
+//   // 10. IDENTITY section
+//   // ---------------------------------------------------
+
+//   const identityItems: any[] = [];
+
+//   if (governmentId) {
+//     identityItems.push({
+//       type: "GOVERNMENT_ID",
+
+//       title: "Government ID",
+
+//       description:
+//         "Identity checked against an official ID",
+
+//       points: governmentId.points,
+
+//       status: governmentId.status,
+
+//       verifiedAt: governmentId.verifiedAt,
+
+//       verifiedBy:
+//         governmentId.provider === "GRIDLINES"
+//           ? "DigiLocker API"
+//           : governmentId.provider,
+
+//       details: isVerified(
+//         governmentId.status
+//       )
+//         ? [
+//           {
+//             label: "Document",
+//             value: formatGovernmentIdType(
+//               governmentId.governmentIdType
+//             ),
+//           },
+//           {
+//             label: "Name on ID",
+//             value:
+//               governmentId?.verifiedName ??
+//               "Verified",
+//           },
+//           {
+//             label: "Age on ID",
+//             value:
+//               governmentMetadata.age ??
+//               (user.birth_date
+//                 ? `${calculateAge(
+//                   user.birth_date
+//                 )} years`
+//                 : null),
+//           },
+
+//           {
+//             label: "Gender",
+//             value:
+//               governmentMetadata.gender ??
+//               user.gender ??
+//               null,
+//           },
+
+//           {
+//             label: "Profile details match",
+//             value:
+//               governmentMetadata.profileMatched ===
+//                 false
+//                 ? "No"
+//                 : "Yes",
+//           },
+//         ].filter((item) => item.value)
+//         : [],
+//     });
+//   }
+
+//   if (face) {
+//     identityItems.push({
+//       type: "FACE_VERIFICATION",
+
+//       title: "Face match",
+
+//       description:
+//         "Profile photo matched with the government ID photo",
+
+//       points: face.points,
+
+//       status: face.status,
+
+//       verifiedAt: face.verifiedAt,
+
+//       verifiedBy:
+//         face.provider ?? "AI face match",
+
+//       details: isVerified(face.status)
+//         ? [
+//           {
+//             label: "Match with ID",
+//             value:
+//               faceMetadata.matchPercentage !=
+//                 null
+//                 ? `${faceMetadata.matchPercentage}% match`
+//                 : "Matched",
+//           },
+
+//           {
+//             label: "Profile photos",
+//             value:
+//               faceMetadata.samePerson ===
+//                 false
+//                 ? "Not matched"
+//                 : "Same person",
+//           },
+//         ]
+//         : [],
+//     });
+//   }
+
+//   if (video) {
+//     identityItems.push({
+//       type: "VIDEO_VERIFICATION",
+
+//       title: "Video liveness",
+
+//       description:
+//         "Live verification confirmed a present person",
+
+//       points: video.points,
+
+//       status: video.status,
+
+//       verifiedAt: video.verifiedAt,
+
+//       verifiedBy:
+//         video.provider ??
+//         "Live video check",
+
+//       details: isVerified(video.status)
+//         ? [
+//           {
+//             label: "Liveness",
+//             value:
+//               videoMetadata.livenessResult ??
+//               "Real person, live",
+//           },
+
+//           {
+//             label: "Gestures",
+//             value:
+//               videoMetadata.gesturesCompleted !=
+//                 null
+//                 ? `${videoMetadata.gesturesCompleted} completed`
+//                 : "Completed",
+//           },
+//         ]
+//         : [],
+//     });
+//   }
+
+//   // ---------------------------------------------------
+//   // 11. HIGH TRUST section
+//   // ---------------------------------------------------
+
+//   const highTrustItems: any[] = [];
+
+//   if (education) {
+//     highTrustItems.push({
+//       type: "EDUCATION_VERIFICATION",
+
+//       title: "Education",
+
+//       description:
+//         "Education details verified",
+
+//       points: education.points,
+
+//       status: education.status,
+
+//       verifiedAt: education.verifiedAt,
+
+//       verifiedBy:
+//         education.provider ??
+//         "Reviewed by Welvors team",
+
+//       details: isVerified(education.status)
+//         ? [
+//           {
+//             label: "Degree",
+//             value:
+//               educationMetadata.degree ??
+//               null,
+//           },
+
+//           {
+//             label: "College",
+//             value:
+//               educationMetadata.college ??
+//               null,
+//           },
+
+//           {
+//             label: "Passing year",
+//             value:
+//               educationMetadata.passingYear ??
+//               null,
+//           },
+//         ].filter((item) => item.value)
+//         : [],
+//     });
+//   }
+
+//   if (profession) {
+//     highTrustItems.push({
+//       type: "PROFESSIONAL_VERIFICATION",
+
+//       title: "Profession",
+
+//       description:
+//         "Employment details verified",
+
+//       points: profession.points,
+
+//       status: profession.status,
+
+//       verifiedAt: profession.verifiedAt,
+
+//       verifiedBy:
+//         profession.provider ??
+//         "Employment verification",
+
+//       details: isVerified(profession.status)
+//         ? [
+//           {
+//             label: "Company",
+//             value:
+//               professionMetadata.companyName ??
+//               null,
+//           },
+
+//           {
+//             label: "Designation",
+//             value:
+//               professionMetadata.designation ??
+//               null,
+//           },
+
+//           {
+//             label: "Joining date",
+//             value:
+//               professionMetadata.joiningDate ??
+//               null,
+//           },
+
+//           {
+//             label: "Currently working",
+//             value:
+//               professionMetadata.isCurrentlyWorking ===
+//                 true
+//                 ? "Yes"
+//                 : professionMetadata.isCurrentlyWorking ===
+//                   false
+//                   ? "No"
+//                   : null,
+//           },
+//         ].filter((item) => item.value)
+//         : [],
+//     });
+//   }
+
+//   if (income) {
+//     highTrustItems.push({
+//       type: "INCOME_VERIFICATION",
+
+//       title: "Income",
+
+//       description:
+//         "Declared income bracket confirmed",
+
+//       points: income.points,
+
+//       status: income.status,
+
+//       verifiedAt: income.verifiedAt,
+
+//       verifiedBy:
+//         income.provider ??
+//         "Income verification",
+
+//       /**
+//        * Don't return bank statements,
+//        * account numbers or raw transactions.
+//        */
+//       details: isVerified(income.status)
+//         ? [
+//           {
+//             label: "Income bracket",
+//             value:
+//               incomeMetadata.incomeBracket ??
+//               null,
+//           },
+
+//           {
+//             label: "Matches declared",
+//             value:
+//               incomeMetadata.matchesDeclared ===
+//                 true
+//                 ? "Yes"
+//                 : incomeMetadata.matchesDeclared ===
+//                   false
+//                   ? "No"
+//                   : null,
+//           },
+
+//           {
+//             label: "Sources verified",
+//             value:
+//               incomeMetadata.sourcesVerified !=
+//                 null
+//                 ? String(
+//                   incomeMetadata.sourcesVerified
+//                 )
+//                 : null,
+//           },
+//         ].filter((item) => item.value)
+//         : [],
+//     });
+//   }
+
+//   // ---------------------------------------------------
+//   // 12. PLATINUM section
+//   // ---------------------------------------------------
+
+//   const platinumItems: any[] = [];
+
+//   if (criminal) {
+//     platinumItems.push({
+//       type: "CRIMINAL_BACKGROUND_CHECK",
+
+//       title: "Criminal background",
+
+//       description:
+//         "Background records were checked",
+
+//       points: criminal.points,
+
+//       status: criminal.status,
+
+//       verifiedAt: criminal.verifiedAt,
+
+//       verifiedBy:
+//         criminal.provider ??
+//         "Background-check partner",
+
+//       details: isVerified(criminal.status)
+//         ? [
+//           {
+//             label: "Court records",
+//             value:
+//               criminalMetadata.courtRecords ??
+//               "No records found",
+//           },
+
+//           {
+//             label: "Police records",
+//             value:
+//               criminalMetadata.policeRecords ??
+//               "No records found",
+//           },
+
+//           {
+//             label: "Result",
+//             value:
+//               criminalMetadata.result ??
+//               "No records found in checked sources",
+//           },
+//         ]
+//         : [],
+//     });
+//   }
+
+//   if (emergencyContact) {
+//     platinumItems.push({
+//       type: "EMERGENCY_CONTACT",
+
+//       title: "Emergency contact",
+
+//       description:
+//         "Emergency contact has been verified",
+
+//       points: emergencyContact.points,
+
+//       status: emergencyContact.status,
+
+//       verifiedAt:
+//         emergencyContact.verifiedAt,
+
+//       verifiedBy:
+//         emergencyContact.provider ??
+//         "Contact verification",
+
+//       details: isVerified(
+//         emergencyContact.status
+//       )
+//         ? [
+//           {
+//             label: "Status",
+//             value: "Verified",
+//           },
+//         ]
+//         : [],
+//     });
+//   }
+
+//   // ---------------------------------------------------
+//   // 13. Section helper
+//   // ---------------------------------------------------
+
+//   const createSection = (
+//     key: string,
+//     number: string,
+//     title: string,
+//     items: any[]
+//   ) => {
+//     const completed = items.filter(
+//       (item) => item.status === "VERIFIED"
+//     ).length;
+
+//     const sectionEarnedPoints = items.reduce(
+//       (total, item) => {
+//         if (item.status !== "VERIFIED") {
+//           return total;
+//         }
+
+//         return total + (item.points ?? 0);
+//       },
+//       0
+//     );
+
+//     const maxPoints = items.reduce(
+//       (total, item) =>
+//         total + (item.points ?? 0),
+//       0
+//     );
+
+//     return {
+//       key,
+//       number,
+//       title,
+
+//       status:
+//         completed === items.length &&
+//           items.length > 0
+//           ? "VERIFIED"
+//           : completed > 0
+//             ? "PARTIALLY_VERIFIED"
+//             : "NOT_VERIFIED",
+
+//       earnedPoints: sectionEarnedPoints,
+//       maxPoints,
+
+//       completed,
+//       total: items.length,
+
+//       items,
+//     };
+//   };
+
+//   // ---------------------------------------------------
+//   // 14. Final SAFE response
+//   // ---------------------------------------------------
+
+//   return {
+//     user: {
+//       id: user.id,
+
+//       name:
+//         user.full_name?.split(" ")[0] ??
+//         "User",
+
+//       age: calculateAge(user.birth_date),
+
+//       profilePhoto:
+//         user.photos[0]?.media_url ?? null,
+//     },
+
+//     trustScore: {
+//       score: trustScore,
+//       maxScore,
+
+//       verifiedChecks,
+//       totalChecks,
+
+//       badge,
+
+//       description:
+//         `A higher Trust Score means more of ${user.full_name?.split(" ")[0] ??
+//         "this user's"
+//         } identity and profile information has been independently checked.`,
+//     },
+
+//     privacyNotice: {
+//       title:
+//         "Verification documents stay private",
+
+//       message:
+//         "You only see the verification result — never the documents. Verification documents and sensitive data are not shared with other users.",
+//     },
+
+//     sections: [
+//       createSection(
+//         "BASIC",
+//         "01",
+//         "Basic verification",
+//         basicItems
+//       ),
+
+//       createSection(
+//         "IDENTITY",
+//         "02",
+//         "Identity verification",
+//         identityItems
+//       ),
+
+//       createSection(
+//         "HIGH_TRUST",
+//         "03",
+//         "High-trust verification",
+//         highTrustItems
+//       ),
+
+//       createSection(
+//         "PLATINUM",
+//         "04",
+//         "Platinum verification",
+//         platinumItems
+//       ),
+//     ],
+//   };
+// };
+
+
+
 export const getPublicTrustScoreService = async (
   viewerUserId: string,
   profileUserId: string
@@ -149,6 +1102,40 @@ export const getPublicTrustScoreService = async (
     // You can remove this check if users are allowed
     // to open their own public trust screen.
   }
+
+  // ============================================================
+  // VERIFICATION POINT CONFIG
+  // ============================================================
+
+  const VERIFICATION_POINTS = {
+    GOVERNMENT_ID: 10,
+    FACE_VERIFICATION: 5,
+    VIDEO_VERIFICATION: 5,
+    EDUCATION_VERIFICATION: 10,
+    PROFESSIONAL_VERIFICATION: 10,
+    INCOME_VERIFICATION: 10,
+    CRIMINAL_BACKGROUND_CHECK: 10,
+    EMERGENCY_CONTACT: 10,
+  } as const;
+
+  // ============================================================
+  // HELPER
+  // ============================================================
+
+  const getDisplayStatus = (
+    verification:
+      | {
+          status?: string | null;
+        }
+      | null
+      | undefined
+  ) => {
+    if (!verification) {
+      return "NOT_VERIFIED";
+    }
+
+    return verification.status ?? "NOT_VERIFIED";
+  };
 
   // ---------------------------------------------------
   // 1. Get profile user
@@ -184,6 +1171,7 @@ export const getPublicTrustScoreService = async (
         where: {
           media_type: "IMAGE",
         },
+
         orderBy: [
           {
             is_primary: "desc",
@@ -192,6 +1180,7 @@ export const getPublicTrustScoreService = async (
             order: "asc",
           },
         ],
+
         take: 1,
 
         select: {
@@ -230,9 +1219,8 @@ export const getPublicTrustScoreService = async (
 
         provider: true,
 
-        // IMPORTANT:
-        // metadata is used internally to build SAFE values.
-        // Never return metadata directly.
+        // Used internally only.
+        // Never return raw metadata directly.
         metadata: true,
       },
     });
@@ -288,9 +1276,11 @@ export const getPublicTrustScoreService = async (
   const governmentMetadata =
     safeMetadata(governmentId);
 
-  const faceMetadata = safeMetadata(face);
+  const faceMetadata =
+    safeMetadata(face);
 
-  const videoMetadata = safeMetadata(video);
+  const videoMetadata =
+    safeMetadata(video);
 
   const educationMetadata =
     safeMetadata(education);
@@ -298,7 +1288,8 @@ export const getPublicTrustScoreService = async (
   const professionMetadata =
     safeMetadata(profession);
 
-  const incomeMetadata = safeMetadata(income);
+  const incomeMetadata =
+    safeMetadata(income);
 
   const criminalMetadata =
     safeMetadata(criminal);
@@ -307,33 +1298,24 @@ export const getPublicTrustScoreService = async (
   // 5. Basic verification
   // ---------------------------------------------------
 
-  /**
-   * Your UI says:
-   *
-   * Mobile & Email
-   * Location
-   *
-   * These are required but have no trust points.
-   */
-
   const mobileVerified =
     user.is_phone_verified === true;
 
   /**
-   * Change this when you have a proper
-   * is_email_verified field.
-   *
-   * Right now email presence is NOT the same as
-   * email verification.
+   * Replace this when you have
+   * is_email_verified.
    */
-  const emailVerified = Boolean(user.email);
+  const emailVerified =
+    Boolean(user.email);
 
   const mobileEmailVerified =
     mobileVerified && emailVerified;
 
-  const locationVerified = Boolean(
-    user.profile?.city && user.profile?.state
-  );
+  const locationVerified =
+    Boolean(
+      user.profile?.city &&
+      user.profile?.state
+    );
 
   // ---------------------------------------------------
   // 6. Score
@@ -353,6 +1335,10 @@ export const getPublicTrustScoreService = async (
   const earnedPoints =
     pointBasedVerifications.reduce(
       (total, verification) => {
+        if (!verification) {
+          return total;
+        }
+
         if (!isVerified(verification.status)) {
           return total;
         }
@@ -375,52 +1361,79 @@ export const getPublicTrustScoreService = async (
 
   const checks = [
     {
+      type: "MOBILE_EMAIL",
       verified: mobileEmailVerified,
     },
+
     {
+      type: "LOCATION",
       verified: locationVerified,
     },
+
     {
+      type: "GOVERNMENT_ID",
       verified: isVerified(
         governmentId?.status
       ),
     },
+
     {
-      verified: isVerified(face?.status),
+      type: "FACE_VERIFICATION",
+      verified: isVerified(
+        face?.status
+      ),
     },
+
     {
-      verified: isVerified(video?.status),
+      type: "VIDEO_VERIFICATION",
+      verified: isVerified(
+        video?.status
+      ),
     },
+
     {
+      type: "EDUCATION_VERIFICATION",
       verified: isVerified(
         education?.status
       ),
     },
+
     {
+      type: "PROFESSIONAL_VERIFICATION",
       verified: isVerified(
         profession?.status
       ),
     },
+
     {
-      verified: isVerified(income?.status),
+      type: "INCOME_VERIFICATION",
+      verified: isVerified(
+        income?.status
+      ),
     },
+
     {
+      type: "CRIMINAL_BACKGROUND_CHECK",
       verified: isVerified(
         criminal?.status
       ),
     },
+
     {
+      type: "EMERGENCY_CONTACT",
       verified: isVerified(
         emergencyContact?.status
       ),
     },
   ];
 
-  const totalChecks = checks.length;
+  const totalChecks =
+    checks.length;
 
-  const verifiedChecks = checks.filter(
-    (check) => check.verified
-  ).length;
+  const verifiedChecks =
+    checks.filter(
+      (check) => check.verified
+    ).length;
 
   // ---------------------------------------------------
   // 8. Badge
@@ -479,13 +1492,17 @@ export const getPublicTrustScoreService = async (
       details: [
         {
           label: "Mobile",
+
           value: mobileVerified
-            ? maskPhoneNumber(user.phone_number)
+            ? maskPhoneNumber(
+                user.phone_number
+              )
             : "Not verified",
         },
 
         {
           label: "Email",
+
           value: emailVerified
             ? maskEmail(user.email)
             : "Not verified",
@@ -493,6 +1510,7 @@ export const getPublicTrustScoreService = async (
 
         {
           label: "Status",
+
           value: mobileEmailVerified
             ? "Both active"
             : "Verification incomplete",
@@ -518,45 +1536,64 @@ export const getPublicTrustScoreService = async (
 
       verifiedAt: null,
 
-      verifiedBy: locationVerified
-        ? "Profile location"
-        : null,
+      verifiedBy:
+        locationVerified
+          ? "Profile location"
+          : null,
 
       details: [
         {
           label: "City",
+
           value:
             [
               user.profile?.city,
               user.profile?.state,
             ]
               .filter(Boolean)
-              .join(", ") || null,
+              .join(", ") ||
+            "Not verified",
         },
 
         {
           label: "Area",
-          value: user.profile?.area ?? null,
+
+          value:
+            user.profile?.area ??
+            "Not verified",
         },
 
         {
           label: "Matches profile",
+
           value: locationVerified
             ? "Yes"
             : "Not verified",
         },
-      ].filter((item) => item.value),
+      ],
     },
   ];
 
   // ---------------------------------------------------
   // 10. IDENTITY section
   // ---------------------------------------------------
+  //
+  // IMPORTANT:
+  // These cards are ALWAYS returned.
+  // No more:
+  //
+  // if (governmentId) {}
+  // if (face) {}
+  // if (video) {}
+  //
+  // ---------------------------------------------------
 
-  const identityItems: any[] = [];
+  const identityItems: any[] = [
+    // =================================================
+    // GOVERNMENT ID
+    // =================================================
 
-  if (governmentId) {
-    identityItems.push({
+    {
       type: "GOVERNMENT_ID",
 
       title: "Government ID",
@@ -564,67 +1601,99 @@ export const getPublicTrustScoreService = async (
       description:
         "Identity checked against an official ID",
 
-      points: governmentId.points,
+      points:
+        governmentId?.maxPoints ??
+        VERIFICATION_POINTS.GOVERNMENT_ID,
 
-      status: governmentId.status,
+      status:
+        getDisplayStatus(governmentId),
 
-      verifiedAt: governmentId.verifiedAt,
+      verifiedAt:
+        governmentId?.verifiedAt ??
+        null,
 
       verifiedBy:
-        governmentId.provider === "GRIDLINES"
-          ? "DigiLocker API"
-          : governmentId.provider,
+        isVerified(governmentId?.status)
+          ? governmentId?.provider ===
+            "GRIDLINES"
+            ? "DigiLocker API"
+            : governmentId?.provider ??
+              null
+          : null,
 
-      details: isVerified(
-        governmentId.status
-      )
-        ? [
-          {
-            label: "Document",
-            value: formatGovernmentIdType(
-              governmentId.governmentIdType
-            ),
-          },
-          {
-            label: "Name on ID",
-            value:
-              governmentId?.verifiedName ??
-              "Verified",
-          },
-          {
-            label: "Age on ID",
-            value:
-              governmentMetadata.age ??
-              (user.birth_date
-                ? `${calculateAge(
-                  user.birth_date
-                )} years`
-                : null),
-          },
+      details:
+        isVerified(
+          governmentId?.status
+        )
+          ? [
+              {
+                label: "Document",
 
-          {
-            label: "Gender",
-            value:
-              governmentMetadata.gender ??
-              user.gender ??
-              null,
-          },
+                value:
+                  formatGovernmentIdType(
+                    governmentId
+                      ?.governmentIdType
+                  ),
+              },
 
-          {
-            label: "Profile details match",
-            value:
-              governmentMetadata.profileMatched ===
-                false
-                ? "No"
-                : "Yes",
-          },
-        ].filter((item) => item.value)
-        : [],
-    });
-  }
+              {
+                label: "Name on ID",
 
-  if (face) {
-    identityItems.push({
+                value:
+                  governmentId
+                    ?.verifiedName ??
+                  "Verified",
+              },
+
+              {
+                label: "Age on ID",
+
+                value:
+                  governmentMetadata.age ??
+                  (user.birth_date
+                    ? `${calculateAge(
+                        user.birth_date
+                      )} years`
+                    : null),
+              },
+
+              {
+                label: "Gender",
+
+                value:
+                  governmentMetadata.gender ??
+                  user.gender ??
+                  null,
+              },
+
+              {
+                label:
+                  "Profile details match",
+
+                value:
+                  governmentMetadata
+                    .profileMatched ===
+                  false
+                    ? "No"
+                    : "Yes",
+              },
+            ].filter(
+              (item) =>
+                item.value != null
+            )
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+
+    // =================================================
+    // FACE VERIFICATION
+    // =================================================
+
+    {
       type: "FACE_VERIFICATION",
 
       title: "Face match",
@@ -632,41 +1701,63 @@ export const getPublicTrustScoreService = async (
       description:
         "Profile photo matched with the government ID photo",
 
-      points: face.points,
+      points:
+        face?.maxPoints ??
+        VERIFICATION_POINTS
+          .FACE_VERIFICATION,
 
-      status: face.status,
+      status:
+        getDisplayStatus(face),
 
-      verifiedAt: face.verifiedAt,
+      verifiedAt:
+        face?.verifiedAt ??
+        null,
 
       verifiedBy:
-        face.provider ?? "AI face match",
+        isVerified(face?.status)
+          ? face?.provider ??
+            "AI face match"
+          : null,
 
-      details: isVerified(face.status)
-        ? [
-          {
-            label: "Match with ID",
-            value:
-              faceMetadata.matchPercentage !=
-                null
-                ? `${faceMetadata.matchPercentage}% match`
-                : "Matched",
-          },
+      details:
+        isVerified(face?.status)
+          ? [
+              {
+                label: "Match with ID",
 
-          {
-            label: "Profile photos",
-            value:
-              faceMetadata.samePerson ===
-                false
-                ? "Not matched"
-                : "Same person",
-          },
-        ]
-        : [],
-    });
-  }
+                value:
+                  faceMetadata
+                    .matchPercentage !=
+                  null
+                    ? `${faceMetadata.matchPercentage}% match`
+                    : "Matched",
+              },
 
-  if (video) {
-    identityItems.push({
+              {
+                label:
+                  "Profile photos",
+
+                value:
+                  faceMetadata
+                    .samePerson ===
+                  false
+                    ? "Not matched"
+                    : "Same person",
+              },
+            ]
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+
+    // =================================================
+    // VIDEO VERIFICATION
+    // =================================================
+
+    {
       type: "VIDEO_VERIFICATION",
 
       title: "Video liveness",
@@ -674,46 +1765,69 @@ export const getPublicTrustScoreService = async (
       description:
         "Live verification confirmed a present person",
 
-      points: video.points,
+      points:
+        video?.maxPoints ??
+        VERIFICATION_POINTS
+          .VIDEO_VERIFICATION,
 
-      status: video.status,
+      status:
+        getDisplayStatus(video),
 
-      verifiedAt: video.verifiedAt,
+      verifiedAt:
+        video?.verifiedAt ??
+        null,
 
       verifiedBy:
-        video.provider ??
-        "Live video check",
+        isVerified(video?.status)
+          ? video?.provider ??
+            "Live video check"
+          : null,
 
-      details: isVerified(video.status)
-        ? [
-          {
-            label: "Liveness",
-            value:
-              videoMetadata.livenessResult ??
-              "Real person, live",
-          },
+      details:
+        isVerified(video?.status)
+          ? [
+              {
+                label: "Liveness",
 
-          {
-            label: "Gestures",
-            value:
-              videoMetadata.gesturesCompleted !=
-                null
-                ? `${videoMetadata.gesturesCompleted} completed`
-                : "Completed",
-          },
-        ]
-        : [],
-    });
-  }
+                value:
+                  videoMetadata
+                    .livenessResult ??
+                  "Real person, live",
+              },
+
+              {
+                label: "Gestures",
+
+                value:
+                  videoMetadata
+                    .gesturesCompleted !=
+                  null
+                    ? `${videoMetadata.gesturesCompleted} completed`
+                    : "Completed",
+              },
+            ]
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+  ];
 
   // ---------------------------------------------------
   // 11. HIGH TRUST section
   // ---------------------------------------------------
+  //
+  // All cards are ALWAYS returned.
+  // ---------------------------------------------------
 
-  const highTrustItems: any[] = [];
+  const highTrustItems: any[] = [
+    // =================================================
+    // EDUCATION
+    // =================================================
 
-  if (education) {
-    highTrustItems.push({
+    {
       type: "EDUCATION_VERIFICATION",
 
       title: "Education",
@@ -721,103 +1835,167 @@ export const getPublicTrustScoreService = async (
       description:
         "Education details verified",
 
-      points: education.points,
+      points:
+        education?.maxPoints ??
+        VERIFICATION_POINTS
+          .EDUCATION_VERIFICATION,
 
-      status: education.status,
+      status:
+        getDisplayStatus(education),
 
-      verifiedAt: education.verifiedAt,
+      verifiedAt:
+        education?.verifiedAt ??
+        null,
 
       verifiedBy:
-        education.provider ??
-        "Reviewed by Welvors team",
+        isVerified(education?.status)
+          ? education?.provider ??
+            "Reviewed by Welvors team"
+          : null,
 
-      details: isVerified(education.status)
-        ? [
-          {
-            label: "Degree",
-            value:
-              educationMetadata.degree ??
-              null,
-          },
+      details:
+        isVerified(
+          education?.status
+        )
+          ? [
+              {
+                label: "Degree",
 
-          {
-            label: "College",
-            value:
-              educationMetadata.college ??
-              null,
-          },
+                value:
+                  educationMetadata
+                    .degree ??
+                  null,
+              },
 
-          {
-            label: "Passing year",
-            value:
-              educationMetadata.passingYear ??
-              null,
-          },
-        ].filter((item) => item.value)
-        : [],
-    });
-  }
+              {
+                label: "College",
 
-  if (profession) {
-    highTrustItems.push({
-      type: "PROFESSIONAL_VERIFICATION",
+                value:
+                  educationMetadata
+                    .college ??
+                  null,
+              },
+
+              {
+                label:
+                  "Passing year",
+
+                value:
+                  educationMetadata
+                    .passingYear ??
+                  null,
+              },
+            ].filter(
+              (item) =>
+                item.value != null
+            )
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+
+    // =================================================
+    // PROFESSION
+    // =================================================
+
+    {
+      type:
+        "PROFESSIONAL_VERIFICATION",
 
       title: "Profession",
 
       description:
         "Employment details verified",
 
-      points: profession.points,
+      points:
+        profession?.maxPoints ??
+        VERIFICATION_POINTS
+          .PROFESSIONAL_VERIFICATION,
 
-      status: profession.status,
+      status:
+        getDisplayStatus(profession),
 
-      verifiedAt: profession.verifiedAt,
+      verifiedAt:
+        profession?.verifiedAt ??
+        null,
 
       verifiedBy:
-        profession.provider ??
-        "Employment verification",
+        isVerified(
+          profession?.status
+        )
+          ? profession?.provider ??
+            "Employment verification"
+          : null,
 
-      details: isVerified(profession.status)
-        ? [
-          {
-            label: "Company",
-            value:
-              professionMetadata.companyName ??
-              null,
-          },
+      details:
+        isVerified(
+          profession?.status
+        )
+          ? [
+              {
+                label: "Company",
 
-          {
-            label: "Designation",
-            value:
-              professionMetadata.designation ??
-              null,
-          },
+                value:
+                  professionMetadata
+                    .companyName ??
+                  null,
+              },
 
-          {
-            label: "Joining date",
-            value:
-              professionMetadata.joiningDate ??
-              null,
-          },
+              {
+                label:
+                  "Designation",
 
-          {
-            label: "Currently working",
-            value:
-              professionMetadata.isCurrentlyWorking ===
-                true
-                ? "Yes"
-                : professionMetadata.isCurrentlyWorking ===
-                  false
-                  ? "No"
-                  : null,
-          },
-        ].filter((item) => item.value)
-        : [],
-    });
-  }
+                value:
+                  professionMetadata
+                    .designation ??
+                  null,
+              },
 
-  if (income) {
-    highTrustItems.push({
+              {
+                label:
+                  "Joining date",
+
+                value:
+                  professionMetadata
+                    .joiningDate ??
+                  null,
+              },
+
+              {
+                label:
+                  "Currently working",
+
+                value:
+                  professionMetadata
+                    .isCurrentlyWorking ===
+                  true
+                    ? "Yes"
+                    : professionMetadata
+                          .isCurrentlyWorking ===
+                        false
+                      ? "No"
+                      : null,
+              },
+            ].filter(
+              (item) =>
+                item.value != null
+            )
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+
+    // =================================================
+    // INCOME
+    // =================================================
+
+    {
       type: "INCOME_VERIFICATION",
 
       title: "Income",
@@ -825,110 +2003,169 @@ export const getPublicTrustScoreService = async (
       description:
         "Declared income bracket confirmed",
 
-      points: income.points,
+      points:
+        income?.maxPoints ??
+        VERIFICATION_POINTS
+          .INCOME_VERIFICATION,
 
-      status: income.status,
+      status:
+        getDisplayStatus(income),
 
-      verifiedAt: income.verifiedAt,
+      verifiedAt:
+        income?.verifiedAt ??
+        null,
 
       verifiedBy:
-        income.provider ??
-        "Income verification",
+        isVerified(income?.status)
+          ? income?.provider ??
+            "Income verification"
+          : null,
 
-      /**
-       * Don't return bank statements,
-       * account numbers or raw transactions.
-       */
-      details: isVerified(income.status)
-        ? [
-          {
-            label: "Income bracket",
-            value:
-              incomeMetadata.incomeBracket ??
-              null,
-          },
+      details:
+        isVerified(income?.status)
+          ? [
+              {
+                label:
+                  "Income bracket",
 
-          {
-            label: "Matches declared",
-            value:
-              incomeMetadata.matchesDeclared ===
-                true
-                ? "Yes"
-                : incomeMetadata.matchesDeclared ===
-                  false
-                  ? "No"
-                  : null,
-          },
+                value:
+                  incomeMetadata
+                    .incomeBracket ??
+                  null,
+              },
 
-          {
-            label: "Sources verified",
-            value:
-              incomeMetadata.sourcesVerified !=
-                null
-                ? String(
-                  incomeMetadata.sourcesVerified
-                )
-                : null,
-          },
-        ].filter((item) => item.value)
-        : [],
-    });
-  }
+              {
+                label:
+                  "Matches declared",
+
+                value:
+                  incomeMetadata
+                    .matchesDeclared ===
+                  true
+                    ? "Yes"
+                    : incomeMetadata
+                          .matchesDeclared ===
+                        false
+                      ? "No"
+                      : null,
+              },
+
+              {
+                label:
+                  "Sources verified",
+
+                value:
+                  incomeMetadata
+                    .sourcesVerified !=
+                  null
+                    ? String(
+                        incomeMetadata
+                          .sourcesVerified
+                      )
+                    : null,
+              },
+            ].filter(
+              (item) =>
+                item.value != null
+            )
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+  ];
 
   // ---------------------------------------------------
   // 12. PLATINUM section
   // ---------------------------------------------------
+  //
+  // All cards are ALWAYS returned.
+  // ---------------------------------------------------
 
-  const platinumItems: any[] = [];
+  const platinumItems: any[] = [
+    // =================================================
+    // CRIMINAL BACKGROUND
+    // =================================================
 
-  if (criminal) {
-    platinumItems.push({
-      type: "CRIMINAL_BACKGROUND_CHECK",
+    {
+      type:
+        "CRIMINAL_BACKGROUND_CHECK",
 
-      title: "Criminal background",
+      title:
+        "Criminal background",
 
       description:
         "Background records were checked",
 
-      points: criminal.points,
+      points:
+        criminal?.maxPoints ??
+        VERIFICATION_POINTS
+          .CRIMINAL_BACKGROUND_CHECK,
 
-      status: criminal.status,
+      status:
+        getDisplayStatus(criminal),
 
-      verifiedAt: criminal.verifiedAt,
+      verifiedAt:
+        criminal?.verifiedAt ??
+        null,
 
       verifiedBy:
-        criminal.provider ??
-        "Background-check partner",
+        isVerified(
+          criminal?.status
+        )
+          ? criminal?.provider ??
+            "Background-check partner"
+          : null,
 
-      details: isVerified(criminal.status)
-        ? [
-          {
-            label: "Court records",
-            value:
-              criminalMetadata.courtRecords ??
-              "No records found",
-          },
+      details:
+        isVerified(
+          criminal?.status
+        )
+          ? [
+              {
+                label:
+                  "Court records",
 
-          {
-            label: "Police records",
-            value:
-              criminalMetadata.policeRecords ??
-              "No records found",
-          },
+                value:
+                  criminalMetadata
+                    .courtRecords ??
+                  "No records found",
+              },
 
-          {
-            label: "Result",
-            value:
-              criminalMetadata.result ??
-              "No records found in checked sources",
-          },
-        ]
-        : [],
-    });
-  }
+              {
+                label:
+                  "Police records",
 
-  if (emergencyContact) {
-    platinumItems.push({
+                value:
+                  criminalMetadata
+                    .policeRecords ??
+                  "No records found",
+              },
+
+              {
+                label: "Result",
+
+                value:
+                  criminalMetadata
+                    .result ??
+                  "No records found in checked sources",
+              },
+            ]
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+
+    // =================================================
+    // EMERGENCY CONTACT
+    // =================================================
+
+    {
       type: "EMERGENCY_CONTACT",
 
       title: "Emergency contact",
@@ -936,29 +2173,49 @@ export const getPublicTrustScoreService = async (
       description:
         "Emergency contact has been verified",
 
-      points: emergencyContact.points,
+      points:
+        emergencyContact
+          ?.maxPoints ??
+        VERIFICATION_POINTS
+          .EMERGENCY_CONTACT,
 
-      status: emergencyContact.status,
+      status:
+        getDisplayStatus(
+          emergencyContact
+        ),
 
       verifiedAt:
-        emergencyContact.verifiedAt,
+        emergencyContact
+          ?.verifiedAt ??
+        null,
 
       verifiedBy:
-        emergencyContact.provider ??
-        "Contact verification",
+        isVerified(
+          emergencyContact?.status
+        )
+          ? emergencyContact
+              ?.provider ??
+            "Contact verification"
+          : null,
 
-      details: isVerified(
-        emergencyContact.status
-      )
-        ? [
-          {
-            label: "Status",
-            value: "Verified",
-          },
-        ]
-        : [],
-    });
-  }
+      details:
+        isVerified(
+          emergencyContact?.status
+        )
+          ? [
+              {
+                label: "Status",
+                value: "Verified",
+              },
+            ]
+          : [
+              {
+                label: "Status",
+                value: "Not verified",
+              },
+            ],
+    },
+  ];
 
   // ---------------------------------------------------
   // 13. Section helper
@@ -970,26 +2227,36 @@ export const getPublicTrustScoreService = async (
     title: string,
     items: any[]
   ) => {
-    const completed = items.filter(
-      (item) => item.status === "VERIFIED"
-    ).length;
+    const completed =
+      items.filter(
+        (item) =>
+          item.status === "VERIFIED"
+      ).length;
 
-    const sectionEarnedPoints = items.reduce(
-      (total, item) => {
-        if (item.status !== "VERIFIED") {
-          return total;
-        }
+    const sectionEarnedPoints =
+      items.reduce(
+        (total, item) => {
+          if (
+            item.status !== "VERIFIED"
+          ) {
+            return total;
+          }
 
-        return total + (item.points ?? 0);
-      },
-      0
-    );
+          return (
+            total +
+            (item.points ?? 0)
+          );
+        },
+        0
+      );
 
-    const maxPoints = items.reduce(
-      (total, item) =>
-        total + (item.points ?? 0),
-      0
-    );
+    const maxPoints =
+      items.reduce(
+        (total, item) =>
+          total +
+          (item.points ?? 0),
+        0
+      );
 
     return {
       key,
@@ -997,17 +2264,21 @@ export const getPublicTrustScoreService = async (
       title,
 
       status:
-        completed === items.length &&
-          items.length > 0
+        completed ===
+          items.length &&
+        items.length > 0
           ? "VERIFIED"
           : completed > 0
             ? "PARTIALLY_VERIFIED"
             : "NOT_VERIFIED",
 
-      earnedPoints: sectionEarnedPoints,
+      earnedPoints:
+        sectionEarnedPoints,
+
       maxPoints,
 
       completed,
+
       total: items.length,
 
       items,
@@ -1023,27 +2294,38 @@ export const getPublicTrustScoreService = async (
       id: user.id,
 
       name:
-        user.full_name?.split(" ")[0] ??
-        "User",
+        user.full_name?.split(
+          " "
+        )[0] ?? "User",
 
-      age: calculateAge(user.birth_date),
+      age:
+        calculateAge(
+          user.birth_date
+        ),
 
       profilePhoto:
-        user.photos[0]?.media_url ?? null,
+        user.photos[0]
+          ?.media_url ??
+        null,
     },
 
     trustScore: {
       score: trustScore,
+
       maxScore,
 
       verifiedChecks,
+
       totalChecks,
 
       badge,
 
       description:
-        `A higher Trust Score means more of ${user.full_name?.split(" ")[0] ??
-        "this user's"
+        `A higher Trust Score means more of ${
+          user.full_name?.split(
+            " "
+          )[0] ??
+          "this user's"
         } identity and profile information has been independently checked.`,
     },
 
