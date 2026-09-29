@@ -378,7 +378,6 @@ export const getMembershipPlanService = async (
   };
 };
 
-
 const GST_PERCENTAGE = 18;
 
 const COMPANY_DETAILS = {
@@ -394,7 +393,6 @@ const COMPANY_DETAILS = {
     "Office No. 243, The Capital, Hadapsar, Pune, 411028",
 };
 
-
 const maskUpi = (upiId: string) => {
   if (!upiId.includes("@")) {
     return "UPI";
@@ -404,8 +402,6 @@ const maskUpi = (upiId: string) => {
 
   return `····@${bank}`;
 };
-
-
 
 /**
  * Generates invoice number without storing it.
@@ -698,5 +694,140 @@ export const turnOffAutoRenewService = async (
     // Subscription itself remains active
     status: updatedPackage.status,
     accessUntil: updatedPackage.endDate,
+  };
+};
+
+export const turnOnAutoRenewService = async (
+  userId: string
+) => {
+  // Find current active package
+  const userPackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: "ACTIVE",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      package: true,
+      price: true,
+    },
+  });
+
+  if (!userPackage) {
+    throw new Error("ACTIVE_PACKAGE_NOT_FOUND");
+  }
+
+  if (userPackage.autoRenew) {
+    throw new Error("AUTO_RENEW_ALREADY_ENABLED");
+  }
+
+  const updatedPackage = await prisma.userPackage.update({
+    where: {
+      id: userPackage.id,
+    },
+    data: {
+      autoRenew: true,
+
+      // Clear previous cancellation information
+      autoRenewCancelReason: null,
+      autoRenewCancelledAt: null,
+    },
+    include: {
+      package: true,
+      price: true,
+    },
+  });
+
+  return {
+    userPackageId: updatedPackage.id,
+
+    package: {
+      id: updatedPackage.package.id,
+      name: updatedPackage.package.name,
+    },
+
+    autoRenew: updatedPackage.autoRenew,
+    status: updatedPackage.status,
+    nextRenewalDate: updatedPackage.endDate,
+  };
+};
+
+export const getAutoRenewOffPreviewService = async (
+  userId: string
+) => {
+  const userPackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: "ACTIVE",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      package: {
+        include: {
+          limits: {
+            where: {
+              feature: {
+                active: true,
+              },
+            },
+            include: {
+              feature: true,
+            },
+            orderBy: {
+              feature: {
+                sortOrder: "asc",
+              },
+            },
+          },
+        },
+      },
+      price: true,
+    },
+  });
+
+  if (!userPackage) {
+    throw new Error("ACTIVE_PACKAGE_NOT_FOUND");
+  }
+
+  if (!userPackage.endDate) {
+    throw new Error("PACKAGE_EXPIRY_DATE_NOT_FOUND");
+  }
+
+  const features = userPackage.package.limits.map((limit) => {
+    return {
+      id: limit.feature.id,
+      code: limit.feature.code,
+      slug: limit.feature.slug,
+      title: limit.feature.title,
+      description: limit.feature.description,
+      icon: limit.feature.icon,
+      category: limit.feature.category,
+
+      // Include your PlanLimit values here.
+      // Change these field names according to your actual PlanLimit model.
+      limit: limit.limit,
+      unlimited: limit.unlimited,
+    };
+  });
+
+  return {
+    userPackageId: userPackage.id,
+
+    package: {
+      id: userPackage.package.id,
+      name: userPackage.package.name,
+      slug: userPackage.package.slug,
+      badgeLabel: userPackage.package.badgeLabel,
+    },
+
+    autoRenew: userPackage.autoRenew,
+
+    expiryDate: userPackage.endDate,
+
+    features,
   };
 };

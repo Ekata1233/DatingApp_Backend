@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { getMembershipInvoiceService, getMembershipPlanService, turnOffAutoRenewService } from "./membership.service";
+import { getAutoRenewOffPreviewService, getMembershipInvoiceService, getMembershipPlanService, turnOffAutoRenewService, turnOnAutoRenewService } from "./membership.service";
 import { AUTO_RENEW_CANCEL_REASONS } from "./membership.constants";
 
 export const getMembershipPlanController = async (
@@ -37,7 +37,6 @@ export const getMembershipPlanController = async (
     });
   }
 };
-
 
 export const getMembershipInvoiceController = async (
   req: Request,
@@ -154,6 +153,93 @@ export const turnOffAutoRenewController = async (
         success: false,
         message:
           "Auto-renew is already turned off.",
+      });
+    }
+
+    next(error);
+  }
+};
+
+export const turnOnAutoRenewController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const result = await turnOnAutoRenewService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Auto-renew has been turned on successfully.",
+      data: result,
+    });
+  } catch (error: any) {
+    if (error.message === "ACTIVE_PACKAGE_NOT_FOUND") {
+      return res.status(404).json({
+        success: false,
+        message: "No active subscription found.",
+      });
+    }
+
+    if (error.message === "AUTO_RENEW_ALREADY_ENABLED") {
+      return res.status(400).json({
+        success: false,
+        message: "Auto-renew is already turned on.",
+      });
+    }
+
+    next(error);
+  }
+};
+
+export const getAutoRenewOffPreviewController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const data =
+      await getAutoRenewOffPreviewService(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Auto-renew cancellation preview fetched successfully.",
+      data,
+    });
+  } catch (error: any) {
+    if (error.message === "ACTIVE_PACKAGE_NOT_FOUND") {
+      return res.status(404).json({
+        success: false,
+        message: "No active package found.",
+      });
+    }
+
+    if (
+      error.message ===
+      "PACKAGE_EXPIRY_DATE_NOT_FOUND"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Package expiry date is not available.",
       });
     }
 
