@@ -316,12 +316,13 @@ import {
 import { prisma } from "../../../prisma/prismaClient";
 
 import { checkPassiveLiveness } from "../../../utils/gridlines-liveness";
+import { recalculateTrustScore } from "../trust-score/trust-score.service";
 
 // =====================================================
 // CONFIGURATION
 // =====================================================
 
-const VIDEO_VERIFICATION_POINTS = 5;
+const VIDEO_VERIFICATION_POINTS = 12;
 
 /**
  * Gridlines documentation suggests 0.5.
@@ -525,7 +526,7 @@ export const verifyVideoLivenessService = async ({
             const passed =
               result.code === "1000" &&
               result.confidence >=
-                LIVENESS_THRESHOLD;
+              LIVENESS_THRESHOLD;
 
             return {
               frame: frameNumber,
@@ -552,8 +553,8 @@ export const verifyVideoLivenessService = async ({
             console.error(
               `GRIDLINES FRAME ${frameNumber} ERROR:`,
               providerError ||
-                error?.message ||
-                error
+              error?.message ||
+              error
             );
 
             return {
@@ -614,21 +615,21 @@ export const verifyVideoLivenessService = async ({
     const averageConfidence =
       results.length > 0
         ? results.reduce(
-            (sum, result) =>
-              sum +
-              result.confidence,
-            0
-          ) / results.length
+          (sum, result) =>
+            sum +
+            result.confidence,
+          0
+        ) / results.length
         : 0;
 
     const highestConfidence =
       results.length > 0
         ? Math.max(
-            ...results.map(
-              (result) =>
-                result.confidence
-            )
+          ...results.map(
+            (result) =>
+              result.confidence
           )
+        )
         : 0;
 
     /**
@@ -676,51 +677,61 @@ export const verifyVideoLivenessService = async ({
     // =================================================
 
     if (!isLive) {
-      await prisma.userVerification.update({
-        where: {
-          id: verification.id,
-        },
+      const trustScore = await prisma.$transaction(
+        async (tx) => {
+          await tx.userVerification.update({
+            where: {
+              id: verification.id,
+            },
 
-        data: {
-          status:
-            VerificationStatus.REJECTED,
+            data: {
+              status:
+                VerificationStatus.REJECTED,
 
-          points: 0,
+              points: 0,
 
-          verifiedAt: null,
+              verifiedAt: null,
 
-          rejectionReason:
-            "Liveness verification failed.",
+              rejectionReason:
+                "Liveness verification failed.",
 
-          metadata: {
-            method:
-              "VIDEO_FRAME_PASSIVE_LIVENESS",
+              metadata: {
+                method:
+                  "VIDEO_FRAME_PASSIVE_LIVENESS",
 
-            provider:
-              "GRIDLINES",
+                provider:
+                  "GRIDLINES",
 
-            threshold:
-              LIVENESS_THRESHOLD,
+                threshold:
+                  LIVENESS_THRESHOLD,
 
-            minimumPassedFrames:
-              MIN_PASSED_FRAMES,
+                minimumPassedFrames:
+                  MIN_PASSED_FRAMES,
 
-            totalFrames:
-              results.length,
+                totalFrames:
+                  results.length,
 
-            passedFrames:
-              passedFrames.length,
+                passedFrames:
+                  passedFrames.length,
 
-            failedFrames,
+                failedFrames,
 
-            averageConfidence,
+                averageConfidence,
 
-            highestConfidence,
+                highestConfidence,
 
-            results,
-          },
-        },
-      });
+                results,
+              },
+            },
+          });
+
+          // Recalculate because video points = 0
+          return await recalculateTrustScore(
+            userId,
+            tx
+          );
+        }
+      );
 
       console.log(
         "VIDEO VERIFICATION REJECTED"
@@ -736,6 +747,8 @@ export const verifyVideoLivenessService = async ({
           VerificationStatus.REJECTED,
 
         points: 0,
+
+        trustScore,
 
         liveness: {
           isLive: false,
@@ -767,54 +780,78 @@ export const verifyVideoLivenessService = async ({
     // 7. LIVENESS VERIFIED
     // =================================================
 
-    const verified =
-      await prisma.userVerification.update({
-        where: {
-          id: verification.id,
-        },
+    const {
+      verified,
+      trustScore,
+    } = await prisma.$transaction(
+      async (tx) => {
 
-        data: {
-          status:
-            VerificationStatus.VERIFIED,
+        // Save successful video verification
+        const verified =
+          await tx.userVerification.update({
+            where: {
+              id: verification.id,
+            },
 
-          points:
-            VIDEO_VERIFICATION_POINTS,
+            data: {
+              status:
+                VerificationStatus.VERIFIED,
 
-          verifiedAt: new Date(),
+              points:
+                VIDEO_VERIFICATION_POINTS,
 
-          rejectionReason: null,
+              verifiedAt:
+                new Date(),
 
-          provider: "GRIDLINES",
+              rejectionReason:
+                null,
 
-          metadata: {
-            method:
-              "VIDEO_FRAME_PASSIVE_LIVENESS",
+              provider:
+                "GRIDLINES",
 
-            provider:
-              "GRIDLINES",
+              metadata: {
+                method:
+                  "VIDEO_FRAME_PASSIVE_LIVENESS",
 
-            threshold:
-              LIVENESS_THRESHOLD,
+                provider:
+                  "GRIDLINES",
 
-            minimumPassedFrames:
-              MIN_PASSED_FRAMES,
+                threshold:
+                  LIVENESS_THRESHOLD,
 
-            totalFrames:
-              results.length,
+                minimumPassedFrames:
+                  MIN_PASSED_FRAMES,
 
-            passedFrames:
-              passedFrames.length,
+                totalFrames:
+                  results.length,
 
-            failedFrames,
+                passedFrames:
+                  passedFrames.length,
 
-            averageConfidence,
+                failedFrames,
 
-            highestConfidence,
+                averageConfidence,
 
-            results,
-          },
-        },
-      });
+                highestConfidence,
+
+                results,
+              },
+            },
+          });
+
+        // Recalculate after video points are saved
+        const trustScore =
+          await recalculateTrustScore(
+            userId,
+            tx
+          );
+
+        return {
+          verified,
+          trustScore,
+        };
+      }
+    );
 
     console.log(
       "VIDEO VERIFICATION VERIFIED:",
@@ -869,8 +906,8 @@ export const verifyVideoLivenessService = async ({
     console.error(
       "VIDEO VERIFICATION SERVICE ERROR:",
       error?.response?.data ||
-        error?.message ||
-        error
+      error?.message ||
+      error
     );
 
     throw error;

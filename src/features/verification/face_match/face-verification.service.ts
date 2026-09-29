@@ -12,8 +12,9 @@ import {
 } from "./face-match.provider";
 import { getGovernmentIdPhoto } from "../government_id/government-id-photo.service";
 import { getUserProfilePhoto } from "./face-match.helper";
+import { recalculateTrustScore } from "../trust-score/trust-score.service";
 
-const FACE_POINTS = 5;
+const FACE_POINTS = 12;
 
 export const verifyUserFaceService = async (
   userId: string,
@@ -84,7 +85,7 @@ export const verifyUserFaceService = async (
 
   if (
     existingFace?.status ===
-      VerificationStatus.VERIFIED &&
+    VerificationStatus.VERIFIED &&
     (
       !existingFace.expiresAt ||
       existingFace.expiresAt > new Date()
@@ -189,91 +190,107 @@ export const verifyUserFaceService = async (
       : null;
 
   // 11. Save result
-  const verification =
-    await prisma.userVerification.upsert({
-      where: {
-        userId_type: {
+  // 11. Save verification + update trust score
+  const result = await prisma.$transaction(async (tx) => {
+    // 11.1 Save face verification
+    const verification =
+      await tx.userVerification.upsert({
+        where: {
+          userId_type: {
+            userId,
+            type: VerificationType.FACE_VERIFICATION,
+          },
+        },
+
+        create: {
           userId,
-          type:
-            VerificationType.FACE_VERIFICATION,
-        },
-      },
 
-      create: {
+          type: VerificationType.FACE_VERIFICATION,
+
+          status: newStatus,
+
+          points,
+
+          maxPoints: FACE_POINTS,
+
+          provider: "GRIDLINES",
+
+          providerRef:
+            faceResult.providerRequestId,
+
+          startedAt: new Date(),
+
+          verifiedAt,
+
+          rejectionReason:
+            faceResult.isMatch
+              ? null
+              : "FACE_NOT_MATCHED",
+
+          metadata: {
+            confidence:
+              faceResult.confidence,
+
+            providerCode:
+              faceResult.providerCode,
+
+            governmentIdType:
+              governmentId.governmentIdType,
+
+            profilePhotoId:
+              userPhoto.id,
+          },
+        },
+
+        update: {
+          status: newStatus,
+
+          points,
+
+          maxPoints: FACE_POINTS,
+
+          provider: "GRIDLINES",
+
+          providerRef:
+            faceResult.providerRequestId,
+
+          verifiedAt,
+
+          rejectionReason:
+            faceResult.isMatch
+              ? null
+              : "FACE_NOT_MATCHED",
+
+          metadata: {
+            confidence:
+              faceResult.confidence,
+
+            providerCode:
+              faceResult.providerCode,
+
+            governmentIdType:
+              governmentId.governmentIdType,
+
+            profilePhotoId:
+              userPhoto.id,
+          },
+        },
+      });
+
+    // 11.2 Recalculate total trust score
+    const trustScore =
+      await recalculateTrustScore(
         userId,
+        tx
+      );
 
-        type:
-          VerificationType.FACE_VERIFICATION,
+    return {
+      verification,
+      trustScore,
+    };
+  });
 
-        status: newStatus,
-
-        points,
-
-        maxPoints: FACE_POINTS,
-
-        provider: "GRIDLINES",
-
-        providerRef:
-          faceResult.providerRequestId,
-
-        startedAt: new Date(),
-
-        verifiedAt,
-
-        rejectionReason:
-          faceResult.isMatch
-            ? null
-            : "FACE_NOT_MATCHED",
-
-        metadata: {
-          confidence:
-            faceResult.confidence,
-
-          providerCode:
-            faceResult.providerCode,
-
-          governmentIdType:
-            governmentId.governmentIdType,
-
-          profilePhotoId:
-            userPhoto.id,
-        },
-      },
-
-      update: {
-        status: newStatus,
-
-        points,
-
-        maxPoints: FACE_POINTS,
-
-        provider: "GRIDLINES",
-
-        providerRef:
-          faceResult.providerRequestId,
-
-        verifiedAt,
-
-        rejectionReason:
-          faceResult.isMatch
-            ? null
-            : "FACE_NOT_MATCHED",
-
-        metadata: {
-          confidence:
-            faceResult.confidence,
-
-          providerCode:
-            faceResult.providerCode,
-
-          governmentIdType:
-            governmentId.governmentIdType,
-
-          profilePhotoId:
-            userPhoto.id,
-        },
-      },
-    });
+  const { verification, trustScore } = result;
 
   // 12. Return result
   return {
@@ -291,6 +308,8 @@ export const verifyUserFaceService = async (
 
     maxPoints:
       verification.maxPoints,
+
+    trustScore,
 
     isMatch:
       faceResult.isMatch,

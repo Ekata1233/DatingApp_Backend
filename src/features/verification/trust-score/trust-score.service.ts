@@ -1,4 +1,5 @@
 import {
+  Prisma,
   VerificationStatus,
   VerificationType,
 } from "@prisma/client";
@@ -1084,4 +1085,39 @@ export const getPublicTrustScoreService = async (
       ),
     ],
   };
+};
+
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+export const recalculateTrustScore = async (
+  userId: string,
+  db: DbClient = prisma
+): Promise<number> => {
+  const result = await db.userVerification.aggregate({
+    where: {
+      userId,
+      status: VerificationStatus.VERIFIED,
+    },
+    _sum: {
+      points: true,
+    },
+  });
+
+  // Prevent invalid values such as > 100.
+  const trustScore = Math.min(
+    Math.max(result._sum.points ?? 0, 0),
+    100
+  );
+
+  await db.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      trust_score: trustScore,
+    },
+  });
+
+  return trustScore;
 };

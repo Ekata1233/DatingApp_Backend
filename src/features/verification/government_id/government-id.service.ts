@@ -13,6 +13,7 @@ import { deleteGovernmentIdPhoto, fetchAndVerifyGovernmentDocument } from "./gov
 import axios from "axios";
 import { uploadGovernmentIdPhoto } from "./government-id.storage";
 import { getVerifiedGovernmentDocument, validateGovernmentIdentity } from "./government-id.helper";
+import { recalculateTrustScore } from "../trust-score/trust-score.service";
 
 
 const hashState = (value: string) =>
@@ -121,7 +122,7 @@ export const initGovernmentIdService = async (
         type: VerificationType.GOVERNMENT_ID,
         status: VerificationStatus.IN_PROGRESS,
         points: 0,
-        maxPoints: 10,
+        maxPoints: 20,
         governmentIdType: documentType,
         provider: "GRIDLINES",
         startedAt: new Date(),
@@ -741,7 +742,7 @@ export const completeGovernmentIdService = async (
               governmentIdPhotoKey:
                 photoKey,
 
-              points: 10,
+              points: 20,
 
               verifiedAt: now,
 
@@ -790,6 +791,10 @@ export const completeGovernmentIdService = async (
           );
         }
 
+        const trustScore = await recalculateTrustScore(
+          userId,
+          tx
+        );
         // ======================================
         // 9. Return verification result
         // ======================================
@@ -816,7 +821,8 @@ export const completeGovernmentIdService = async (
 
           status: "VERIFIED",
 
-          points: 10,
+          points: 20,
+          trustScore
         };
 
       }

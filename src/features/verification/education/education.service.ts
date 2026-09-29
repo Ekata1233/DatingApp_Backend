@@ -10,10 +10,11 @@ import imagekit from "../../../utils/imagekit";
 
 import {
   EducationVerificationInput,
-  
+
   validateEducationFile,
 } from "./education.validation";
 import { EducationFile, EducationFiles } from "./education.type";
+import { recalculateTrustScore } from "../trust-score/trust-score.service";
 const EDUCATION_VERIFICATION_POINTS = 10;
 const uploadEducationDocument = async (
   userId: string,
@@ -83,7 +84,7 @@ export const submitEducationVerificationService = async (
 
   if (
     existingVerification?.status ===
-      VerificationStatus.IN_PROGRESS &&
+    VerificationStatus.IN_PROGRESS &&
     existingVerification.educationVerification
   ) {
     throw new Error(
@@ -100,10 +101,10 @@ export const submitEducationVerificationService = async (
 
   let marksheet:
     | Awaited<
-        ReturnType<
-          typeof uploadEducationDocument
-        >
+      ReturnType<
+        typeof uploadEducationDocument
       >
+    >
     | null = null;
 
   if (files.marksheet) {
@@ -278,15 +279,15 @@ export const getMyEducationVerificationService =
     return result;
   };
 
-  export const getEducationVerificationsService =
+export const getEducationVerificationsService =
   async (
     status?: VerificationStatus
   ) => {
     return prisma.educationVerification.findMany({
       where: status
         ? {
-            status,
-          }
+          status,
+        }
         : {},
 
       select: {
@@ -318,7 +319,7 @@ export const getMyEducationVerificationService =
     });
   };
 
-  export const getEducationVerificationDetailsService =
+export const getEducationVerificationDetailsService =
   async (educationId: string) => {
     const result =
       await prisma.educationVerification.findUnique({
@@ -358,10 +359,10 @@ export const getMyEducationVerificationService =
     const marksheetUrl =
       result.marksheetUrl
         ? imagekit.url({
-            path: result.marksheetUrl,
-            signed: true,
-            expireSeconds: expires,
-          })
+          path: result.marksheetUrl,
+          signed: true,
+          expireSeconds: expires,
+        })
         : null;
 
     return {
@@ -410,104 +411,115 @@ export const getMyEducationVerificationService =
     };
   };
 
-  export const reviewEducationVerificationService =
-  async (
-    educationId: string,
-    action: "APPROVE" | "REJECT",
-    rejectionReason?: string
-  ) => {
-    const education =
-      await prisma.educationVerification.findUnique({
+export const reviewEducationVerificationService = async (
+  educationId: string,
+  action: "APPROVE" | "REJECT",
+  rejectionReason?: string
+) => {
+  const education =
+    await prisma.educationVerification.findUnique({
+      where: {
+        id: educationId,
+      },
+
+      include: {
+        verification: true,
+      },
+    });
+
+  if (!education) {
+    throw new Error(
+      "EDUCATION_VERIFICATION_NOT_FOUND"
+    );
+  }
+
+  if (
+    education.status ===
+    VerificationStatus.VERIFIED
+  ) {
+    throw new Error(
+      "EDUCATION_VERIFICATION_ALREADY_REVIEWED"
+    );
+  }
+
+  if (
+    action === "REJECT" &&
+    !rejectionReason?.trim()
+  ) {
+    throw new Error(
+      "REJECTION_REASON_REQUIRED"
+    );
+  }
+
+  const approved =
+    action === "APPROVE";
+
+  const now = new Date();
+
+  return prisma.$transaction(
+    async (tx) => {
+      const updatedEducation = await tx.educationVerification.update({
         where: {
           id: educationId,
         },
 
-        include: {
-          verification: true,
+        data: {
+          status: approved
+            ? VerificationStatus.VERIFIED
+            : VerificationStatus.REJECTED,
+
+          reviewedBy: null,
+
+          reviewedAt: now,
+
+          verifiedAt: approved
+            ? now
+            : null,
+
+          rejectionReason: approved
+            ? null
+            : rejectionReason!.trim(),
         },
       });
 
-    if (!education) {
-      throw new Error(
-        "EDUCATION_VERIFICATION_NOT_FOUND"
-      );
+      await tx.userVerification.update({
+        where: {
+          id: education.verificationId,
+        },
+
+        data: {
+          status: approved
+            ? VerificationStatus.VERIFIED
+            : VerificationStatus.REJECTED,
+
+          points: approved
+            ? EDUCATION_VERIFICATION_POINTS
+            : 0,
+
+          verifiedAt: approved
+            ? now
+            : null,
+
+          rejectionReason: approved
+            ? null
+            : rejectionReason!.trim(),
+        },
+      });
+
+      // ========================================
+      // 3. Recalculate user's trust score
+      // ========================================
+
+      const trustScore =
+        await recalculateTrustScore(
+          education.userId,
+          tx
+        );
+
+      return {
+        ...updatedEducation,
+        trustScore,
+      };
     }
-
-    if (
-      education.status ===
-      VerificationStatus.VERIFIED
-    ) {
-      throw new Error(
-        "EDUCATION_VERIFICATION_ALREADY_REVIEWED"
-      );
-    }
-
-    if (
-      action === "REJECT" &&
-      !rejectionReason?.trim()
-    ) {
-      throw new Error(
-        "REJECTION_REASON_REQUIRED"
-      );
-    }
-
-    const approved =
-      action === "APPROVE";
-
-    const now = new Date();
-
-    return prisma.$transaction(
-      async (tx) => {
-        const updatedEducation =
-          await tx.educationVerification.update({
-            where: {
-              id: educationId,
-            },
-
-            data: {
-              status: approved
-                ? VerificationStatus.VERIFIED
-                : VerificationStatus.REJECTED,
-
-              reviewedBy: null,
-
-              reviewedAt: now,
-
-              verifiedAt: approved
-                ? now
-                : null,
-
-              rejectionReason: approved
-                ? null
-                : rejectionReason!.trim(),
-            },
-          });
-
-        await tx.userVerification.update({
-          where: {
-            id: education.verificationId,
-          },
-
-          data: {
-            status: approved
-              ? VerificationStatus.VERIFIED
-              : VerificationStatus.REJECTED,
-
-            points: approved
-              ? EDUCATION_VERIFICATION_POINTS
-              : 0,
-
-            verifiedAt: approved
-              ? now
-              : null,
-
-            rejectionReason: approved
-              ? null
-              : rejectionReason!.trim(),
-          },
-        });
-
-        return updatedEducation;
-      }
-    );
-  };
+  );
+};

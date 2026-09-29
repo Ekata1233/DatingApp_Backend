@@ -18,6 +18,7 @@ import {
 } from "./employment.gridlines";
 import { EmploymentFile, EmploymentFiles, EmploymentVerificationInput, validateEmploymentFile } from "./employment.validation";
 import imagekit from "../../../utils/imagekit";
+import { recalculateTrustScore } from "../trust-score/trust-score.service";
 
 
 
@@ -194,6 +195,9 @@ const rejectVerification = async (
     rejectionReason: reason,
   });
 
+  const trustScore =
+    await recalculateTrustScore(userId);
+
   return {
     success: false,
     message: reason,
@@ -203,6 +207,7 @@ const rejectVerification = async (
     uan: null,
     latestEmployment: null,
     points: 0,
+    trustScore
   };
 };
 
@@ -375,8 +380,8 @@ export const verifyEmploymentService = async ({
   if (existing?.status === VerificationStatus.VERIFIED) {
     const metadata =
       existing.metadata &&
-      typeof existing.metadata === "object" &&
-      !Array.isArray(existing.metadata)
+        typeof existing.metadata === "object" &&
+        !Array.isArray(existing.metadata)
         ? (existing.metadata as Record<string, unknown>)
         : {};
 
@@ -388,17 +393,17 @@ export const verifyEmploymentService = async ({
       employmentFound: true,
       uan: (metadata.latestEmployment as { uan?: string })?.uan ?? null,
       latestEmployment: metadata.latestEmployment ?? null,
-        governmentIdName:
-      metadata.governmentIdName ?? null,
+      governmentIdName:
+        metadata.governmentIdName ?? null,
 
-    epfoName:
-      metadata.epfoName ?? null,
+      epfoName:
+        metadata.epfoName ?? null,
 
-    nameMatches:
-      metadata.nameMatches ?? null,
+      nameMatches:
+        metadata.nameMatches ?? null,
 
-    verifiedName:
-      metadata.verifiedName ?? null,
+      verifiedName:
+        metadata.verifiedName ?? null,
       companyMatches: metadata.companyMatches ?? null,
       companyNameUpdated: metadata.companyNameUpdated ?? false,
       points: existing.points,
@@ -571,8 +576,8 @@ export const verifyEmploymentService = async ({
       employmentFound: true,
       uanNumbers: maskedUANs,
       latestEmployment,
-        governmentIdName: idVerification.verifiedName,
-  epfoName: latest.record.name ?? null,
+      governmentIdName: idVerification.verifiedName,
+      epfoName: latest.record.name ?? null,
       nameMatches: true,
       verifiedName: idVerification.verifiedName,
       companyMatches: company.companyMatches,
@@ -582,6 +587,12 @@ export const verifyEmploymentService = async ({
     },
   });
 
+  // ------------------------------------------
+  // 8.1 RECALCULATE TRUST SCORE
+  // ------------------------------------------
+
+  const trustScore =
+    await recalculateTrustScore(userId);
   // ------------------------------------------
   // 9. RESPONSE
   // ------------------------------------------
@@ -597,7 +608,7 @@ export const verifyEmploymentService = async ({
     uan: latest.uan,
     latestEmployment,
     governmentIdName: idVerification.verifiedName,
-  epfoName: latest.record.name ?? null,
+    epfoName: latest.record.name ?? null,
     nameMatches: true,
     verifiedName: idVerification.verifiedName,
     companyMatches: company.companyMatches,
@@ -605,6 +616,7 @@ export const verifyEmploymentService = async ({
     previousCompanyName: company.previousCompanyName,
     companyName: company.companyName,
     points: verification.points,
+    trustScore,
     verifiedAt: verification.verifiedAt,
   };
 };
@@ -965,7 +977,7 @@ export const getEmploymentVerificationDetailsAdminService =
     };
   };
 
-  
+
 export const reviewEmploymentVerificationService = async (
   employmentId: string,
   action: "APPROVE" | "REJECT",
@@ -998,35 +1010,33 @@ export const reviewEmploymentVerificationService = async (
     const approved = action === "APPROVE";
     const now = new Date();
 
-    const updated =
-      await tx.employmentVerification.updateMany({
-        where: {
-          id: employmentId,
-          status: {
-            in: ["PENDING", "UNDER_REVIEW"],
-          },
+    const updated = await tx.employmentVerification.updateMany({
+      where: {
+        id: employmentId,
+        status: {
+          in: ["PENDING", "UNDER_REVIEW"],
         },
-        data: {
-  status: approved ? "VERIFIED" : "REJECTED",
-  reviewedBy: null,
-  reviewedAt: now,
-  verifiedAt: approved ? now : null,
-  rejectionReason: approved
-    ? null
-    : rejectionReason!.trim(),
-},
-      });
+      },
+      data: {
+        status: approved ? "VERIFIED" : "REJECTED",
+        reviewedBy: null,
+        reviewedAt: now,
+        verifiedAt: approved ? now : null,
+        rejectionReason: approved
+          ? null
+          : rejectionReason!.trim(),
+      },
+    });
 
     if (updated.count !== 1) {
       throw new Error("VERIFICATION_ALREADY_REVIEWED");
     }
 
-    const verification =
-      await tx.userVerification.findUniqueOrThrow({
-        where: {
-          id: employment.verificationId,
-        },
-      });
+    const verification = await tx.userVerification.findUniqueOrThrow({
+      where: {
+        id: employment.verificationId,
+      },
+    });
 
     await tx.userVerification.update({
       where: {
@@ -1042,15 +1052,42 @@ export const reviewEmploymentVerificationService = async (
       },
     });
 
-    return tx.employmentVerification.findUniqueOrThrow({
-      where: { id: employmentId },
-      select: {
-        id: true,
-        status: true,
-        reviewedAt: true,
-        verifiedAt: true,
-        rejectionReason: true,
-      },
-    });
+    // ==========================================
+    // 4. Recalculate Trust Score
+    // ==========================================
+
+    const trustScore =
+      await recalculateTrustScore(
+        employment.userId,
+        tx
+      );
+
+    // ==========================================
+    // 5. Get updated employment
+    // ==========================================
+
+    const updatedEmployment =
+      await tx.employmentVerification.findUniqueOrThrow({
+        where: {
+          id: employmentId,
+        },
+
+        select: {
+          id: true,
+          status: true,
+          reviewedAt: true,
+          verifiedAt: true,
+          rejectionReason: true,
+        },
+      });
+
+    // ==========================================
+    // 6. Return
+    // ==========================================
+
+    return {
+      ...updatedEmployment,
+      trustScore,
+    };
   });
 };
