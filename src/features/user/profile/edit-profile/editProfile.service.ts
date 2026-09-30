@@ -144,9 +144,9 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
 
   // Clear cache only after a successful transaction
   await redis.del(`profile:edit:${userId}`);
@@ -266,9 +266,9 @@ export const updateBioService = async (userId: string, bio: string) => {
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
@@ -426,9 +426,9 @@ export const updateQuestionAnswersService = async (
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
@@ -527,9 +527,9 @@ export const updateEduWorkService = async (userId: string, payload: any) => {
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
@@ -612,9 +612,9 @@ export const updateUserPromptService = async (userId: string, payload: any) => {
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
@@ -680,9 +680,9 @@ export const updateLocationService = async (
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
@@ -718,9 +718,9 @@ export const deleteUserPromptService = async (
     },
   });
 
-  await queueMatchScoreCalculation(
-    userId,
-  );
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
