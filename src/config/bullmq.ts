@@ -23,7 +23,7 @@ export const createBullMQRedisConnection = () => {
     );
   });
 
-  redis.on("reconnecting", (delay) => {
+  redis.on("reconnecting", (delay:number) => {
     console.warn(
       `🔄 BullMQ Redis reconnecting in ${delay}ms`,
     );
