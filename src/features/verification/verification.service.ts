@@ -31,6 +31,7 @@ export const getTrustVerificationStatusService = async (
       email: true,
       phone_number: true,
       is_phone_verified: true,
+      created_at: true,
 
       profile: {
         select: {
@@ -99,6 +100,10 @@ export const getTrustVerificationStatusService = async (
       points: config.points,
       earnedPoints,
       status,
+      verifiedAt:
+      status === VerificationStatus.VERIFIED
+        ? verification?.verifiedAt ?? null
+        : null,
       action:
         getVerificationAction(status),
     };
@@ -157,6 +162,11 @@ export const getTrustVerificationStatusService = async (
         mobileEmailVerified
           ? "VERIFIED"
           : "NOT_STARTED",
+
+      verifiedAt:
+    mobileEmailVerified
+      ? user.created_at
+      : null,
 
       action: mobileEmailVerified
         ? null
