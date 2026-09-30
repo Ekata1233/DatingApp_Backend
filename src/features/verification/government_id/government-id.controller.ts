@@ -157,37 +157,48 @@ export const governmentIdCallbackController = async (
       });
     }
 
+    // ==========================================
+    // 2. HANDLE GRIDLINES CALLBACK
+    // ==========================================
     const result = await handleGovernmentIdCallback(
       transaction_id,
       state,
       code
     );
 
-    const frontendUrl =
-      process.env.FRONTEND_KYC_RETURN_URL;
+    console.log("Government ID callback result:", result);
 
-    if (!frontendUrl) {
-      return res.status(200).json({
-        success: true,
-        data: result,
-      });
-    }
+    // At this point result should be something like:
+    //
+    // {
+    //   attemptId: "xxx",
+    //   status: "AUTHORIZED"
+    // }
 
-    const returnUrl = new URL(frontendUrl);
+    // ==========================================
+    // 3. CREATE FLUTTER DEEP LINK
+    // ==========================================
+    const appUrl =
+      `welvors://government-id/complete` +
+      `?attemptId=${encodeURIComponent(result.attemptId)}` +
+      `&status=${encodeURIComponent(result.status)}`;
 
-    returnUrl.searchParams.set(
-      "attemptId",
-      result.attemptId
+    console.log(
+      "Redirecting user back to Flutter:",
+      appUrl
     );
 
-    returnUrl.searchParams.set(
-      "status",
-      result.status
-    );
-
-    return res.redirect(303, returnUrl.toString());
+    // ==========================================
+    // 4. REDIRECT BROWSER → FLUTTER APP
+    // ==========================================
+    return res.redirect(303, appUrl);
 
   } catch (error) {
+    console.error(
+      "Government ID Callback Error:",
+      error
+    );
+
     next(error);
   }
 };
@@ -207,7 +218,7 @@ export const completeGovernmentIdController = async (
       });
     }
 
-const { attemptId } = req.body ?? {};
+    const { attemptId } = req.body ?? {};
 
     if (
       typeof attemptId !== "string" ||

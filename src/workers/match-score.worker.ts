@@ -1,8 +1,14 @@
-console.log("🚀 Match score worker file loaded");
-import { Worker, Job } from "bullmq";
+console.log(
+  "🚀 Match score worker file loaded",
+);
 
 import {
-  bullmqRedis,
+  Worker,
+  Job,
+} from "bullmq";
+
+import {
+  createBullMQRedisConnection,
 } from "../config/bullmq";
 
 import {
@@ -14,6 +20,9 @@ import {
   calculateUserMatchScores,
 } from "../features/match-score/match-score.service";
 
+const workerRedis =
+  createBullMQRedisConnection();
+
 export const matchScoreWorker =
   new Worker<MatchScoreJobData>(
     MATCH_SCORE_QUEUE,
@@ -21,12 +30,11 @@ export const matchScoreWorker =
     async (
       job: Job<MatchScoreJobData>,
     ) => {
-
       const { userId } =
         job.data;
 
       console.log(
-        `🔥 Processing match score job`,
+        "🔥 Processing match score job",
         {
           jobId: job.id,
           userId,
@@ -38,7 +46,7 @@ export const matchScoreWorker =
       );
 
       console.log(
-        `✅ Match score job completed`,
+        "✅ Match score calculation completed",
         {
           jobId: job.id,
           userId,
@@ -51,34 +59,39 @@ export const matchScoreWorker =
     },
 
     {
-      connection: bullmqRedis,
+      connection: workerRedis,
 
-      concurrency: 5,
+      // Start lower while debugging
+      concurrency: 2,
     },
   );
 
-  // =====================================================
+// ========================================
 // WORKER EVENTS
-// =====================================================
+// ========================================
 
-// Redis connection + worker ready
-matchScoreWorker.on("ready", () => {
-  console.log(
-    "🟢 Match score worker ready",
-  );
-});
+matchScoreWorker.on(
+  "ready",
+  () => {
+    console.log(
+      "🟢 Match score worker ready",
+    );
+  },
+);
 
-
-// Worker picked a job
-matchScoreWorker.on("active", (job) => {
-  console.log(
-    "🟡 Match score worker picked job",
-    {
-      jobId: job.id,
-      userId: job.data.userId,
-    },
-  );
-});
+matchScoreWorker.on(
+  "active",
+  (job) => {
+    console.log(
+      "🟡 Match score worker picked job",
+      {
+        jobId: job.id,
+        userId:
+          job.data.userId,
+      },
+    );
+  },
+);
 
 matchScoreWorker.on(
   "completed",
@@ -93,18 +106,30 @@ matchScoreWorker.on(
   "failed",
   (job, error) => {
     console.error(
-      `❌ Worker failed job ${job?.id}`,
-      error,
+      `❌ Worker failed job ${job?.id}:`,
+      error.message,
     );
   },
 );
 
+let lastWorkerErrorLog = 0;
+
 matchScoreWorker.on(
   "error",
   (error) => {
-    console.error(
-      "❌ Worker error:",
-      error,
-    );
+    const now = Date.now();
+
+    // Prevent terminal spam
+    if (
+      now - lastWorkerErrorLog >
+      30_000
+    ) {
+      console.error(
+        "❌ Match score worker error:",
+        error.message,
+      );
+
+      lastWorkerErrorLog = now;
+    }
   },
 );
