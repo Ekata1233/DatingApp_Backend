@@ -38,3 +38,7 @@ export const createBullMQRedisConnection = () => {
 
   return redis;
 };
+
+
+//ITS NOT WORKING 
+//AFTER THE EXECUTTION OF THIS CODE UPSTASH REACH TO 5 LAKHS COMMANDS(FREE TIER) THEN SERVER DOWN

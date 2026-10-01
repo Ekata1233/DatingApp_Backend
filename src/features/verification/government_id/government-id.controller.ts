@@ -166,39 +166,31 @@ export const governmentIdCallbackController = async (
       code
     );
 
-    console.log("Government ID callback result:", result);
+    const frontendUrl =
+      process.env.FRONTEND_KYC_RETURN_URL;
 
-    // At this point result should be something like:
-    //
-    // {
-    //   attemptId: "xxx",
-    //   status: "AUTHORIZED"
-    // }
+    if (!frontendUrl) {
+      return res.status(200).json({
+        success: true,
+        data: result,
+      });
+    }
 
-    // ==========================================
-    // 3. CREATE FLUTTER DEEP LINK
-    // ==========================================
-    const appUrl =
-      `welvors://government-id/complete` +
-      `?attemptId=${encodeURIComponent(result.attemptId)}` +
-      `&status=${encodeURIComponent(result.status)}`;
+    const returnUrl = new URL(frontendUrl);
 
-    console.log(
-      "Redirecting user back to Flutter:",
-      appUrl
+    returnUrl.searchParams.set(
+      "attemptId",
+      result.attemptId
     );
 
-    // ==========================================
-    // 4. REDIRECT BROWSER → FLUTTER APP
-    // ==========================================
-    return res.redirect(303, appUrl);
+    returnUrl.searchParams.set(
+      "status",
+      result.status
+    );
+
+    return res.redirect(303, returnUrl.toString());
 
   } catch (error) {
-    console.error(
-      "Government ID Callback Error:",
-      error
-    );
-
     next(error);
   }
 };

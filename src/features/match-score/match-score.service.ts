@@ -11,107 +11,107 @@ import { calculateMatchScore } from "../../utils/matchScore.constants";
 
 export const calculateUserMatchScores = async (userId: string) => {
 
-    console.log(
-      `🧮 Starting match calculation for ${userId}`,
+  console.log(
+    `🧮 Starting match calculation for ${userId}`,
+  );
+
+  // --------------------------------
+  // 1. Get current user
+  // --------------------------------
+
+  const me =
+    await matchScoreRepository
+      .getUserForMatchScore(userId);
+
+  if (!me) {
+    throw new Error(
+      `User not found: ${userId}`,
     );
+  }
 
-    // --------------------------------
-    // 1. Get current user
-    // --------------------------------
+  // --------------------------------
+  // 2. Get candidate IDs
+  // --------------------------------
 
-    const me =
-      await matchScoreRepository
-        .getUserForMatchScore(userId);
+  const candidatesResult = await matchScoreRepository.getCandidates(userId);
 
-    if (!me) {
-      throw new Error(
-        `User not found: ${userId}`,
-      );
-    }
+  // FIX: Extract users array from the result
+  const candidates = candidatesResult.users || [];
 
-    // --------------------------------
-    // 2. Get candidate IDs
-    // --------------------------------
+  console.log(`👥 Candidates: ${candidates.length}`);
 
-    const candidatesResult = await matchScoreRepository.getCandidates(userId);
+  if (candidates.length === 0) {
+    console.log(`No candidates found for user ${userId}`);
+    return { success: true, matchesCalculated: 0 };
+  }
 
-    // FIX: Extract users array from the result
-    const candidates = candidatesResult.users || [];
+  // --------------------------------
+  // 3. Calculate each score
+  // --------------------------------
 
-    console.log(`👥 Candidates: ${candidates.length}`);
+  for (const candidate of candidates) {
 
-    if (candidates.length === 0) {
-      console.log(`No candidates found for user ${userId}`);
-      return { success: true, matchesCalculated: 0 };
-    }
+    try {
 
-    // --------------------------------
-    // 3. Calculate each score
-    // --------------------------------
-
-    for (const candidate of candidates) {
-
-      try {
-
-        const user =
-          await matchScoreRepository
-            .getUserForMatchScore(
-              candidate.id,
-            );
-
-        if (!user) {
-          continue;
-        }
-
-        // --------------------------------
-        // YOUR EXISTING FUNCTION
-        // --------------------------------
-
-        const result =
-          calculateMatchScore(
-            me,
-            user,
+      const user =
+        await matchScoreRepository
+          .getUserForMatchScore(
+            candidate.id,
           );
 
-        console.log(
-          `💯 ${userId} → ${candidate.id}`,
-          result,
+      if (!user) {
+        continue;
+      }
+
+      // --------------------------------
+      // YOUR EXISTING FUNCTION
+      // --------------------------------
+
+      const result =
+        calculateMatchScore(
+          me,
+          user,
         );
 
-        // --------------------------------
-        // 4. PostgreSQL
-        // --------------------------------
+      console.log(
+        `💯 ${userId} → ${candidate.id}`,
+        result,
+      );
 
-        await matchScoreRepository
-          .upsertScore(
-            userId,
-            candidate.id,
-            result.score,
-            result.percentage,
-          );
+      // --------------------------------
+      // 4. PostgreSQL
+      // --------------------------------
 
-        // --------------------------------
-        // 5. Redis
-        // --------------------------------
-
-        await matchScoreCache.set(
+      await matchScoreRepository
+        .upsertScore(
           userId,
           candidate.id,
           result.score,
           result.percentage,
         );
 
-      } catch (error) {
+      // --------------------------------
+      // 5. Redis
+      // --------------------------------
 
-        console.error(
-          `❌ Failed for candidate ${candidate.id}`,
-          error,
-        );
+      await matchScoreCache.set(
+        userId,
+        candidate.id,
+        result.score,
+        result.percentage,
+      );
 
-      }
+    } catch (error) {
+
+      console.error(
+        `❌ Failed for candidate ${candidate.id}`,
+        error,
+      );
+
     }
+  }
 
-    console.log(
-      `✅ Match calculation completed for ${userId}`,
-    );
-  };
+  console.log(
+    `✅ Match calculation completed for ${userId}`,
+  );
+};
