@@ -16,6 +16,7 @@ export const createNotification = async ({
   title,
   message,
   data,
+  skipPush = false,
 }: CreateNotificationParams) => {
 
 

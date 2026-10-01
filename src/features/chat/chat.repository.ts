@@ -103,6 +103,14 @@ export const chatRepository = {
           userId,
         },
       },
+       include: {
+      user: {
+        select: {
+          id: true,
+          full_name: true,
+        },
+      },
+    },
     });
   },
 
@@ -1852,6 +1860,12 @@ export const chatRepository = {
       },
       select: {
         userId: true,
+        user: {
+        select: {
+          id: true,
+          full_name: true,
+        },
+      },
       },
     });
 

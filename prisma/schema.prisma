@@ -130,10 +130,11 @@ model User {
   BoostReachUser   BoostReachUser[]
 
   //verification
-  verifications           UserVerification[]
-  governmentIdAttempts    GovernmentIdAttempt[]
-  employmentVerifications EmploymentVerification?
-  educationVerifications  EducationVerification[]
+  verifications                  UserVerification[]
+  governmentIdAttempts           GovernmentIdAttempt[]
+  employmentVerifications        EmploymentVerification?
+  educationVerifications         EducationVerification[]
+  manualGovernmentIdVerification ManualGovernmentIdVerification?
 
   @@index([phone_number])
   @@index([google_id])
@@ -768,10 +769,11 @@ model UserVerification {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  attempts                GovernmentIdAttempt[]
-  employmentVerifications EmploymentVerification?
-  educationVerification   EducationVerification?
-  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts                       GovernmentIdAttempt[]
+  employmentVerifications        EmploymentVerification?
+  educationVerification          EducationVerification?
+  manualGovernmentIdVerification ManualGovernmentIdVerification?
+  user                           User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
   @@index([userId])
@@ -814,6 +816,32 @@ model GovernmentIdAttempt {
   @@index([userId, createdAt])
   @@index([verificationId, status])
   @@map("government_id_attempts")
+}
+
+model ManualGovernmentIdVerification {
+  id              String             @id @default(uuid()) @db.Uuid
+  userId          String             @unique @db.Uuid
+  verificationId  String             @unique @db.Uuid
+  documentType    GovernmentIdType
+  documentNumber  String             @db.VarChar(50)
+  fullName        String
+  dateOfBirth     DateTime?          @db.Date
+  frontPhoto      String
+  backPhoto       String?
+  status          VerificationStatus @default(NOT_STARTED)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  verifiedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([documentType])
+  @@map("manual_government_id_verifications")
 }
 
 model EmploymentVerification {

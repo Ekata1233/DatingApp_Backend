@@ -11,12 +11,13 @@ import {
 } from "./chat.types";
 
 import { chatRepository } from "./chat.repository";
-import { buildMessageProgress } from "./chat.helper";
+import { buildMessageProgress, isUserViewingConversation } from "./chat.helper";
 import { createNotification } from "../notification/notification.service";
 import { presenceService } from "./presence/presence.service";
 import { findConversationMatchState, markConversationMatched } from "../match/match.repository";
 import { createMatchFromReplyService } from "../match/match.service";
 import console from "console";
+import { MessageType } from "@prisma/client";
 
 export const chatService = {
   /**
@@ -288,6 +289,148 @@ export const chatService = {
      * relationships would be another repository method
      * in a larger implementation.
      */
+    /**
+  * =========================================================
+  * CHAT PUSH NOTIFICATION
+  * =========================================================
+  *
+  * ROSE / GIFT / COMPLIMENT already have their own
+  * notification logic, so don't create MESSAGE notification
+  * for those types.
+  */const chatNotificationTypes: MessageType[] = [
+      MessageType.TEXT,
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.AUDIO,
+      MessageType.FILE,
+      MessageType.LINK,
+    ];
+
+    if (
+      chatNotificationTypes.includes(
+        data.messageType,
+      )
+    ) {
+      /**
+       * findOtherParticipant returns userId
+       * directly as string.
+       */
+      const receiverId =
+        await chatRepository.findOtherParticipant(
+          data.conversationId,
+          data.userId,
+        );
+
+      console.log(
+        "Chat notification receiverId:",
+        receiverId,
+      );
+
+      if (receiverId) {
+        /**
+         * Check whether receiver currently
+         * has this conversation open.
+         */
+        const receiverViewingChat =
+          await isUserViewingConversation(
+            receiverId,
+            data.conversationId,
+          );
+
+        console.log(
+          "Receiver viewing chat:",
+          receiverViewingChat,
+        );
+
+        /**
+         * Notification message.
+         */
+        let notificationMessage =
+          "Sent you a message";
+
+        switch (data.messageType) {
+          case MessageType.TEXT:
+            notificationMessage =
+              data.content?.trim() ||
+              "Sent you a message";
+            break;
+
+          case MessageType.IMAGE:
+            notificationMessage =
+              "Sent you a photo";
+            break;
+
+          case MessageType.VIDEO:
+            notificationMessage =
+              "Sent you a video";
+            break;
+
+          case MessageType.AUDIO:
+            notificationMessage =
+              "Sent you an audio message";
+            break;
+
+          case MessageType.FILE:
+            notificationMessage =
+              "Sent you a file";
+            break;
+
+          case MessageType.LINK:
+            notificationMessage =
+              data.content?.trim() ||
+              "Sent you a link";
+            break;
+        }
+
+        /**
+         * Create chat notification.
+         */
+        createNotification({
+          senderId: data.userId,
+
+          // receiverId is already a string
+          receiverId,
+
+          type: "NEW_MESSAGE",
+
+          title:
+            participant.user?.full_name ??
+            "New message",
+
+          message: notificationMessage,
+
+          data: {
+            type: "MESSAGE",
+
+            targetType: "CHAT",
+
+            targetId:
+              data.conversationId,
+
+            conversationId:
+              data.conversationId,
+
+            messageId:
+              message.id,
+
+            senderId:
+              data.userId,
+
+            // Again, directly use receiverId
+            receiverId,
+          },
+
+          skipPush:
+            receiverViewingChat,
+        }).catch((error) => {
+          console.error(
+            "Failed to create chat notification:",
+            error,
+          );
+        });
+      }
+    }
+
     return message;
   },
 

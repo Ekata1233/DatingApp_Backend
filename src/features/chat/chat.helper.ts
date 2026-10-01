@@ -1,4 +1,5 @@
 import { MessageType, Prisma } from "@prisma/client";
+import { getIO } from "../../config/socket";
 
 export const getOrCreateConversation = async (
   user1Id: string,
@@ -179,4 +180,48 @@ export const buildMessageProgress = (
   }
 
   return null;
+};
+
+
+export const isUserViewingConversation = async (
+  userId: string,
+  conversationId: string,
+): Promise<boolean> => {
+
+  console.log(
+    "conversationId for notification:",
+    conversationId,
+  );
+
+  console.log(
+    "user id for notification:",
+    userId,
+  );
+
+  const io = getIO();
+
+  const sockets = await io
+    .in(`conversation:${conversationId}`)
+    .fetchSockets();
+
+  console.log(
+    "SOCKETS IN CONVERSATION:",
+    sockets.map((socket: any) => ({
+      socketId: socket.id,
+      userId: socket.userId,
+      dataUserId: socket.data?.userId,
+    })),
+  );
+
+  const isViewing = sockets.some(
+    (socket: any) =>
+      socket.userId === userId,
+  );
+
+  console.log(
+    "IS USER VIEWING CONVERSATION:",
+    isViewing,
+  );
+
+  return isViewing;
 };

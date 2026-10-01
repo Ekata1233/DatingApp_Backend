@@ -13,6 +13,7 @@ export interface CreateNotificationParams {
   title: string;
   message: string;
   data?: Record<string, any>;
+  skipPush?: boolean;
 }
 
 export type NotificationCategory =
@@ -21,7 +22,8 @@ export type NotificationCategory =
   | "MATCHES"
   | "GIFTS"
   | "DATES"
-  | "EVENTS";
+  | "EVENTS"
+  | "MESSAGES";
 
 export const notificationCategoryMap: Record<
   Exclude<NotificationCategory, "ALL">,
@@ -50,5 +52,9 @@ export const notificationCategoryMap: Record<
   EVENTS: [
     NotificationType.EVENT_INVITE,
     NotificationType.EVENT_RESPONSE,
+  ],
+
+  MESSAGES: [
+    NotificationType.NEW_MESSAGE,
   ],
 };

@@ -15,7 +15,7 @@ export const relationshipTagSchema = z.object({
   message: z
     .string()
     .trim()
-    .max(20, "Message cannot exceed 20 characters")
+    .max(50, "Message cannot exceed 50 characters")
     .optional(),
 });
 

@@ -14,6 +14,9 @@ import {
   MarkMessagesReadInput,
 } from "./message.types";
 import { createMatchFromReplyService } from "../../match/match.service";
+import { createNotification } from "../../notification/notification.service";
+import { isUserViewingConversation } from "../chat.helper";
+import { prisma } from "../../../prisma/prismaClient";
 
 export const messageService = {
   /**
@@ -29,9 +32,9 @@ export const messageService = {
 
     console.log("data in message service : ", data);
     const participant = await messageRepository.findConversationParticipant(
-        data.conversationId,
-        data.userId
-      );
+      data.conversationId,
+      data.userId
+    );
 
     if (!participant) {
       throw new Error(
@@ -69,18 +72,18 @@ export const messageService = {
       }
     }
 
-     /**
-   * 4. Validate compliment
-   */
-  if (
-    data.messageType ===
+    /**
+  * 4. Validate compliment
+  */
+    if (
+      data.messageType ===
       MessageType.COMPLIMENT &&
-    !data.content?.trim()
-  ) {
-    throw new Error(
-      "Compliment content is required"
-    );
-  }
+      !data.content?.trim()
+    ) {
+      throw new Error(
+        "Compliment content is required"
+      );
+    }
 
     /**
      * 4. If this is a reply,
@@ -114,45 +117,262 @@ export const messageService = {
         metadata: data.metadata,
       });
 
-      /**
- * Check whether this message is
- * a reply that should create match.
- *
- * IMPORTANT:
- * Don't run this for Rose/Gift/Compliment
- * themselves.
- */
-const replyTypes: MessageType[] = [
-  MessageType.TEXT,
-  MessageType.IMAGE,
-  MessageType.VIDEO,
-  MessageType.AUDIO,
-  MessageType.FILE,
-];
+    /**
+* Check whether this message is
+* a reply that should create match.
+*
+* IMPORTANT:
+* Don't run this for Rose/Gift/Compliment
+* themselves.
+*/
+    const replyTypes: MessageType[] = [
+      MessageType.TEXT,
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.AUDIO,
+      MessageType.FILE,
+      MessageType.LINK,
+    ];
 
-if (
-  replyTypes.includes(
-    data.messageType,
-  )
-) {
-  try {
-    const matchResult =
-      await createMatchFromReplyService(
-        data.conversationId,
-        data.userId,
-      );
+    if (
+      replyTypes.includes(
+        data.messageType,
+      )
+    ) {
+      try {
+        const matchResult =
+          await createMatchFromReplyService(
+            data.conversationId,
+            data.userId,
+          );
 
-    console.log(
-      "MATCH FROM REPLY RESULT:",
-      matchResult,
-    );
-  } catch (error) {
-    console.error(
-      "MATCH FROM REPLY ERROR:",
-      error,
-    );
-  }
-}
+        console.log(
+          "MATCH FROM REPLY RESULT:",
+          matchResult,
+        );
+      } catch (error) {
+        console.error(
+          "MATCH FROM REPLY ERROR:",
+          error,
+        );
+      }
+    }
+
+    /**
+     * =====================================================
+     * CHAT NOTIFICATION
+     * =====================================================
+     *
+     * ROSE / GIFT / COMPLIMENT already have
+     * their own notification flows.
+     */
+    const chatNotificationTypes: MessageType[] = [
+      MessageType.TEXT,
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.AUDIO,
+      MessageType.FILE,
+      MessageType.LINK,
+    ];
+
+    if (
+      chatNotificationTypes.includes(
+        data.messageType
+      )
+    ) {
+      try {
+        /**
+         * Returns:
+         *
+         * {
+         *   userId: "receiver-user-id"
+         * }
+         *
+         * OR null
+         */
+        const receiver =
+          await messageRepository.findOtherParticipant(
+            data.conversationId,
+            data.userId,
+          );
+
+        console.log(
+          "MESSAGE RECEIVER:",
+          receiver,
+        );
+
+        if (receiver) {
+          /**
+           * Extract actual string user ID.
+           */
+          const receiverId =
+            receiver.userId;
+
+          console.log(
+            "MESSAGE RECEIVER ID:",
+            receiverId,
+          );
+
+          /**
+           * Check whether receiver currently
+           * has this exact conversation open.
+           */
+          const receiverViewingChat =
+            await isUserViewingConversation(
+              receiverId,
+              data.conversationId,
+            );
+
+          console.log(
+            "RECEIVER VIEWING CHAT:",
+            receiverViewingChat,
+          );
+
+          /**
+           * Build notification message.
+           */
+          let notificationMessage =
+            "Sent you a message";
+
+          switch (data.messageType) {
+            case MessageType.TEXT:
+              notificationMessage =
+                data.content?.trim() ||
+                "Sent you a message";
+              break;
+
+            case MessageType.IMAGE:
+              notificationMessage =
+                "Sent you a photo";
+              break;
+
+            case MessageType.VIDEO:
+              notificationMessage =
+                "Sent you a video";
+              break;
+
+            case MessageType.AUDIO:
+              notificationMessage =
+                "Sent you an audio message";
+              break;
+
+            case MessageType.FILE:
+              notificationMessage =
+                "Sent you a file";
+              break;
+
+            case MessageType.LINK:
+              notificationMessage =
+                data.content?.trim() ||
+                "Sent you a link";
+              break;
+          }
+
+          /**
+           * Get sender information.
+           *
+           * Needed because your current
+           * participant query does not include User.
+           */
+          const sender =
+            await prisma.user.findUnique({
+              where: {
+                id: data.userId,
+              },
+              select: {
+                full_name: true,
+              },
+            });
+
+          /**
+           * Create notification.
+           */
+          await createNotification({
+            senderId:
+              data.userId,
+
+            /**
+             * This is now string,
+             * NOT { userId: string }
+             */
+            receiverId,
+
+            type:
+              "NEW_MESSAGE",
+
+            title:
+              sender?.full_name ??
+              "New message",
+
+            message:
+              notificationMessage,
+
+            /**
+             * Flutter can use this data
+             * to navigate to the chat.
+             */
+            data: {
+              type:
+                "MESSAGE",
+
+              targetType:
+                "CHAT",
+
+              targetId:
+                data.conversationId,
+
+              conversationId:
+                data.conversationId,
+
+              messageId:
+                message.id,
+
+              senderId:
+                data.userId,
+
+              receiverId,
+            },
+
+            /**
+             * Same chat currently open:
+             * skip FCM push.
+             */
+            skipPush:
+              receiverViewingChat,
+          });
+
+          console.log(
+            "CHAT NOTIFICATION CREATED:",
+            {
+              messageId:
+                message.id,
+
+              conversationId:
+                data.conversationId,
+
+              senderId:
+                data.userId,
+
+              receiverId,
+
+              receiverViewingChat,
+
+              pushSkipped:
+                receiverViewingChat,
+            },
+          );
+        }
+      } catch (error) {
+        /**
+         * Don't fail message sending just
+         * because notification failed.
+         */
+        console.error(
+          "CHAT NOTIFICATION ERROR:",
+          error,
+        );
+      }
+    }
 
     return message;
   },

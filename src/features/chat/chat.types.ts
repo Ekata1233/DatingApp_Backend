@@ -4,7 +4,10 @@ export type MessageType =
   | "TEXT"
   | "IMAGE"
   | "VIDEO"
-  | "AUDIO";
+  | "AUDIO"
+  | "FILE"
+  | "LINK"
+  ;
 
 export interface CreateConversationInput {
   userId: string;
