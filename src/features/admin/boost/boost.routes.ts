@@ -6,7 +6,7 @@ const router = express.Router();
 // ============================================================
 //  BOOST PACK APIs
 // ============================================================
-router.post("/create", createBoostController);
+router.post("/boost/create", createBoostController);
 router.get("/get-all", getBoostsController); 
 router.get("/boost/get", getAllBoostsController); 
 router.get("/boost/get-all",getBoostsController); 
