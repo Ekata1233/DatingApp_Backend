@@ -96,6 +96,8 @@ import matchAnalysisRoutes from "../features/match/match-analysis/match-analysis
 import videoVerification from "../features/verification/video-verification/video-verification.routes"
 import educationAdminVefication from "../features/verification/education/educationadmin.routes"
 import educationVefication from "../features/verification/education/education.routes"
+import manualAadhaarAdminRoutes from "../features/verification/manual-aadhaar/manual-aadhaar.admin.routes";
+import manualAadhaarRoutes from "../features/verification/manual-aadhaar/manual-aadhaarroutes";
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -112,7 +114,7 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes);
 
 
 
@@ -122,7 +124,7 @@ router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes)
 
 router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes, eventsRoutes, payoutMethodRoutes)
 router.use("/user", blockRoutes)
