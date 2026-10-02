@@ -7,6 +7,7 @@ import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
+import { getReplyTimeLabel, MIN_REPLY_SAMPLES } from "../../chat/user-reply-stats.service";
 
 // =========================
 // HELPERS
@@ -1792,6 +1793,34 @@ export const getFeedService = async ({
         user.id,
     );
 
+    // ========================================================
+// REPLY TIME STATS
+// ========================================================
+
+const replyStats =
+  await prisma.userReplyStats.findMany({
+    where: {
+      userId: {
+        in: candidateIds,
+      },
+    },
+
+    select: {
+      userId: true,
+      medianReplyMinutes: true,
+      sampleCount: true,
+    },
+  });
+
+const replyStatsMap =
+  new Map(
+    replyStats.map(
+      (stat) => [
+        stat.userId,
+        stat,
+      ],
+    ),
+  );
   // ========================================================
   // BOOSTS
   // ========================================================
@@ -1942,8 +1971,7 @@ export const getFeedService = async ({
   // ENRICH USERS
   // ========================================================
 
-  const nowMs =
-    Date.now();
+  const nowMs = Date.now();
 
   const boostWindow =
     NEW_USER_BOOST_HOURS *
@@ -1968,6 +1996,20 @@ export const getFeedService = async ({
           compatibilityMap.get(
             user.id,
           );
+
+          const replyStat =
+        replyStatsMap.get(
+          user.id,
+        );
+
+      const replyTime =
+        replyStat &&
+        replyStat.medianReplyMinutes !== null &&
+        replyStat.sampleCount >= MIN_REPLY_SAMPLES
+          ? getReplyTimeLabel(
+              replyStat.medianReplyMinutes,
+            )
+          : null;
 
         const matchScore =
           compat?.percentage ??
@@ -2105,8 +2147,7 @@ export const getFeedService = async ({
 
           trust:user.trust_score ?? 0,
 
-          replyTime:
-            STATIC_REPLY_TIME,
+          replyTime,
 
           isOnline:
             presence?.isOnline ||

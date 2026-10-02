@@ -31,7 +31,6 @@ export const createNotification = async ({
     },
   });
 
-  console.log("notification : ", notification)
 
   // 🔥 REAL-TIME EMIT
   const io = getIO();

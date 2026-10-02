@@ -225,10 +225,10 @@ const compareDynamicAnswers = (
       score =
         union.size > 0
           ? Math.round(
-              (commonOptionIds.length /
-                union.size) *
-                100
-            )
+            (commonOptionIds.length /
+              union.size) *
+            100
+          )
           : 0;
     } else {
       score =
@@ -302,6 +302,12 @@ export const getMatchAnalysisService = async (
   }
 
   const signals: SignalResult[] = [];
+
+  const targetFirstName =
+    target.full_name
+      ?.trim()
+      .split(/\s+/)[0] ??
+    "this person";
 
   // =====================================================
   // 1. RELATIONSHIP INTENT
@@ -791,14 +797,14 @@ export const getMatchAnalysisService = async (
   const overallScore =
     totalAvailableWeight > 0
       ? Math.round(
-          availableDimensions.reduce(
-            (sum, dimension) =>
-              sum +
-              (dimension.score as number) *
-                dimension.weight,
-            0
-          ) / totalAvailableWeight
-        )
+        availableDimensions.reduce(
+          (sum, dimension) =>
+            sum +
+            (dimension.score as number) *
+            dimension.weight,
+          0
+        ) / totalAvailableWeight
+      )
       : 0;
 
   // =====================================================
@@ -827,24 +833,63 @@ export const getMatchAnalysisService = async (
       })
     );
 
+  const intentSignal =
+    signals.find(
+      (signal) =>
+        signal.key === "RELATIONSHIP_INTENT"
+    );
+
+  const howYouMatch = intentSignal
+    ? {
+      key: "RELATIONSHIP_INTENT",
+      title: "Relationship intent",
+      icon: "🎯",
+      score: intentSignal.score,
+
+      strongest:
+        intentSignal.score === 100,
+
+      you:
+        user.intention?.option ??
+        null,
+
+      them:
+        target.intention?.option ??
+        null,
+
+      description:
+        intentSignal.score === 100
+          ? `You both want ${user.intention?.option ??
+          "the same kind of relationship"
+          } — ${user.intention?.optDescription ??
+          ""
+          }`
+          : `You want ${user.intention?.option ??
+          "Not specified"
+          }, while ${targetFirstName} wants ${target.intention?.option ??
+          "Not specified"
+          }.`,
+    }
+    : null;
+
   // =====================================================
   // SHARED INTERESTS
   // =====================================================
 
   const sharedInterests =
-  signals
-    .filter(
-      (signal) =>
-        signal.dimension === "INTERESTS" &&
-        signal.sharedValues &&
-        signal.sharedValues.length > 0
-    )
-    .flatMap((signal) =>
-      signal.sharedValues!.map((value) => ({
-        name: value,
-        both: true,
-      }))
-    );
+    signals
+      .filter(
+        (signal) =>
+          signal.dimension === "INTERESTS" &&
+          signal.sharedValues &&
+          signal.sharedValues.length > 0
+      )
+      .flatMap((signal) =>
+        signal.sharedValues!.map((value) => ({
+          name: value,
+          both: true,
+        }))
+      );
 
   // =====================================================
   // DIFFERENCES
@@ -948,11 +993,6 @@ export const getMatchAnalysisService = async (
     matchLabel = "Moderate match";
   }
 
-  const targetFirstName =
-    target.full_name
-      ?.trim()
-      .split(/\s+/)[0] ??
-    "this person";
 
   const strongestNames =
     availableDimensions
@@ -1037,6 +1077,8 @@ export const getMatchAnalysisService = async (
 
     highlights:
       highlights.slice(0, 4),
+
+    howYouMatch,
 
     dimensions,
 

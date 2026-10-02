@@ -15,8 +15,21 @@ export const getUserForMatchAnalysis = async (userId: string) => {
       looking_for_option: true,
       intentionId: true,
 
-      intention: true,
+      intention: {
+        select: {
+          id: true,
+          option: true,
+          optDescription: true,
 
+          intention: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+            },
+          },
+        },
+      },
       profile: {
         include: {
           religion: true,

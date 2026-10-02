@@ -179,7 +179,6 @@ export const chatService = {
       throw new Error("Conversation not found");
     }
 
-    console.log("conversation : ", conversation)
 
     /**
      * Create message.
@@ -337,10 +336,7 @@ export const chatService = {
             data.conversationId,
           );
 
-        console.log(
-          "Receiver viewing chat:",
-          receiverViewingChat,
-        );
+      
 
         /**
          * Notification message.

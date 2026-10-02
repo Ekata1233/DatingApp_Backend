@@ -204,24 +204,13 @@ export const isUserViewingConversation = async (
     .in(`conversation:${conversationId}`)
     .fetchSockets();
 
-  console.log(
-    "SOCKETS IN CONVERSATION:",
-    sockets.map((socket: any) => ({
-      socketId: socket.id,
-      userId: socket.userId,
-      dataUserId: socket.data?.userId,
-    })),
-  );
 
   const isViewing = sockets.some(
     (socket: any) =>
       socket.userId === userId,
   );
 
-  console.log(
-    "IS USER VIEWING CONVERSATION:",
-    isViewing,
-  );
+
 
   return isViewing;
 };

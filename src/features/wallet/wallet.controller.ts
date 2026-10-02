@@ -3,9 +3,63 @@ import {
   Response,
 } from "express";
 
-import { getMyWalletService } from "./wallet.service";
+import { addMoneyToWalletService, getMyWalletService } from "./wallet.service";
+import { addMoneySchema } from "./wallet.validation";
 
-export const getMyWalletController =
+export const getMyWalletController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const filter = req.query.filter
+      ? String(req.query.filter)
+      : "ALL";
+
+    const page = req.query.page
+      ? Number(req.query.page)
+      : 1;
+
+    const limit = req.query.limit
+      ? Number(req.query.limit)
+      : 20;
+
+    const result =
+      await getMyWalletService(
+        userId,
+        {
+          filter: filter as any,
+          page,
+          limit,
+        },
+      );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Wallet fetched successfully",
+
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(
+      "GET MY WALLET ERROR:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        error.message ||
+        "Failed to fetch wallet",
+    });
+  }
+};
+
+export const addMoneyToWalletController =
   async (
     req: Request,
     res: Response,
@@ -13,48 +67,40 @@ export const getMyWalletController =
     try {
       const userId = (req as any).user.id;
 
-      const filter = req.query.filter
-        ? String(req.query.filter)
-        : "ALL";
+      const parsed = addMoneySchema.safeParse(req.body);
 
-      const page = req.query.page
-        ? Number(req.query.page)
-        : 1;
-
-      const limit = req.query.limit
-        ? Number(req.query.limit)
-        : 20;
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message:
+            parsed.error.issues[0]?.message ||
+            "Invalid amount",
+        });
+      }
 
       const result =
-        await getMyWalletService(
+        await addMoneyToWalletService({
           userId,
-          {
-            filter: filter as any,
-            page,
-            limit,
-          },
-        );
+          amount: parsed.data.amount,
+        });
 
       return res.status(200).json({
         success: true,
-
         message:
-          "Wallet fetched successfully",
-
+          "Money added to wallet successfully",
         data: result,
       });
     } catch (error: any) {
       console.error(
-        "GET MY WALLET ERROR:",
+        "ADD MONEY WALLET ERROR:",
         error,
       );
 
-      return res.status(500).json({
+      return res.status(400).json({
         success: false,
-
         message:
           error.message ||
-          "Failed to fetch wallet",
+          "Failed to add money to wallet",
       });
     }
   };

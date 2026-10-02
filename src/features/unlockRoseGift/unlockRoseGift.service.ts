@@ -330,8 +330,6 @@ export const incrementRoseAndGiftMessages = async (
 ) => {
   const now = new Date();
 
-  console.log("sendid : ", senderId)
-  console.log("receiver id : ", receiverId)
 
   return prisma.$transaction(
     async (tx) => {
@@ -408,7 +406,6 @@ export const incrementRoseAndGiftMessages = async (
           },
         });
 
-        console.log("pending gift : ", pendingGift)
 
       // =====================================================
       // NOTHING PENDING
