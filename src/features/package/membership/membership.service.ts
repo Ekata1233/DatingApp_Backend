@@ -232,12 +232,13 @@ const getInvoiceUrl = (
 export const getMembershipPlanService = async (
   userId: string,
 ) => {
-  const [currentMembership, membershipHistory, totalPaidResult] =
-    await Promise.all([
-      findCurrentMembership(userId),
-      findMembershipHistory(userId),
-      getTotalMembershipPaid(userId),
-    ]);
+  const [
+  currentMembership,
+  membershipHistory,
+] = await Promise.all([
+  findCurrentMembership(userId),
+  findMembershipHistory(userId),
+]);
 
   /*
    * --------------------------------------------------
@@ -362,9 +363,12 @@ export const getMembershipPlanService = async (
    * --------------------------------------------------
    */
 
-  const totalPaid = toNumber(
-    totalPaidResult._sum.amount,
-  );
+ const totalPaid = membershipHistory.reduce(
+  (total, item) => {
+    return total + toNumber(item.purchasePrice);
+  },
+  0,
+);
 
   return {
     currentPlan,
