@@ -31,11 +31,8 @@ export const getMyBalancesService = async (
   // Because UserBoost can contain multiple rows,
   // calculate all available boosts.
 
-  const boosts = boostBalance.reduce(
-    (total, boost) =>
-      total + (boost.remaining_boosts ?? 0),
-    0,
-  );
+  const boosts =
+    boostBalance?.remaining_boosts ?? 0;
 
   // =========================================
   // WALLET

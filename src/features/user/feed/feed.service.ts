@@ -75,7 +75,7 @@ export const getOrientationCompatibility = (
     QUEER: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER"],
     ASEXUAL: ["ASEXUAL"],
     AROMATIC: ["AROMATIC"],
-    NOT_LISTED: [],
+    NOT_LISTED: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER", "ASEXUAL", "AROMATIC", "NOT_LISTED",],
   };
   return map[orientation?.toUpperCase() ?? ""] ?? [];
 };
@@ -97,9 +97,6 @@ const STATIC_MATCH_SCORE = 78;
 const STATIC_TRUST = 75;
 const STATIC_REPLY_TIME = "5 m reply";
 
-// VERIFY which column stores orientation. Unified on profile.sexual_orientation.
-const ORIENTATION_TABLE = "p"; // "p" = user_profiles, "u" = users
-const ORIENTATION_COL = "sexual_orientation";
 
 // =========================
 // CURSOR (keyset)
@@ -148,58 +145,57 @@ export const getFeedService = async ({
   const USER_CACHE_KEY =
     `feed:user:${userId}`;
 
-  const currentUserPromise =
-    async () => {
-      const cached =
-        await redis.get<any>(
-          USER_CACHE_KEY,
-        );
+  const currentUserPromise = async () => {
+    const cached =
+      await redis.get<any>(
+        USER_CACHE_KEY,
+      );
 
-      if (cached) {
-        return cached;
-      }
+    if (cached) {
+      return cached;
+    }
 
-      const user =
-        await prisma.user.findUnique({
-          where: {
-            id: userId,
-          },
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
 
-          select: {
-            id: true,
+        select: {
+          id: true,
 
-            gender: true,
+          gender: true,
 
-            profile: {
-              select: {
-                interested_in: true,
+          profile: {
+            select: {
+              interested_in: true,
 
-                sexual_orientation:
-                  true,
+              sexual_orientation:
+                true,
 
-                latitude: true,
+              latitude: true,
 
-                longitude: true,
+              longitude: true,
 
-                max_distance_km:
-                  true,
-              },
+              max_distance_km:
+                true,
             },
           },
-        });
+        },
+      });
 
-      if (user) {
-        await redis.set(
-          USER_CACHE_KEY,
-          user,
-          {
-            ex: USER_CACHE_TTL,
-          },
-        );
-      }
+    if (user) {
+      await redis.set(
+        USER_CACHE_KEY,
+        user,
+        {
+          ex: USER_CACHE_TTL,
+        },
+      );
+    }
 
-      return user;
-    };
+    return user;
+  };
 
   // ========================================================
   // DATE FORMAT
@@ -288,47 +284,46 @@ export const getFeedService = async ({
   // VIP PACKAGE CHECK
   // ========================================================
 
-  const activeVipPackage =
-    await prisma.userPackage.findFirst(
-      {
-        where: {
-          user_id: userId,
+  const activeVipPackage = await prisma.userPackage.findFirst(
+    {
+      where: {
+        user_id: userId,
 
-          status: "ACTIVE",
+        status: "ACTIVE",
 
-          package: {
-            name: {
-              in: [
-                "VIP",
-                "VIP_ELITE",
-              ],
-            },
+        package: {
+          name: {
+            in: [
+              "VIP",
+              "VIP_ELITE",
+            ],
           },
-
-          OR: [
-            {
-              endDate: null,
-            },
-
-            {
-              endDate: {
-                gt: new Date(),
-              },
-            },
-          ],
         },
 
-        select: {
-          id: true,
+        OR: [
+          {
+            endDate: null,
+          },
 
-          package: {
-            select: {
-              name: true,
+          {
+            endDate: {
+              gt: new Date(),
             },
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+
+        package: {
+          select: {
+            name: true,
           },
         },
       },
-    );
+    },
+  );
 
   const hasActiveVip =
     !!activeVipPackage;
@@ -371,10 +366,12 @@ export const getFeedService = async ({
   const myInterest =
     interested_in.toUpperCase();
 
-  const myOrientation =
-    (
-      sexual_orientation ?? ""
-    ).toUpperCase();
+  const myOrientation = (
+    sexual_orientation ?? ""
+  ).toUpperCase();
+
+  const orientationGenderOptions =
+    getOrientationCompatibility(myOrientation);
 
   // ========================================================
   // SAFE COORDINATE HANDLING
@@ -449,33 +446,6 @@ export const getFeedService = async ({
           myGender,
         ),
     );
-
-  const orientationForward =
-    getOrientationCompatibility(
-      myOrientation,
-    );
-
-  const orientationReverse =
-    ALL_ORIENTATIONS.filter(
-      (orientation) =>
-        getOrientationCompatibility(
-          orientation,
-        ).includes(
-          myOrientation,
-        ),
-    );
-
-  if (
-    orientationForward.length ===
-    0 ||
-    orientationReverse.length ===
-    0
-  ) {
-    return {
-      users: [],
-      nextCursor: null,
-    };
-  }
 
   // ========================================================
   // VIP FILTER: AMBITION
@@ -757,11 +727,6 @@ export const getFeedService = async ({
   // SQL MATCH CONDITIONS
   // ========================================================
 
-  const orientCol =
-    Prisma.raw(
-      `${ORIENTATION_TABLE}.${ORIENTATION_COL}`,
-    );
-
   const matchConditions =
     Prisma.sql`
         u.deleted_at IS NULL
@@ -808,23 +773,19 @@ export const getFeedService = async ({
             ]::text[]
           )
 
-        AND ${orientCol}::text =
-          ANY(
-            ARRAY[
-              ${Prisma.join(
-      orientationForward,
-    )}
-            ]::text[]
-          )
-
-        AND ${orientCol}::text =
-          ANY(
-            ARRAY[
-              ${Prisma.join(
-      orientationReverse,
-    )}
-            ]::text[]
-          )
+       ${orientationGenderOptions.length > 0
+        ? Prisma.sql`
+          AND u.gender_option::text =
+            ANY(
+              ARRAY[
+                ${Prisma.join(
+          orientationGenderOptions,
+        )}
+              ]::text[]
+            )
+        `
+        : Prisma.empty
+      }
       `;
 
   // ========================================================
@@ -1793,34 +1754,34 @@ export const getFeedService = async ({
         user.id,
     );
 
-    // ========================================================
-// REPLY TIME STATS
-// ========================================================
+  // ========================================================
+  // REPLY TIME STATS
+  // ========================================================
 
-const replyStats =
-  await prisma.userReplyStats.findMany({
-    where: {
-      userId: {
-        in: candidateIds,
+  const replyStats =
+    await prisma.userReplyStats.findMany({
+      where: {
+        userId: {
+          in: candidateIds,
+        },
       },
-    },
 
-    select: {
-      userId: true,
-      medianReplyMinutes: true,
-      sampleCount: true,
-    },
-  });
+      select: {
+        userId: true,
+        medianReplyMinutes: true,
+        sampleCount: true,
+      },
+    });
 
-const replyStatsMap =
-  new Map(
-    replyStats.map(
-      (stat) => [
-        stat.userId,
-        stat,
-      ],
-    ),
-  );
+  const replyStatsMap =
+    new Map(
+      replyStats.map(
+        (stat) => [
+          stat.userId,
+          stat,
+        ],
+      ),
+    );
   // ========================================================
   // BOOSTS
   // ========================================================
@@ -1997,19 +1958,19 @@ const replyStatsMap =
             user.id,
           );
 
-          const replyStat =
-        replyStatsMap.get(
-          user.id,
-        );
+        const replyStat =
+          replyStatsMap.get(
+            user.id,
+          );
 
-      const replyTime =
-        replyStat &&
-        replyStat.medianReplyMinutes !== null &&
-        replyStat.sampleCount >= MIN_REPLY_SAMPLES
-          ? getReplyTimeLabel(
+        const replyTime =
+          replyStat &&
+            replyStat.medianReplyMinutes !== null &&
+            replyStat.sampleCount >= MIN_REPLY_SAMPLES
+            ? getReplyTimeLabel(
               replyStat.medianReplyMinutes,
             )
-          : null;
+            : null;
 
         const matchScore =
           compat?.percentage ??
@@ -2145,7 +2106,7 @@ const replyStatsMap =
               ) / 100
               : null,
 
-          trust:user.trust_score ?? 0,
+          trust: user.trust_score ?? 0,
 
           replyTime,
 
