@@ -377,56 +377,68 @@ export const getFeedService = async ({
   // SAFE COORDINATE HANDLING
   // ========================================================
 
-  /**
-   * IMPORTANT
-   *
-   * Don't use:
-   *
-   * Number(null)
-   *
-   * because:
-   *
-   * Number(null) === 0
-   *
-   * which incorrectly creates:
-   *
-   * latitude = 0
-   * longitude = 0
-   */
-
   const rawLatitude =
-    currentUser.profile
-      .latitude;
+    currentUser.profile.latitude;
 
   const rawLongitude =
-    currentUser.profile
-      .longitude;
+    currentUser.profile.longitude;
 
-  const hasCurrentUserCoordinates =
-    rawLatitude !== null &&
-    rawLatitude !== undefined &&
-    rawLongitude !== null &&
-    rawLongitude !== undefined;
-
+  /**
+   * Convert coordinates safely.
+   *
+   * IMPORTANT:
+   * Number(null) === 0
+   * Number(undefined) === NaN
+   *
+   * So first check null/undefined,
+   * then convert.
+   */
   const myLatitude =
-    hasCurrentUserCoordinates
+    rawLatitude !== null &&
+      rawLatitude !== undefined
       ? Number(rawLatitude)
       : null;
 
   const myLongitude =
-    hasCurrentUserCoordinates
+    rawLongitude !== null &&
+      rawLongitude !== undefined
       ? Number(rawLongitude)
       : null;
 
+  /**
+   * Valid location rules:
+   *
+   * 1. latitude exists
+   * 2. longitude exists
+   * 3. both are finite numbers
+   * 4. latitude is between -90 and 90
+   * 5. longitude is between -180 and 180
+   * 6. (0, 0) is treated as missing location
+   */
   const validCurrentUserCoordinates =
     myLatitude !== null &&
     myLongitude !== null &&
-    Number.isFinite(
-      myLatitude,
-    ) &&
-    Number.isFinite(
-      myLongitude,
+    Number.isFinite(myLatitude) &&
+    Number.isFinite(myLongitude) &&
+    myLatitude >= -90 &&
+    myLatitude <= 90 &&
+    myLongitude >= -180 &&
+    myLongitude <= 180 &&
+    !(
+      myLatitude === 0 &&
+      myLongitude === 0
     );
+
+  console.log(
+    "CURRENT USER LOCATION:",
+    {
+      rawLatitude,
+      rawLongitude,
+      myLatitude,
+      myLongitude,
+      validCurrentUserCoordinates,
+    },
+  );
 
   // ========================================================
   // PRECOMPUTE MATCH FILTERS
@@ -649,7 +661,7 @@ export const getFeedService = async ({
     filters?.distanceKm ??
     currentUser.profile
       .max_distance_km ??
-    50;
+    1000;
 
   // ========================================================
   // FALLBACK FILTER QUERY
