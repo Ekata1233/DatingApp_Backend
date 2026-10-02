@@ -1502,9 +1502,9 @@ export const getDatePlanHistory = async (
 
     status: {
       in: [
-        PlanStatus.ACTIVE,
+        // PlanStatus.ACTIVE,
         PlanStatus.COMPLETED,
-        PlanStatus.BOOKED,
+        // PlanStatus.BOOKED,
         PlanStatus.CANCELLED,
         PlanStatus.EXPIRED,
       ],
