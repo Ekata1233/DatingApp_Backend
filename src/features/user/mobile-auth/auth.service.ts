@@ -785,33 +785,33 @@ const handleVerifiedUser = async ({
         // BOOST
         // =================================================
 
-        await tx.userBoost.create({
-          data: {
-            user_id:
-              newUser.id,
+        // await tx.userBoost.create({
+        //   data: {
+        //     user_id:
+        //       newUser.id,
 
-            total_boosts:
-              0,
+        //     total_boosts:
+        //       0,
 
-            remaining_boosts:
-              0,
+        //     remaining_boosts:
+        //       0,
 
-            weeklyLimit:
-              0,
+        //     weeklyLimit:
+        //       0,
 
-            last_reset_at:
-              now,
+        //     last_reset_at:
+        //       now,
 
-            next_reset_at:
-              nextWeek,
+        //     next_reset_at:
+        //       nextWeek,
 
-            start_at:
-              now,
+        //     start_at:
+        //       now,
 
-            is_active:
-              true,
-          },
-        });
+        //     is_active:
+        //       true,
+        //   },
+        // });
 
         // =================================================
         // REFERRAL
@@ -1638,21 +1638,6 @@ export const logoutService = async (
 //           nextResetAt: nextWeek,
 //         },
 //       });
-
-
-//       await tx.userBoost.create({
-//         data: {
-//           user_id: newUser.id,
-//           total_boosts: 0,
-//           remaining_boosts: 0,
-//           weeklyLimit: 0,
-//           last_reset_at: now,
-//           next_reset_at: nextWeek,
-//           start_at: now,
-//           is_active: true,
-//         },
-//       });
-
 
 //       /*
 //        * =====================================================

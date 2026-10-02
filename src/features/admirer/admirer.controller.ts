@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as admirerService from "./admirer.service";
+import { getAdmirerDetailsService } from "./admirer.service";
 
 export const getAdmirers = async (
   req: Request,
@@ -36,3 +37,92 @@ export const getAdmirers = async (
     next(error);
   }
 };
+
+
+
+export const getAdmirerDetailsController =
+  async (
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      const userId = (req as any).user!.id;
+
+      const admirerIdParam =
+        req.params.admirerId;
+
+      // Validate param
+      if (
+        !admirerIdParam ||
+        Array.isArray(admirerIdParam)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid admirer id",
+        });
+      }
+
+      // Now TypeScript knows this is string
+      const admirerId: string =
+        admirerIdParam;
+
+      const result =
+        await getAdmirerDetailsService(
+          userId,
+          admirerId,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Admirer details fetched successfully",
+        data: result,
+      });
+    } catch (error: any) {
+      console.error(
+        "GET ADMIRER DETAILS ERROR:",
+        error,
+      );
+
+      if (
+        error.message ===
+        "Admirer not found"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Admirer not found",
+        });
+      }
+
+      if (
+        error.message ===
+        "Current user not found"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Current user not found",
+        });
+      }
+
+      if (
+        error.message ===
+        "Invalid admirer"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid admirer",
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Failed to fetch admirer details",
+      });
+    }
+  };
