@@ -47,8 +47,7 @@ export const matchService = {
   },
 };
 
-export const createMatchFromReplyService =
-  async (
+export const createMatchFromReplyService = async (
     conversationId: string,
     replyingUserId: string,
   ) => {
@@ -60,7 +59,6 @@ export const createMatchFromReplyService =
         conversationId,
       );
 
-      console.log("conversation : ", conversation)
 
     if (!conversation) {
       return {
@@ -94,8 +92,6 @@ export const createMatchFromReplyService =
      */
 
 
-    console.log("replying Id : ", replyingUserId)
-    console.log("match pending for user Id : ", conversation.matchPendingForUserId)
     if (
       conversation.matchPendingForUserId !==
       replyingUserId

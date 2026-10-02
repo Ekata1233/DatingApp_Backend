@@ -1,14 +1,17 @@
 import {
   TransactionSource,
+  TransactionStatus,
   TransactionType,
 } from "@prisma/client";
 
 import { walletRepository } from "./wallet.repository";
 
 import {
+  AddMoneyData,
   GetWalletQuery,
   WalletTransactionFilter,
 } from "./wallet.types";
+import { prisma } from "../../prisma/prismaClient";
 
 export const getMyWalletService = async (
   userId: string,
@@ -380,4 +383,123 @@ const formatTransactionAmount = (
   return direction === "IN"
     ? `+₹${formatted}`
     : `-₹${formatted}`;
+};
+
+export const addMoneyToWalletService = async (
+  data: AddMoneyData,
+) => {
+  const { userId, amount } = data;
+
+  if (!amount || amount <= 0) {
+    throw new Error(
+      "Amount must be greater than 0",
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const result = await prisma.$transaction(
+    async (tx) => {
+      // Get existing wallet
+      let wallet = await tx.wallet.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+      // Create wallet if user does not have one
+      if (!wallet) {
+        wallet = await tx.wallet.create({
+          data: {
+            userId,
+            balance: 0,
+          },
+        });
+      }
+
+      const balanceBefore = wallet.balance;
+
+      // Atomic increment
+      const updatedWallet =
+        await tx.wallet.update({
+          where: {
+            id: wallet.id,
+          },
+          data: {
+            balance: {
+              increment: amount,
+            },
+          },
+        });
+
+      // Create transaction history
+      const transaction =
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+
+            amount,
+
+            type: TransactionType.DEPOSIT,
+
+            status:
+              TransactionStatus.SUCCESS,
+
+            source:
+              TransactionSource.WALLET_TOPUP,
+
+            description: "Money added to wallet",
+
+            balanceBefore,
+
+            balanceAfter:
+              updatedWallet.balance,
+          },
+        });
+
+      return {
+        wallet: updatedWallet,
+        transaction,
+      };
+    },
+  );
+
+  return {
+    walletId: result.wallet.id,
+
+    addedAmount:
+      result.transaction.amount.toNumber(),
+
+    balanceBefore:
+      result.transaction.balanceBefore.toNumber(),
+
+    balanceAfter:
+      result.transaction.balanceAfter.toNumber(),
+
+    transactionId:
+      result.transaction.id,
+
+    transactionType:
+      result.transaction.type,
+
+    transactionStatus:
+      result.transaction.status,
+
+    source:
+      result.transaction.source,
+
+    createdAt:
+      result.transaction.createdAt,
+  };
 };

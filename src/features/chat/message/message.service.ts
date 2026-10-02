@@ -17,6 +17,7 @@ import { createMatchFromReplyService } from "../../match/match.service";
 import { createNotification } from "../../notification/notification.service";
 import { isUserViewingConversation } from "../chat.helper";
 import { prisma } from "../../../prisma/prismaClient";
+import { updateUserReplyStats } from "../user-reply-stats.service";
 
 export const messageService = {
   /**
@@ -104,18 +105,120 @@ export const messageService = {
     //   }
     // }
 
+    // /**
+    //  * 5. Save message.
+    //  */
+    // const message =
+    //   await messageRepository.create({
+    //     conversationId: data.conversationId,
+    //     senderId: data.userId,
+    //     content: data.content,
+    //     messageType: data.messageType,
+    //     mediaUrl: data.mediaUrl,
+    //     metadata: data.metadata,
+    //   });
+
     /**
-     * 5. Save message.
-     */
-    const message =
-      await messageRepository.create({
-        conversationId: data.conversationId,
-        senderId: data.userId,
-        content: data.content,
-        messageType: data.messageType,
-        mediaUrl: data.mediaUrl,
-        metadata: data.metadata,
+ * 5. Get previous message BEFORE saving
+ *    the new message.
+ *
+ * Used only to determine whether this
+ * new message is a reply.
+ */
+    const previousMessage =
+      await prisma.chatMessage.findFirst({
+        where: {
+          conversationId:
+            data.conversationId,
+          deletedAt: null,
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+
+        select: {
+          id: true,
+          senderId: true,
+          createdAt: true,
+        },
       });
+
+    /**
+     * 6. Save message.
+     */
+    const message = await messageRepository.create({
+      conversationId:
+        data.conversationId,
+
+      senderId:
+        data.userId,
+
+      content:
+        data.content,
+
+      messageType:
+        data.messageType,
+
+      mediaUrl:
+        data.mediaUrl,
+
+      metadata:
+        data.metadata,
+    });
+
+    /**
+     * =====================================================
+     * USER REPLY STATS
+     * =====================================================
+     *
+     * Only calculate when:
+     *
+     * 1. Previous message exists
+     * 2. Previous message was from another user
+     * 3. Current message is a normal chat message
+     *
+     * Example:
+     *
+     * C -> B
+     * B -> C
+     *
+     * B's message is a reply.
+     *
+     * But:
+     *
+     * B -> C
+     * B -> C
+     *
+     * Second message is NOT another reply sample.
+     */
+    const replyStatsMessageTypes: MessageType[] = [
+      MessageType.TEXT,
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.AUDIO,
+      MessageType.FILE,
+      MessageType.LINK,
+    ];
+
+    const isReply =
+      previousMessage !== null &&
+      previousMessage.senderId !==
+      data.userId &&
+      replyStatsMessageTypes.includes(
+        data.messageType,
+      );
+
+      
+
+    if (isReply) {
+      void updateUserReplyStats(
+        data.userId,
+        previousMessage.createdAt,
+        message.createdAt,
+      );
+    }
+
 
     /**
 * Check whether this message is
@@ -223,10 +326,7 @@ export const messageService = {
               data.conversationId,
             );
 
-          console.log(
-            "RECEIVER VIEWING CHAT:",
-            receiverViewingChat,
-          );
+       
 
           /**
            * Build notification message.
@@ -341,26 +441,7 @@ export const messageService = {
               receiverViewingChat,
           });
 
-          console.log(
-            "CHAT NOTIFICATION CREATED:",
-            {
-              messageId:
-                message.id,
-
-              conversationId:
-                data.conversationId,
-
-              senderId:
-                data.userId,
-
-              receiverId,
-
-              receiverViewingChat,
-
-              pushSkipped:
-                receiverViewingChat,
-            },
-          );
+          
         }
       } catch (error) {
         /**

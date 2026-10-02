@@ -8,3 +8,8 @@ export interface GetWalletQuery {
   page?: number;
   limit?: number;
 }
+
+export interface AddMoneyData {
+  userId: string;
+  amount: number;
+}

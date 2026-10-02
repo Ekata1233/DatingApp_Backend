@@ -146,13 +146,6 @@ export const registerChatEvents = (
 
         const rateLimit = await messageSendRateLimit(userId);
 
-        console.log("MESSAGE RATE LIMIT:", {
-          userId,
-          allowed: rateLimit.allowed,
-          remaining: rateLimit.remaining,
-          limit: rateLimit.limit,
-          retryAfter: rateLimit.retryAfter,
-        });
 
         if (!rateLimit.allowed) {
           socket.emit("rate_limit:exceeded", {
