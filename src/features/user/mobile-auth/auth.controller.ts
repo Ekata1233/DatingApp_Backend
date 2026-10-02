@@ -1,44 +1,85 @@
-import { Request, Response } from "express";
-import { logoutService, sendOtp, verifyOtp } from "./auth.service";
+
+import {
+  Request,
+  Response,
+} from "express";
+
+import {
+  logoutService,
+  sendOtp,
+  verifyOtp,
+} from "./auth.service";
+
+/* =========================================================
+   SEND OTP
+========================================================= */
 
 export const sendOtpController = async (
   req: Request,
   res: Response,
 ) => {
   try {
-    const { phoneNumber } = req.body;
-
-    const result = await sendOtp({
+    const {
       phoneNumber,
-    });
+    } = req.body;
 
-    return res.status(200).json({
-      success: true,
-      message: "OTP sent successfully",
-      data: result,
-    });
+    const result =
+      await sendOtp({
+        phoneNumber,
+      });
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+
+        message:
+          "OTP sent successfully",
+
+        data: result,
+      });
   } catch (error: any) {
+    console.error(
+      "Send OTP Error:",
+      error,
+    );
 
-  // =====================================================
-  // DELETED ACCOUNT
-  // =====================================================
+    // =====================================================
+    // DELETED ACCOUNT
+    // =====================================================
 
-  if (error?.message === "ACCOUNT_DELETED") {
-    return res.status(403).json({
-      success: false,
-      code: "ACCOUNT_DELETED",
-      message:
-        "This account has been deleted. You cannot login with this account.",
-    });
-  }
+    if (
+      error?.message ===
+      "ACCOUNT_DELETED"
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
 
-  return res.status(400).json({
-    success: false,
-    message:
-      error?.message || "Failed to send OTP",
-  });
+          code:
+            "ACCOUNT_DELETED",
+
+          message:
+            "This account has been deleted. You cannot login with this account.",
+        });
+    }
+
+    return res
+      .status(400)
+      .json({
+        success: false,
+
+        message:
+          error?.message ||
+          "Failed to send OTP",
+      });
   }
 };
+
+/* =========================================================
+   VERIFY OTP
+========================================================= */
 
 export const verifyOtpController = async (
   req: Request,
@@ -51,62 +92,223 @@ export const verifyOtpController = async (
       referralCode,
     } = req.body;
 
-    const result = await verifyOtp({
-      phoneNumber,
-      otp,
-      referralCode,
-    });
+    const result =
+      await verifyOtp({
+        phoneNumber,
+        otp,
+        referralCode,
+      });
 
-    return res.status(200).json({
-      success: true,
-      message: "OTP verified successfully",
-      data: result,
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
 
+        message:
+          "OTP verified successfully",
+
+        data: result,
+      });
   } catch (error: any) {
+    console.error(
+      "Verify OTP Error:",
+      error,
+    );
 
     // =====================================================
     // DELETED ACCOUNT
     // =====================================================
 
-    if (error?.message === "ACCOUNT_DELETED") {
-      return res.status(403).json({
-        success: false,
-        code: "ACCOUNT_DELETED",
-        message:
-          "This account has been deleted. You cannot login with this account.",
-      });
+    if (
+      error?.message ===
+      "ACCOUNT_DELETED"
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+
+          code:
+            "ACCOUNT_DELETED",
+
+          message:
+            "This account has been deleted. You cannot login with this account.",
+        });
     }
 
-    return res.status(400).json({
-      success: false,
-      message:
-        error?.message || "OTP verification failed",
-    });
+    return res
+      .status(400)
+      .json({
+        success: false,
+
+        message:
+          error?.message ||
+          "OTP verification failed",
+      });
   }
 };
+
+/* =========================================================
+   LOGOUT
+========================================================= */
 
 export const logoutController = async (
   req: Request,
   res: Response,
 ) => {
   try {
-    const userId = (req as any).user.id;
-    const sessionId = (req as any).user.sessionId;
+    const userId =
+      (req as any).user.id;
 
-    const result = await logoutService(
-      userId,
-      sessionId,
+    const sessionId =
+      (req as any).user
+        .sessionId;
+
+    const result =
+      await logoutService(
+        userId,
+        sessionId,
+      );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message:
+          result.message,
+      });
+  } catch (error: any) {
+    console.error(
+      "Logout Error:",
+      error,
     );
 
-    return res.status(200).json({
-      success: true,
-      message: result.message,
-    });
-  } catch (error: any) {
-    return res.status(400).json({
-      success: false,
-      message: error.message || "Logout failed",
-    });
+    return res
+      .status(400)
+      .json({
+        success: false,
+
+        message:
+          error?.message ||
+          "Logout failed",
+      });
   }
 };
+
+
+
+
+
+
+// import { Request, Response } from "express";
+// import { logoutService, sendOtp, verifyOtp } from "./auth.service";
+
+// export const sendOtpController = async (
+//   req: Request,
+//   res: Response,
+// ) => {
+//   try {
+//     const { phoneNumber } = req.body;
+
+//     const result = await sendOtp({
+//       phoneNumber,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "OTP sent successfully",
+//       data: result,
+//     });
+//   } catch (error: any) {
+
+//   // =====================================================
+//   // DELETED ACCOUNT
+//   // =====================================================
+
+//   if (error?.message === "ACCOUNT_DELETED") {
+//     return res.status(403).json({
+//       success: false,
+//       code: "ACCOUNT_DELETED",
+//       message:
+//         "This account has been deleted. You cannot login with this account.",
+//     });
+//   }
+
+//   return res.status(400).json({
+//     success: false,
+//     message:
+//       error?.message || "Failed to send OTP",
+//   });
+//   }
+// };
+
+// export const verifyOtpController = async (
+//   req: Request,
+//   res: Response,
+// ) => {
+//   try {
+//     const {
+//       phoneNumber,
+//       otp,
+//       referralCode,
+//     } = req.body;
+
+//     const result = await verifyOtp({
+//       phoneNumber,
+//       otp,
+//       referralCode,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "OTP verified successfully",
+//       data: result,
+//     });
+
+//   } catch (error: any) {
+
+//     // =====================================================
+//     // DELETED ACCOUNT
+//     // =====================================================
+
+//     if (error?.message === "ACCOUNT_DELETED") {
+//       return res.status(403).json({
+//         success: false,
+//         code: "ACCOUNT_DELETED",
+//         message:
+//           "This account has been deleted. You cannot login with this account.",
+//       });
+//     }
+
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         error?.message || "OTP verification failed",
+//     });
+//   }
+// };
+
+// export const logoutController = async (
+//   req: Request,
+//   res: Response,
+// ) => {
+//   try {
+//     const userId = (req as any).user.id;
+//     const sessionId = (req as any).user.sessionId;
+
+//     const result = await logoutService(
+//       userId,
+//       sessionId,
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: result.message,
+//     });
+//   } catch (error: any) {
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message || "Logout failed",
+//     });
+//   }
+// };

@@ -96,8 +96,8 @@ import matchAnalysisRoutes from "../features/match/match-analysis/match-analysis
 import videoVerification from "../features/verification/video-verification/video-verification.routes"
 import educationAdminVefication from "../features/verification/education/educationadmin.routes"
 import educationVefication from "../features/verification/education/education.routes"
-import manualAadhaarAdminRoutes from "../features/verification/manual-aadhaar/manual-aadhaar.admin.routes";
-import manualAadhaarRoutes from "../features/verification/manual-aadhaar/manual-aadhaarroutes";
+import manualAadhaarAdminRoutes from "../features/verification/manual-government-id/manual-government-id.admin.routes";
+import manualAadhaarRoutes from "../features/verification/manual-government-id/manual-government-id.user.routes";
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
