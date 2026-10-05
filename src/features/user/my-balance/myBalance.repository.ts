@@ -37,12 +37,11 @@ export const getMyBalancesRepository = async (
     // =========================
     // BOOSTS
     // =========================
-    prisma.userBoost.findMany({
+    prisma.userBoost.findFirst({
       where: {
         user_id: userId,
       },
       select: {
-        id: true,
         remaining_boosts: true,
       },
     }),

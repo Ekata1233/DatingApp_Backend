@@ -3509,11 +3509,11 @@ enum MessagePermission {
 model UserPrivacySettings {
   id String @id @default(uuid()) @db.Uuid
 
-  userId            String            @unique @db.Uuid
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messagePermission MessagePermission @default(MATCHES_ONLY)
-  hideFromContacts  Boolean           @default(false)
-  ghostMode         Boolean           @default(false)
+  userId            String              @unique @db.Uuid
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messagePermission MessagePermission[] @default([MATCHES_ONLY])
+  hideFromContacts  Boolean             @default(false)
+  ghostMode         Boolean             @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3521,4 +3521,26 @@ model UserPrivacySettings {
   @@index([messagePermission])
   @@index([hideFromContacts])
   @@index([ghostMode])
+}
+
+model LocationMaster {
+  id               Int      @id @default(autoincrement())
+  city             String
+  state            String?
+  country          String
+  countryCode      String
+  latitude         Float
+  longitude        Float
+  capital          String?
+  population       BigInt?
+  populationProper BigInt?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  @@unique([city, state, countryCode])
+  @@index([city])
+  @@index([state])
+  @@index([countryCode])
+  @@map("location_master")
 }

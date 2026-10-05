@@ -75,7 +75,7 @@ export const getOrientationCompatibility = (
     QUEER: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER"],
     ASEXUAL: ["ASEXUAL"],
     AROMATIC: ["AROMATIC"],
-    NOT_LISTED: [],
+    NOT_LISTED: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER", "ASEXUAL", "AROMATIC", "NOT_LISTED",],
   };
   return map[orientation?.toUpperCase() ?? ""] ?? [];
 };
@@ -95,11 +95,7 @@ const OVERFETCH = 1.5;
 const MAX_ROUNDS = 5;
 const STATIC_MATCH_SCORE = 78;
 const STATIC_TRUST = 75;
-const STATIC_REPLY_TIME = "5 m reply";
 
-// VERIFY which column stores orientation. Unified on profile.sexual_orientation.
-const ORIENTATION_TABLE = "p"; // "p" = user_profiles, "u" = users
-const ORIENTATION_COL = "sexual_orientation";
 
 // =========================
 // CURSOR (keyset)
@@ -148,58 +144,57 @@ export const getFeedService = async ({
   const USER_CACHE_KEY =
     `feed:user:${userId}`;
 
-  const currentUserPromise =
-    async () => {
-      const cached =
-        await redis.get<any>(
-          USER_CACHE_KEY,
-        );
+  const currentUserPromise = async () => {
+    const cached =
+      await redis.get<any>(
+        USER_CACHE_KEY,
+      );
 
-      if (cached) {
-        return cached;
-      }
+    if (cached) {
+      return cached;
+    }
 
-      const user =
-        await prisma.user.findUnique({
-          where: {
-            id: userId,
-          },
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
 
-          select: {
-            id: true,
+        select: {
+          id: true,
 
-            gender: true,
+          gender: true,
 
-            profile: {
-              select: {
-                interested_in: true,
+          profile: {
+            select: {
+              interested_in: true,
 
-                sexual_orientation:
-                  true,
+              sexual_orientation:
+                true,
 
-                latitude: true,
+              latitude: true,
 
-                longitude: true,
+              longitude: true,
 
-                max_distance_km:
-                  true,
-              },
+              max_distance_km:
+                true,
             },
           },
-        });
+        },
+      });
 
-      if (user) {
-        await redis.set(
-          USER_CACHE_KEY,
-          user,
-          {
-            ex: USER_CACHE_TTL,
-          },
-        );
-      }
+    if (user) {
+      await redis.set(
+        USER_CACHE_KEY,
+        user,
+        {
+          ex: USER_CACHE_TTL,
+        },
+      );
+    }
 
-      return user;
-    };
+    return user;
+  };
 
   // ========================================================
   // DATE FORMAT
@@ -288,47 +283,46 @@ export const getFeedService = async ({
   // VIP PACKAGE CHECK
   // ========================================================
 
-  const activeVipPackage =
-    await prisma.userPackage.findFirst(
-      {
-        where: {
-          user_id: userId,
+  const activeVipPackage = await prisma.userPackage.findFirst(
+    {
+      where: {
+        user_id: userId,
 
-          status: "ACTIVE",
+        status: "ACTIVE",
 
-          package: {
-            name: {
-              in: [
-                "VIP",
-                "VIP_ELITE",
-              ],
-            },
+        package: {
+          name: {
+            in: [
+              "VIP",
+              "VIP_ELITE",
+            ],
           },
-
-          OR: [
-            {
-              endDate: null,
-            },
-
-            {
-              endDate: {
-                gt: new Date(),
-              },
-            },
-          ],
         },
 
-        select: {
-          id: true,
+        OR: [
+          {
+            endDate: null,
+          },
 
-          package: {
-            select: {
-              name: true,
+          {
+            endDate: {
+              gt: new Date(),
             },
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+
+        package: {
+          select: {
+            name: true,
           },
         },
       },
-    );
+    },
+  );
 
   const hasActiveVip =
     !!activeVipPackage;
@@ -371,65 +365,79 @@ export const getFeedService = async ({
   const myInterest =
     interested_in.toUpperCase();
 
-  const myOrientation =
-    (
-      sexual_orientation ?? ""
-    ).toUpperCase();
+  const myOrientation = (
+    sexual_orientation ?? ""
+  ).toUpperCase();
+
+  const orientationGenderOptions =
+    getOrientationCompatibility(myOrientation);
 
   // ========================================================
   // SAFE COORDINATE HANDLING
   // ========================================================
 
-  /**
-   * IMPORTANT
-   *
-   * Don't use:
-   *
-   * Number(null)
-   *
-   * because:
-   *
-   * Number(null) === 0
-   *
-   * which incorrectly creates:
-   *
-   * latitude = 0
-   * longitude = 0
-   */
-
   const rawLatitude =
-    currentUser.profile
-      .latitude;
+    currentUser.profile.latitude;
 
   const rawLongitude =
-    currentUser.profile
-      .longitude;
+    currentUser.profile.longitude;
 
-  const hasCurrentUserCoordinates =
-    rawLatitude !== null &&
-    rawLatitude !== undefined &&
-    rawLongitude !== null &&
-    rawLongitude !== undefined;
-
+  /**
+   * Convert coordinates safely.
+   *
+   * IMPORTANT:
+   * Number(null) === 0
+   * Number(undefined) === NaN
+   *
+   * So first check null/undefined,
+   * then convert.
+   */
   const myLatitude =
-    hasCurrentUserCoordinates
+    rawLatitude !== null &&
+      rawLatitude !== undefined
       ? Number(rawLatitude)
       : null;
 
   const myLongitude =
-    hasCurrentUserCoordinates
+    rawLongitude !== null &&
+      rawLongitude !== undefined
       ? Number(rawLongitude)
       : null;
 
+  /**
+   * Valid location rules:
+   *
+   * 1. latitude exists
+   * 2. longitude exists
+   * 3. both are finite numbers
+   * 4. latitude is between -90 and 90
+   * 5. longitude is between -180 and 180
+   * 6. (0, 0) is treated as missing location
+   */
   const validCurrentUserCoordinates =
     myLatitude !== null &&
     myLongitude !== null &&
-    Number.isFinite(
-      myLatitude,
-    ) &&
-    Number.isFinite(
-      myLongitude,
+    Number.isFinite(myLatitude) &&
+    Number.isFinite(myLongitude) &&
+    myLatitude >= -90 &&
+    myLatitude <= 90 &&
+    myLongitude >= -180 &&
+    myLongitude <= 180 &&
+    !(
+      myLatitude === 0 &&
+      myLongitude === 0
     );
+
+  console.log(
+    "CURRENT USER LOCATION:",
+    {
+      rawLatitude,
+      rawLongitude,
+      myLatitude,
+      myLongitude,
+      validCurrentUserCoordinates,
+    },
+  );
 
   // ========================================================
   // PRECOMPUTE MATCH FILTERS
@@ -449,33 +457,6 @@ export const getFeedService = async ({
           myGender,
         ),
     );
-
-  const orientationForward =
-    getOrientationCompatibility(
-      myOrientation,
-    );
-
-  const orientationReverse =
-    ALL_ORIENTATIONS.filter(
-      (orientation) =>
-        getOrientationCompatibility(
-          orientation,
-        ).includes(
-          myOrientation,
-        ),
-    );
-
-  if (
-    orientationForward.length ===
-    0 ||
-    orientationReverse.length ===
-    0
-  ) {
-    return {
-      users: [],
-      nextCursor: null,
-    };
-  }
 
   // ========================================================
   // VIP FILTER: AMBITION
@@ -664,22 +645,115 @@ export const getFeedService = async ({
   // ========================================================
 
   const hasManualLocationFilter =
-    !!filters?.location
-      ?.city ||
-    !!filters?.location
-      ?.state ||
-    !!filters?.location
-      ?.country;
+    !!filters?.location?.city ||
+    !!filters?.location?.state ||
+    !!filters?.location?.country;
+
+    console.log("hasManualLocationFilter", hasManualLocationFilter);
+
+  // ========================================================
+  // RESOLVE MANUAL LOCATION → LAT/LNG
+  // ========================================================
+
+  let manualLocation:
+    | {
+      latitude: number;
+      longitude: number;
+    }
+    | null = null;
+
+  if (hasManualLocationFilter) {
+    const city =
+      filters?.location?.city?.trim();
+
+    const state =
+      filters?.location?.state?.trim();
+
+    const country =
+      filters?.location?.country?.trim();
+
+    if (!city) {
+      throw new Error(
+        "City is required for manual location search",
+      );
+    }
+
+    const location =
+      await prisma.locationMaster.findFirst({
+        where: {
+          active: true,
+
+          city: {
+            equals: city,
+            mode: "insensitive",
+          },
+
+          ...(state
+            ? {
+              state: {
+                equals: state,
+                mode: "insensitive",
+              },
+            }
+            : {}),
+
+          ...(country
+            ? {
+              country: {
+                equals: country,
+                mode: "insensitive",
+              },
+            }
+            : {}),
+        },
+
+        select: {
+          latitude: true,
+          longitude: true,
+        },
+      });
+
+    if (!location) {
+      throw new Error(
+        `Location "${city}" not found`,
+      );
+    }
+
+    manualLocation = {
+      latitude: Number(
+        location.latitude,
+      ),
+
+      longitude: Number(
+        location.longitude,
+      ),
+    };
+
+    console.log(
+      "MANUAL LOCATION RESOLVED:",
+      {
+        city,
+        state,
+        country,
+        latitude:
+          manualLocation.latitude,
+        longitude:
+          manualLocation.longitude,
+      },
+    );
+  }
 
   // ========================================================
   // DISTANCE
   // ========================================================
 
-  const distanceKm =
-    filters?.distanceKm ??
-    currentUser.profile
-      .max_distance_km ??
-    50;
+const distanceKm =
+  filters?.distanceKm ??
+  (
+    hasManualLocationFilter
+      ? 100
+      : currentUser.profile.max_distance_km ?? 1000
+  );
 
   // ========================================================
   // FALLBACK FILTER QUERY
@@ -757,11 +831,6 @@ export const getFeedService = async ({
   // SQL MATCH CONDITIONS
   // ========================================================
 
-  const orientCol =
-    Prisma.raw(
-      `${ORIENTATION_TABLE}.${ORIENTATION_COL}`,
-    );
-
   const matchConditions =
     Prisma.sql`
         u.deleted_at IS NULL
@@ -808,23 +877,19 @@ export const getFeedService = async ({
             ]::text[]
           )
 
-        AND ${orientCol}::text =
-          ANY(
-            ARRAY[
-              ${Prisma.join(
-      orientationForward,
-    )}
-            ]::text[]
-          )
-
-        AND ${orientCol}::text =
-          ANY(
-            ARRAY[
-              ${Prisma.join(
-      orientationReverse,
-    )}
-            ]::text[]
-          )
+       ${orientationGenderOptions.length > 0
+        ? Prisma.sql`
+          AND u.gender_option::text =
+            ANY(
+              ARRAY[
+                ${Prisma.join(
+          orientationGenderOptions,
+        )}
+              ]::text[]
+            )
+        `
+        : Prisma.empty
+      }
       `;
 
   // ========================================================
@@ -955,21 +1020,49 @@ export const getFeedService = async ({
 
     // ======================================================
     // CASE 1:
-    // MANUAL CITY / STATE / COUNTRY
+    // MANUAL LOCATION → LOCATION MASTER → POSTGIS
     // ======================================================
 
     if (
-      hasManualLocationFilter
+      hasManualLocationFilter &&
+      manualLocation
     ) {
       console.log(
-        "LOCATION MODE: MANUAL CITY/STATE/COUNTRY",
+        "LOCATION MODE: MANUAL LOCATION",
+        {
+          latitude:
+            manualLocation.latitude,
+
+          longitude:
+            manualLocation.longitude,
+
+          distanceKm,
+        },
       );
+
+      // ------------------------------------------------------
+      // SEARCH POINT
+      // ------------------------------------------------------
+
+      const searchPoint =
+        Prisma.sql`
+      ST_SetSRID(
+        ST_MakePoint(
+          ${manualLocation.longitude},
+          ${manualLocation.latitude}
+        ),
+        4326
+      )::geography
+    `;
+
+      // ------------------------------------------------------
+      // SEARCH
+      // ------------------------------------------------------
 
       for (
         let round = 0;
         round < MAX_ROUNDS &&
-        collected.length <
-        pageLimit;
+        collected.length < pageLimit;
         round++
       ) {
         const candidateStart =
@@ -982,53 +1075,60 @@ export const getFeedService = async ({
               sort_val: number;
             }[]
           >`
-              SELECT
-                u.id,
+        SELECT
+          u.id,
 
-                (
-                  EXTRACT(
-                    EPOCH FROM u.created_at
-                  ) * 1000
-                )::float8 AS sort_val
+          (
+            p.location::geography
+            <-> ${searchPoint}
+          )::float8 AS sort_val
 
-              FROM users u
+        FROM users u
 
-              JOIN user_profiles p
-                ON p.user_id = u.id
+        JOIN user_profiles p
+          ON p.user_id = u.id
 
-              WHERE
-                ${matchConditions}
+        WHERE
+          ${matchConditions}
 
-                ${cursorState
+          AND p.location IS NOT NULL
+
+          AND ST_DWithin(
+            p.location::geography,
+            ${searchPoint},
+            ${distanceKm * 1000}
+          )
+
+          ${cursorState
               ? Prisma.sql`
-                        AND (
-                          (
-                            EXTRACT(
-                              EPOCH FROM u.created_at
-                            ) * 1000
-                          ) < ${cursorState.k}
+                  AND (
+                    (
+                      p.location::geography
+                      <-> ${searchPoint}
+                    ) > ${cursorState.k}
 
-                          OR (
-                            (
-                              EXTRACT(
-                                EPOCH FROM u.created_at
-                              ) * 1000
-                            ) = ${cursorState.k}
+                    OR (
+                      (
+                        p.location::geography
+                        <-> ${searchPoint}
+                      ) = ${cursorState.k}
 
-                            AND u.id <
-                              ${cursorState.id}::uuid
-                          )
-                        )
-                      `
+                      AND u.id >
+                        ${cursorState.id}::uuid
+                    )
+                  )
+                `
               : Prisma.empty
             }
 
-              ORDER BY
-                sort_val DESC,
-                u.id DESC
+        ORDER BY
+          p.location::geography
+            <-> ${searchPoint} ASC,
 
-              LIMIT ${batchSize};
-            `;
+          u.id ASC
+
+        LIMIT ${batchSize};
+      `;
 
         console.log(
           `MANUAL LOCATION candidate round ${round}:`,
@@ -1039,61 +1139,78 @@ export const getFeedService = async ({
           rows.length,
         );
 
-        if (
-          rows.length === 0
-        ) {
+        if (rows.length === 0) {
           break;
+        }
+
+        // ----------------------------------------------------
+        // SAVE DISTANCE
+        // ----------------------------------------------------
+
+        for (const row of rows) {
+          meterById.set(
+            row.id,
+            Number(row.sort_val),
+          );
         }
 
         const idOrder =
           rows.map(
-            (row) =>
-              row.id,
+            (row) => row.id,
           );
+
+        // ----------------------------------------------------
+        // HYDRATE USERS
+        // ----------------------------------------------------
 
         const hydrateStart =
           performance.now();
 
-        /**
-         * IMPORTANT:
-         *
-         * This is where actual:
-         *
-         * city = Pune
-         * state = Maharashtra
-         * country = India
-         *
-         * is applied through
-         * buildFilterQuery().
-         */
-
         const hydrated =
-          await prisma.user.findMany(
-            {
-              where: {
-                id: {
-                  in: idOrder,
-                },
-
-                ...userFilters,
-                account_status: "ACTIVE",
-                deleted_at: null,
-
-                ...(Object.keys(
-                  profileFilters,
-                ).length > 0
-                  ? {
-                    profile: {
-                      is: profileFilters,
-                    },
-                  }
-                  : {}),
+          await prisma.user.findMany({
+            where: {
+              id: {
+                in: idOrder,
               },
 
-              select:
-                userSelect,
+              account_status:
+                "ACTIVE",
+
+              deleted_at:
+                null,
+
+              /*
+               * IMPORTANT
+               *
+               * Use fallback filters here.
+               *
+               * These contain all selected
+               * filters EXCEPT:
+               *
+               * location
+               * distanceKm
+               *
+               * Therefore city/state/country
+               * are NOT compared against
+               * candidate profiles.
+               */
+              ...fallbackUserFilters,
+
+              ...(Object.keys(
+                fallbackProfileFilters,
+              ).length > 0
+                ? {
+                  profile: {
+                    is:
+                      fallbackProfileFilters,
+                  },
+                }
+                : {}),
             },
-          );
+
+            select:
+              userSelect,
+          });
 
         console.log(
           `MANUAL LOCATION hydration round ${round}:`,
@@ -1103,6 +1220,10 @@ export const getFeedService = async ({
           "users:",
           hydrated.length,
         );
+
+        // ----------------------------------------------------
+        // PRESERVE SQL DISTANCE ORDER
+        // ----------------------------------------------------
 
         const byId =
           new Map(
@@ -1117,13 +1238,9 @@ export const getFeedService = async ({
         let pageFilled =
           false;
 
-        for (
-          const row of rows
-        ) {
+        for (const row of rows) {
           const user =
-            byId.get(
-              row.id,
-            );
+            byId.get(row.id);
 
           if (!user) {
             continue;
@@ -1142,7 +1259,8 @@ export const getFeedService = async ({
                 row.sort_val,
               ),
 
-              id: row.id,
+              id:
+                row.id,
 
               mode:
                 "LOCATION",
@@ -1159,10 +1277,13 @@ export const getFeedService = async ({
           break;
         }
 
+        // ----------------------------------------------------
+        // NEXT SQL BATCH
+        // ----------------------------------------------------
+
         const tail =
           rows[
-          rows.length -
-          1
+          rows.length - 1
           ];
 
         cursorState = {
@@ -1170,7 +1291,8 @@ export const getFeedService = async ({
             tail.sort_val,
           ),
 
-          id: tail.id,
+          id:
+            tail.id,
 
           mode:
             "LOCATION",
@@ -1327,14 +1449,14 @@ export const getFeedService = async ({
                 },
                 account_status: "ACTIVE",
                 deleted_at: null,
-                ...userFilters,
+                ...fallbackUserFilters,
 
                 ...(Object.keys(
-                  profileFilters,
+                  fallbackProfileFilters,
                 ).length > 0
                   ? {
                     profile: {
-                      is: profileFilters,
+                      is: fallbackProfileFilters,
                     },
                   }
                   : {}),
@@ -1473,7 +1595,8 @@ export const getFeedService = async ({
    */
 
   if (
-    collected.length === 0
+    collected.length === 0 &&
+  !hasManualLocationFilter
   ) {
     locationFallbackUsed =
       true;
@@ -1793,34 +1916,34 @@ export const getFeedService = async ({
         user.id,
     );
 
-    // ========================================================
-// REPLY TIME STATS
-// ========================================================
+  // ========================================================
+  // REPLY TIME STATS
+  // ========================================================
 
-const replyStats =
-  await prisma.userReplyStats.findMany({
-    where: {
-      userId: {
-        in: candidateIds,
+  const replyStats =
+    await prisma.userReplyStats.findMany({
+      where: {
+        userId: {
+          in: candidateIds,
+        },
       },
-    },
 
-    select: {
-      userId: true,
-      medianReplyMinutes: true,
-      sampleCount: true,
-    },
-  });
+      select: {
+        userId: true,
+        medianReplyMinutes: true,
+        sampleCount: true,
+      },
+    });
 
-const replyStatsMap =
-  new Map(
-    replyStats.map(
-      (stat) => [
-        stat.userId,
-        stat,
-      ],
-    ),
-  );
+  const replyStatsMap =
+    new Map(
+      replyStats.map(
+        (stat) => [
+          stat.userId,
+          stat,
+        ],
+      ),
+    );
   // ========================================================
   // BOOSTS
   // ========================================================
@@ -1997,19 +2120,19 @@ const replyStatsMap =
             user.id,
           );
 
-          const replyStat =
-        replyStatsMap.get(
-          user.id,
-        );
+        const replyStat =
+          replyStatsMap.get(
+            user.id,
+          );
 
-      const replyTime =
-        replyStat &&
-        replyStat.medianReplyMinutes !== null &&
-        replyStat.sampleCount >= MIN_REPLY_SAMPLES
-          ? getReplyTimeLabel(
+        const replyTime =
+          replyStat &&
+            replyStat.medianReplyMinutes !== null &&
+            replyStat.sampleCount >= MIN_REPLY_SAMPLES
+            ? getReplyTimeLabel(
               replyStat.medianReplyMinutes,
             )
-          : null;
+            : null;
 
         const matchScore =
           compat?.percentage ??
@@ -2119,8 +2242,6 @@ const replyStatsMap =
 
           matchScore,
 
-          compatibilityScore,
-
           /**
            * Distance is available
            * only when actual
@@ -2145,7 +2266,7 @@ const replyStatsMap =
               ) / 100
               : null,
 
-          trust:user.trust_score ?? 0,
+          trust: user.trust_score ?? 0,
 
           replyTime,
 
@@ -2348,6 +2469,7 @@ export const getFeedDetailsService = async (
     return cachedFeedDetails;
   }
 
+
   // =====================================================
   // 3. GET PROFILE FROM DATABASE
   // =====================================================
@@ -2430,8 +2552,31 @@ export const getFeedDetailsService = async (
     throw new Error('User not found');
   }
 
+  // =====================================================
+  // 4. GET REPLY TIME FOR THIS PARTICULAR USER
+  // =====================================================
+
+  const replyStats = await prisma.userReplyStats.findUnique({
+    where: {
+      userId: userId,
+    },
+    select: {
+      userId: true,
+      medianReplyMinutes: true,
+      sampleCount: true,
+    },
+  });
+
+  // Same logic as your main Feed API
+  const replyTime =
+    replyStats &&
+      replyStats.medianReplyMinutes !== null &&
+      replyStats.sampleCount >= MIN_REPLY_SAMPLES
+      ? getReplyTimeLabel(replyStats.medianReplyMinutes) ?? ""
+      : "";
+
   // 3. Transform data
-  const response: UserFeedResponse = transformUserData(user);
+  const response: UserFeedResponse = transformUserData(user, replyTime);
 
   // 4. Save to Redis
   await redis.set(CACHE_KEY, response, {
@@ -2460,7 +2605,7 @@ export const getFeedDetailsService = async (
 };
 
 // Helper function to transform user data
-const transformUserData = (user: any): UserFeedResponse => {
+const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
   // Extract lifestyle answers (screen = LIFESTYLE)
   const lifestyleAnswers = user.answer.filter(
     (a: any) => a.question.screen === 'LIFESTYLE'
@@ -2500,8 +2645,7 @@ const transformUserData = (user: any): UserFeedResponse => {
     // Static values
     matchScore: STATIC_MATCH_SCORE,
     trust: user.trust_score ?? 0,
-    replyTime: STATIC_REPLY_TIME,
-
+    replyTime: replyTime,
     // Basic Info
     bio: user.bio?.bio || null,
     lookingFor: user.intention?.option || null,
