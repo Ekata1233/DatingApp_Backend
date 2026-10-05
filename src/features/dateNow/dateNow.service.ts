@@ -376,6 +376,7 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
         const matchScore = calculateMatchScore(me, plan.user);
         let distanceKm = null;
 
+
         if (plan.venueLat != null && plan.venueLng != null) {
           distanceKm = calculateDistanceKm(
             Number(profile!.latitude),
@@ -385,6 +386,13 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
           );
         }
 
+        const distanceText =
+          distanceKm === null
+            ? null
+            : distanceKm < 0.5
+              ? "Near you"
+              : `${distanceKm.toFixed(1)} km away`;
+
         const hoursAway =
           ((plan.eventDateTime?.getTime() || now.getTime()) - now.getTime()) /
           (1000 * 60 * 60);
@@ -392,9 +400,8 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
         return {
           ...plan,
           matchScore,
-          distanceKm:
-            distanceKm !== null ? Number(distanceKm.toFixed(1)) : null,
-
+          distanceKm: distanceKm !== null ? Number(distanceKm.toFixed(1)) : null,
+          distanceText,
           score: (distanceKm ?? 999) * 5 + Math.max(hoursAway, 0),
         };
       })
@@ -421,7 +428,7 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
     matchScore: plan.matchScore,
     venueName: plan.venueName,
     distanceKm: plan.distanceKm,
-    // Activity
+    distanceText: plan.distanceText,
     activity: plan.activity?.label,
     activityIcon: plan.activity?.icon,
 
@@ -437,6 +444,7 @@ export const discoverDatePlan = async (userId: string, filter?: string) => {
     host: {
       id: plan.user.id,
       name: plan.user.full_name,
+      trustScore: plan.user.trust_score,
       profilePhoto:
         plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
       age: plan.user.birth_date

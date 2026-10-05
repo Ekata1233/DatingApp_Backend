@@ -95,7 +95,6 @@ const OVERFETCH = 1.5;
 const MAX_ROUNDS = 5;
 const STATIC_MATCH_SCORE = 78;
 const STATIC_TRUST = 75;
-const STATIC_REPLY_TIME = "5 m reply";
 
 
 // =========================
@@ -2092,8 +2091,6 @@ export const getFeedService = async ({
 
           matchScore,
 
-          compatibilityScore,
-
           /**
            * Distance is available
            * only when actual
@@ -2321,6 +2318,7 @@ export const getFeedDetailsService = async (
     return cachedFeedDetails;
   }
 
+
   // =====================================================
   // 3. GET PROFILE FROM DATABASE
   // =====================================================
@@ -2403,8 +2401,31 @@ export const getFeedDetailsService = async (
     throw new Error('User not found');
   }
 
+  // =====================================================
+  // 4. GET REPLY TIME FOR THIS PARTICULAR USER
+  // =====================================================
+
+  const replyStats = await prisma.userReplyStats.findUnique({
+    where: {
+      userId: userId,
+    },
+    select: {
+      userId: true,
+      medianReplyMinutes: true,
+      sampleCount: true,
+    },
+  });
+
+  // Same logic as your main Feed API
+  const replyTime =
+    replyStats &&
+      replyStats.medianReplyMinutes !== null &&
+      replyStats.sampleCount >= MIN_REPLY_SAMPLES
+      ? getReplyTimeLabel(replyStats.medianReplyMinutes) ?? ""
+      : "";
+
   // 3. Transform data
-  const response: UserFeedResponse = transformUserData(user);
+  const response: UserFeedResponse = transformUserData(user, replyTime);
 
   // 4. Save to Redis
   await redis.set(CACHE_KEY, response, {
@@ -2433,7 +2454,7 @@ export const getFeedDetailsService = async (
 };
 
 // Helper function to transform user data
-const transformUserData = (user: any): UserFeedResponse => {
+const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
   // Extract lifestyle answers (screen = LIFESTYLE)
   const lifestyleAnswers = user.answer.filter(
     (a: any) => a.question.screen === 'LIFESTYLE'
@@ -2473,8 +2494,7 @@ const transformUserData = (user: any): UserFeedResponse => {
     // Static values
     matchScore: STATIC_MATCH_SCORE,
     trust: user.trust_score ?? 0,
-    replyTime: STATIC_REPLY_TIME,
-
+    replyTime: replyTime,
     // Basic Info
     bio: user.bio?.bio || null,
     lookingFor: user.intention?.option || null,
