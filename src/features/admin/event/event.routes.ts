@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { calculateEventCheckoutController, createEventController, getAllEventsController, getEventCheckoutDetailsController, getEventDetailsController, getEventListController, publishEventController, updateEventExperienceController, updateEventHostController, updateEventSafetyController, updateEventTicketsController, updateEventVenueController } from "./event.controller";
+import { calculateEventCheckoutController, createEventController, getAllEventsController, getEventBookingStatsController, getEventCheckoutDetailsController, getEventDetailsController, getEventListController, publishEventController, updateEventExperienceController, updateEventHostController, updateEventSafetyController, updateEventTicketsController, updateEventVenueController } from "./event.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = Router();
@@ -58,5 +58,11 @@ router.post(
   "/events/:eventId/checkout/calculate",
   authMiddleware,
   calculateEventCheckoutController,
+);
+
+router.get(
+  "/events/:eventId/booking-stats",
+  authMiddleware,
+  getEventBookingStatsController,
 );
 export default router;

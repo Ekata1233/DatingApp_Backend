@@ -72,15 +72,29 @@ export const updatePrivacySettingsService = async (
   // Validate message permission
   // ==========================================
 
-  if (
-    messagePermission !== undefined &&
-    !Object.values(MessagePermission).includes(
-      messagePermission,
-    )
-  ) {
-    throw new Error(
-      "Invalid message permission",
-    );
+  if (messagePermission !== undefined) {
+    if (
+      !Array.isArray(messagePermission) ||
+      messagePermission.length === 0
+    ) {
+      throw new Error(
+        "messagePermission must be a non-empty array",
+      );
+    }
+
+    const invalidPermission =
+      messagePermission.find(
+        (permission) =>
+          !Object.values(
+            MessagePermission,
+          ).includes(permission),
+      );
+
+    if (invalidPermission) {
+      throw new Error(
+        `Invalid message permission: ${invalidPermission}`,
+      );
+    }
   }
 
   // ==========================================
@@ -122,13 +136,16 @@ export const updatePrivacySettingsService = async (
   return {
     id: settings.id,
 
-    messagePermission: {
-      value: settings.messagePermission,
-      label:
-        getMessagePermissionLabel(
-          settings.messagePermission,
-        ),
-    },
+    messagePermission:
+      settings.messagePermission.map(
+        (permission) => ({
+          value: permission,
+          label:
+            getMessagePermissionLabel(
+              permission,
+            ),
+        }),
+      ),
 
     hideFromContacts:
       settings.hideFromContacts,

@@ -31,7 +31,7 @@ export const createPrivacySettingsRepository = async (
 export const updatePrivacySettingsRepository = async (
   userId: string,
   data: {
-    messagePermission?: MessagePermission;
+    messagePermission?: MessagePermission[];
     hideFromContacts?: boolean;
     ghostMode?: boolean;
   },
