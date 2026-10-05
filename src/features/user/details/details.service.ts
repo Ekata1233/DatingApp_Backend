@@ -285,6 +285,60 @@ export const getProfileSummaryService = async (
             },
           },
         },
+
+        relationshipsAsUser1: {
+  where: {
+    status: "ACTIVE",
+
+    proposal: {
+      is: {
+        status: "ACCEPTED",
+      },
+    },
+  },
+
+  take: 1,
+
+  select: {
+    id: true,
+    tag: true,
+    startedAt: true,
+
+    user2: {
+      select: {
+        id: true,
+        full_name: true,
+      },
+    },
+  },
+},
+
+relationshipsAsUser2: {
+  where: {
+    status: "ACTIVE",
+
+    proposal: {
+      is: {
+        status: "ACCEPTED",
+      },
+    },
+  },
+
+  take: 1,
+
+  select: {
+    id: true,
+    tag: true,
+    startedAt: true,
+
+    user1: {
+      select: {
+        id: true,
+        full_name: true,
+      },
+    },
+  },
+},
       },
     });
 
@@ -294,6 +348,45 @@ export const getProfileSummaryService = async (
 
   const age = getAge(user.birth_date);
 
+  const relationshipAsUser1 =
+  user.relationshipsAsUser1[0];
+
+const relationshipAsUser2 =
+  user.relationshipsAsUser2[0];
+
+let relationship = null;
+
+if (relationshipAsUser1) {
+  relationship = {
+    id: relationshipAsUser1.id,
+    tag: relationshipAsUser1.tag,
+
+    partner: {
+      id: relationshipAsUser1.user2.id,
+      name:
+        relationshipAsUser1.user2.full_name ??
+        null,
+    },
+
+    startedAt:
+      relationshipAsUser1.startedAt,
+  };
+} else if (relationshipAsUser2) {
+  relationship = {
+    id: relationshipAsUser2.id,
+    tag: relationshipAsUser2.tag,
+
+    partner: {
+      id: relationshipAsUser2.user1.id,
+      name:
+        relationshipAsUser2.user1.full_name ??
+        null,
+    },
+
+    startedAt:
+      relationshipAsUser2.startedAt,
+  };
+}
   /**
    * Convert Prisma Decimal to number
    */
@@ -389,5 +482,7 @@ export const getProfileSummaryService = async (
 
     profileCompletion:
       user.profile_completion,
+
+      relationship
   };
 };
