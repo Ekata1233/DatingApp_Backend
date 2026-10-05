@@ -3509,11 +3509,11 @@ enum MessagePermission {
 model UserPrivacySettings {
   id String @id @default(uuid()) @db.Uuid
 
-  userId            String            @unique @db.Uuid
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messagePermission MessagePermission @default(MATCHES_ONLY)
-  hideFromContacts  Boolean           @default(false)
-  ghostMode         Boolean           @default(false)
+  userId            String              @unique @db.Uuid
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messagePermission MessagePermission[] @default([MATCHES_ONLY])
+  hideFromContacts  Boolean             @default(false)
+  ghostMode         Boolean             @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
