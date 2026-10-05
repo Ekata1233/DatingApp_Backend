@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getUserDetailsService } from "./details.service";
+import { getProfileSummaryService, getUserDetailsService } from "./details.service";
 
 export const getUserDetailsController = async (
   req: Request,
@@ -29,3 +29,46 @@ export const getUserDetailsController = async (
     });
   }
 };
+
+export const getProfileSummaryController = async (
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      const userId =
+        (req as any).user.id;
+
+      const data =
+        await getProfileSummaryService(
+          userId,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Profile summary fetched successfully",
+        data,
+      });
+    } catch (error: any) {
+      console.error(
+        "Get profile summary error:",
+        error,
+      );
+
+      if (
+        error.message ===
+        "USER_NOT_FOUND"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to fetch profile summary",
+      });
+    }
+  };
