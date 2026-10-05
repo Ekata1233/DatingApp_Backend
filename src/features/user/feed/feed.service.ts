@@ -645,22 +645,115 @@ export const getFeedService = async ({
   // ========================================================
 
   const hasManualLocationFilter =
-    !!filters?.location
-      ?.city ||
-    !!filters?.location
-      ?.state ||
-    !!filters?.location
-      ?.country;
+    !!filters?.location?.city ||
+    !!filters?.location?.state ||
+    !!filters?.location?.country;
+
+    console.log("hasManualLocationFilter", hasManualLocationFilter);
+
+  // ========================================================
+  // RESOLVE MANUAL LOCATION → LAT/LNG
+  // ========================================================
+
+  let manualLocation:
+    | {
+      latitude: number;
+      longitude: number;
+    }
+    | null = null;
+
+  if (hasManualLocationFilter) {
+    const city =
+      filters?.location?.city?.trim();
+
+    const state =
+      filters?.location?.state?.trim();
+
+    const country =
+      filters?.location?.country?.trim();
+
+    if (!city) {
+      throw new Error(
+        "City is required for manual location search",
+      );
+    }
+
+    const location =
+      await prisma.locationMaster.findFirst({
+        where: {
+          active: true,
+
+          city: {
+            equals: city,
+            mode: "insensitive",
+          },
+
+          ...(state
+            ? {
+              state: {
+                equals: state,
+                mode: "insensitive",
+              },
+            }
+            : {}),
+
+          ...(country
+            ? {
+              country: {
+                equals: country,
+                mode: "insensitive",
+              },
+            }
+            : {}),
+        },
+
+        select: {
+          latitude: true,
+          longitude: true,
+        },
+      });
+
+    if (!location) {
+      throw new Error(
+        `Location "${city}" not found`,
+      );
+    }
+
+    manualLocation = {
+      latitude: Number(
+        location.latitude,
+      ),
+
+      longitude: Number(
+        location.longitude,
+      ),
+    };
+
+    console.log(
+      "MANUAL LOCATION RESOLVED:",
+      {
+        city,
+        state,
+        country,
+        latitude:
+          manualLocation.latitude,
+        longitude:
+          manualLocation.longitude,
+      },
+    );
+  }
 
   // ========================================================
   // DISTANCE
   // ========================================================
 
-  const distanceKm =
-    filters?.distanceKm ??
-    currentUser.profile
-      .max_distance_km ??
-    1000;
+const distanceKm =
+  filters?.distanceKm ??
+  (
+    hasManualLocationFilter
+      ? 100
+      : currentUser.profile.max_distance_km ?? 1000
+  );
 
   // ========================================================
   // FALLBACK FILTER QUERY
@@ -927,21 +1020,49 @@ export const getFeedService = async ({
 
     // ======================================================
     // CASE 1:
-    // MANUAL CITY / STATE / COUNTRY
+    // MANUAL LOCATION → LOCATION MASTER → POSTGIS
     // ======================================================
 
     if (
-      hasManualLocationFilter
+      hasManualLocationFilter &&
+      manualLocation
     ) {
       console.log(
-        "LOCATION MODE: MANUAL CITY/STATE/COUNTRY",
+        "LOCATION MODE: MANUAL LOCATION",
+        {
+          latitude:
+            manualLocation.latitude,
+
+          longitude:
+            manualLocation.longitude,
+
+          distanceKm,
+        },
       );
+
+      // ------------------------------------------------------
+      // SEARCH POINT
+      // ------------------------------------------------------
+
+      const searchPoint =
+        Prisma.sql`
+      ST_SetSRID(
+        ST_MakePoint(
+          ${manualLocation.longitude},
+          ${manualLocation.latitude}
+        ),
+        4326
+      )::geography
+    `;
+
+      // ------------------------------------------------------
+      // SEARCH
+      // ------------------------------------------------------
 
       for (
         let round = 0;
         round < MAX_ROUNDS &&
-        collected.length <
-        pageLimit;
+        collected.length < pageLimit;
         round++
       ) {
         const candidateStart =
@@ -954,53 +1075,60 @@ export const getFeedService = async ({
               sort_val: number;
             }[]
           >`
-              SELECT
-                u.id,
+        SELECT
+          u.id,
 
-                (
-                  EXTRACT(
-                    EPOCH FROM u.created_at
-                  ) * 1000
-                )::float8 AS sort_val
+          (
+            p.location::geography
+            <-> ${searchPoint}
+          )::float8 AS sort_val
 
-              FROM users u
+        FROM users u
 
-              JOIN user_profiles p
-                ON p.user_id = u.id
+        JOIN user_profiles p
+          ON p.user_id = u.id
 
-              WHERE
-                ${matchConditions}
+        WHERE
+          ${matchConditions}
 
-                ${cursorState
+          AND p.location IS NOT NULL
+
+          AND ST_DWithin(
+            p.location::geography,
+            ${searchPoint},
+            ${distanceKm * 1000}
+          )
+
+          ${cursorState
               ? Prisma.sql`
-                        AND (
-                          (
-                            EXTRACT(
-                              EPOCH FROM u.created_at
-                            ) * 1000
-                          ) < ${cursorState.k}
+                  AND (
+                    (
+                      p.location::geography
+                      <-> ${searchPoint}
+                    ) > ${cursorState.k}
 
-                          OR (
-                            (
-                              EXTRACT(
-                                EPOCH FROM u.created_at
-                              ) * 1000
-                            ) = ${cursorState.k}
+                    OR (
+                      (
+                        p.location::geography
+                        <-> ${searchPoint}
+                      ) = ${cursorState.k}
 
-                            AND u.id <
-                              ${cursorState.id}::uuid
-                          )
-                        )
-                      `
+                      AND u.id >
+                        ${cursorState.id}::uuid
+                    )
+                  )
+                `
               : Prisma.empty
             }
 
-              ORDER BY
-                sort_val DESC,
-                u.id DESC
+        ORDER BY
+          p.location::geography
+            <-> ${searchPoint} ASC,
 
-              LIMIT ${batchSize};
-            `;
+          u.id ASC
+
+        LIMIT ${batchSize};
+      `;
 
         console.log(
           `MANUAL LOCATION candidate round ${round}:`,
@@ -1011,61 +1139,78 @@ export const getFeedService = async ({
           rows.length,
         );
 
-        if (
-          rows.length === 0
-        ) {
+        if (rows.length === 0) {
           break;
+        }
+
+        // ----------------------------------------------------
+        // SAVE DISTANCE
+        // ----------------------------------------------------
+
+        for (const row of rows) {
+          meterById.set(
+            row.id,
+            Number(row.sort_val),
+          );
         }
 
         const idOrder =
           rows.map(
-            (row) =>
-              row.id,
+            (row) => row.id,
           );
+
+        // ----------------------------------------------------
+        // HYDRATE USERS
+        // ----------------------------------------------------
 
         const hydrateStart =
           performance.now();
 
-        /**
-         * IMPORTANT:
-         *
-         * This is where actual:
-         *
-         * city = Pune
-         * state = Maharashtra
-         * country = India
-         *
-         * is applied through
-         * buildFilterQuery().
-         */
-
         const hydrated =
-          await prisma.user.findMany(
-            {
-              where: {
-                id: {
-                  in: idOrder,
-                },
-
-                ...userFilters,
-                account_status: "ACTIVE",
-                deleted_at: null,
-
-                ...(Object.keys(
-                  profileFilters,
-                ).length > 0
-                  ? {
-                    profile: {
-                      is: profileFilters,
-                    },
-                  }
-                  : {}),
+          await prisma.user.findMany({
+            where: {
+              id: {
+                in: idOrder,
               },
 
-              select:
-                userSelect,
+              account_status:
+                "ACTIVE",
+
+              deleted_at:
+                null,
+
+              /*
+               * IMPORTANT
+               *
+               * Use fallback filters here.
+               *
+               * These contain all selected
+               * filters EXCEPT:
+               *
+               * location
+               * distanceKm
+               *
+               * Therefore city/state/country
+               * are NOT compared against
+               * candidate profiles.
+               */
+              ...fallbackUserFilters,
+
+              ...(Object.keys(
+                fallbackProfileFilters,
+              ).length > 0
+                ? {
+                  profile: {
+                    is:
+                      fallbackProfileFilters,
+                  },
+                }
+                : {}),
             },
-          );
+
+            select:
+              userSelect,
+          });
 
         console.log(
           `MANUAL LOCATION hydration round ${round}:`,
@@ -1075,6 +1220,10 @@ export const getFeedService = async ({
           "users:",
           hydrated.length,
         );
+
+        // ----------------------------------------------------
+        // PRESERVE SQL DISTANCE ORDER
+        // ----------------------------------------------------
 
         const byId =
           new Map(
@@ -1089,13 +1238,9 @@ export const getFeedService = async ({
         let pageFilled =
           false;
 
-        for (
-          const row of rows
-        ) {
+        for (const row of rows) {
           const user =
-            byId.get(
-              row.id,
-            );
+            byId.get(row.id);
 
           if (!user) {
             continue;
@@ -1114,7 +1259,8 @@ export const getFeedService = async ({
                 row.sort_val,
               ),
 
-              id: row.id,
+              id:
+                row.id,
 
               mode:
                 "LOCATION",
@@ -1131,10 +1277,13 @@ export const getFeedService = async ({
           break;
         }
 
+        // ----------------------------------------------------
+        // NEXT SQL BATCH
+        // ----------------------------------------------------
+
         const tail =
           rows[
-          rows.length -
-          1
+          rows.length - 1
           ];
 
         cursorState = {
@@ -1142,7 +1291,8 @@ export const getFeedService = async ({
             tail.sort_val,
           ),
 
-          id: tail.id,
+          id:
+            tail.id,
 
           mode:
             "LOCATION",
@@ -1299,14 +1449,14 @@ export const getFeedService = async ({
                 },
                 account_status: "ACTIVE",
                 deleted_at: null,
-                ...userFilters,
+                ...fallbackUserFilters,
 
                 ...(Object.keys(
-                  profileFilters,
+                  fallbackProfileFilters,
                 ).length > 0
                   ? {
                     profile: {
-                      is: profileFilters,
+                      is: fallbackProfileFilters,
                     },
                   }
                   : {}),
@@ -1445,7 +1595,8 @@ export const getFeedService = async ({
    */
 
   if (
-    collected.length === 0
+    collected.length === 0 &&
+  !hasManualLocationFilter
   ) {
     locationFallbackUsed =
       true;
