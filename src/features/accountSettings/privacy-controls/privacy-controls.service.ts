@@ -28,13 +28,16 @@ export const getPrivacySettingsService = async (
   return {
     id: settings.id,
 
-    messagePermission: {
-      value: settings.messagePermission,
-      label:
-        getMessagePermissionLabel(
-          settings.messagePermission,
-        ),
-    },
+    messagePermission:
+      settings.messagePermission.map(
+        (permission) => ({
+          value: permission,
+          label:
+            getMessagePermissionLabel(
+              permission,
+            ),
+        }),
+      ),
 
     hideFromContacts:
       settings.hideFromContacts,
