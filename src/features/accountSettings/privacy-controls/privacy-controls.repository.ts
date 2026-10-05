@@ -19,9 +19,11 @@ export const createPrivacySettingsRepository = async (
     data: {
       userId,
 
-      // These are already Prisma defaults,
-      // but keeping them explicit is also fine.
-      messagePermission: MessagePermission.MATCHES_ONLY,
+      // messagePermission is now an array
+      messagePermission: [
+        MessagePermission.MATCHES_ONLY,
+      ],
+
       hideFromContacts: false,
       ghostMode: false,
     },
@@ -59,8 +61,9 @@ export const updatePrivacySettingsRepository = async (
       userId,
 
       messagePermission:
-        data.messagePermission ??
-        MessagePermission.MATCHES_ONLY,
+        data.messagePermission ?? [
+          MessagePermission.MATCHES_ONLY,
+        ],
 
       hideFromContacts:
         data.hideFromContacts ?? false,
