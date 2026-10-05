@@ -315,8 +315,54 @@ export const handleSwipe = async (data: {
     }),
   ]).catch(console.error);
 
+  // ------------------------------------------------------------
+  // Get both users' primary profile photos for match popup
+  // ------------------------------------------------------------
+  const [swiperPhoto, targetPhoto] = await Promise.all([
+    prisma.userPhoto.findFirst({
+      where: {
+        user_id: swiperId,
+        is_primary: true,
+        media_type: "IMAGE",
+      },
+      select: {
+        media_url: true,
+      },
+    }),
+
+    prisma.userPhoto.findFirst({
+      where: {
+        user_id: targetUserId,
+        is_primary: true,
+        media_type: "IMAGE",
+      },
+      select: {
+        media_url: true,
+      },
+    }),
+  ]);
+
   return {
     matched: true,
     matchId: match.id,
+
+    matchPopup: {
+      title: "It's a Match! ❤️",
+
+      message:
+        "Two hearts beating to the same rhythm. Your connection is already written in the stars. ✨",
+
+      users: {
+        me: {
+          userId: swiperId,
+          profilePhoto: swiperPhoto?.media_url ?? null,
+        },
+
+        matchedUser: {
+          userId: targetUserId,
+          profilePhoto: targetPhoto?.media_url ?? null,
+        },
+      },
+    },
   };
 };
