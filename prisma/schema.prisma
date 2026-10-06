@@ -9,54 +9,56 @@ datasource db {
 }
 
 model User {
-  id                         String                @id @default(uuid()) @db.Uuid
-  full_name                  String?               @db.VarChar(100)
-  email                      String?               @unique @db.VarChar(255)
-  phone_number               String?               @db.VarChar(20)
-  is_phone_verified          Boolean               @default(false)
-  google_id                  String?               @unique @db.VarChar(255)
-  birth_date                 DateTime?             @db.Date
-  height                     Int?
-  gender                     Gender?
-  gender_option              GenderOption?
-  looking_for                LookingFor?
-  intentionId                String?               @db.Uuid
-  onboarding_step            String?               @db.VarChar(20)
-  next_step                  String?               @db.VarChar(20)
-  onboarding_completed       Boolean               @default(false)
-  last_active_at             DateTime?
-  device_token               String?
-  referralCode               String?               @unique @db.VarChar(20)
-  badge_count                Int                   @default(0)
-  trust_score                Int                   @default(0)
-  deleted_at                 DateTime?
-  created_at                 DateTime              @default(now())
-  updated_at                 DateTime              @updatedAt
-  profile_completion         Int                   @default(0)
-  looking_for_option         LookingForOption?
-  account_status             AccountStatus         @default(ACTIVE)
-  paused_at                  DateTime?
-  pause_reason               String?               @db.VarChar(255)
-  answer                     UserAnswer[]
-  matchesAsUser1             UserMatch[]           @relation("MatchUser1")
-  matchesAsUser2             UserMatch[]           @relation("MatchUser2")
-  swipesGiven                UserSwipe[]           @relation("Swiper")
-  swipesReceived             UserSwipe[]           @relation("TargetUser")
-  about                      UserAbout?
-  bio                        UserBio?
-  eduWork                    UserEduWork?          @relation("UserEduWork")
-  familyProfile              UserFamilyProfile?    @relation("UserFamilyProfile")
-  skills                     UserSkill[]
-  photos                     UserPhoto[]
-  profile                    UserProfile?
-  userBoosts                 UserBoost[]
-  boostUsages                BoostUsage[]
-  userPackages               UserPackage[]
-  boostEvents                BoostEvent[]          @relation("BoostedUser")
-  actorEvents                BoostEvent[]          @relation("ActorUser")
-  boostStats                 UserBoostStats?
-  boostPurchases             BoostPurchase[]
-  boostTransactions          BoostTransaction[]
+  id                   String             @id @default(uuid()) @db.Uuid
+  full_name            String?            @db.VarChar(100)
+  email                String?            @unique @db.VarChar(255)
+  phone_number         String?            @db.VarChar(20)
+  is_phone_verified    Boolean            @default(false)
+  google_id            String?            @unique @db.VarChar(255)
+  birth_date           DateTime?          @db.Date
+  height               Int?
+  gender               Gender?
+  gender_option        GenderOption?
+  looking_for          LookingFor?
+  intentionId          String?            @db.Uuid
+  onboarding_step      String?            @db.VarChar(20)
+  next_step            String?            @db.VarChar(20)
+  onboarding_completed Boolean            @default(false)
+  last_active_at       DateTime?
+  device_token         String?
+  referralCode         String?            @unique @db.VarChar(20)
+  badge_count          Int                @default(0)
+  trust_score          Int                @default(0)
+  deleted_at           DateTime?
+  created_at           DateTime           @default(now())
+  updated_at           DateTime           @updatedAt
+  profile_completion   Int                @default(0)
+  looking_for_option   LookingForOption?
+  account_status       AccountStatus      @default(ACTIVE)
+  paused_at            DateTime?
+  pause_reason         String?            @db.VarChar(255)
+  answer               UserAnswer[]
+  matchesAsUser1       UserMatch[]        @relation("MatchUser1")
+  matchesAsUser2       UserMatch[]        @relation("MatchUser2")
+  swipesGiven          UserSwipe[]        @relation("Swiper")
+  swipesReceived       UserSwipe[]        @relation("TargetUser")
+  about                UserAbout?
+  bio                  UserBio?
+  eduWork              UserEduWork?       @relation("UserEduWork")
+  familyProfile        UserFamilyProfile? @relation("UserFamilyProfile")
+  skills               UserSkill[]
+  photos               UserPhoto[]
+  profile              UserProfile?
+  userBoosts           UserBoost[]
+  boostUsages          BoostUsage[]
+  userPackages         UserPackage[]
+  boostEvents          BoostEvent[]       @relation("BoostedUser")
+  actorEvents          BoostEvent[]       @relation("ActorUser")
+  boostStats           UserBoostStats?
+  boostPurchases       BoostPurchase[]
+  boostTransactions    BoostTransaction[]
+
+  //DATE PLAN 
   datePlan                   DatePlan[]
   datePlanRequests           DatePlanRequest[]
   datePlanSkips              DatePlanSkip[]
@@ -79,6 +81,10 @@ model User {
   referralStats    UserReferralStats?
   receivedReferral UserReferral?      @relation("ReferredUser")
   replyStats       UserReplyStats?
+
+  //FEED
+  dailyFeedViews       UserDailyFeedView[] @relation("DailyFeedViewer")
+  dailyFeedTargetViews UserDailyFeedView[] @relation("DailyFeedTarget")
 
   //chat
   conversationParticipants ConversationParticipant[]
@@ -136,6 +142,7 @@ model User {
   employmentVerifications        EmploymentVerification?
   educationVerifications         EducationVerification[]
   manualGovernmentIdVerification ManualGovernmentIdVerification?
+  incomeVerification             IncomeVerification?
 
   @@index([phone_number])
   @@index([google_id])
@@ -774,6 +781,7 @@ model UserVerification {
   employmentVerifications        EmploymentVerification?
   educationVerification          EducationVerification?
   manualGovernmentIdVerification ManualGovernmentIdVerification?
+  incomeVerification             IncomeVerification?
   user                           User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
@@ -905,6 +913,43 @@ model EducationVerification {
 
   @@index([userId])
   @@index([status])
+}
+
+model IncomeVerification {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @unique @db.Uuid
+  verificationId       String             @unique @db.Uuid
+  annualIncome         Decimal?           @db.Decimal(15, 2)
+  currency             String             @default("INR") @db.VarChar(10)
+  proofType            IncomeProofType
+  employerName         String?
+  financialYear        String?            @db.VarChar(20)
+  primaryDocumentUrl   String
+  secondaryDocumentUrl String?
+  status               VerificationStatus @default(NOT_STARTED)
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  verifiedAt           DateTime?
+  rejectionReason      String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([proofType])
+  @@map("income_verifications")
+}
+
+enum IncomeProofType {
+  SALARY_SLIP
+  FORM_16
+  ITR
+  BANK_STATEMENT
+  EMPLOYMENT_LETTER
+  BUSINESS_INCOME_PROOF
+  OTHER
 }
 
 model UserBlock {
@@ -3543,4 +3588,19 @@ model LocationMaster {
   @@index([state])
   @@index([countryCode])
   @@map("location_master")
+}
+
+model UserDailyFeedView {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  targetUserId String   @db.Uuid
+  viewDate     DateTime @db.Date
+  createdAt    DateTime @default(now())
+
+  user       User @relation("DailyFeedViewer", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser User @relation("DailyFeedTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetUserId, viewDate])
+  @@index([userId, viewDate])
+  @@index([targetUserId])
 }
