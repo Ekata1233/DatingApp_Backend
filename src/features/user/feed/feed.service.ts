@@ -8,6 +8,7 @@ import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
 import { getReplyTimeLabel, MIN_REPLY_SAMPLES } from "../../chat/user-reply-stats.service";
+import { maskAge, maskName } from "./feed.helper";
 
 // =========================
 // HELPERS
@@ -90,7 +91,13 @@ const ALL_ORIENTATIONS = [
 ];
 
 const NEW_USER_BOOST_HOURS = 48;
-const DEFAULT_PAGE_LIMIT = 20;
+const DEFAULT_PAGE_LIMIT = 25;
+
+const FREE_DAILY_PROFILE_LIMIT = 5;
+const PAID_DAILY_PROFILE_LIMIT = 25;
+
+const FREE_LOCKED_PROFILE_COUNT = 20;
+const LOCKED_PREVIEW_COUNT = 3;
 const OVERFETCH = 1.5;
 const MAX_ROUNDS = 5;
 const STATIC_MATCH_SCORE = 78;
@@ -124,8 +131,9 @@ export const getFeedService = async ({
   limit,
   filters,
 }: FeedParams) => {
-  const pageLimit =
-    limit ?? DEFAULT_PAGE_LIMIT;
+
+
+  const requestedLimit = limit ?? DEFAULT_PAGE_LIMIT;
 
   const decodedCursor =
     decodeCursor(
@@ -133,6 +141,21 @@ export const getFeedService = async ({
     );
 
   const now = new Date();
+
+  const todayStart = new Date(now);
+
+  todayStart.setHours(
+    0,
+    0,
+    0,
+    0,
+  );
+
+  const tomorrowStart = new Date(todayStart);
+
+  tomorrowStart.setDate(
+    tomorrowStart.getDate() + 1,
+  );
 
   // ========================================================
   // CURRENT USER
@@ -324,18 +347,105 @@ export const getFeedService = async ({
     },
   );
 
-  const hasActiveVip =
-    !!activeVipPackage;
+  const hasActiveVip = !!activeVipPackage;
 
-  console.log(
-    "ACTIVE VIP PACKAGE:",
-    activeVipPackage,
-  );
+  // ========================================================
+  // FEED DAILY LIMIT PACKAGE CHECK
+  // VIP + VIP_ELITE + PREMIUM
+  // ========================================================
 
-  console.log(
-    "HAS ACTIVE VIP/VIP_ELITE:",
-    hasActiveVip,
-  );
+  const activeFeedPackage =
+    await prisma.userPackage.findFirst({
+      where: {
+        user_id: userId,
+
+        status: "ACTIVE",
+
+        package: {
+          name: {
+            in: [
+              "VIP",
+              "VIP_ELITE",
+              "PREMIUM",
+            ],
+          },
+        },
+
+        OR: [
+          {
+            endDate: null,
+          },
+          {
+            endDate: {
+              gt: now,
+            },
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+
+        package: {
+          select: {
+            name: true,
+          },
+        },
+      },
+
+      orderBy: {
+        startDate: "desc",
+      },
+    });
+
+  const hasActiveFeedPackage =
+    !!activeFeedPackage;
+
+  const isFreeUser = !hasActiveFeedPackage;
+
+  const dailyProfileLimit = isFreeUser
+    ? FREE_DAILY_PROFILE_LIMIT
+    : PAID_DAILY_PROFILE_LIMIT;
+
+  const pageLimit =
+    isFreeUser
+      ? PAID_DAILY_PROFILE_LIMIT
+      : Math.min(
+        requestedLimit,
+        PAID_DAILY_PROFILE_LIMIT,
+      );
+
+  const todayFeedViews = await prisma.userDailyFeedView.findMany({
+    where: {
+      userId,
+
+      viewDate: {
+        gte: todayStart,
+        lt: tomorrowStart,
+      },
+    },
+
+    select: {
+      targetUserId: true,
+    },
+  });
+
+  const seenTodayIds =
+    new Set(
+      todayFeedViews.map(
+        (item) =>
+          item.targetUserId,
+      ),
+    );
+
+  const seenToday =
+    seenTodayIds.size;
+
+  const remainingToday =
+    Math.max(
+      dailyProfileLimit - seenToday,
+      0,
+    );
 
   // ========================================================
   // BASIC USER PREFERENCES
@@ -1946,99 +2056,99 @@ export const getFeedService = async ({
       pageLimit,
     );
 
-    // ========================================================
-// ENSURE DISTANCE FOR FINAL PAGE USERS
-// ========================================================
+  // ========================================================
+  // ENSURE DISTANCE FOR FINAL PAGE USERS
+  // ========================================================
 
-if (
-  validCurrentUserCoordinates &&
-  myLatitude !== null &&
-  myLongitude !== null
-) {
-  for (const user of page) {
-    // Distance already calculated by PostGIS.
-    if (meterById.has(user.id)) {
-      continue;
-    }
+  if (
+    validCurrentUserCoordinates &&
+    myLatitude !== null &&
+    myLongitude !== null
+  ) {
+    for (const user of page) {
+      // Distance already calculated by PostGIS.
+      if (meterById.has(user.id)) {
+        continue;
+      }
 
-    const candidateLatitude =
-      user.profile?.latitude !== null &&
-      user.profile?.latitude !== undefined
-        ? Number(user.profile.latitude)
-        : null;
+      const candidateLatitude =
+        user.profile?.latitude !== null &&
+          user.profile?.latitude !== undefined
+          ? Number(user.profile.latitude)
+          : null;
 
-    const candidateLongitude =
-      user.profile?.longitude !== null &&
-      user.profile?.longitude !== undefined
-        ? Number(user.profile.longitude)
-        : null;
+      const candidateLongitude =
+        user.profile?.longitude !== null &&
+          user.profile?.longitude !== undefined
+          ? Number(user.profile.longitude)
+          : null;
 
-    const validCandidateCoordinates =
-      candidateLatitude !== null &&
-      candidateLongitude !== null &&
-      Number.isFinite(candidateLatitude) &&
-      Number.isFinite(candidateLongitude) &&
-      candidateLatitude >= -90 &&
-      candidateLatitude <= 90 &&
-      candidateLongitude >= -180 &&
-      candidateLongitude <= 180 &&
-      !(
-        candidateLatitude === 0 &&
-        candidateLongitude === 0
-      );
+      const validCandidateCoordinates =
+        candidateLatitude !== null &&
+        candidateLongitude !== null &&
+        Number.isFinite(candidateLatitude) &&
+        Number.isFinite(candidateLongitude) &&
+        candidateLatitude >= -90 &&
+        candidateLatitude <= 90 &&
+        candidateLongitude >= -180 &&
+        candidateLongitude <= 180 &&
+        !(
+          candidateLatitude === 0 &&
+          candidateLongitude === 0
+        );
 
-    if (!validCandidateCoordinates) {
-      continue;
-    }
+      if (!validCandidateCoordinates) {
+        continue;
+      }
 
-    // Haversine distance
-    const R = 6371000; // Earth radius in meters
+      // Haversine distance
+      const R = 6371000; // Earth radius in meters
 
-    const toRadians = (degree: number) =>
-      (degree * Math.PI) / 180;
+      const toRadians = (degree: number) =>
+        (degree * Math.PI) / 180;
 
-    const lat1 =
-      toRadians(myLatitude);
+      const lat1 =
+        toRadians(myLatitude);
 
-    const lat2 =
-      toRadians(candidateLatitude);
+      const lat2 =
+        toRadians(candidateLatitude);
 
-    const deltaLat =
-      toRadians(
-        candidateLatitude -
-        myLatitude,
-      );
+      const deltaLat =
+        toRadians(
+          candidateLatitude -
+          myLatitude,
+        );
 
-    const deltaLng =
-      toRadians(
-        candidateLongitude -
-        myLongitude,
-      );
+      const deltaLng =
+        toRadians(
+          candidateLongitude -
+          myLongitude,
+        );
 
-    const a =
-      Math.sin(deltaLat / 2) *
+      const a =
+        Math.sin(deltaLat / 2) *
         Math.sin(deltaLat / 2) +
-      Math.cos(lat1) *
+        Math.cos(lat1) *
         Math.cos(lat2) *
         Math.sin(deltaLng / 2) *
         Math.sin(deltaLng / 2);
 
-    const c =
-      2 *
-      Math.atan2(
-        Math.sqrt(a),
-        Math.sqrt(1 - a),
+      const c =
+        2 *
+        Math.atan2(
+          Math.sqrt(a),
+          Math.sqrt(1 - a),
+        );
+
+      const meters =
+        R * c;
+
+      meterById.set(
+        user.id,
+        meters,
       );
-
-    const meters =
-      R * c;
-
-    meterById.set(
-      user.id,
-      meters,
-    );
+    }
   }
-}
 
   if (filledCursor) {
     nextCursor =
@@ -2483,91 +2593,195 @@ if (
   // SORT RETURNED PAGE
   // ========================================================
 
-  const sortedUsers =
-    enriched.sort(
-      (a, b) => {
-        const aActivity =
-          a.lastActiveAt
-            ?.getTime() ||
-          0;
+  const sortedUsers = enriched.sort(
+    (a, b) => {
+      const aActivity =
+        a.lastActiveAt
+          ?.getTime() ||
+        0;
 
-        const bActivity =
-          b.lastActiveAt
-            ?.getTime() ||
-          0;
+      const bActivity =
+        b.lastActiveAt
+          ?.getTime() ||
+        0;
 
-        const aCreated =
-          a.created_at
-            ? new Date(
-              a.created_at,
-            ).getTime()
-            : 0;
+      const aCreated =
+        a.created_at
+          ? new Date(
+            a.created_at,
+          ).getTime()
+          : 0;
 
-        const bCreated =
-          b.created_at
-            ? new Date(
-              b.created_at,
-            ).getTime()
-            : 0;
+      const bCreated =
+        b.created_at
+          ? new Date(
+            b.created_at,
+          ).getTime()
+          : 0;
 
-        const aIsNew =
-          nowMs -
-          aCreated <
-          boostWindow;
+      const aIsNew =
+        nowMs -
+        aCreated <
+        boostWindow;
 
-        const bIsNew =
-          nowMs -
-          bCreated <
-          boostWindow;
+      const bIsNew =
+        nowMs -
+        bCreated <
+        boostWindow;
 
-        // 1. BOOSTED FIRST
-        if (
-          a.isBoosted !==
-          b.isBoosted
-        ) {
-          return a.isBoosted
-            ? -1
-            : 1;
-        }
+      // 1. BOOSTED FIRST
+      if (
+        a.isBoosted !==
+        b.isBoosted
+      ) {
+        return a.isBoosted
+          ? -1
+          : 1;
+      }
 
-        // 2. NEW USERS
-        if (
-          aIsNew !==
-          bIsNew
-        ) {
-          return aIsNew
-            ? -1
-            : 1;
-        }
+      // 2. NEW USERS
+      if (
+        aIsNew !==
+        bIsNew
+      ) {
+        return aIsNew
+          ? -1
+          : 1;
+      }
 
-        // 3. MATCH SCORE
-        if (
-          a.matchScore !==
-          b.matchScore
-        ) {
-          return (
-            b.matchScore -
-            a.matchScore
-          );
-        }
-
-        // 4. ACTIVE USERS
+      // 3. MATCH SCORE
+      if (
+        a.matchScore !==
+        b.matchScore
+      ) {
         return (
-          bActivity -
-          aActivity
+          b.matchScore -
+          a.matchScore
         );
-      },
-    );
+      }
+
+      // 4. ACTIVE USERS
+      return (
+        bActivity -
+        aActivity
+      );
+    },
+  );
+
+  // ========================================================
+  // DAILY FEED ACCESS
+  // ========================================================
+
+  let visibleUsers = sortedUsers;
+
+  let lockedUsers: typeof sortedUsers = [];
+
+  if (isFreeUser) {
+    /**
+     * IMPORTANT:
+     *
+     * Daily quota is consumed ONLY after:
+     *
+     * LIKE
+     * PASS
+     * SUPERLIKE
+     *
+     * Fetching /feed does NOT consume quota.
+     */
+
+    visibleUsers =
+      sortedUsers.slice(
+        0,
+        remainingToday,
+      );
+
+    /**
+     * Everything after the remaining
+     * Free allowance is locked.
+     */
+    lockedUsers =
+      sortedUsers.slice(
+        remainingToday,
+      );
+  }
+
+  // ========================================================
+  // LOCKED COUNT
+  // ========================================================
+
+  const lockedCount =
+    isFreeUser
+      ? Math.min(
+        lockedUsers.length,
+        FREE_LOCKED_PROFILE_COUNT,
+      )
+      : 0;
+
+  // ========================================================
+  // LOCKED PREVIEWS
+  // ========================================================
+
+  const lockedPreviews =
+    isFreeUser
+      ? lockedUsers
+        .slice(
+          0,
+          LOCKED_PREVIEW_COUNT,
+        )
+        .map(
+          (user) => ({
+            displayName:
+              maskName(
+                user.full_name,
+              ),
+
+            age:
+              maskAge(
+                user.age,
+              ),
+
+            /**
+             * Replace this with actual
+             * verification logic later.
+             */
+            verification: null,
+
+            matchScore:
+              user.matchScore,
+
+            trustScore:
+              user.trust,
+
+            locked: true,
+          }),
+        )
+      : [];
+
+  // ========================================================
+  // FINAL DAILY LIMIT
+  // ========================================================
+
+  const finalSeenToday =
+    isFreeUser
+      ? seenToday
+      : 0;
+
+  const finalRemainingToday =
+    isFreeUser
+      ? remainingToday
+      : PAID_DAILY_PROFILE_LIMIT;
+
 
   // ========================================================
   // TRACK BOOST IMPRESSIONS
   // ========================================================
 
-  const boostedVisibleUsers = sortedUsers.filter(
-    (feedUser) =>
-      feedUser.isBoosted &&
-      feedUser.id !== userId
-  );
+  const boostedVisibleUsers =
+    visibleUsers.filter(
+      (feedUser) =>
+        feedUser.isBoosted &&
+        feedUser.id !== userId
+    );
 
   Promise.all(
     boostedVisibleUsers.map((feedUser) =>
@@ -2584,14 +2798,70 @@ if (
     );
   });
 
+  const showUpgradeGate =
+    isFreeUser &&
+    lockedCount > 0;
+
   // ========================================================
   // RESPONSE
   // ========================================================
 
   return {
-    users: sortedUsers,
-    nextCursor,
+    users: visibleUsers,
+
+    /**
+     * Free user should not paginate
+     * beyond today's allowance.
+     */
+    nextCursor:
+      isFreeUser
+        ? null
+        : nextCursor,
+
     locationFallbackUsed,
+
+    dailyLimit: {
+      plan:
+        isFreeUser
+          ? "FREE"
+          : activeVipPackage
+            ?.package
+            ?.name ?? "PAID",
+
+      limit:
+        dailyProfileLimit,
+
+      seen:
+        finalSeenToday,
+
+      remaining:
+        finalRemainingToday,
+
+      resetAt:
+        tomorrowStart.toISOString(),
+    },
+
+    upgradeGate: {
+      show:
+        showUpgradeGate,
+
+      lockedCount,
+
+      title:
+        showUpgradeGate
+          ? "Your best matches are just behind this"
+          : null,
+
+      subtitle:
+        showUpgradeGate
+          ? `${lockedCount} more verified profiles picked for you today — upgrade to unlock more.`
+          : null,
+
+      lockedProfiles:
+        showUpgradeGate
+          ? lockedPreviews
+          : [],
+    },
   };
 };
 
