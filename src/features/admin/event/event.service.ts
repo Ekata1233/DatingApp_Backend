@@ -987,7 +987,7 @@ export const publishEvent = async (eventId: string) => {
     nextStep: null,
   };
 };
-const getEventBookingStats = async (
+export const getEventBookingStats = async (
   eventId: string,
   totalCapacity: number | null,
 ) => {

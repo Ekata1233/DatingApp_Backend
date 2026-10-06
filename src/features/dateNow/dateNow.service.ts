@@ -1506,18 +1506,29 @@ export const getDatePlanHistory = async (
   console.log("QUERY:", query);
 
   const where = {
-    userId,
+  userId,
 
-    status: {
-      in: [
-        // PlanStatus.ACTIVE,
-        PlanStatus.COMPLETED,
-        // PlanStatus.BOOKED,
-        PlanStatus.CANCELLED,
-        PlanStatus.EXPIRED,
-      ],
+  OR: [
+    {
+      status: {
+        in: [
+          PlanStatus.COMPLETED,
+          PlanStatus.CANCELLED,
+          PlanStatus.EXPIRED,
+        ],
+      },
     },
-  };
+    {
+      feedbacks: {
+        some: {
+          reviewerId: userId,
+          attendanceStatus: DatePlanAttendanceStatus.NO_SHOW,
+          status: DatePlanFeedbackStatus.SUBMITTED,
+        },
+      },
+    },
+  ],
+};
 
   console.log("HISTORY WHERE:", JSON.stringify(where, null, 2));
 
@@ -1534,7 +1545,10 @@ export const getDatePlanHistory = async (
     },
   });
 
-  console.log("ALL USER DATE PLANS:", JSON.stringify(allUserPlans, null, 2));
+  console.log(
+    "ALL USER DATE PLANS:",
+    JSON.stringify(allUserPlans, null, 2),
+  );
 
   const [plans, total] = await prisma.$transaction([
     prisma.datePlan.findMany({
@@ -1553,6 +1567,7 @@ export const getDatePlanHistory = async (
         quickTitle: true,
 
         whoPays: true,
+
         feedbacks: {
           where: {
             reviewerId: userId,
@@ -1566,6 +1581,7 @@ export const getDatePlanHistory = async (
             metUserId: true,
           },
         },
+
         requests: {
           select: {
             id: true,
@@ -1637,10 +1653,12 @@ export const getDatePlanHistory = async (
       where,
     }),
   ]);
+
   console.log("HISTORY PLANS FOUND:", plans.length);
   console.log("HISTORY TOTAL:", total);
 
   console.log("HISTORY PLANS:", JSON.stringify(plans, null, 2));
+
   const data = plans.map((plan) => {
     console.log("========== PROCESSING PLAN ==========");
     console.log("PLAN ID:", plan.id);
@@ -1650,6 +1668,7 @@ export const getDatePlanHistory = async (
     console.log("CONFIRMED DATE:", plan.DateConfirmed);
 
     const confirmed = plan.DateConfirmed?.[0] ?? null;
+
     /**
      * 1. Calculate actual history status
      */
@@ -1677,6 +1696,7 @@ export const getDatePlanHistory = async (
         plan.eventDateTime,
       );
     }
+
     /**
      * 2. UI label
      */
@@ -1698,14 +1718,17 @@ export const getDatePlanHistory = async (
     const requestStats = {
       total: plan._count.requests,
 
-      pending: plan.requests.filter((request) => request.status === "PENDING")
-        .length,
+      pending: plan.requests.filter(
+        (request) => request.status === "PENDING",
+      ).length,
 
-      approved: plan.requests.filter((request) => request.status === "APPROVED")
-        .length,
+      approved: plan.requests.filter(
+        (request) => request.status === "APPROVED",
+      ).length,
 
-      declined: plan.requests.filter((request) => request.status === "DECLINED")
-        .length,
+      declined: plan.requests.filter(
+        (request) => request.status === "DECLINED",
+      ).length,
 
       cancelled: plan.requests.filter(
         (request) => request.status === "CANCELLED",
@@ -1755,16 +1778,16 @@ export const getDatePlanHistory = async (
        */
       participant: participant
         ? {
-          id: participant.id,
+            id: participant.id,
 
-          name: participant.full_name,
+            name: participant.full_name,
 
-          age: participant.birth_date
-            ? calculateAge(participant.birth_date)
-            : null,
+            age: participant.birth_date
+              ? calculateAge(participant.birth_date)
+              : null,
 
-          photoUrl: participant.photos[0]?.media_url ?? null,
-        }
+            photoUrl: participant.photos[0]?.media_url ?? null,
+          }
         : null,
 
       /**
@@ -1772,9 +1795,13 @@ export const getDatePlanHistory = async (
        */
       requests: {
         total: requestStats.total,
+
         pending: requestStats.pending,
+
         approved: requestStats.approved,
+
         declined: requestStats.declined,
+
         cancelled: requestStats.cancelled,
 
         users: plan.requests.map((request) => ({
@@ -1802,12 +1829,12 @@ export const getDatePlanHistory = async (
        */
       confirmedDate: confirmed
         ? {
-          id: confirmed.id,
+            id: confirmed.id,
 
-          status: confirmed.status,
+            status: confirmed.status,
 
-          eventDateTime: confirmed.eventDateTime,
-        }
+            eventDateTime: confirmed.eventDateTime,
+          }
         : null,
 
       /**
@@ -1839,9 +1866,14 @@ export const getDatePlanHistory = async (
     requestedStatus && requestedStatus !== "ALL"
       ? data.filter((item) => item.status === requestedStatus)
       : data;
-  console.log("FINAL HISTORY DATA:", JSON.stringify(filteredData, null, 2));
+
+  console.log(
+    "FINAL HISTORY DATA:",
+    JSON.stringify(filteredData, null, 2),
+  );
 
   console.log("========== END HISTORY DEBUG ==========");
+
   return {
     data: filteredData,
 
@@ -2028,13 +2060,17 @@ export const getDatePlanHistoryDetails = async (
    * MET + SUBMITTED feedback has highest priority.
    */
   const historyStatus =
-    feedback?.attendanceStatus === "MET" && feedback?.status === "SUBMITTED"
+  feedback?.attendanceStatus === DatePlanAttendanceStatus.NO_SHOW &&
+  feedback?.status === DatePlanFeedbackStatus.SUBMITTED
+    ? "NO_SHOW"
+    : feedback?.attendanceStatus === DatePlanAttendanceStatus.MET &&
+        feedback?.status === DatePlanFeedbackStatus.SUBMITTED
       ? "COMPLETED"
       : getHistoryStatus(
-        plan.status,
-        confirmed?.status ?? null,
-        plan.eventDateTime,
-      );
+          plan.status,
+          confirmed?.status ?? null,
+          plan.eventDateTime,
+        );
 
   const statusLabel = getHistoryStatusLabel(historyStatus);
 

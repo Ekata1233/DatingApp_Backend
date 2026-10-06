@@ -1012,22 +1012,31 @@ export const reviewEmploymentVerificationService = async (
     const now = new Date();
 
     const updated = await tx.employmentVerification.updateMany({
-      where: {
-        id: employmentId,
-        status: {
-          in: ["PENDING", "UNDER_REVIEW"],
-        },
-      },
-      data: {
-        status: approved ? "VERIFIED" : "REJECTED",
-         reviewedBy: REVIEWED_BY,
-        reviewedAt: now,
-        verifiedAt: approved ? now : null,
-        rejectionReason: approved
-          ? null
-          : rejectionReason!.trim(),
-      },
-    });
+  where: {
+    id: employmentId,
+    status: {
+      in: ["PENDING", "UNDER_REVIEW"],
+    },
+  },
+
+  data: {
+    status: approved
+      ? "VERIFIED"
+      : "REJECTED",
+
+    reviewedBy: null,
+
+    reviewedAt: now,
+
+    verifiedAt: approved
+      ? now
+      : null,
+
+    rejectionReason: approved
+      ? null
+      : rejectionReason!.trim(),
+  },
+});
 
     if (updated.count !== 1) {
       throw new Error("VERIFICATION_ALREADY_REVIEWED");

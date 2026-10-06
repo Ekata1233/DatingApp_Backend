@@ -424,7 +424,6 @@ export const reviewEducationVerificationService = async (
       where: {
         id: educationId,
       },
-
       include: {
         verification: true,
       },
@@ -454,36 +453,46 @@ export const reviewEducationVerificationService = async (
     );
   }
 
-  const approved =
-    action === "APPROVE";
-
+  const approved = action === "APPROVE";
   const now = new Date();
 
   return prisma.$transaction(
     async (tx) => {
-      const updatedEducation = await tx.educationVerification.update({
-        where: {
-          id: educationId,
-        },
+      // ========================================
+      // 1. Update Education Verification
+      // ========================================
 
-        data: {
-          status: approved
-            ? VerificationStatus.VERIFIED
-            : VerificationStatus.REJECTED,
+      const updatedEducation =
+        await tx.educationVerification.update({
+          where: {
+            id: educationId,
+          },
 
-         reviewedBy: REVIEWED_BY,
+          data: {
+            status: approved
+              ? VerificationStatus.VERIFIED
+              : VerificationStatus.REJECTED,
 
-          reviewedAt: now,
+            // reviewedBy is UUID.
+            // Keep null until admin authentication
+            // provides an actual admin UUID.
+            reviewedBy: null,
 
-          verifiedAt: approved
-            ? now
-            : null,
+            reviewedAt: now,
 
-          rejectionReason: approved
-            ? null
-            : rejectionReason!.trim(),
-        },
-      });
+            verifiedAt: approved
+              ? now
+              : null,
+
+            rejectionReason: approved
+              ? null
+              : rejectionReason!.trim(),
+          },
+        });
+
+      // ========================================
+      // 2. Update Main User Verification
+      // ========================================
 
       await tx.userVerification.update({
         where: {
@@ -510,7 +519,7 @@ export const reviewEducationVerificationService = async (
       });
 
       // ========================================
-      // 3. Recalculate user's trust score
+      // 3. Recalculate Trust Score
       // ========================================
 
       const trustScore =

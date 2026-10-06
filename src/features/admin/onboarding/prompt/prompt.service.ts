@@ -1,6 +1,12 @@
 import { prisma } from "../../../../prisma/prismaClient";
 import { CreatePromptCategoryDto, CreatePromptDto, UpdatePromptCategoryDto, UpdatePromptDto } from "./prompt.types";
+import { redis } from "../../../../lib/redis";
 
+const PROMPT_CATEGORY_CACHE_KEY = "prompt_category:all";
+const PROMPT_CACHE_KEY = "prompt:all";
+const ACTIVE_PROMPT_CACHE_KEY = "prompt:active";
+
+const CACHE_TTL = 600; // 10 minutes
 export const createPromptCategoryService = async (
   data: CreatePromptCategoryDto
 ) => {
@@ -14,21 +20,32 @@ export const createPromptCategoryService = async (
     throw new Error("Prompt category already exists.");
   }
 
-  return prisma.promptCategory.create({
-    data,
-  });
+  const category = await prisma.promptCategory.create({
+  data,
+});
+
+await redis.del(PROMPT_CATEGORY_CACHE_KEY);
+await redis.del(ACTIVE_PROMPT_CACHE_KEY);
+
+return category;
 };
 
 export const updatePromptCategoryService = async (
   id: string,
   data: UpdatePromptCategoryDto
 ) => {
-  return prisma.promptCategory.update({
-    where: {
-      id,
-    },
-    data,
-  });
+ const category = await prisma.promptCategory.update({
+  where: {
+    id,
+  },
+  data,
+});
+
+await redis.del(PROMPT_CATEGORY_CACHE_KEY);
+await redis.del(PROMPT_CACHE_KEY);
+await redis.del(ACTIVE_PROMPT_CACHE_KEY);
+
+return category;
 };
 
 export const deletePromptCategoryService = async (id: string) => {
@@ -45,10 +62,23 @@ export const deletePromptCategoryService = async (id: string) => {
       id,
     },
   });
+  await redis.del(PROMPT_CATEGORY_CACHE_KEY);
+await redis.del(PROMPT_CACHE_KEY);
+await redis.del(ACTIVE_PROMPT_CACHE_KEY);
 };
 
 export const getPromptCategoryService = async () => {
-  return prisma.promptCategory.findMany({
+  const cached = await redis.get(PROMPT_CATEGORY_CACHE_KEY);
+
+  if (cached) {
+    if (typeof cached === "string") {
+      return JSON.parse(cached);
+    }
+
+    return cached;
+  }
+
+  const categories = await prisma.promptCategory.findMany({
     include: {
       _count: {
         select: {
@@ -60,32 +90,54 @@ export const getPromptCategoryService = async () => {
       priority: "asc",
     },
   });
+
+  await redis.set(
+    PROMPT_CATEGORY_CACHE_KEY,
+    JSON.stringify(categories),
+    {
+      ex: CACHE_TTL,
+    }
+  );
+
+  return categories;
 };
 
 export const createPromptService = async (
   data: CreatePromptDto
 ) => {
-  return prisma.prompt.create({
-    data,
-    include: {
-      category: true,
-    },
-  });
+  const prompt = await prisma.prompt.create({
+  data,
+  include: {
+    category: true,
+  },
+});
+
+await redis.del(PROMPT_CACHE_KEY);
+await redis.del(PROMPT_CATEGORY_CACHE_KEY);
+await redis.del(ACTIVE_PROMPT_CACHE_KEY);
+
+return prompt;
 };
 
 export const updatePromptService = async (
   id: string,
   data: UpdatePromptDto
 ) => {
-  return prisma.prompt.update({
-    where: {
-      id,
-    },
-    data,
-    include: {
-      category: true,
-    },
-  });
+  const prompt = await prisma.prompt.update({
+  where: {
+    id,
+  },
+  data,
+  include: {
+    category: true,
+  },
+});
+
+await redis.del(PROMPT_CACHE_KEY);
+await redis.del(PROMPT_CATEGORY_CACHE_KEY);
+await redis.del(ACTIVE_PROMPT_CACHE_KEY);
+
+return prompt;
 };
 
 export const deletePromptService = async (
@@ -104,10 +156,23 @@ export const deletePromptService = async (
       id,
     },
   });
+  await redis.del(PROMPT_CACHE_KEY);
+await redis.del(PROMPT_CATEGORY_CACHE_KEY);
+await redis.del(ACTIVE_PROMPT_CACHE_KEY);
 };
 
 export const getPromptService = async () => {
-  return prisma.prompt.findMany({
+  const cached = await redis.get(PROMPT_CACHE_KEY);
+
+  if (cached) {
+    if (typeof cached === "string") {
+      return JSON.parse(cached);
+    }
+
+    return cached;
+  }
+
+  const prompts = await prisma.prompt.findMany({
     include: {
       category: true,
       _count: {
@@ -127,10 +192,30 @@ export const getPromptService = async () => {
       },
     ],
   });
+
+  await redis.set(
+    PROMPT_CACHE_KEY,
+    JSON.stringify(prompts),
+    {
+      ex: CACHE_TTL,
+    }
+  );
+
+  return prompts;
 };
 
 export const getActivePromptsService = async () => {
-  return prisma.promptCategory.findMany({
+  const cached = await redis.get(ACTIVE_PROMPT_CACHE_KEY);
+
+  if (cached) {
+    if (typeof cached === "string") {
+      return JSON.parse(cached);
+    }
+
+    return cached;
+  }
+
+  const activePrompts = await prisma.promptCategory.findMany({
     where: {
       active: true,
     },
@@ -148,4 +233,14 @@ export const getActivePromptsService = async () => {
       priority: "asc",
     },
   });
+
+  await redis.set(
+    ACTIVE_PROMPT_CACHE_KEY,
+    JSON.stringify(activePrompts),
+    {
+      ex: CACHE_TTL,
+    }
+  );
+
+  return activePrompts;
 };

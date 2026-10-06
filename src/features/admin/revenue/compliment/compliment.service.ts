@@ -5,6 +5,7 @@ import { ICreateComplimentCategory, ICreateComplimentIdea, IUpdateComplimentCate
 
 const ALL_CACHE_KEY = "compliment_category:all";
 const ALL_IDEA_CACHE_KEY = "compliment_ideas:all";
+const CACHE_TTL = 600; // 10 minutes
 /**
  * Create Compliment Category
  */
@@ -73,6 +74,14 @@ export const getAllComplimentCategoryService = async () => {
  * Get Compliment Category By Id
  */
 export const getComplimentCategoryByIdService = async (id: string) => {
+  const CACHE_KEY = `compliment_category:${id}`;
+
+const cached = await redis.get(CACHE_KEY);
+
+if (cached) {
+  console.log("✅ Compliment category from Redis");
+  return cached;
+}
   const category = await prisma.complimentCategory.findUnique({
     where: {
       id,
@@ -82,7 +91,9 @@ export const getComplimentCategoryByIdService = async (id: string) => {
   if (!category) {
     throw new Error("Compliment category not found");
   }
-
+await redis.set(CACHE_KEY, category, {
+  ex: CACHE_TTL,
+});
   return category;
 };
 
@@ -126,8 +137,10 @@ export const updateComplimentCategoryService = async (
   });
 
   await redis.del(ALL_CACHE_KEY);
+await redis.del(`compliment_category:${id}`);
+await redis.del(ALL_IDEA_CACHE_KEY);
 
-  return updated;
+return updated;
 };
 
 /**
@@ -151,7 +164,7 @@ export const deleteComplimentCategoryService = async (id: string) => {
   });
 
   await redis.del(ALL_CACHE_KEY);
-
+await redis.del(`compliment_category:${id}`);
   return {
     message: "Compliment category deleted successfully",
   };
@@ -179,6 +192,8 @@ export const createComplimentIdeaService = async (
   }
 
 
+
+
   const idea = await prisma.complimentIdea.create({
     data: {
       categoryId: payload.categoryId,
@@ -192,7 +207,9 @@ export const createComplimentIdeaService = async (
 
 
   await redis.del(ALL_IDEA_CACHE_KEY);
-
+await redis.del(
+  `compliment_ideas:category:${payload.categoryId}`
+);
 
   return idea;
 };
@@ -248,7 +265,16 @@ export const getAllComplimentIdeaService = async () => {
 export const getComplimentIdeaByCategoryService = async (
   categoryId: string
 ) => {
+const CACHE_KEY = `compliment_ideas:category:${categoryId}`;
 
+const cached = await redis.get(CACHE_KEY);
+
+if (cached) {
+  console.log(
+    `✅ Compliment ideas category ${categoryId} from Redis`
+  );
+  return cached;
+}
   const category = await prisma.complimentCategory.findUnique({
     where: {
       id: categoryId,
@@ -270,7 +296,9 @@ export const getComplimentIdeaByCategoryService = async (
     },
   });
 
-
+await redis.set(CACHE_KEY, ideas, {
+  ex: CACHE_TTL,
+});
   return ideas;
 };
 
@@ -283,7 +311,14 @@ export const getComplimentIdeaByCategoryService = async (
 export const getComplimentIdeaByIdService = async (
   id: string
 ) => {
+const CACHE_KEY = `compliment_idea:${id}`;
 
+const cached = await redis.get(CACHE_KEY);
+
+if (cached) {
+  console.log("✅ Compliment idea from Redis");
+  return cached;
+}
   const idea = await prisma.complimentIdea.findUnique({
     where: {
       id,
@@ -297,7 +332,9 @@ export const getComplimentIdeaByIdService = async (
   if (!idea) {
     throw new Error("Compliment idea not found");
   }
-
+await redis.set(CACHE_KEY, idea, {
+  ex: CACHE_TTL,
+});
 
   return idea;
 };
@@ -320,12 +357,9 @@ export const updateComplimentIdeaService = async (
     },
   });
 
-
   if (!idea) {
     throw new Error("Compliment idea not found");
   }
-
-
 
   if (payload.categoryId) {
 
@@ -355,9 +389,22 @@ export const updateComplimentIdeaService = async (
   });
 
 
-  await redis.del(ALL_IDEA_CACHE_KEY);
+await redis.del(ALL_IDEA_CACHE_KEY);
 
+await redis.del(`compliment_idea:${id}`);
 
+await redis.del(
+  `compliment_ideas:category:${idea.categoryId}`
+);
+
+if (
+  payload.categoryId &&
+  payload.categoryId !== idea.categoryId
+) {
+  await redis.del(
+    `compliment_ideas:category:${payload.categoryId}`
+  );
+}
   return updatedIdea;
 };
 
@@ -395,7 +442,11 @@ export const deleteComplimentIdeaService = async (
 
   await redis.del(ALL_IDEA_CACHE_KEY);
 
+await redis.del(`compliment_idea:${id}`);
 
+await redis.del(
+  `compliment_ideas:category:${idea.categoryId}`
+);
 
   return {
     message: "Compliment idea deleted successfully",

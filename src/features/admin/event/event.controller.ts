@@ -4,6 +4,7 @@ import { UpdateEventExperienceInput } from "./event.types";
 import imagekit from "../../../utils/imagekit";
 import { Type } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
+import { getEventBookingStats } from "./event.service";
 interface EventParams {
   id: string;
 }
@@ -596,3 +597,74 @@ export const getEventCheckoutDetailsController =
       });
     }
   };
+
+  export const getEventBookingStatsController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const eventId = req.params.eventId as string;
+    // ========================================
+    // VALIDATE EVENT ID
+    // ========================================
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        message: "Event ID is required",
+      });
+    }
+
+    // ========================================
+    // FIND EVENT
+    // ========================================
+
+    const event = await prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+      select: {
+        id: true,
+        totalCapacity: true,
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    // ========================================
+    // GET BOOKING STATS
+    // ========================================
+
+    const stats = await getEventBookingStats(
+      event.id,
+      event.totalCapacity,
+    );
+
+    // ========================================
+    // RESPONSE
+    // ========================================
+
+    return res.status(200).json({
+      success: true,
+      message: "Event booking stats fetched successfully",
+      data: stats,
+    });
+  } catch (error: any) {
+    console.error(
+      "Get event booking stats error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to fetch event booking stats",
+    });
+  }
+};

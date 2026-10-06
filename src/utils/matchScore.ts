@@ -72,7 +72,7 @@ export function scoreByDistance(
 
     case 1:
       return maxPoints * 0.8;
-
+   
     case 2:
       return maxPoints * 0.5;
 
