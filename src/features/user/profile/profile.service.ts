@@ -83,7 +83,7 @@ export const updateProfileService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -140,7 +140,7 @@ export const updateInterestedInService = async (
   //   userId,
   // );
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -215,7 +215,7 @@ export const updateReligionService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return updatedProfile;
@@ -292,7 +292,7 @@ export const updateLookingForService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return result;
@@ -359,7 +359,7 @@ export const updateAddressService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return result;
@@ -488,7 +488,7 @@ export const updateLocationService = async (
   console.log("after bullmq")
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return {
@@ -574,7 +574,7 @@ export const updateUserAnswerService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -639,7 +639,7 @@ export const updateEducationService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return {
@@ -715,7 +715,7 @@ export const updateWorkService = async (
 
   await clearFeedUserCache(userId);
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   return {
     eduWork,
@@ -837,7 +837,7 @@ export const updateFamilyProfileService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -923,7 +923,7 @@ export const updateLanguageService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -971,10 +971,10 @@ export const uploadUserMediaService = async (
   // 2. FIND CURRENT HIGHEST ORDER
   // ==================================================
 
- const highestOrder =
-  existingMedia.length > 0
-    ? existingMedia[0].order ?? 0
-    : 0;
+  const highestOrder =
+    existingMedia.length > 0
+      ? existingMedia[0].order ?? 0
+      : 0;
 
   // ==================================================
   // 3. CHECK IF PRIMARY PHOTO ALREADY EXISTS
@@ -1122,9 +1122,9 @@ export const uploadUserMediaService = async (
     `feed:details:${userId}`,
   );
 
-  await clearFeedUserCache(
-    userId,
-  );
+  await clearFeedUserCache(userId,);
+  await clearUserFeedDetailsCache(userId);
+
 
   return {
     media: savedMedia,
@@ -1191,7 +1191,6 @@ export const updateUserMediaService = async (
   await redis.del(`profile:edit:${userId}`);
   //   // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
-  await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return updatedMedia;
 };
@@ -1230,7 +1229,7 @@ export const setPrimaryPhotoService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -1339,14 +1338,11 @@ export const deleteUserMediaService = async (
     `feed:details:${userId}`,
   );
 
-  await clearFeedUserCache(
-    userId,
-  );
+  await clearFeedUserCache(userId,);
+  await clearUserFeedDetailsCache(userId);
 
-  const score =
-    await calculateProfileScore(
-      userId,
-    );
+
+  const score = await calculateProfileScore(userId,);
 
   await prisma.user.update({
     where: {
@@ -1430,7 +1426,7 @@ export const updateUserVideoService = async (
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -1494,7 +1490,7 @@ export const updateUserBioService = async (userId: string, bio?: string) => {
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -1580,7 +1576,7 @@ export const updateUserPromptService = async (
   // await queueMatchScoreCalculation(userId);
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
@@ -1609,7 +1605,6 @@ export const completeOnboardingService = async (userId: string) => {
   // Credit referral reward if applicable
   try {
     await ReferralService.onRegistrationCompleted(userId);
-    console.log("Funtion call ......");
   } catch (error) {
     console.error("Referral registration reward failed:", error);
   }
@@ -1619,7 +1614,7 @@ export const completeOnboardingService = async (userId: string) => {
   // );
 
   await redis.del(`profile:edit:${userId}`);
-    // await redis.del(`feed:details:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
   return user;

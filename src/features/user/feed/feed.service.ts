@@ -649,7 +649,7 @@ export const getFeedService = async ({
     !!filters?.location?.state ||
     !!filters?.location?.country;
 
-    console.log("hasManualLocationFilter", hasManualLocationFilter);
+  console.log("hasManualLocationFilter", hasManualLocationFilter);
 
   // ========================================================
   // RESOLVE MANUAL LOCATION → LAT/LNG
@@ -747,13 +747,13 @@ export const getFeedService = async ({
   // DISTANCE
   // ========================================================
 
-const distanceKm =
-  filters?.distanceKm ??
-  (
-    hasManualLocationFilter
-      ? 100
-      : currentUser.profile.max_distance_km ?? 1000
-  );
+  const distanceKm =
+    filters?.distanceKm ??
+    (
+      hasManualLocationFilter
+        ? 100
+        : currentUser.profile.max_distance_km ?? 1000
+    );
 
   // ========================================================
   // FALLBACK FILTER QUERY
@@ -896,7 +896,7 @@ const distanceKm =
   // REUSABLE SELECT
   // ========================================================
 
-  const userSelect = {
+  const userSelect: Prisma.UserSelect = {
     id: true,
 
     full_name: true,
@@ -955,6 +955,49 @@ const distanceKm =
       orderBy: {
         order:
           "asc" as const,
+      },
+
+      take: 1,
+    },
+    intention: {
+      select: {
+        id: true,
+        option: true,
+        optDescription: true,
+      },
+    },
+
+    userPackages: {
+      where: {
+        status: "ACTIVE",
+
+        OR: [
+          {
+            endDate: null,
+          },
+          {
+            endDate: {
+              gt: now,
+            },
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+
+        package: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+
+      orderBy: {
+        startDate: "desc" as const,
       },
 
       take: 1,
@@ -1596,7 +1639,7 @@ const distanceKm =
 
   if (
     collected.length === 0 &&
-  !hasManualLocationFilter
+    !hasManualLocationFilter
   ) {
     locationFallbackUsed =
       true;
@@ -1902,6 +1945,100 @@ const distanceKm =
       0,
       pageLimit,
     );
+
+    // ========================================================
+// ENSURE DISTANCE FOR FINAL PAGE USERS
+// ========================================================
+
+if (
+  validCurrentUserCoordinates &&
+  myLatitude !== null &&
+  myLongitude !== null
+) {
+  for (const user of page) {
+    // Distance already calculated by PostGIS.
+    if (meterById.has(user.id)) {
+      continue;
+    }
+
+    const candidateLatitude =
+      user.profile?.latitude !== null &&
+      user.profile?.latitude !== undefined
+        ? Number(user.profile.latitude)
+        : null;
+
+    const candidateLongitude =
+      user.profile?.longitude !== null &&
+      user.profile?.longitude !== undefined
+        ? Number(user.profile.longitude)
+        : null;
+
+    const validCandidateCoordinates =
+      candidateLatitude !== null &&
+      candidateLongitude !== null &&
+      Number.isFinite(candidateLatitude) &&
+      Number.isFinite(candidateLongitude) &&
+      candidateLatitude >= -90 &&
+      candidateLatitude <= 90 &&
+      candidateLongitude >= -180 &&
+      candidateLongitude <= 180 &&
+      !(
+        candidateLatitude === 0 &&
+        candidateLongitude === 0
+      );
+
+    if (!validCandidateCoordinates) {
+      continue;
+    }
+
+    // Haversine distance
+    const R = 6371000; // Earth radius in meters
+
+    const toRadians = (degree: number) =>
+      (degree * Math.PI) / 180;
+
+    const lat1 =
+      toRadians(myLatitude);
+
+    const lat2 =
+      toRadians(candidateLatitude);
+
+    const deltaLat =
+      toRadians(
+        candidateLatitude -
+        myLatitude,
+      );
+
+    const deltaLng =
+      toRadians(
+        candidateLongitude -
+        myLongitude,
+      );
+
+    const a =
+      Math.sin(deltaLat / 2) *
+        Math.sin(deltaLat / 2) +
+      Math.cos(lat1) *
+        Math.cos(lat2) *
+        Math.sin(deltaLng / 2) *
+        Math.sin(deltaLng / 2);
+
+    const c =
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a),
+      );
+
+    const meters =
+      R * c;
+
+    meterById.set(
+      user.id,
+      meters,
+    );
+  }
+}
 
   if (filledCursor) {
     nextCursor =
@@ -2269,6 +2406,31 @@ const distanceKm =
           trust: user.trust_score ?? 0,
 
           replyTime,
+
+          lookingFor: user.intention
+            ? {
+              id: user.intention.id,
+              option: user.intention.option,
+              optDescription:
+                user.intention.optDescription,
+            }
+            : null,
+
+          package: user.userPackages?.[0]
+            ? {
+              id: user.userPackages[0].package.id,
+              name: user.userPackages[0].package.name,
+              startDate:
+                user.userPackages[0].startDate,
+              endDate:
+                user.userPackages[0].endDate,
+            }
+            : {
+              id: null,
+              name: "FREE",
+              startDate: null,
+              endDate: null,
+            },
 
           isOnline:
             presence?.isOnline ||
