@@ -39,6 +39,22 @@ export const createNotification = async ({
   // Badge increment
   await incrementBadgeCount(receiverId);
 
+  /**
+   * 4. If user is already viewing
+   *    this conversation, don't send FCM.
+   *
+   * Database notification + socket notification
+   * are already created above.
+   */
+  if (skipPush) {
+    console.log(
+      `FCM push skipped because receiver is viewing chat: ${receiverId}`,
+    );
+
+    return notification;
+  }
+
+  
   // ==========================================
   // 4. CHECK PUSH PERMISSION
   // ==========================================

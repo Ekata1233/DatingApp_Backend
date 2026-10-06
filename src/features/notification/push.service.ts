@@ -49,6 +49,7 @@ export const sendPushNotification = async ({
     }
   });
 
+  
   try {
     const response = await firebaseMessaging.send({
       token: user.device_token,

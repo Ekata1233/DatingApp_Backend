@@ -5,10 +5,10 @@ import { prisma } from "../../prisma/prismaClient";
 type AdmirerDirection = "RECEIVED" | "SENT";
 
 interface GetAdmirersParams {
-    userId: string;
-    direction: AdmirerDirection;
-    page?: number;
-    limit?: number;
+  userId: string;
+  direction: AdmirerDirection;
+  page?: number;
+  limit?: number;
 }
 
 // ==========================================
@@ -16,34 +16,34 @@ interface GetAdmirersParams {
 // ==========================================
 
 const calculateAge = (
-    birthDate: Date | null
+  birthDate: Date | null
 ): number | null => {
-    if (!birthDate) {
-        return null;
-    }
+  if (!birthDate) {
+    return null;
+  }
 
-    const today = new Date();
+  const today = new Date();
 
-    let age =
-        today.getFullYear() -
-        birthDate.getFullYear();
+  let age =
+    today.getFullYear() -
+    birthDate.getFullYear();
 
-    const monthDifference =
-        today.getMonth() -
-        birthDate.getMonth();
+  const monthDifference =
+    today.getMonth() -
+    birthDate.getMonth();
 
-    if (
-        monthDifference < 0 ||
-        (
-            monthDifference === 0 &&
-            today.getDate() <
-            birthDate.getDate()
-        )
-    ) {
-        age--;
-    }
+  if (
+    monthDifference < 0 ||
+    (
+      monthDifference === 0 &&
+      today.getDate() <
+      birthDate.getDate()
+    )
+  ) {
+    age--;
+  }
 
-    return age;
+  return age;
 };
 
 // ==========================================
@@ -51,90 +51,90 @@ const calculateAge = (
 // ==========================================
 
 const getTimeAgo = (
-    date: Date
+  date: Date
 ): string => {
-    const now = new Date();
+  const now = new Date();
 
-    const createdAt =
-        new Date(date);
+  const createdAt =
+    new Date(date);
 
-    const diffMs =
-        now.getTime() -
-        createdAt.getTime();
+  const diffMs =
+    now.getTime() -
+    createdAt.getTime();
 
-    const diffSeconds =
-        Math.floor(
-            diffMs / 1000
-        );
+  const diffSeconds =
+    Math.floor(
+      diffMs / 1000
+    );
 
-    const diffMinutes =
-        Math.floor(
-            diffSeconds / 60
-        );
+  const diffMinutes =
+    Math.floor(
+      diffSeconds / 60
+    );
 
-    const diffHours =
-        Math.floor(
-            diffMinutes / 60
-        );
+  const diffHours =
+    Math.floor(
+      diffMinutes / 60
+    );
 
-    const diffDays =
-        Math.floor(
-            diffHours / 24
-        );
+  const diffDays =
+    Math.floor(
+      diffHours / 24
+    );
 
-    const diffWeeks =
-        Math.floor(
-            diffDays / 7
-        );
+  const diffWeeks =
+    Math.floor(
+      diffDays / 7
+    );
 
-    const diffMonths =
-        Math.floor(
-            diffDays / 30
-        );
+  const diffMonths =
+    Math.floor(
+      diffDays / 30
+    );
 
-    const diffYears =
-        Math.floor(
-            diffDays / 365
-        );
+  const diffYears =
+    Math.floor(
+      diffDays / 365
+    );
 
-    if (diffSeconds < 60) {
-        return "Just now";
-    }
+  if (diffSeconds < 60) {
+    return "Just now";
+  }
 
-    if (diffMinutes < 60) {
-        return `${diffMinutes}m ago`;
-    }
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
 
-    if (diffHours < 24) {
-        return `${diffHours}h ago`;
-    }
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
 
-    if (diffDays === 1) {
-        return "Yesterday";
-    }
+  if (diffDays === 1) {
+    return "Yesterday";
+  }
 
-    if (diffDays < 7) {
-        return `${diffDays} days ago`;
-    }
+  if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  }
 
-    if (diffWeeks < 4) {
-        return `${diffWeeks} week${diffWeeks > 1
-            ? "s"
-            : ""
-            } ago`;
-    }
+  if (diffWeeks < 4) {
+    return `${diffWeeks} week${diffWeeks > 1
+      ? "s"
+      : ""
+      } ago`;
+  }
 
-    if (diffMonths < 12) {
-        return `${diffMonths} month${diffMonths > 1
-            ? "s"
-            : ""
-            } ago`;
-    }
+  if (diffMonths < 12) {
+    return `${diffMonths} month${diffMonths > 1
+      ? "s"
+      : ""
+      } ago`;
+  }
 
-    return `${diffYears} year${diffYears > 1
-        ? "s"
-        : ""
-        } ago`;
+  return `${diffYears} year${diffYears > 1
+    ? "s"
+    : ""
+    } ago`;
 };
 
 // ==========================================
@@ -142,404 +142,445 @@ const getTimeAgo = (
 // ==========================================
 
 export const getAdmirers = async ({
-    userId,
-    direction,
-    page = 1,
-    limit = 20,
+  userId,
+  direction,
+  page = 1,
+  limit = 20,
 }: GetAdmirersParams) => {
 
-    const skip =
-        (page - 1) * limit;
+  const skip =
+    (page - 1) * limit;
 
-    // ==========================================
-    // CHECK ACTIVE PACKAGE
-    // ==========================================
+  // ==========================================
+  // CHECK ACTIVE PACKAGE
+  // ==========================================
 
-    const now =
-        new Date();
+  const now =
+    new Date();
 
-    const activePackage =
-        await prisma.userPackage.findFirst({
-            where: {
-                user_id: userId,
+  const activePackage =
+    await prisma.userPackage.findFirst({
+      where: {
+        user_id: userId,
 
-                status: "ACTIVE",
+        status: "ACTIVE",
 
-                startDate: {
-                    lte: now,
-                },
+        startDate: {
+          lte: now,
+        },
 
-                OR: [
-                    {
-                        endDate: null,
-                    },
-                    {
-                        endDate: {
-                            gte: now,
-                        },
-                    },
-                ],
+        OR: [
+          {
+            endDate: null,
+          },
+          {
+            endDate: {
+              gte: now,
             },
+          },
+        ],
+      },
 
-            select: {
-                id: true,
-                packageId: true,
-                startDate: true,
-                endDate: true,
-                status: true,
-            },
+      select: {
+        id: true,
+        packageId: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+      },
 
-            orderBy: {
-                endDate: "desc",
-            },
-        });
+      orderBy: {
+        endDate: "desc",
+      },
+    });
 
-    const hasActivePackage =
-        !!activePackage;
+  const hasActivePackage =
+    !!activePackage;
 
-    // ==========================================
-    // CURRENT USER LOCATION
-    // ==========================================
+  // ==========================================
+  // CURRENT USER LOCATION
+  // ==========================================
 
-    const currentUser =
-        await prisma.userProfile.findUnique({
-            where: {
-                user_id: userId,
-            },
+  const currentUser =
+    await prisma.userProfile.findUnique({
+      where: {
+        user_id: userId,
+      },
 
-            select: {
-                latitude: true,
-                longitude: true,
-            },
-        });
+      select: {
+        latitude: true,
+        longitude: true,
+      },
+    });
 
-    // ==========================================
-    // CREATE CURRENT USER POSTGIS POINT
-    // ==========================================
+  // ==========================================
+  // CREATE CURRENT USER POSTGIS POINT
+  // ==========================================
 
-    const me =
-        currentUser?.latitude !== null &&
-            currentUser?.latitude !== undefined &&
-            currentUser?.longitude !== null &&
-            currentUser?.longitude !== undefined
+  const me =
+    currentUser?.latitude !== null &&
+      currentUser?.latitude !== undefined &&
+      currentUser?.longitude !== null &&
+      currentUser?.longitude !== undefined
 
-            ? Prisma.sql`
+      ? Prisma.sql`
                 ST_SetSRID(
                     ST_MakePoint(
                         ${Number(
-                currentUser.longitude
-            )},
+        currentUser.longitude
+      )},
                         ${Number(
-                currentUser.latitude
-            )}
+        currentUser.latitude
+      )}
                     ),
                     4326
                 )::geography
             `
 
-            : null;
+      : null;
 
-    // ==========================================
-    // RECEIVED LIKES COUNT
-    // ==========================================
+  // ==========================================
+  // GET ACTIVE MATCHED USER IDS
+  // ==========================================
 
-    const receivedLikesCount =
-        await prisma.userSwipe.count({
-            where: {
-                targetUserId: userId,
+  const activeMatches =
+    await prisma.userMatch.findMany({
+      where: {
+        is_active: true,
+        is_deleted: false,
 
-                action: "LIKE",
-                isMutual: false,
-                swiper: {
-                    deleted_at: null,
-                },
-            },
-        });
+        OR: [
+          {
+            user1Id: userId,
+          },
+          {
+            user2Id: userId,
+          },
+        ],
+      },
 
-    // ==========================================
-    // WHERE CONDITION
-    // ==========================================
+      select: {
+        user1Id: true,
+        user2Id: true,
+      },
+    });
 
-    const where:
-        Prisma.UserSwipeWhereInput = {
+  const matchedUserIds =
+    activeMatches.map((match) =>
+      match.user1Id === userId
+        ? match.user2Id
+        : match.user1Id
+    );
+  // ==========================================
+  // RECEIVED LIKES COUNT
+  // ==========================================
+
+  const receivedLikesCount =
+    await prisma.userSwipe.count({
+      where: {
+        targetUserId: userId,
 
         action: "LIKE",
         isMutual: false,
-        ...(direction === "RECEIVED"
-
-            ? {
-                targetUserId: userId,
-
-                swiper: {
-                    deleted_at: null,
-                },
-            }
-
-            : {
-                swiperId: userId,
-
-                targetUser: {
-                    deleted_at: null,
-                },
-            }),
-    };
-
-    // ==========================================
-    // LOCK RECEIVED LIKES WITHOUT PACKAGE
-    // ==========================================
-
-    if (
-        direction === "RECEIVED" &&
-        !hasActivePackage
-    ) {
-        const total =
-            await prisma.userSwipe.count({
-                where,
-            });
-
-        return {
-            receivedLikesCount,
-
-            isPackageActive: false,
-
-            isLocked: true,
-
-            data: [],
-
-            pagination: {
-                page,
-                limit,
-                total,
-
-                hasNext:
-                    page * limit <
-                    total,
-            },
-        };
-    }
-
-    // ==========================================
-    // FETCH LIKES
-    // ==========================================
-
-    const [
-        swipes,
-        total,
-    ] = await Promise.all([
-
-        prisma.userSwipe.findMany({
-            where,
-
-            include: {
-                swiper: {
-                    select: {
-                        id: true,
-                        full_name: true,
-                        birth_date: true,
-
-                        photos: {
-                            where: {
-                                is_primary: true,
-                            },
-
-                            select: {
-                                id: true,
-                                media_url: true,
-                                media_type: true,
-                            },
-
-                            take: 1,
-                        },
-                    },
-                },
-
-                targetUser: {
-                    select: {
-                        id: true,
-                        full_name: true,
-                        birth_date: true,
-
-                        photos: {
-                            where: {
-                                is_primary: true,
-                            },
-
-                            select: {
-                                id: true,
-                                media_url: true,
-                                media_type: true,
-                            },
-
-                            take: 1,
-                        },
-                    },
-                },
-            },
-
-            orderBy: {
-                created_at: "desc",
-            },
-
-            skip,
-
-            take: limit,
-        }),
-
-        prisma.userSwipe.count({
-            where,
-        }),
-    ]);
-
-    // ==========================================
-    // GET OTHER USER IDS
-    // ==========================================
-
-    const userIds =
-        swipes.map((swipe) =>
-            direction === "RECEIVED"
-                ? swipe.swiper.id
-                : swipe.targetUser.id
-        );
-
-    // ==========================================
-    // FETCH COMPATIBILITY SCORES
-    // ==========================================
-
-    let compatibilityMap =
-        new Map<
-            string,
-            {
-                score: number;
-                percentage: number;
-            }
-        >();
-
-    if (userIds.length > 0) {
-        const compatibilityScores =
-            await prisma.userCompatibility.findMany({
-                where: {
-                    userId,
-
-                    targetUserId: {
-                        in: userIds,
-                    },
-                },
-
-                select: {
-                    targetUserId: true,
-                    score: true,
-                    percentage: true,
-                },
-            });
-
-        compatibilityMap =
-            new Map(
-                compatibilityScores.map(
-                    (compatibility) => [
-                        compatibility.targetUserId,
-                        {
-                            score:
-                                compatibility.score,
-
-                            percentage:
-                                compatibility.percentage,
-                        },
-                    ]
-                )
-            );
-    }
-
-    // ==========================================
-    // FETCH MATCHES
-    // ==========================================
-
-    const matches =
-        userIds.length > 0
-            ? await prisma.userMatch.findMany({
-                where: {
-                    is_active: true,
-
-                    is_deleted: false,
-
-                    OR: [
-                        {
-                            user1Id: userId,
-
-                            user2Id: {
-                                in: userIds,
-                            },
-                        },
-
-                        {
-                            user2Id: userId,
-
-                            user1Id: {
-                                in: userIds,
-                            },
-                        },
-                    ],
-                },
-
-                select: {
-                    user1Id: true,
-                    user2Id: true,
-                    matched_at: true,
-                },
-            })
-            : [];
-
-    // ==========================================
-    // CREATE MATCH MAP
-    // ==========================================
-
-    const matchMap =
-        new Map<
-            string,
-            {
-                isMatch: boolean;
-                matchedAt: Date | null;
-            }
-        >();
-
-    matches.forEach((match) => {
-
-        const matchedUserId =
-            match.user1Id === userId
-                ? match.user2Id
-                : match.user1Id;
-
-        matchMap.set(
-            matchedUserId,
-            {
-                isMatch: true,
-                matchedAt:
-                    match.matched_at,
-            }
-        );
+        swiperId: {
+          notIn: matchedUserIds,
+        },
+        swiper: {
+          deleted_at: null,
+        },
+      },
     });
 
-    // ==========================================
-    // DISTANCE MAP
-    // ==========================================
 
-    let distanceMap =
-        new Map<
-            string,
-            number | null
-        >();
 
-    if (
-        me &&
-        userIds.length > 0
-    ) {
-        const distances =
-            await prisma.$queryRaw<
-                {
-                    user_id: string;
-                    distance_km:
-                    number | null;
-                }[]
-            >`
+  // ==========================================
+  // WHERE CONDITION
+  // ==========================================
+
+  const where:
+    Prisma.UserSwipeWhereInput = {
+
+    action: "LIKE",
+    isMutual: false,
+    ...(direction === "RECEIVED"
+
+      ? {
+        targetUserId: userId,
+        swiperId: {
+          notIn: matchedUserIds,
+        },
+        swiper: {
+          deleted_at: null,
+        },
+      }
+
+      : {
+        swiperId: userId,
+        targetUserId: {
+          notIn: matchedUserIds,
+        },
+        targetUser: {
+          deleted_at: null,
+        },
+      }),
+  };
+
+  // ==========================================
+  // LOCK RECEIVED LIKES WITHOUT PACKAGE
+  // ==========================================
+
+  if (
+    direction === "RECEIVED" &&
+    !hasActivePackage
+  ) {
+    const total =
+      await prisma.userSwipe.count({
+        where,
+      });
+
+    return {
+      receivedLikesCount,
+
+      isPackageActive: false,
+
+      isLocked: true,
+
+      data: [],
+
+      pagination: {
+        page,
+        limit,
+        total,
+
+        hasNext:
+          page * limit <
+          total,
+      },
+    };
+  }
+
+  // ==========================================
+  // FETCH LIKES
+  // ==========================================
+
+  const [
+    swipes,
+    total,
+  ] = await Promise.all([
+
+    prisma.userSwipe.findMany({
+      where,
+
+      include: {
+        swiper: {
+          select: {
+            id: true,
+            full_name: true,
+            birth_date: true,
+
+            photos: {
+              where: {
+                is_primary: true,
+              },
+
+              select: {
+                id: true,
+                media_url: true,
+                media_type: true,
+              },
+
+              take: 1,
+            },
+          },
+        },
+
+        targetUser: {
+          select: {
+            id: true,
+            full_name: true,
+            birth_date: true,
+
+            photos: {
+              where: {
+                is_primary: true,
+              },
+
+              select: {
+                id: true,
+                media_url: true,
+                media_type: true,
+              },
+
+              take: 1,
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        created_at: "desc",
+      },
+
+      skip,
+
+      take: limit,
+    }),
+
+    prisma.userSwipe.count({
+      where,
+    }),
+  ]);
+
+  // ==========================================
+  // GET OTHER USER IDS
+  // ==========================================
+
+  const userIds =
+    swipes.map((swipe) =>
+      direction === "RECEIVED"
+        ? swipe.swiper.id
+        : swipe.targetUser.id
+    );
+
+  // ==========================================
+  // FETCH COMPATIBILITY SCORES
+  // ==========================================
+
+  let compatibilityMap =
+    new Map<
+      string,
+      {
+        score: number;
+        percentage: number;
+      }
+    >();
+
+  if (userIds.length > 0) {
+    const compatibilityScores =
+      await prisma.userCompatibility.findMany({
+        where: {
+          userId,
+
+          targetUserId: {
+            in: userIds,
+          },
+        },
+
+        select: {
+          targetUserId: true,
+          score: true,
+          percentage: true,
+        },
+      });
+
+    compatibilityMap =
+      new Map(
+        compatibilityScores.map(
+          (compatibility) => [
+            compatibility.targetUserId,
+            {
+              score:
+                compatibility.score,
+
+              percentage:
+                compatibility.percentage,
+            },
+          ]
+        )
+      );
+  }
+
+  // ==========================================
+  // FETCH MATCHES
+  // ==========================================
+
+  const matches =
+    userIds.length > 0
+      ? await prisma.userMatch.findMany({
+        where: {
+          is_active: true,
+
+          is_deleted: false,
+
+          OR: [
+            {
+              user1Id: userId,
+
+              user2Id: {
+                in: userIds,
+              },
+            },
+
+            {
+              user2Id: userId,
+
+              user1Id: {
+                in: userIds,
+              },
+            },
+          ],
+        },
+
+        select: {
+          user1Id: true,
+          user2Id: true,
+          matched_at: true,
+        },
+      })
+      : [];
+
+  // ==========================================
+  // CREATE MATCH MAP
+  // ==========================================
+
+  const matchMap =
+    new Map<
+      string,
+      {
+        isMatch: boolean;
+        matchedAt: Date | null;
+      }
+    >();
+
+  matches.forEach((match) => {
+
+    const matchedUserId =
+      match.user1Id === userId
+        ? match.user2Id
+        : match.user1Id;
+
+    matchMap.set(
+      matchedUserId,
+      {
+        isMatch: true,
+        matchedAt:
+          match.matched_at,
+      }
+    );
+  });
+
+  // ==========================================
+  // DISTANCE MAP
+  // ==========================================
+
+  let distanceMap =
+    new Map<
+      string,
+      number | null
+    >();
+
+  if (
+    me &&
+    userIds.length > 0
+  ) {
+    const distances =
+      await prisma.$queryRaw<
+        {
+          user_id: string;
+          distance_km:
+          number | null;
+        }[]
+      >`
                 SELECT
                     p.user_id::text AS user_id,
 
@@ -557,162 +598,153 @@ export const getAdmirers = async ({
 
                 WHERE p.user_id IN (
                     ${Prisma.join(
-                userIds.map(
-                    (id) =>
-                        Prisma.sql`${id}::uuid`
-                )
-            )}
+        userIds.map(
+          (id) =>
+            Prisma.sql`${id}::uuid`
+        )
+      )}
                 )
             `;
 
-        distanceMap =
-            new Map(
-                distances.map(
-                    (item) => [
-                        item.user_id,
-                        item.distance_km,
-                    ]
-                )
-            );
-    }
+    distanceMap =
+      new Map(
+        distances.map(
+          (item) => [
+            item.user_id,
+            item.distance_km,
+          ]
+        )
+      );
+  }
 
-    // ==========================================
-    // FORMAT DATA
-    // ==========================================
+  // ==========================================
+  // FORMAT DATA
+  // ==========================================
 
-    const data =
-        swipes.map((swipe) => {
+  const data =
+    swipes.map((swipe) => {
 
-            const user =
-                direction === "RECEIVED"
-                    ? swipe.swiper
-                    : swipe.targetUser;
+      const user =
+        direction === "RECEIVED"
+          ? swipe.swiper
+          : swipe.targetUser;
 
-            const compatibility =
-                compatibilityMap.get(
-                    user.id
-                );
+      const compatibility =
+        compatibilityMap.get(
+          user.id
+        );
 
-            const match =
-                matchMap.get(
-                    user.id
-                );
+      const match =
+        matchMap.get(
+          user.id
+        );
 
-            const isMatch =
-                match?.isMatch ??
-                false;
+      const isMatch =
+        match?.isMatch ??
+        false;
 
-            const matchedAt =
-                match?.matchedAt ??
-                null;
+      const matchedAt =
+        match?.matchedAt ??
+        null;
 
-            return {
-                interactionId:
-                    swipe.id,
+      return {
+        interactionId:
+          swipe.id,
 
-                type: "LIKE",
+        type: "LIKE",
 
-                user: {
-                    id:
-                        user.id,
+        user: {
+          id:
+            user.id,
 
-                    name:
-                        user.full_name,
+          name:
+            user.full_name,
 
-                    age:
-                        calculateAge(
-                            user.birth_date
-                        ),
+          age:
+            calculateAge(
+              user.birth_date
+            ),
 
-                    profileImage:
-                        user.photos[0]
-                            ?.media_url ??
-                        null,
+          profileImage:
+            user.photos[0]
+              ?.media_url ??
+            null,
 
-                    distanceKm:
-                        distanceMap.get(
-                            user.id
-                        ) ??
-                        null,
+          distanceKm:
+            distanceMap.get(
+              user.id
+            ) ??
+            null,
 
-                    matchScore:
-                        compatibility
-                            ?.percentage ??
-                        0,
-                },
-
-                // ==========================================
-                // LIKE INFO
-                // ==========================================
-
-                createdAt:
-                    swipe.created_at,
-
-                timeAgo:
-                    getTimeAgo(
-                        swipe.created_at
-                    ),
-
-                // ==========================================
-                // MATCH INFO
-                // ==========================================
-
-                isMatch,
-
-                matchedAt,
-
-                // ==========================================
-                // SENT / SEEN / MATCHED STATUS
-                // ==========================================
-
-                likeStatus: {
-                    sent: true,
-
-                    // STATIC FOR NOW
-                    // No database field required
-                    seen: true,
-
-                    // Dynamic from UserMatch
-                    matched:
-                        isMatch,
-                },
-            };
-        });
-
-    // ==========================================
-    // FINAL RESPONSE
-    // ==========================================
-
-    return {
-        receivedLikesCount,
-
-        isPackageActive:
-            hasActivePackage,
-
-        isLocked: false,
-
-        data,
-
-        pagination: {
-            page,
-            limit,
-            total,
-
-            hasNext:
-                page * limit <
-                total,
+          matchScore:
+            compatibility
+              ?.percentage ??
+            0,
         },
-    };
+
+        // ==========================================
+        // LIKE INFO
+        // ==========================================
+
+        createdAt:
+          swipe.created_at,
+
+        timeAgo:
+          getTimeAgo(
+            swipe.created_at
+          ),
+
+        // ==========================================
+        // MATCH INFO
+        // ==========================================
+
+        isMatch,
+
+        matchedAt,
+
+        // ==========================================
+        // SENT / SEEN / MATCHED STATUS
+        // ==========================================
+
+        likeStatus: {
+          sent: true,
+
+          // STATIC FOR NOW
+          // No database field required
+          seen: true,
+
+          // Dynamic from UserMatch
+          matched:
+            isMatch,
+        },
+      };
+    });
+
+  // ==========================================
+  // FINAL RESPONSE
+  // ==========================================
+
+  return {
+    receivedLikesCount,
+
+    isPackageActive:
+      hasActivePackage,
+
+    isLocked: false,
+
+    data,
+
+    pagination: {
+      page,
+      limit,
+      total,
+
+      hasNext:
+        page * limit <
+        total,
+    },
+  };
 };
-
-
-
-
-/**
- * ============================================
- * CALCULATE AGE
- * ============================================
- */
 
 
 /**
@@ -1114,7 +1146,7 @@ export const getAdmirerDetailsService =
           await prisma.$queryRaw<
             {
               distance_meters:
-                number | null;
+              number | null;
             }[]
           >(
             Prisma.sql`
@@ -1155,7 +1187,7 @@ export const getAdmirerDetailsService =
             Math.round(
               (Number(meters) /
                 1000) *
-                100,
+              100,
             ) / 100;
         }
       }
@@ -1228,118 +1260,118 @@ export const getAdmirerDetailsService =
     // ==========================================
 
     return {
-  // ========================================
-  // 1. USER NAME + AGE
-  // ========================================
+      // ========================================
+      // 1. USER NAME + AGE
+      // ========================================
 
-  full_name:
-    admirer.full_name,
+      full_name:
+        admirer.full_name,
 
-  birth_date:
-    admirer.birth_date,
+      birth_date:
+        admirer.birth_date,
 
-  age:
-    calculateAge(
-      admirer.birth_date,
-    ),
+      age:
+        calculateAge(
+          admirer.birth_date,
+        ),
 
-  // ========================================
-  // 2. PHOTO
-  // ========================================
+      // ========================================
+      // 2. PHOTO
+      // ========================================
 
-  photo: firstPhoto
-    ? {
-        id:
-          firstPhoto.id,
+      photo: firstPhoto
+        ? {
+          id:
+            firstPhoto.id,
 
-        media_url:
-          firstPhoto.media_url,
+          media_url:
+            firstPhoto.media_url,
 
-        media_type:
-          firstPhoto.media_type,
+          media_type:
+            firstPhoto.media_type,
 
-        is_primary:
-          firstPhoto.is_primary,
+          is_primary:
+            firstPhoto.is_primary,
 
-        order:
-          firstPhoto.order,
-      }
-    : null,
+          order:
+            firstPhoto.order,
+        }
+        : null,
 
-  // ========================================
-  // 3. PROFESSION
-  // ========================================
+      // ========================================
+      // 3. PROFESSION
+      // ========================================
 
-  profession:
-    admirer.eduWork
-      ?.profession ?? null,
+      profession:
+        admirer.eduWork
+          ?.profession ?? null,
 
-  // ========================================
-  // 4. TRUST
-  // ========================================
+      // ========================================
+      // 4. TRUST
+      // ========================================
 
-  trust_score:
-    admirer.trust_score ?? 0,
+      trust_score:
+        admirer.trust_score ?? 0,
 
-  // ========================================
-  // 5. MATCH - STATIC
-  // ========================================
+      // ========================================
+      // 5. MATCH - STATIC
+      // ========================================
 
-  matchScore: 75,
+      matchScore: 75,
 
-  // ========================================
-  // 6. DISTANCE
-  // ========================================
+      // ========================================
+      // 6. DISTANCE
+      // ========================================
 
-  distanceKm,
-
-  distanceLabel:
-    formatDistance(
       distanceKm,
-    ),
 
-  // ========================================
-  // 7. WHY THEY LIKED YOU
-  // UserCompliment.message
-  // ========================================
+      distanceLabel:
+        formatDistance(
+          distanceKm,
+        ),
 
-  whyTheyLikedYou:
-    compliment?.message ??
-    null,
+      // ========================================
+      // 7. WHY THEY LIKED YOU
+      // UserCompliment.message
+      // ========================================
 
-  // ========================================
-  // 8. BASICS
-  // ========================================
+      whyTheyLikedYou:
+        compliment?.message ??
+        null,
 
-  basics: {
-    lookingFor:
-      admirer.looking_for ??
-      null,
+      // ========================================
+      // 8. BASICS
+      // ========================================
 
-    height:
-      admirer.height,
+      basics: {
+        lookingFor:
+          admirer.looking_for ??
+          null,
 
-    heightFormatted:
-      formatHeight(
-        admirer.height,
-      ),
+        height:
+          admirer.height,
 
-    collegeName:
-      admirer.eduWork
-        ?.collegeName ?? null,
+        heightFormatted:
+          formatHeight(
+            admirer.height,
+          ),
 
-    highestEdu:
-      admirer.eduWork
-        ?.highestEdu ?? null,
+        collegeName:
+          admirer.eduWork
+            ?.collegeName ?? null,
 
-    lifestyle:
-      lifestyleAnswers,
-  },
+        highestEdu:
+          admirer.eduWork
+            ?.highestEdu ?? null,
 
-  // ========================================
-  // 9. INTERESTS
-  // ========================================
+        lifestyle:
+          lifestyleAnswers,
+      },
 
-  interests,
-};
+      // ========================================
+      // 9. INTERESTS
+      // ========================================
+
+      interests,
+    };
   };
