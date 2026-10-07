@@ -198,155 +198,168 @@ export const relationshipTagController = {
      * /api/relationship-tags/proposals/:proposalId/accept
      */
     async acceptProposal(
-        req: Request,
-        res: Response
-    ) {
-        try {
-            /**
-             * ----------------------------------------
-             * Get authenticated user
-             * ----------------------------------------
-             */
-            const userId = (req as any).user?.id;
+    req: Request,
+    res: Response
+) {
+    try {
 
-            const { proposalId } = req.params as {
-                proposalId: string;
-            };
+        // =====================================================
+        // GET LOGGED-IN USER
+        // =====================================================
 
-            if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: "Unauthorized",
-                });
-            }
+        const userId =
+            (req as any).user?.id;
 
-            // ========================================
-            // Validate proposal ID
-            // ========================================
-
-            if (!proposalId) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Proposal ID is required",
-                });
-            }
-
-            // ========================================
-            // Accept proposal
-            // ========================================
-
-            const result =
-                await relationshipTagService.acceptProposal(
-                    proposalId,
-                    userId
-                );
-
-
-            // ========================================
-            // SOCKET.IO
-            // ========================================
-
-            // const io = getIO();
-
-
-            // // Sender + receiver
-            // const senderId =
-            //     result.message.metadata &&
-            //         typeof result.message.metadata === "object"
-            //         ? (result.message.metadata as any).senderId
-            //         : null;
-
-            // const receiverId =
-            //     result.message.metadata &&
-            //         typeof result.message.metadata === "object"
-            //         ? (result.message.metadata as any).receiverId
-            //         : null;
-
-
-            // ========================================
-            // Emit to sender
-            // ========================================
-
-            // if (senderId) {
-            //     io.to(`user:${senderId}`).emit(
-            //         "message:receive",
-            //         result.message
-            //     );
-            // }
-
-
-            // ========================================
-            // Emit to receiver
-            // ========================================
-
-            // if (receiverId) {
-            //     io.to(`user:${receiverId}`).emit(
-            //         "message:receive",
-            //         result.message
-            //     );
-            // }
-
-
-            // ========================================
-            // Response
-            // ========================================
-
-            return res.status(200).json({
-                success: true,
-
-                message:
-                    "Relationship tag proposal accepted successfully",
-
-                data: {
-                    id: result.id,
-
-                    tag: result.tag,
-
-                    status: result.status,
-
-                    startedAt: result.startedAt,
-
-                    partner: result.partner,
-
-                    proposal: result.proposal,
-                },
-            });
-        } catch (error: any) {
-            console.error(
-                "acceptRelationshipTagProposalController error:",
-                error
-            );
-
-            const businessErrors = [
-                "Relationship tag proposal not found",
-                "You are not allowed to accept this proposal",
-                "This relationship tag proposal is no longer pending",
-                "You already have an active relationship with this user",
-            ];
-
-            if (businessErrors.includes(error.message)) {
-                let statusCode = 400;
-
-                if (
-                    error.message ===
-                    "Relationship tag proposal not found"
-                ) {
-                    statusCode = 404;
-                }
-
-                return res.status(statusCode).json({
-                    success: false,
-                    message: error.message,
-                });
-            }
-
-            return res.status(500).json({
+        if (!userId) {
+            return res.status(401).json({
                 success: false,
-                message:
-                    "Failed to accept relationship tag proposal",
+                message: "Unauthorized",
             });
         }
-    },
+
+
+        // =====================================================
+        // GET PROPOSAL ID
+        // =====================================================
+
+        const {
+            proposalId,
+        } = (req as any).params;
+
+        if (!proposalId) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Proposal ID is required",
+            });
+        }
+
+
+        // =====================================================
+        // ACCEPT PROPOSAL
+        // =====================================================
+
+        const result =
+            await relationshipTagService.acceptProposal(
+                proposalId,
+                userId
+            );
+
+
+        // =====================================================
+        // SUCCESS RESPONSE
+        // =====================================================
+
+        return res.status(200).json({
+            success: true,
+
+            message:
+                "Relationship tag proposal accepted successfully",
+
+            data: {
+
+                // =============================================
+                // NEW ACTIVE RELATIONSHIP
+                // =============================================
+
+                id:
+                    result.id,
+
+                tag:
+                    result.tag,
+
+                status:
+                    result.status,
+
+                startedAt:
+                    result.startedAt,
+
+
+                // =============================================
+                // NEW PARTNER
+                // =============================================
+
+                partner:
+                    result.partner,
+
+
+                // =============================================
+                // ACCEPTED PROPOSAL
+                // =============================================
+
+                proposal:
+                    result.proposal,
+
+
+                // =============================================
+                // OLD ENDED RELATIONSHIP
+                // =============================================
+
+                endedRelationship:
+                    result.endedRelationship,
+
+
+                // =============================================
+                // MESSAGE FOR NEW PARTNER
+                // =============================================
+
+                acceptedMessage:
+                    result.acceptedMessage,
+            },
+        });
+
+    } catch (error: any) {
+
+        console.error(
+            "ACCEPT RELATIONSHIP TAG PROPOSAL ERROR:",
+            error
+        );
+
+
+        // =====================================================
+        // BUSINESS ERRORS
+        // =====================================================
+
+        const businessErrors = [
+            "Relationship tag proposal not found",
+
+            "You are not allowed to accept this proposal",
+
+            "This relationship tag proposal is no longer pending",
+
+            "You already have an active relationship with this user",
+
+            "Proposal sender already has an active relationship",
+
+            "Conversation not found between users",
+        ];
+
+
+        if (
+            businessErrors.includes(
+                error.message
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    error.message,
+            });
+        }
+
+
+        // =====================================================
+        // INTERNAL SERVER ERROR
+        // =====================================================
+
+        return res.status(500).json({
+            success: false,
+
+            message:
+                "Something went wrong while accepting relationship tag proposal",
+        });
+    }
+},
 
     async rejectProposal(
         req: Request,

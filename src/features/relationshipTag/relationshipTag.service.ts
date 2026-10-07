@@ -184,50 +184,182 @@ export const relationshipTagService = {
    * Accept proposal
    * ----------------------------------------
    */
- async acceptProposal(
-  proposalId: string,
-  userId: string
+async acceptProposal(
+    proposalId: string,
+    userId: string
 ) {
-  const result =
-    await relationshipTagRepository.acceptProposal(
-      proposalId,
-      userId
-    );
+    const result =
+        await relationshipTagRepository.acceptProposal(
+            proposalId,
+            userId
+        );
 
-  const {
-    relationship,
-    proposal,
-    message,
-  } = result;
+    const {
+        relationship,
+        proposal,
+        message,
+        previousRelationship,
+    } = result;
 
-  // Determine partner
-  const partner =
-    userId === proposal.senderId
-      ? proposal.receiver
-      : proposal.sender;
 
-  return {
-    id: relationship.id,
+    // =====================================================
+    // NEW ACCEPTED PARTNER
+    // =====================================================
 
-    tag: relationship.tag,
+    const partner =
+        userId === proposal.senderId
+            ? proposal.receiver
+            : proposal.sender;
 
-    status: relationship.status,
 
-    startedAt: relationship.startedAt,
+    // =====================================================
+    // RETURN COMPLETE RESPONSE
+    // =====================================================
 
-    partner: {
-      id: partner.id,
-      fullName: partner.full_name,
-    },
+    return {
 
-    proposal: {
-      id: proposal.id,
-      status: proposal.status,
-      respondedAt: proposal.respondedAt,
-    },
+        // =================================================
+        // NEW ACTIVE RELATIONSHIP
+        // =================================================
 
-    message,
-  };
+        id:
+            relationship.id,
+
+        tag:
+            relationship.tag,
+
+        status:
+            relationship.status,
+
+        startedAt:
+            relationship.startedAt,
+
+
+        // =================================================
+        // NEW PARTNER
+        // =================================================
+
+        partner: {
+            id:
+                partner.id,
+
+            fullName:
+                partner.full_name,
+        },
+
+
+        // =================================================
+        // ACCEPTED PROPOSAL
+        // =================================================
+
+        proposal: {
+            id:
+                proposal.id,
+
+            status:
+                proposal.status,
+
+            respondedAt:
+                proposal.respondedAt,
+        },
+
+
+        // =================================================
+        // OLD ENDED RELATIONSHIP
+        // =================================================
+
+        endedRelationship:
+            previousRelationship
+                ? {
+                    id:
+                        previousRelationship.id,
+
+                    tag:
+                        previousRelationship.tag,
+
+                    status:
+                        previousRelationship.status,
+
+                    startedAt:
+                        previousRelationship.startedAt,
+
+                    endedAt:
+                        previousRelationship.endedAt,
+
+
+                    // =====================================
+                    // OLD PARTNER B
+                    // =====================================
+
+                    user:
+                        previousRelationship.partner
+                            ? {
+                                id:
+                                    previousRelationship.partner.id,
+
+                                fullName:
+                                    previousRelationship.partner.full_name,
+                            }
+                            : null,
+
+
+                    // =====================================
+                    // MESSAGE SENT TO OLD PARTNER B
+                    // =====================================
+
+                    message:
+                        previousRelationship.message
+                            ? {
+                                id:
+                                    previousRelationship.message.id,
+
+                                conversationId:
+                                    previousRelationship.message.conversationId,
+
+                                senderId:
+                                    previousRelationship.message.senderId,
+
+                                content:
+                                    previousRelationship.message.content,
+
+                                messageType:
+                                    previousRelationship.message.messageType,
+
+                                createdAt:
+                                    previousRelationship.message.createdAt,
+                            }
+                            : null,
+                }
+                : null,
+
+
+        // =================================================
+        // NEW RELATIONSHIP ACCEPTED MESSAGE
+        // =================================================
+
+        acceptedMessage:
+            message
+                ? {
+                    id:
+                        message.id,
+
+                    conversationId:
+                        message.conversationId,
+
+                    senderId:
+                        message.senderId,
+
+                    content:
+                        message.content,
+
+                    messageType:
+                        message.messageType,
+
+                    createdAt:
+                        message.createdAt,
+                }
+                : null,
+    };
 },
 
   async rejectProposal(
