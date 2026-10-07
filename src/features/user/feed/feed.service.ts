@@ -2594,3 +2594,312 @@ if (
     locationFallbackUsed,
   };
 };
+
+export const getFeedDetailsService = async (
+  userId: string,
+  currentUserId: string
+): Promise<UserFeedResponse> => {
+  const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
+
+  // =====================================================
+  // 1. PREVENT SELF PROFILE VIEW
+  // =====================================================
+
+  const shouldTrackProfileView =
+    userId !== currentUserId;
+
+  // =====================================================
+  // 2. CHECK REDIS
+  // =====================================================
+
+  const cachedFeedDetails =
+    await redis.get<UserFeedResponse>(CACHE_KEY);
+
+  if (cachedFeedDetails) {
+
+    console.log("✅ Feed Details from Redis");
+
+    // Track even when profile comes from Redis
+    if (shouldTrackProfileView) {
+      await trackBoostEvent({
+        targetUserId: userId,       // Profile owner
+        actorId: currentUserId,      // Person viewing profile
+        type: "PROFILE_VIEW",
+      });
+    }
+
+    return cachedFeedDetails;
+  }
+
+
+  // =====================================================
+  // 3. GET PROFILE FROM DATABASE
+  // =====================================================
+
+  console.log("📦 Feed Details from Database");
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      profile: {
+        include: {
+          religion: true,
+          community: true,
+          languages: {
+            include: {
+              language: true
+            }
+          }
+        }
+      },
+      bio: true,
+      intention: true,
+      about: true,
+      eduWork: {
+        include: {
+          profession: true,
+          employmentType: true,
+          experience: true,
+          ambition: true,
+          salaryRange: true
+        }
+      },
+      familyProfile: {
+        include: {
+          familyStatus: true,
+          familyType: true,
+          fatherOccupation: true,
+          fatherOrganisation: true,
+          motherOccupation: true,
+          motherOrganisation: true,
+          familyHome: true,
+          nativePlace: true,
+          familyIncome: true,
+          siblings: {
+            include: {
+              siblingType: true,
+              occupation: true,
+              marital: true,
+            },
+          },
+        }
+      },
+      photos: {
+        orderBy: {
+          order: 'asc'
+        }
+      },
+      userPrompts: {
+        include: {
+          prompt: {
+            include: {
+              category: true
+            }
+          }
+        },
+        orderBy: {
+          displayOrder: 'asc'
+        }
+      },
+      answer: {
+        include: {
+          question: true,
+          option: true
+        }
+      }
+    }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // =====================================================
+  // 4. GET REPLY TIME FOR THIS PARTICULAR USER
+  // =====================================================
+
+  const replyStats = await prisma.userReplyStats.findUnique({
+    where: {
+      userId: userId,
+    },
+    select: {
+      userId: true,
+      medianReplyMinutes: true,
+      sampleCount: true,
+    },
+  });
+
+  // Same logic as your main Feed API
+  const replyTime =
+    replyStats &&
+      replyStats.medianReplyMinutes !== null &&
+      replyStats.sampleCount >= MIN_REPLY_SAMPLES
+      ? getReplyTimeLabel(replyStats.medianReplyMinutes) ?? ""
+      : "";
+
+  // 3. Transform data
+  const response: UserFeedResponse = transformUserData(user, replyTime);
+
+  // 4. Save to Redis
+  await redis.set(CACHE_KEY, response, {
+    ex: CACHE_TTL,
+  });
+
+  console.log("💾 Feed Details cached");
+
+  // =====================================================
+  // 6. TRACK BOOST PROFILE VIEW
+  // =====================================================
+
+  if (shouldTrackProfileView) {
+
+    await trackBoostEvent({
+      targetUserId: userId,
+      actorId: currentUserId,
+      type: "PROFILE_VIEW",
+    });
+  }
+
+  // =====================================================
+  // 7. RETURN
+  // =====================================================
+  return response;
+};
+
+// Helper function to transform user data
+const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
+  // Extract lifestyle answers (screen = LIFESTYLE)
+  const lifestyleAnswers = user.answer.filter(
+    (a: any) => a.question.screen === 'LIFESTYLE'
+  );
+
+  // Extract interests (screen = THINGS_U_LOVE)
+  const interestAnswers = user.answer.filter(
+    (a: any) => a.question.screen === 'THINGS_U_LOVE'
+  );
+
+  // Extract networking (screen = NETWORKING)
+  const networkingAnswers = user.answer.filter(
+    (a: any) => a.question.screen === 'NETWORKING_INTENT'
+  );
+
+  // Calculate age from birth_date
+  const age = calculateAge(user.birth_date);
+
+  // Get primary photo
+  const primaryPhoto = user.photos.find((p: any) => p.is_primary) || user.photos[0];
+
+  // Get mother tongue from languages
+  const motherTongue = user.profile?.languages?.[0]?.language?.name || null;
+
+  // Extract zodiac sign from birth_date
+  const zodiac = user.about?.zodiac || null;
+  const communicationStyle = user.about?.communicationStyle || null;
+  const loveLanguage = user.about?.loveLanguage || null;
+
+  return {
+    userId: user.id,
+    fullName: user.full_name,
+    age: age,
+    gender: user.gender,
+    phone_number: user.phone_number,
+
+    // Static values
+    matchScore: STATIC_MATCH_SCORE,
+    trust: user.trust_score ?? 0,
+    replyTime: replyTime,
+    // Basic Info
+    bio: user.bio?.bio || null,
+    lookingFor: user.intention?.option || null,
+    lookingFor_subtitle: user.intention?.optDescription || null,
+    religion: user.profile?.religion?.name || null,
+    community: user.profile?.community?.name || null,
+    motherTongue: motherTongue,
+    height: user.height,
+    city: user.profile?.city || null,
+    state: user.profile?.state || null,
+    country: user.profile?.country || null,
+    area: user.profile?.area || null,
+    zodiac: zodiac,
+
+    // Communication & Love Language
+    communicationStyle: communicationStyle,
+    loveLanguage: loveLanguage,
+
+    // Photos
+    photos: user.photos.map((photo: any) => ({
+      id: photo.id,
+      url: photo.media_url,
+      isPrimary: photo.is_primary,
+      order: photo.order,
+      mediaType: photo.media_type
+    })),
+
+    // Prompts
+    prompts: user.userPrompts.map((prompt: any) => ({
+      id: prompt.id,
+      question: prompt.prompt.question,
+      answer: prompt.answer,
+      category: prompt.prompt.category?.name || null,
+      displayOrder: prompt.displayOrder
+    })),
+
+    // Career
+    career: {
+      highestEducation: user.eduWork?.highestEdu || null,
+      degree: user.eduWork?.degree || null,
+      collegeName: user.eduWork?.collegeName || null,
+      graduationYear: user.eduWork?.graduationYear || null,
+      profession: user.eduWork?.profession?.name || null,
+      companyName: user.eduWork?.companyName || null,
+      employmentType: user.eduWork?.employmentType?.name || null,
+      experience: user.eduWork?.experience?.title || null,
+      ambition: user.eduWork?.ambition?.title || null,
+      salaryRange: user.eduWork?.salaryRange?.title || null,
+      bigDreams: user.eduWork?.bigDreams || null
+    },
+
+    // Lifestyle
+    lifestyle: lifestyleAnswers.map((answer: any) => ({
+      question: answer.question.title,
+      answer: answer.option.label,
+      description: answer.description || null
+    })),
+
+    // Interests
+    interests: interestAnswers.map((answer: any) => ({
+      question: answer.question.title,
+      answer: answer.option.label,
+      description: answer.description || null
+    })),
+
+    networkingAnswers: networkingAnswers.map((answer: any) => ({
+      question: answer.question.title,
+      answer: answer.option.label,
+      description: answer.description || null
+    })),
+
+    // Family
+    family: {
+      familyStatus: user.familyProfile?.familyStatus?.value || null,
+      familyType: user.familyProfile?.familyType?.value || null,
+      fatherOccupation: user.familyProfile?.fatherOccupation?.value || null,
+      fatherOrganisation: user.familyProfile?.fatherOrganisation?.value || null,
+      motherOccupation: user.familyProfile?.motherOccupation?.value || null,
+      motherOrganisation: user.familyProfile?.motherOrganisation?.value || null,
+      familyHome: user.familyProfile?.familyHome?.value || null,
+      nativePlace: user.familyProfile?.nativePlace?.value || null,
+      familyIncome: user.familyProfile?.familyIncome?.title || null,
+      siblings:
+        user.familyProfile?.siblings?.map(
+          (sibling: UserSiblingWithDetails) => ({
+            relation: sibling.siblingType?.value || null,
+            occupation: sibling.occupation?.value || null,
+            marital: sibling.marital?.value || null,
+          })
+        ) || [],
+    }
+  };
+};
+
+
