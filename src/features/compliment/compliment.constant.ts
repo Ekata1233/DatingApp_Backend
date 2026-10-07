@@ -9,6 +9,7 @@ export const COMPLIMENT_CONSTANTS = {
   MAX_PAGE_SIZE: 50,
   DAILY_RESET_HOUR: 0, 
   MIN_MATCH_SCORE_FOR_COMPLIMENT: 0,
+  WALLET_PRICE: 10,
   
   // Error messages
   ERRORS: {

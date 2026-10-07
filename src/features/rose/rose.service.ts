@@ -23,7 +23,7 @@ import {
 } from './rose.types';
 import { AppError } from './AppError';
 import { getOrCreateConversation } from "../chat/chat.helper";
-import { createRoseChatMessage } from "./rose.helper";
+import { createRoseChatMessage, deductRoseAmountFromWallet } from "./rose.helper";
 import { createNotification } from "../notification/notification.service";
 
 export const sendRoseService = async (
@@ -101,12 +101,12 @@ export const sendRoseService = async (
   // Get user balance
   const balance = await getOrCreateBalance(senderId, prisma);
 
-  if (balance.totalRoses <= 0) {
-    throw new AppError(
-      400,
-      ROSE_CONSTANTS.ERRORS.PURCHASED_ROSES_UNAVAILABLE
-    );
-  }
+  // if (balance.totalRoses <= 0) {
+  //   throw new AppError(
+  //     400,
+  //     ROSE_CONSTANTS.ERRORS.PURCHASED_ROSES_UNAVAILABLE
+  //   );
+  // }
 
   if (
     (targetType === "PHOTO" || targetType === "PROMPT") &&
@@ -125,82 +125,169 @@ export const sendRoseService = async (
   }
 
   // Execute transaction
-  const result = await prisma.$transaction(async (tx) => {
-    // Deduct rose from balance
-    const deduction = await deductRose(senderId, tx);
+const result = await prisma.$transaction(async (tx) => {
+  const ROSE_PRICE = 10;
 
-    // Create rose transaction
-    const rose = await createRoseTransaction(
-      {
-        senderId,
-        receiverId,
-        targetType,
-        targetId,
-        requiredMessages,
-        expiresAt,
+  // =====================================================
+  // 1. CHECK ROSE BALANCE
+  // =====================================================
+
+  const roseBalance =
+    await tx.userRoseBalance.findUnique({
+      where: {
+        userId: senderId,
       },
+    });
+
+  let deduction:
+    | Awaited<ReturnType<typeof deductRose>>
+    | null = null;
+
+  let walletDeduction:
+    | Awaited<
+        ReturnType<
+          typeof deductRoseAmountFromWallet
+        >
+      >
+    | null = null;
+
+  let paymentMethod:
+    | "ROSE_BALANCE"
+    | "WALLET" = "ROSE_BALANCE";
+
+  // =====================================================
+  // 2. USE EXISTING ROSE FIRST
+  // =====================================================
+
+  if (
+    roseBalance &&
+    roseBalance.totalRoses > 0
+  ) {
+    deduction = await deductRose(
+      senderId,
       tx
     );
 
+    paymentMethod = "ROSE_BALANCE";
+  }
+
+  // =====================================================
+  // 3. NO ROSE -> CHARGE ₹10 FROM WALLET
+  // =====================================================
+
+  else {
+    walletDeduction =
+      await deductRoseAmountFromWallet(
+        senderId,
+        ROSE_PRICE,
+        tx
+      );
+
+    paymentMethod = "WALLET";
+  }
+
+  // =====================================================
+  // 4. CREATE ROSE
+  // =====================================================
+
+  const rose = await createRoseTransaction(
+    {
+      senderId,
+      receiverId,
+      targetType,
+      targetId,
+      requiredMessages,
+      expiresAt,
+    },
+    tx
+  );
+
+  // =====================================================
+  // 5. CREATE ROSE LEDGER ONLY IF ROSE BALANCE WAS USED
+  // =====================================================
+
+  if (deduction) {
     await createRoseLedger(
       {
         userId: senderId,
         type: deduction.transactionType,
         quantity: 1,
-        roseBalanceAfter: deduction.balance.totalRoses,
+        roseBalanceAfter:
+          deduction.balance.totalRoses,
       },
       tx
     );
+  }
 
-    const conversation = await getOrCreateConversation(
+  // =====================================================
+  // 6. GET / CREATE CONVERSATION
+  // =====================================================
+
+  const conversation =
+    await getOrCreateConversation(
       senderId,
       receiverId,
       tx
     );
 
-    // 5. Create ROSE chat message
-    const chatMessage = await createRoseChatMessage(
-      {
-        conversationId: conversation.id,
-        senderId,
-        roseId: rose.id,
-        targetType: rose.targetType,
-        targetId: rose.targetId,
-      },
-      tx
-    );
+  // =====================================================
+  // 7. CREATE ROSE CHAT MESSAGE
+  // =====================================================
 
-    // 6. Update conversation
-    await tx.conversation.update({
-      where: {
-        id: conversation.id,
-      },
-      data: {
-        updatedAt: new Date(),
-      },
-    });
-
-    // Get updated balance
-    const updatedBalance = await getOrCreateBalance(senderId, tx as any);
-
-    if (!updatedBalance) {
-      throw new AppError(500, 'Failed to retrieve updated balance');
-    }
-
-    // Log success
-    console.log('Rose sent successfully', {
+  await createRoseChatMessage(
+    {
+      conversationId: conversation.id,
       senderId,
-      receiverId,
       roseId: rose.id,
-    });
+      targetType: rose.targetType,
+      targetId: rose.targetId,
+    },
+    tx
+  );
 
-    const sender = await tx.user.findUniqueOrThrow({
+  // =====================================================
+  // 8. UPDATE CONVERSATION
+  // =====================================================
+
+  await tx.conversation.update({
+    where: {
+      id: conversation.id,
+    },
+    data: {
+      updatedAt: new Date(),
+    },
+  });
+
+  // =====================================================
+  // 9. GET UPDATED ROSE BALANCE
+  // =====================================================
+
+  const updatedBalance =
+    await getOrCreateBalance(
+      senderId,
+      tx as any
+    );
+
+  if (!updatedBalance) {
+    throw new AppError(
+      500,
+      "Failed to retrieve updated balance"
+    );
+  }
+
+  // =====================================================
+  // 10. GET SENDER
+  // =====================================================
+
+  const sender =
+    await tx.user.findUniqueOrThrow({
       where: {
         id: senderId,
       },
       select: {
         id: true,
         full_name: true,
+
         photos: {
           where: {
             is_primary: true,
@@ -212,35 +299,83 @@ export const sendRoseService = async (
         },
       },
     });
-    // Format response
-    const roseResponse = {
-      id: rose.id,
-      senderId: rose.senderId,
-      receiverId: rose.receiverId,
-      createdAt: rose.createdAt,
-      sender: {
-        id: sender.id,
-        full_name: sender.full_name ?? " ",
-        photos: sender.photos.map(photo => photo.media_url),
+
+  // =====================================================
+  // 11. RESPONSE
+  // =====================================================
+
+  const roseResponse = {
+    id: rose.id,
+    senderId: rose.senderId,
+    receiverId: rose.receiverId,
+    createdAt: rose.createdAt,
+
+    sender: {
+      id: sender.id,
+      full_name:
+        sender.full_name ?? " ",
+      photos: sender.photos.map(
+        (photo) => photo.media_url
+      ),
+    },
+  };
+
+  const balanceResponse: RoseBalanceResponse =
+    {
+      totalRoses:
+        updatedBalance.totalRoses,
+      lastResetAt:
+        updatedBalance.lastResetAt,
+    };
+
+  console.log(
+    "Rose sent successfully",
+    {
+      senderId,
+      receiverId,
+      roseId: rose.id,
+      paymentMethod,
+      walletAmountCharged:
+        paymentMethod === "WALLET"
+          ? ROSE_PRICE
+          : 0,
+    }
+  );
+
+  return {
+    success: true,
+
+    message:
+      paymentMethod === "WALLET"
+        ? "Rose sent successfully. ₹10 deducted from wallet."
+        : ROSE_CONSTANTS.SUCCESS
+            .PURCHASED_ROSE_USED,
+
+    data: {
+      rose: roseResponse,
+
+      payment: {
+        method: paymentMethod,
+
+        amount:
+          paymentMethod === "WALLET"
+            ? ROSE_PRICE
+            : 0,
+
+        walletBalance:
+          walletDeduction
+            ? walletDeduction.wallet
+                .balance
+            : null,
       },
-    };
 
-    const balanceResponse: RoseBalanceResponse = {
-      totalRoses: updatedBalance.totalRoses,
-      lastResetAt: updatedBalance.lastResetAt,
-    };
+      remainingBalance:
+        balanceResponse,
+    },
+  };
+});
 
-    return {
-      success: true,
-      message: ROSE_CONSTANTS.SUCCESS.PURCHASED_ROSE_USED,
-      data: {
-        rose: roseResponse,
-        remainingBalance: balanceResponse,
-      },
-    };
-  });
-
-   // 🔔 Send notification AFTER transaction successfully commits
+  // 🔔 Send notification AFTER transaction successfully commits
   createNotification({
     senderId,
     receiverId,

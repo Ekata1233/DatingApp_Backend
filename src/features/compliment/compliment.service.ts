@@ -4,7 +4,7 @@ import { createNotification } from "../notification/notification.service";
 import { AppError } from "../rose/AppError";
 import { checkBlockedStatus, checkMatch } from "../rose/rose.repository";
 import { COMPLIMENT_CONSTANTS } from "./compliment.constant";
-import { createComplimentChatMessage } from "./compliment.helper";
+import { createComplimentChatMessage, deductComplimentAmountFromWallet } from "./compliment.helper";
 import { createComplimentLedger, createUserCompliment, deductCompliment, getComplimentBalance, getComplimentBalanceByUserId, getComplimentDashboard, getComplimentHistory } from "./compliment.repository";
 import { ComplimentBalancebyIdResponse, ComplimentBalanceResponse, ComplimentHistoryQuery, SendComplimentDto, SendComplimentResponse } from "./compliment.types";
 
@@ -69,15 +69,6 @@ export const sendComplimentService = async (
 
     const balance = await getComplimentBalance(senderId, prisma);
 
-    if (!balance) {
-        throw new AppError(404, "Compliment balance not found");
-    }
-    if (balance.totalCompliments <= 0) {
-        throw new AppError(
-            400,
-            COMPLIMENT_CONSTANTS.ERRORS.NO_COMPLIMENTS_AVAILABLE
-        );
-    }
 
     if (
         (targetType === "PHOTO" || targetType === "PROMPT") &&
@@ -130,38 +121,121 @@ export const sendComplimentService = async (
     }
 
     const result = await prisma.$transaction(async (tx) => {
-        const deduction = await deductCompliment(senderId, tx);
+        const COMPLIMENT_PRICE =
+            COMPLIMENT_CONSTANTS.WALLET_PRICE;
 
-        const compliment = await createUserCompliment(
-            {
+        /* ------------------------------------------------------ */
+        /* CHECK COMPLIMENT BALANCE                               */
+        /* ------------------------------------------------------ */
+
+        const complimentBalance =
+            await tx.userComplimentBalance.findUnique({
+                where: {
+                    userId: senderId,
+                },
+            });
+
+        let deduction:
+            | Awaited<ReturnType<typeof deductCompliment>>
+            | null = null;
+
+        let walletDeduction:
+            | Awaited<
+                ReturnType<
+                    typeof deductComplimentAmountFromWallet
+                >
+            >
+            | null = null;
+
+        let paymentMethod:
+            | "COMPLIMENT_BALANCE"
+            | "WALLET";
+
+        /* ------------------------------------------------------ */
+        /* USE COMPLIMENT FIRST                                   */
+        /* ------------------------------------------------------ */
+
+        if (
+            complimentBalance &&
+            complimentBalance.totalCompliments > 0
+        ) {
+            deduction = await deductCompliment(
+                senderId,
+                tx
+            );
+
+            paymentMethod =
+                "COMPLIMENT_BALANCE";
+        }
+
+        /* ------------------------------------------------------ */
+        /* NO COMPLIMENT -> DEDUCT ₹10 FROM WALLET                */
+        /* ------------------------------------------------------ */
+
+        else {
+            walletDeduction =
+                await deductComplimentAmountFromWallet(
+                    senderId,
+                    COMPLIMENT_PRICE,
+                    tx
+                );
+
+            paymentMethod = "WALLET";
+        }
+
+        /* ------------------------------------------------------ */
+        /* CREATE COMPLIMENT                                      */
+        /* ------------------------------------------------------ */
+
+        const compliment =
+            await createUserCompliment(
+                {
+                    senderId,
+                    receiverId,
+                    ideaId: ideaId ?? null,
+                    message,
+                    targetType,
+                    targetId,
+                },
+                tx
+            );
+
+        /* ------------------------------------------------------ */
+        /* CREATE COMPLIMENT LEDGER ONLY WHEN COMPLIMENT USED     */
+        /* ------------------------------------------------------ */
+
+        if (deduction) {
+            await createComplimentLedger(
+                {
+                    userId: senderId,
+
+                    type:
+                        deduction.transactionType,
+
+                    quantity: 1,
+
+                    complimentBalanceAfter:
+                        deduction.balance
+                            .totalCompliments,
+                },
+                tx
+            );
+        }
+
+        /* ------------------------------------------------------ */
+        /* CONVERSATION                                           */
+        /* ------------------------------------------------------ */
+
+        const conversation =
+            await getOrCreateConversation(
                 senderId,
                 receiverId,
-                ideaId: ideaId ?? null,
-                message,
-                targetType,
-                targetId
-            },
-            tx
-        );
+                tx
+            );
 
-        await createComplimentLedger(
-            {
-                userId: senderId,
-                type: deduction.transactionType,
-                quantity: 1,
-                complimentBalanceAfter:
-                    deduction.balance.totalCompliments,
-            },
-            tx
-        );
+        const chatContent =
+            message ?? complimentIdeaText;
 
-        const conversation = await getOrCreateConversation(
-            senderId,
-            receiverId,
-            tx
-        );
-
-        const chatContent = message ?? complimentIdeaText;
         if (!chatContent) {
             throw new AppError(
                 400,
@@ -169,107 +243,214 @@ export const sendComplimentService = async (
             );
         }
 
-        // 5. Create ROSE chat message
-        const chatMessage = await createComplimentChatMessage(
+        /* ------------------------------------------------------ */
+        /* CREATE CHAT MESSAGE                                    */
+        /* ------------------------------------------------------ */
+
+        await createComplimentChatMessage(
             {
-                conversationId: conversation.id,
+                conversationId:
+                    conversation.id,
+
                 senderId,
-                complimentId: compliment.id,
-                targetType: compliment.targetType,
-                targetId: compliment.targetId,
+
+                complimentId:
+                    compliment.id,
+
+                targetType:
+                    compliment.targetType,
+
+                targetId:
+                    compliment.targetId,
+
                 content: chatContent,
             },
             tx
         );
 
-        // 6. Update conversation
+        /* ------------------------------------------------------ */
+        /* UPDATE CONVERSATION                                    */
+        /* ------------------------------------------------------ */
+
         await tx.conversation.update({
             where: {
                 id: conversation.id,
             },
+
             data: {
                 updatedAt: new Date(),
             },
         });
 
-        const updatedBalance = await getComplimentBalance(senderId, tx);
+        /* ------------------------------------------------------ */
+        /* GET UPDATED COMPLIMENT BALANCE                         */
+        /* ------------------------------------------------------ */
 
-        if (!updatedBalance) {
-            throw new AppError(
-                404,
-                "Compliment balance not found."
+        const updatedBalance =
+            await getComplimentBalance(
+                senderId,
+                tx
             );
-        }
 
-        const sender = await tx.user.findUniqueOrThrow({
-            where: {
-                id: senderId,
-            },
-            select: {
-                id: true,
-                full_name: true,
-                photos: {
-                    where: {
-                        is_primary: true,
-                    },
-                    select: {
-                        media_url: true,
-                    },
-                    take: 1,
+        /* ------------------------------------------------------ */
+        /* GET SENDER                                             */
+        /* ------------------------------------------------------ */
+
+        const sender =
+            await tx.user.findUniqueOrThrow({
+                where: {
+                    id: senderId,
                 },
-            },
-        });
+
+                select: {
+                    id: true,
+                    full_name: true,
+
+                    photos: {
+                        where: {
+                            is_primary: true,
+                        },
+
+                        select: {
+                            media_url: true,
+                        },
+
+                        take: 1,
+                    },
+                },
+            });
 
         const complimentResponse = {
             id: compliment.id,
-            senderId: compliment.senderId,
-            receiverId: compliment.receiverId,
-            ideaId: compliment.ideaId,
-            message: compliment.message,
-            status: compliment.status,
-            createdAt: compliment.createdAt,
+
+            senderId:
+                compliment.senderId,
+
+            receiverId:
+                compliment.receiverId,
+
+            ideaId:
+                compliment.ideaId,
+
+            message:
+                compliment.message,
+
+            status:
+                compliment.status,
+
+            createdAt:
+                compliment.createdAt,
 
             sender: {
                 id: sender.id,
-                full_name: sender.full_name ?? " ",
-                photos: sender.photos.map((photo) => photo.media_url),
+
+                full_name:
+                    sender.full_name ?? " ",
+
+                photos:
+                    sender.photos.map(
+                        (photo) =>
+                            photo.media_url
+                    ),
             },
         };
 
-        const balanceResponse: ComplimentBalanceResponse = {
-            totalCompliments: updatedBalance.totalCompliments,
-            lastResetAt: updatedBalance.lastResetAt,
+        /*
+         * Balance can be null because user may not have
+         * UserComplimentBalance and paid directly from wallet.
+         */
+
+        const balanceResponse:
+            ComplimentBalanceResponse = {
+            totalCompliments:
+                updatedBalance
+                    ?.totalCompliments ?? 0,
+
+            lastResetAt:
+                updatedBalance
+                    ?.lastResetAt ?? new Date(),
         };
+
+        console.log(
+            "Compliment sent successfully",
+            {
+                senderId,
+                receiverId,
+                complimentId:
+                    compliment.id,
+
+                paymentMethod,
+
+                walletAmountCharged:
+                    paymentMethod === "WALLET"
+                        ? COMPLIMENT_PRICE
+                        : 0,
+
+                walletBalanceAfter:
+                    walletDeduction
+                        ? walletDeduction.wallet
+                            .balance
+                            .toString()
+                        : null,
+            }
+        );
 
         return {
             success: true,
+
             message:
-                COMPLIMENT_CONSTANTS.SUCCESS.COMPLIMENT_SENT,
+                paymentMethod === "WALLET"
+                    ? `Compliment sent successfully. ₹${COMPLIMENT_PRICE} deducted from wallet.`
+                    : COMPLIMENT_CONSTANTS
+                        .SUCCESS
+                        .COMPLIMENT_SENT,
+
             data: {
-                compliment: complimentResponse,
-                remainingBalance: balanceResponse,
+                compliment:
+                    complimentResponse,
+
+                payment: {
+                    method:
+                        paymentMethod,
+
+                    amount:
+                        paymentMethod ===
+                            "WALLET"
+                            ? COMPLIMENT_PRICE
+                            : 0,
+
+                    walletBalance:
+                        walletDeduction
+                            ? walletDeduction.wallet
+                                .balance
+                                .toString()
+                            : null,
+                },
+
+                remainingBalance:
+                    balanceResponse,
             },
         };
     });
 
     // 🔔 Send notification AFTER transaction successfully commits
-      createNotification({
+    createNotification({
         senderId,
         receiverId,
         type: "NEW_COMPLIMENT",
         title: "You received a Compliment 💬",
         message: "Someone sent you a compliment 💬",
         data: {
-          complimentId: result.data.compliment.id,
-          senderId,
-          receiverId,
-          targetType,
-          targetId,
-          type: "COMPLIMENT",
+            complimentId: result.data.compliment.id,
+            senderId,
+            receiverId,
+            targetType,
+            targetId,
+            type: "COMPLIMENT",
         },
-      }).catch((error) => {
+    }).catch((error) => {
         console.error("Failed to send rose notification:", error);
-      });
+    });
 
     return result;
 };

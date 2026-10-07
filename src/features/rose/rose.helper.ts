@@ -1,4 +1,4 @@
-import { MessageType, Prisma, TargetType } from "@prisma/client";
+import { MessageType, Prisma, TargetType, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
 import { checkExistingRose, countTodayRoses, countTodayRosesToUser, createRoseLedger, createRoseTransaction, deductRose, getOrCreateBalance } from "./rose.repository";
 import { prisma } from "../../prisma/prismaClient";
 import { ROSE_CONSTANTS } from "./rose.constants";
@@ -244,5 +244,70 @@ export const createBundleRose = async (
   return {
     roseId: rose.id,
     rose,
+  };
+};
+
+
+export const deductRoseAmountFromWallet = async (
+  userId: string,
+  amount: number,
+  tx: Prisma.TransactionClient
+) => {
+  const wallet = await tx.wallet.findUnique({
+    where: {
+      userId,
+    },
+  });
+
+  if (!wallet) {
+    throw new AppError(
+      400,
+      "You don't have enough roses or wallet balance"
+    );
+  }
+
+  const amountDecimal = new Prisma.Decimal(amount);
+
+  if (wallet.balance.lessThan(amountDecimal)) {
+    throw new AppError(
+      400,
+      `Insufficient wallet balance. ₹${amount} is required to send a Rose.`
+    );
+  }
+
+  const balanceBefore = wallet.balance;
+  const balanceAfter =
+    balanceBefore.minus(amountDecimal);
+
+  const updatedWallet = await tx.wallet.update({
+    where: {
+      id: wallet.id,
+    },
+    data: {
+      balance: balanceAfter,
+    },
+  });
+
+  const walletTransaction =
+    await tx.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+        amount: amountDecimal,
+        type: TransactionType.PURCHASE,
+        status: TransactionStatus.SUCCESS,
+
+        // See schema change below
+        source: TransactionSource.WALLET_TOPUP,
+
+        description: "Rose purchase",
+        balanceBefore,
+        balanceAfter,
+      },
+    });
+
+  return {
+    wallet: updatedWallet,
+    transaction: walletTransaction,
+    amountCharged: amountDecimal,
   };
 };

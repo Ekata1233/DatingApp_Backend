@@ -1,4 +1,4 @@
-import { MessageType, Prisma, TargetType } from "@prisma/client";
+import { MessageType, Prisma, TargetType, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { SendEngagementDTO } from "../engagement/engagement.validation";
 import { AppError } from "../rose/AppError";
@@ -33,8 +33,6 @@ export const createComplimentChatMessage = async (
     },
   });
 };
-
-
 
 export const createBundleCompliment = async (
   senderId: string,
@@ -194,5 +192,65 @@ export const createBundleCompliment = async (
       lastResetAt:
         balance.lastResetAt,
     },
+  };
+};
+
+export const deductComplimentAmountFromWallet = async (
+  userId: string,
+  amount: number,
+  tx: Prisma.TransactionClient
+) => {
+  const wallet = await tx.wallet.findUnique({
+    where: {
+      userId,
+    },
+  });
+
+  if (!wallet) {
+    throw new AppError(
+      400,
+      "You don't have enough compliments or wallet balance"
+    );
+  }
+
+  const amountDecimal = new Prisma.Decimal(amount);
+
+  if (wallet.balance.lessThan(amountDecimal)) {
+    throw new AppError(
+      400,
+      `Insufficient wallet balance. ₹${amount} is required to send a compliment.`
+    );
+  }
+
+  const balanceBefore = wallet.balance;
+  const balanceAfter = balanceBefore.minus(amountDecimal);
+
+  const updatedWallet = await tx.wallet.update({
+    where: {
+      id: wallet.id,
+    },
+    data: {
+      balance: balanceAfter,
+    },
+  });
+
+  const walletTransaction =
+    await tx.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+        amount: amountDecimal,
+        type: TransactionType.PURCHASE,
+        status: TransactionStatus.SUCCESS,
+        source: TransactionSource.WALLET_TOPUP,
+        description: "Compliment purchase",
+        balanceBefore,
+        balanceAfter,
+      },
+    });
+
+  return {
+    wallet: updatedWallet,
+    transaction: walletTransaction,
+    amountCharged: amountDecimal,
   };
 };

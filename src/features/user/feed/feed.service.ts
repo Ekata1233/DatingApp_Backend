@@ -8,7 +8,6 @@ import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
 import { getReplyTimeLabel, MIN_REPLY_SAMPLES } from "../../chat/user-reply-stats.service";
-import { maskAge, maskName } from "./feed.helper";
 
 // =========================
 // HELPERS
@@ -91,13 +90,7 @@ const ALL_ORIENTATIONS = [
 ];
 
 const NEW_USER_BOOST_HOURS = 48;
-const DEFAULT_PAGE_LIMIT = 25;
-
-const FREE_DAILY_PROFILE_LIMIT = 5;
-const PAID_DAILY_PROFILE_LIMIT = 25;
-
-const FREE_LOCKED_PROFILE_COUNT = 20;
-const LOCKED_PREVIEW_COUNT = 3;
+const DEFAULT_PAGE_LIMIT = 20;
 const OVERFETCH = 1.5;
 const MAX_ROUNDS = 5;
 const STATIC_MATCH_SCORE = 78;
@@ -131,9 +124,8 @@ export const getFeedService = async ({
   limit,
   filters,
 }: FeedParams) => {
-
-
-  const requestedLimit = limit ?? DEFAULT_PAGE_LIMIT;
+  const pageLimit =
+    limit ?? DEFAULT_PAGE_LIMIT;
 
   const decodedCursor =
     decodeCursor(
@@ -141,21 +133,6 @@ export const getFeedService = async ({
     );
 
   const now = new Date();
-
-  const todayStart = new Date(now);
-
-  todayStart.setHours(
-    0,
-    0,
-    0,
-    0,
-  );
-
-  const tomorrowStart = new Date(todayStart);
-
-  tomorrowStart.setDate(
-    tomorrowStart.getDate() + 1,
-  );
 
   // ========================================================
   // CURRENT USER
@@ -347,105 +324,18 @@ export const getFeedService = async ({
     },
   );
 
-  const hasActiveVip = !!activeVipPackage;
+  const hasActiveVip =
+    !!activeVipPackage;
 
-  // ========================================================
-  // FEED DAILY LIMIT PACKAGE CHECK
-  // VIP + VIP_ELITE + PREMIUM
-  // ========================================================
+  console.log(
+    "ACTIVE VIP PACKAGE:",
+    activeVipPackage,
+  );
 
-  const activeFeedPackage =
-    await prisma.userPackage.findFirst({
-      where: {
-        user_id: userId,
-
-        status: "ACTIVE",
-
-        package: {
-          name: {
-            in: [
-              "VIP",
-              "VIP_ELITE",
-              "PREMIUM",
-            ],
-          },
-        },
-
-        OR: [
-          {
-            endDate: null,
-          },
-          {
-            endDate: {
-              gt: now,
-            },
-          },
-        ],
-      },
-
-      select: {
-        id: true,
-
-        package: {
-          select: {
-            name: true,
-          },
-        },
-      },
-
-      orderBy: {
-        startDate: "desc",
-      },
-    });
-
-  const hasActiveFeedPackage =
-    !!activeFeedPackage;
-
-  const isFreeUser = !hasActiveFeedPackage;
-
-  const dailyProfileLimit = isFreeUser
-    ? FREE_DAILY_PROFILE_LIMIT
-    : PAID_DAILY_PROFILE_LIMIT;
-
-  const pageLimit =
-    isFreeUser
-      ? PAID_DAILY_PROFILE_LIMIT
-      : Math.min(
-        requestedLimit,
-        PAID_DAILY_PROFILE_LIMIT,
-      );
-
-  const todayFeedViews = await prisma.userDailyFeedView.findMany({
-    where: {
-      userId,
-
-      viewDate: {
-        gte: todayStart,
-        lt: tomorrowStart,
-      },
-    },
-
-    select: {
-      targetUserId: true,
-    },
-  });
-
-  const seenTodayIds =
-    new Set(
-      todayFeedViews.map(
-        (item) =>
-          item.targetUserId,
-      ),
-    );
-
-  const seenToday =
-    seenTodayIds.size;
-
-  const remainingToday =
-    Math.max(
-      dailyProfileLimit - seenToday,
-      0,
-    );
+  console.log(
+    "HAS ACTIVE VIP/VIP_ELITE:",
+    hasActiveVip,
+  );
 
   // ========================================================
   // BASIC USER PREFERENCES
@@ -2056,99 +1946,99 @@ export const getFeedService = async ({
       pageLimit,
     );
 
-  // ========================================================
-  // ENSURE DISTANCE FOR FINAL PAGE USERS
-  // ========================================================
+    // ========================================================
+// ENSURE DISTANCE FOR FINAL PAGE USERS
+// ========================================================
 
-  if (
-    validCurrentUserCoordinates &&
-    myLatitude !== null &&
-    myLongitude !== null
-  ) {
-    for (const user of page) {
-      // Distance already calculated by PostGIS.
-      if (meterById.has(user.id)) {
-        continue;
-      }
+if (
+  validCurrentUserCoordinates &&
+  myLatitude !== null &&
+  myLongitude !== null
+) {
+  for (const user of page) {
+    // Distance already calculated by PostGIS.
+    if (meterById.has(user.id)) {
+      continue;
+    }
 
-      const candidateLatitude =
-        user.profile?.latitude !== null &&
-          user.profile?.latitude !== undefined
-          ? Number(user.profile.latitude)
-          : null;
+    const candidateLatitude =
+      user.profile?.latitude !== null &&
+      user.profile?.latitude !== undefined
+        ? Number(user.profile.latitude)
+        : null;
 
-      const candidateLongitude =
-        user.profile?.longitude !== null &&
-          user.profile?.longitude !== undefined
-          ? Number(user.profile.longitude)
-          : null;
+    const candidateLongitude =
+      user.profile?.longitude !== null &&
+      user.profile?.longitude !== undefined
+        ? Number(user.profile.longitude)
+        : null;
 
-      const validCandidateCoordinates =
-        candidateLatitude !== null &&
-        candidateLongitude !== null &&
-        Number.isFinite(candidateLatitude) &&
-        Number.isFinite(candidateLongitude) &&
-        candidateLatitude >= -90 &&
-        candidateLatitude <= 90 &&
-        candidateLongitude >= -180 &&
-        candidateLongitude <= 180 &&
-        !(
-          candidateLatitude === 0 &&
-          candidateLongitude === 0
-        );
+    const validCandidateCoordinates =
+      candidateLatitude !== null &&
+      candidateLongitude !== null &&
+      Number.isFinite(candidateLatitude) &&
+      Number.isFinite(candidateLongitude) &&
+      candidateLatitude >= -90 &&
+      candidateLatitude <= 90 &&
+      candidateLongitude >= -180 &&
+      candidateLongitude <= 180 &&
+      !(
+        candidateLatitude === 0 &&
+        candidateLongitude === 0
+      );
 
-      if (!validCandidateCoordinates) {
-        continue;
-      }
+    if (!validCandidateCoordinates) {
+      continue;
+    }
 
-      // Haversine distance
-      const R = 6371000; // Earth radius in meters
+    // Haversine distance
+    const R = 6371000; // Earth radius in meters
 
-      const toRadians = (degree: number) =>
-        (degree * Math.PI) / 180;
+    const toRadians = (degree: number) =>
+      (degree * Math.PI) / 180;
 
-      const lat1 =
-        toRadians(myLatitude);
+    const lat1 =
+      toRadians(myLatitude);
 
-      const lat2 =
-        toRadians(candidateLatitude);
+    const lat2 =
+      toRadians(candidateLatitude);
 
-      const deltaLat =
-        toRadians(
-          candidateLatitude -
-          myLatitude,
-        );
+    const deltaLat =
+      toRadians(
+        candidateLatitude -
+        myLatitude,
+      );
 
-      const deltaLng =
-        toRadians(
-          candidateLongitude -
-          myLongitude,
-        );
+    const deltaLng =
+      toRadians(
+        candidateLongitude -
+        myLongitude,
+      );
 
-      const a =
-        Math.sin(deltaLat / 2) *
+    const a =
+      Math.sin(deltaLat / 2) *
         Math.sin(deltaLat / 2) +
-        Math.cos(lat1) *
+      Math.cos(lat1) *
         Math.cos(lat2) *
         Math.sin(deltaLng / 2) *
         Math.sin(deltaLng / 2);
 
-      const c =
-        2 *
-        Math.atan2(
-          Math.sqrt(a),
-          Math.sqrt(1 - a),
-        );
-
-      const meters =
-        R * c;
-
-      meterById.set(
-        user.id,
-        meters,
+    const c =
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a),
       );
-    }
+
+    const meters =
+      R * c;
+
+    meterById.set(
+      user.id,
+      meters,
+    );
   }
+}
 
   if (filledCursor) {
     nextCursor =
@@ -2593,195 +2483,91 @@ export const getFeedService = async ({
   // SORT RETURNED PAGE
   // ========================================================
 
-  const sortedUsers = enriched.sort(
-    (a, b) => {
-      const aActivity =
-        a.lastActiveAt
-          ?.getTime() ||
-        0;
+  const sortedUsers =
+    enriched.sort(
+      (a, b) => {
+        const aActivity =
+          a.lastActiveAt
+            ?.getTime() ||
+          0;
 
-      const bActivity =
-        b.lastActiveAt
-          ?.getTime() ||
-        0;
+        const bActivity =
+          b.lastActiveAt
+            ?.getTime() ||
+          0;
 
-      const aCreated =
-        a.created_at
-          ? new Date(
-            a.created_at,
-          ).getTime()
-          : 0;
+        const aCreated =
+          a.created_at
+            ? new Date(
+              a.created_at,
+            ).getTime()
+            : 0;
 
-      const bCreated =
-        b.created_at
-          ? new Date(
-            b.created_at,
-          ).getTime()
-          : 0;
+        const bCreated =
+          b.created_at
+            ? new Date(
+              b.created_at,
+            ).getTime()
+            : 0;
 
-      const aIsNew =
-        nowMs -
-        aCreated <
-        boostWindow;
+        const aIsNew =
+          nowMs -
+          aCreated <
+          boostWindow;
 
-      const bIsNew =
-        nowMs -
-        bCreated <
-        boostWindow;
+        const bIsNew =
+          nowMs -
+          bCreated <
+          boostWindow;
 
-      // 1. BOOSTED FIRST
-      if (
-        a.isBoosted !==
-        b.isBoosted
-      ) {
-        return a.isBoosted
-          ? -1
-          : 1;
-      }
+        // 1. BOOSTED FIRST
+        if (
+          a.isBoosted !==
+          b.isBoosted
+        ) {
+          return a.isBoosted
+            ? -1
+            : 1;
+        }
 
-      // 2. NEW USERS
-      if (
-        aIsNew !==
-        bIsNew
-      ) {
-        return aIsNew
-          ? -1
-          : 1;
-      }
+        // 2. NEW USERS
+        if (
+          aIsNew !==
+          bIsNew
+        ) {
+          return aIsNew
+            ? -1
+            : 1;
+        }
 
-      // 3. MATCH SCORE
-      if (
-        a.matchScore !==
-        b.matchScore
-      ) {
+        // 3. MATCH SCORE
+        if (
+          a.matchScore !==
+          b.matchScore
+        ) {
+          return (
+            b.matchScore -
+            a.matchScore
+          );
+        }
+
+        // 4. ACTIVE USERS
         return (
-          b.matchScore -
-          a.matchScore
+          bActivity -
+          aActivity
         );
-      }
-
-      // 4. ACTIVE USERS
-      return (
-        bActivity -
-        aActivity
-      );
-    },
-  );
-
-  // ========================================================
-  // DAILY FEED ACCESS
-  // ========================================================
-
-  let visibleUsers = sortedUsers;
-
-  let lockedUsers: typeof sortedUsers = [];
-
-  if (isFreeUser) {
-    /**
-     * IMPORTANT:
-     *
-     * Daily quota is consumed ONLY after:
-     *
-     * LIKE
-     * PASS
-     * SUPERLIKE
-     *
-     * Fetching /feed does NOT consume quota.
-     */
-
-    visibleUsers =
-      sortedUsers.slice(
-        0,
-        remainingToday,
-      );
-
-    /**
-     * Everything after the remaining
-     * Free allowance is locked.
-     */
-    lockedUsers =
-      sortedUsers.slice(
-        remainingToday,
-      );
-  }
-
-  // ========================================================
-  // LOCKED COUNT
-  // ========================================================
-
-  const lockedCount =
-    isFreeUser
-      ? Math.min(
-        lockedUsers.length,
-        FREE_LOCKED_PROFILE_COUNT,
-      )
-      : 0;
-
-  // ========================================================
-  // LOCKED PREVIEWS
-  // ========================================================
-
-  const lockedPreviews =
-    isFreeUser
-      ? lockedUsers
-        .slice(
-          0,
-          LOCKED_PREVIEW_COUNT,
-        )
-        .map(
-          (user) => ({
-            displayName:
-              maskName(
-                user.full_name,
-              ),
-
-            age:
-              maskAge(
-                user.age,
-              ),
-
-            /**
-             * Replace this with actual
-             * verification logic later.
-             */
-            verification: null,
-
-            matchScore:
-              user.matchScore,
-
-            trustScore:
-              user.trust,
-
-            locked: true,
-          }),
-        )
-      : [];
-
-  // ========================================================
-  // FINAL DAILY LIMIT
-  // ========================================================
-
-  const finalSeenToday =
-    isFreeUser
-      ? seenToday
-      : 0;
-
-  const finalRemainingToday =
-    isFreeUser
-      ? remainingToday
-      : PAID_DAILY_PROFILE_LIMIT;
-
+      },
+    );
 
   // ========================================================
   // TRACK BOOST IMPRESSIONS
   // ========================================================
 
-  const boostedVisibleUsers =
-    visibleUsers.filter(
-      (feedUser) =>
-        feedUser.isBoosted &&
-        feedUser.id !== userId
-    );
+  const boostedVisibleUsers = sortedUsers.filter(
+    (feedUser) =>
+      feedUser.isBoosted &&
+      feedUser.id !== userId
+  );
 
   Promise.all(
     boostedVisibleUsers.map((feedUser) =>
@@ -2798,378 +2584,13 @@ export const getFeedService = async ({
     );
   });
 
-  const showUpgradeGate =
-    isFreeUser &&
-    lockedCount > 0;
-
   // ========================================================
   // RESPONSE
   // ========================================================
 
   return {
-    users: visibleUsers,
-
-    /**
-     * Free user should not paginate
-     * beyond today's allowance.
-     */
-    nextCursor:
-      isFreeUser
-        ? null
-        : nextCursor,
-
+    users: sortedUsers,
+    nextCursor,
     locationFallbackUsed,
-
-    dailyLimit: {
-      plan:
-        isFreeUser
-          ? "FREE"
-          : activeVipPackage
-            ?.package
-            ?.name ?? "PAID",
-
-      limit:
-        dailyProfileLimit,
-
-      seen:
-        finalSeenToday,
-
-      remaining:
-        finalRemainingToday,
-
-      resetAt:
-        tomorrowStart.toISOString(),
-    },
-
-    upgradeGate: {
-      show:
-        showUpgradeGate,
-
-      lockedCount,
-
-      title:
-        showUpgradeGate
-          ? "Your best matches are just behind this"
-          : null,
-
-      subtitle:
-        showUpgradeGate
-          ? `${lockedCount} more verified profiles picked for you today — upgrade to unlock more.`
-          : null,
-
-      lockedProfiles:
-        showUpgradeGate
-          ? lockedPreviews
-          : [],
-    },
   };
 };
-
-export const getFeedDetailsService = async (
-  userId: string,
-  currentUserId: string
-): Promise<UserFeedResponse> => {
-  const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
-
-  // =====================================================
-  // 1. PREVENT SELF PROFILE VIEW
-  // =====================================================
-
-  const shouldTrackProfileView =
-    userId !== currentUserId;
-
-  // =====================================================
-  // 2. CHECK REDIS
-  // =====================================================
-
-  const cachedFeedDetails =
-    await redis.get<UserFeedResponse>(CACHE_KEY);
-
-  if (cachedFeedDetails) {
-
-    console.log("✅ Feed Details from Redis");
-
-    // Track even when profile comes from Redis
-    if (shouldTrackProfileView) {
-      await trackBoostEvent({
-        targetUserId: userId,       // Profile owner
-        actorId: currentUserId,      // Person viewing profile
-        type: "PROFILE_VIEW",
-      });
-    }
-
-    return cachedFeedDetails;
-  }
-
-
-  // =====================================================
-  // 3. GET PROFILE FROM DATABASE
-  // =====================================================
-
-  console.log("📦 Feed Details from Database");
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      profile: {
-        include: {
-          religion: true,
-          community: true,
-          languages: {
-            include: {
-              language: true
-            }
-          }
-        }
-      },
-      bio: true,
-      intention: true,
-      about: true,
-      eduWork: {
-        include: {
-          profession: true,
-          employmentType: true,
-          experience: true,
-          ambition: true,
-          salaryRange: true
-        }
-      },
-      familyProfile: {
-        include: {
-          familyStatus: true,
-          familyType: true,
-          fatherOccupation: true,
-          fatherOrganisation: true,
-          motherOccupation: true,
-          motherOrganisation: true,
-          familyHome: true,
-          nativePlace: true,
-          familyIncome: true,
-          siblings: {
-            include: {
-              siblingType: true,
-              occupation: true,
-              marital: true,
-            },
-          },
-        }
-      },
-      photos: {
-        orderBy: {
-          order: 'asc'
-        }
-      },
-      userPrompts: {
-        include: {
-          prompt: {
-            include: {
-              category: true
-            }
-          }
-        },
-        orderBy: {
-          displayOrder: 'asc'
-        }
-      },
-      answer: {
-        include: {
-          question: true,
-          option: true
-        }
-      }
-    }
-  });
-
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  // =====================================================
-  // 4. GET REPLY TIME FOR THIS PARTICULAR USER
-  // =====================================================
-
-  const replyStats = await prisma.userReplyStats.findUnique({
-    where: {
-      userId: userId,
-    },
-    select: {
-      userId: true,
-      medianReplyMinutes: true,
-      sampleCount: true,
-    },
-  });
-
-  // Same logic as your main Feed API
-  const replyTime =
-    replyStats &&
-      replyStats.medianReplyMinutes !== null &&
-      replyStats.sampleCount >= MIN_REPLY_SAMPLES
-      ? getReplyTimeLabel(replyStats.medianReplyMinutes) ?? ""
-      : "";
-
-  // 3. Transform data
-  const response: UserFeedResponse = transformUserData(user, replyTime);
-
-  // 4. Save to Redis
-  await redis.set(CACHE_KEY, response, {
-    ex: CACHE_TTL,
-  });
-
-  console.log("💾 Feed Details cached");
-
-  // =====================================================
-  // 6. TRACK BOOST PROFILE VIEW
-  // =====================================================
-
-  if (shouldTrackProfileView) {
-
-    await trackBoostEvent({
-      targetUserId: userId,
-      actorId: currentUserId,
-      type: "PROFILE_VIEW",
-    });
-  }
-
-  // =====================================================
-  // 7. RETURN
-  // =====================================================
-  return response;
-};
-
-// Helper function to transform user data
-const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
-  // Extract lifestyle answers (screen = LIFESTYLE)
-  const lifestyleAnswers = user.answer.filter(
-    (a: any) => a.question.screen === 'LIFESTYLE'
-  );
-
-  // Extract interests (screen = THINGS_U_LOVE)
-  const interestAnswers = user.answer.filter(
-    (a: any) => a.question.screen === 'THINGS_U_LOVE'
-  );
-
-  // Extract networking (screen = NETWORKING)
-  const networkingAnswers = user.answer.filter(
-    (a: any) => a.question.screen === 'NETWORKING_INTENT'
-  );
-
-  // Calculate age from birth_date
-  const age = calculateAge(user.birth_date);
-
-  // Get primary photo
-  const primaryPhoto = user.photos.find((p: any) => p.is_primary) || user.photos[0];
-
-  // Get mother tongue from languages
-  const motherTongue = user.profile?.languages?.[0]?.language?.name || null;
-
-  // Extract zodiac sign from birth_date
-  const zodiac = user.about?.zodiac || null;
-  const communicationStyle = user.about?.communicationStyle || null;
-  const loveLanguage = user.about?.loveLanguage || null;
-
-  return {
-    userId: user.id,
-    fullName: user.full_name,
-    age: age,
-    gender: user.gender,
-    phone_number: user.phone_number,
-
-    // Static values
-    matchScore: STATIC_MATCH_SCORE,
-    trust: user.trust_score ?? 0,
-    replyTime: replyTime,
-    // Basic Info
-    bio: user.bio?.bio || null,
-    lookingFor: user.intention?.option || null,
-    lookingFor_subtitle: user.intention?.optDescription || null,
-    religion: user.profile?.religion?.name || null,
-    community: user.profile?.community?.name || null,
-    motherTongue: motherTongue,
-    height: user.height,
-    city: user.profile?.city || null,
-    state: user.profile?.state || null,
-    country: user.profile?.country || null,
-    area: user.profile?.area || null,
-    zodiac: zodiac,
-
-    // Communication & Love Language
-    communicationStyle: communicationStyle,
-    loveLanguage: loveLanguage,
-
-    // Photos
-    photos: user.photos.map((photo: any) => ({
-      id: photo.id,
-      url: photo.media_url,
-      isPrimary: photo.is_primary,
-      order: photo.order,
-      mediaType: photo.media_type
-    })),
-
-    // Prompts
-    prompts: user.userPrompts.map((prompt: any) => ({
-      id: prompt.id,
-      question: prompt.prompt.question,
-      answer: prompt.answer,
-      category: prompt.prompt.category?.name || null,
-      displayOrder: prompt.displayOrder
-    })),
-
-    // Career
-    career: {
-      highestEducation: user.eduWork?.highestEdu || null,
-      degree: user.eduWork?.degree || null,
-      collegeName: user.eduWork?.collegeName || null,
-      graduationYear: user.eduWork?.graduationYear || null,
-      profession: user.eduWork?.profession?.name || null,
-      companyName: user.eduWork?.companyName || null,
-      employmentType: user.eduWork?.employmentType?.name || null,
-      experience: user.eduWork?.experience?.title || null,
-      ambition: user.eduWork?.ambition?.title || null,
-      salaryRange: user.eduWork?.salaryRange?.title || null,
-      bigDreams: user.eduWork?.bigDreams || null
-    },
-
-    // Lifestyle
-    lifestyle: lifestyleAnswers.map((answer: any) => ({
-      question: answer.question.title,
-      answer: answer.option.label,
-      description: answer.description || null
-    })),
-
-    // Interests
-    interests: interestAnswers.map((answer: any) => ({
-      question: answer.question.title,
-      answer: answer.option.label,
-      description: answer.description || null
-    })),
-
-    networkingAnswers: networkingAnswers.map((answer: any) => ({
-      question: answer.question.title,
-      answer: answer.option.label,
-      description: answer.description || null
-    })),
-
-    // Family
-    family: {
-      familyStatus: user.familyProfile?.familyStatus?.value || null,
-      familyType: user.familyProfile?.familyType?.value || null,
-      fatherOccupation: user.familyProfile?.fatherOccupation?.value || null,
-      fatherOrganisation: user.familyProfile?.fatherOrganisation?.value || null,
-      motherOccupation: user.familyProfile?.motherOccupation?.value || null,
-      motherOrganisation: user.familyProfile?.motherOrganisation?.value || null,
-      familyHome: user.familyProfile?.familyHome?.value || null,
-      nativePlace: user.familyProfile?.nativePlace?.value || null,
-      familyIncome: user.familyProfile?.familyIncome?.title || null,
-      siblings:
-        user.familyProfile?.siblings?.map(
-          (sibling: UserSiblingWithDetails) => ({
-            relation: sibling.siblingType?.value || null,
-            occupation: sibling.occupation?.value || null,
-            marital: sibling.marital?.value || null,
-          })
-        ) || [],
-    }
-  };
-};
-
-
