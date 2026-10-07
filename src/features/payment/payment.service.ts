@@ -1176,66 +1176,104 @@ const createEventBookingForPayment =
     // YOUR EXISTING LOGIC - UNCHANGED
     // =====================================
 
-    const checkCapacity = async (
-      ticketType:
-        | "MEN"
-        | "WOMEN"
-        | "OTHER",
-      requestedCount: number,
-      capacity: number | null,
-    ) => {
-      if (
-        requestedCount <= 0
-      ) {
-        return;
-      }
+   const checkCapacity = async (
+  ticketType:
+    | "MEN"
+    | "WOMEN"
+    | "OTHER",
+  requestedCount: number,
+  capacity: number | null,
+) => {
+  if (requestedCount <= 0) {
+    return;
+  }
 
-      if (
-        capacity === null ||
-        capacity <= 0
-      ) {
-        throw new Error(
-          `${ticketType} ticket capacity is not available`,
-        );
-      }
+  if (
+    capacity === null ||
+    capacity <= 0
+  ) {
+    throw new Error(
+      `${ticketType} ticket capacity is not available`,
+    );
+  }
 
-      const alreadyBooked =
-        await prisma
-          .eventBookingTicket
-          .count({
-            where: {
-              booking: {
-                eventId:
-                  event.id,
-              },
+  // =====================================
+  // ONLY CONFIRMED BOOKINGS COUNT
+  // =====================================
 
-              ticketType,
+  const alreadyBooked =
+    await prisma.eventBookingTicket.count({
+      where: {
+        booking: {
+          eventId: event.id,
 
-              status: {
-                in: [
-                  "PENDING",
-                  "CONFIRMED",
-                ],
-              },
-            },
-          });
+          status:
+            EventBookingStatus.CONFIRMED,
+        },
 
-      const remaining =
-        Math.max(
-          capacity -
-            alreadyBooked,
-          0,
-        );
+        ticketType,
+      },
+    });
 
-      if (
-        requestedCount >
-        remaining
-      ) {
-        throw new Error(
-          `Only ${remaining} ${ticketType} ticket(s) available`,
-        );
-      }
-    };
+  // =====================================
+  // LEFT SPOTS
+  // =====================================
+
+  const remaining = Math.max(
+    capacity - alreadyBooked,
+    0,
+  );
+
+  // =====================================
+  // DEBUG CONSOLE
+  // =====================================
+
+  console.log(
+    "======================================",
+  );
+
+  console.log(
+    `🎟️ ${ticketType} TICKET CAPACITY CHECK`,
+  );
+
+  console.log(
+    "Event ID:",
+    event.id,
+  );
+
+  console.log(
+    "Total Capacity:",
+    capacity,
+  );
+
+  console.log(
+    "Confirmed Booked:",
+    alreadyBooked,
+  );
+
+  console.log(
+    "Left Spots:",
+    remaining,
+  );
+
+  console.log(
+    "User Requested:",
+    requestedCount,
+  );
+
+  console.log(
+    "======================================",
+  );
+
+  if (
+    requestedCount >
+    remaining
+  ) {
+    throw new Error(
+      `Only ${remaining} ${ticketType} ticket(s) available`,
+    );
+  }
+};
 
     await checkCapacity(
       "MEN",

@@ -589,6 +589,8 @@ export const getUserDetailsService = async (
             onboardingStep: user.onboarding_step,
             nextStep: user.next_step,
             onboardingCompleted: user.onboarding_completed,
+            pausedAt: user.paused_at,
+    pauseReason: user.pause_reason,
         },
     };
 
@@ -612,6 +614,8 @@ export const getUserDetailsService = async (
                         onboardingStep: user.onboarding_step,
                         nextStep: user.next_step,
                         onboardingCompleted: user.onboarding_completed,
+                        pausedAt: user.paused_at,
+    pauseReason: user.pause_reason,
                     },
                 },
             };

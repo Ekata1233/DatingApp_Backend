@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { endRelationshipController, getCommitmentManagementController, relationshipTagController } from "./relationshipTag.controller";
+import { acceptRelationshipProposalController, endRelationshipController, getCommitmentManagementController, relationshipTagController } from "./relationshipTag.controller";
 import authMiddleware from "../../middleware/auth.middleware";
 
 const router = Router();
@@ -59,5 +59,11 @@ router.patch(
   authMiddleware,
   endRelationshipController,
 );  
+
+router.post(
+  "/relationship-proposals/:proposalId/accept",
+  authMiddleware,
+  acceptRelationshipProposalController,
+);
 
 export default router;

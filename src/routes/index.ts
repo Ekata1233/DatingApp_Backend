@@ -98,6 +98,8 @@ import educationAdminVefication from "../features/verification/education/educati
 import educationVefication from "../features/verification/education/education.routes"
 import manualAadhaarAdminRoutes from "../features/verification/manual-government-id/manual-government-id.admin.routes";
 import manualAadhaarRoutes from "../features/verification/manual-government-id/manual-government-id.user.routes";
+import incomeVerificationRoutes from "../features/verification/income-verification/income.user.routes";
+import incomeVerificationAdminRoutes from "../features/verification/income-verification/income.admin.routes";
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -114,12 +116,12 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes);
 
 
 
 router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, eventPartnerRoutes);
-router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes)
+router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes)
 router.use("/legal", legalRoutes);
 
 // router.use("/users",usersRoutes)

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { endRelationshipService, getCommitmentManagementService, relationshipTagService } from "./relationshipTag.service";
+import { acceptRelationshipProposalService, endRelationshipService, getCommitmentManagementService, relationshipTagService } from "./relationshipTag.service";
 import { getIO } from "../../config/socket";
 import { relationshipTagSchema } from "./relationshipTag.validation";
 
@@ -107,6 +107,7 @@ export const relationshipTagController = {
                 "This user is no longer available",
                 "You already have an active relationship with this user",
                 "A relationship tag proposal is already pending between you and this user",
+                "Proposal sender already has an active relationship",
             ];
 
             if (businessErrors.includes(error.message)) {
@@ -559,3 +560,191 @@ export const endRelationshipController = async (
     });
   }
 };
+
+
+
+
+
+
+/* =========================================================
+   ACCEPT RELATIONSHIP PROPOSAL
+========================================================= */
+
+export const acceptRelationshipProposalController =
+  async (
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      // =====================================================
+      // 1. GET LOGGED-IN USER
+      // =====================================================
+
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized.",
+        });
+      }
+
+      // =====================================================
+      // 2. GET PROPOSAL ID
+      // =====================================================
+
+      const { proposalId } = (req as any).params;
+
+      if (!proposalId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Relationship proposal ID is required.",
+        });
+      }
+
+      // =====================================================
+      // 3. ACCEPT PROPOSAL
+      // =====================================================
+
+      const result =
+        await acceptRelationshipProposalService(
+          userId,
+          proposalId,
+        );
+
+      // =====================================================
+      // 4. SUCCESS RESPONSE
+      // =====================================================
+
+      return res.status(200).json({
+        success: true,
+        message:
+          result.message,
+
+        data: {
+          previousRelationship:
+            result.previousRelationship,
+
+          currentRelationship:
+            result.currentRelationship,
+        },
+      });
+    } catch (error: any) {
+      console.error(
+        "ACCEPT RELATIONSHIP PROPOSAL ERROR:",
+        error,
+      );
+
+      // =====================================================
+      // PROPOSAL NOT FOUND
+      // =====================================================
+
+      if (
+        error.message ===
+        "RELATIONSHIP_PROPOSAL_NOT_FOUND"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Relationship request not found.",
+        });
+      }
+
+      // =====================================================
+      // UNAUTHORIZED
+      // =====================================================
+
+      if (
+        error.message ===
+        "NOT_AUTHORIZED_TO_ACCEPT_PROPOSAL"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not authorized to accept this relationship request.",
+        });
+      }
+
+      // =====================================================
+      // ALREADY ACCEPTED / REJECTED / CANCELLED
+      // =====================================================
+
+      if (
+        error.message ===
+        "RELATIONSHIP_PROPOSAL_ALREADY_RESPONDED"
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "This relationship request has already been responded to.",
+        });
+      }
+
+      // =====================================================
+      // SENDER ALREADY IN RELATIONSHIP
+      // =====================================================
+
+      if (
+        error.message ===
+        "PROPOSAL_SENDER_ALREADY_IN_RELATIONSHIP"
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "The user who sent this request is already in an active relationship.",
+        });
+      }
+
+      // =====================================================
+      // USER ID REQUIRED
+      // =====================================================
+
+      if (
+        error.message ===
+        "USER_ID_REQUIRED"
+      ) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized.",
+        });
+      }
+
+      // =====================================================
+      // PROPOSAL ID REQUIRED
+      // =====================================================
+
+      if (
+        error.message ===
+        "PROPOSAL_ID_REQUIRED"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Relationship proposal ID is required.",
+        });
+      }
+
+      // =====================================================
+      // PRISMA UNIQUE CONSTRAINT
+      // =====================================================
+
+      if (error.code === "P2002") {
+        return res.status(409).json({
+          success: false,
+          message:
+            "An active relationship already exists.",
+        });
+      }
+
+      // =====================================================
+      // INTERNAL SERVER ERROR
+      // =====================================================
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to accept relationship request.",
+      });
+    }
+  };

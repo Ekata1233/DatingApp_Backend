@@ -298,268 +298,470 @@ export const relationshipTagRepository = {
      *
      * Both happen inside the same transaction.
      */
-    async acceptProposal(
-        proposalId: string,
-        userId: string
-    ) {
-        return prisma.$transaction(async (tx) => {
-            /**
-             * ----------------------------------------
-             * 1. Get proposal
-             * ----------------------------------------
-             */
-            const proposal =
-                await tx.relationshipTagProposal.findUnique({
-                    where: {
-                        id: proposalId,
-                    },
-                    include: {
-                        sender: {
-                            select: {
-                                id: true,
-                                full_name: true,
-                            },
-                        },
+   async acceptProposal(
+  proposalId: string,
+  userId: string
+) {
+  return prisma.$transaction(async (tx) => {
 
-                        receiver: {
-                            select: {
-                                id: true,
-                                full_name: true,
-                            },
-                        },
-                    },
-                });
+    // =====================================================
+    // 1. GET PROPOSAL
+    // =====================================================
 
-            if (!proposal) {
-                throw new Error(
-                    "Relationship tag proposal not found"
-                );
-            }
+    const proposal =
+      await tx.relationshipTagProposal.findUnique({
+        where: {
+          id: proposalId,
+        },
 
-            /**
-             * ----------------------------------------
-             * 2. Make sure logged-in user is receiver
-             * ----------------------------------------
-             */
-            if (proposal.receiverId !== userId) {
-                throw new Error(
-                    "You are not allowed to accept this proposal"
-                );
-            }
+        include: {
+          sender: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
 
-            /**
-             * ----------------------------------------
-             * 3. Make sure proposal is still pending
-             * ----------------------------------------
-             */
-            if (proposal.status !== "PENDING") {
-                throw new Error(
-                    "This relationship tag proposal is no longer pending"
-                );
-            }
+          receiver: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+        },
+      });
 
-            /**
-             * ----------------------------------------
-             * 4. Normalize user IDs
-             *
-             * Always store the smaller UUID in user1Id.
-             *
-             * A -> B
-             * B -> A
-             *
-             * both become the same pair.
-             * ----------------------------------------
-             */
-            const [user1Id, user2Id] =
-                proposal.senderId < proposal.receiverId
-                    ? [
-                        proposal.senderId,
-                        proposal.receiverId,
-                    ]
-                    : [
-                        proposal.receiverId,
-                        proposal.senderId,
-                    ];
+    if (!proposal) {
+      throw new Error(
+        "Relationship tag proposal not found"
+      );
+    }
 
-            /**
-             * ----------------------------------------
-             * 5. Check active relationship
-             * ----------------------------------------
-             */
-            const existingRelationship =
-                await tx.userRelationship.findFirst({
-                    where: {
-                        user1Id,
-                        user2Id,
-                        status: "ACTIVE",
-                    },
-                });
+    // =====================================================
+    // 2. ONLY RECEIVER CAN ACCEPT
+    // =====================================================
 
-            if (existingRelationship) {
-                throw new Error(
-                    "You already have an active relationship with this user"
-                );
-            }
+    if (proposal.receiverId !== userId) {
+      throw new Error(
+        "You are not allowed to accept this proposal"
+      );
+    }
 
-            /**
-             * ----------------------------------------
-             * 6. Create relationship
-             * ----------------------------------------
-             */
-            const relationship =
-                await tx.userRelationship.create({
-                    data: {
-                        user1Id,
-                        user2Id,
+    // =====================================================
+    // 3. PROPOSAL MUST BE PENDING
+    // =====================================================
 
-                        tag: proposal.tag,
+    if (proposal.status !== "PENDING") {
+      throw new Error(
+        "This relationship tag proposal is no longer pending"
+      );
+    }
 
-                        status: "ACTIVE",
+    const senderId =
+      proposal.senderId; // C
 
-                        startedAt: new Date(),
+    const receiverId =
+      proposal.receiverId; // A
 
-                        proposalId: proposal.id,
-                    },
+    // =====================================================
+    // 4. CHECK C DOES NOT ALREADY HAVE ACTIVE RELATIONSHIP
+    // =====================================================
 
-                    include: {
-                        user1: {
-                            select: {
-                                id: true,
-                                full_name: true,
-                            },
-                        },
+    const senderActiveRelationship =
+      await tx.userRelationship.findFirst({
+        where: {
+          status: "ACTIVE",
 
-                        user2: {
-                            select: {
-                                id: true,
-                                full_name: true,
-                            },
-                        },
-                    },
-                });
+          OR: [
+            {
+              user1Id: senderId,
+            },
+            {
+              user2Id: senderId,
+            },
+          ],
+        },
+      });
 
-            // ========================================
-            // 7. Update proposal
-            // ========================================
+    if (senderActiveRelationship) {
+      throw new Error(
+        "Proposal sender already has an active relationship"
+      );
+    }
 
-            const updatedProposal =
-                await tx.relationshipTagProposal.update({
-                    where: {
-                        id: proposal.id,
-                    },
+    // =====================================================
+    // 5. FIND A'S CURRENT ACTIVE RELATIONSHIP
+    // =====================================================
 
-                    data: {
-                        status: "ACCEPTED",
-                        respondedAt: new Date(),
-                    },
+    const receiverActiveRelationship =
+      await tx.userRelationship.findFirst({
+        where: {
+          status: "ACTIVE",
 
-                    include: {
-                        sender: {
-                            select: {
-                                id: true,
-                                full_name: true,
-                            },
-                        },
+          OR: [
+            {
+              user1Id: receiverId,
+            },
+            {
+              user2Id: receiverId,
+            },
+          ],
+        },
 
-                        receiver: {
-                            select: {
-                                id: true,
-                                full_name: true,
-                            },
-                        },
-                    },
-                });
+        include: {
+          user1: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
 
+          user2: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+        },
+      });
 
-            // ========================================
-            // 8. Find conversation
-            // ========================================
+    // =====================================================
+    // 6. IF A ALREADY HAS B -> END A + B
+    // =====================================================
 
-            const conversation =
-                await tx.conversation.findFirst({
-                    where: {
-                        AND: [
-                            {
-                                participants: {
-                                    some: {
-                                        userId: proposal.senderId,
-                                    },
-                                },
-                            },
+    let previousPartner:
+      | {
+          id: string;
+          full_name: string | null;
+        }
+      | null = null;
 
-                            {
-                                participants: {
-                                    some: {
-                                        userId: proposal.receiverId,
-                                    },
-                                },
-                            },
-                        ],
-                    },
+    let breakupMessage = null;
 
-                    select: {
-                        id: true,
-                    },
-                });
+    if (receiverActiveRelationship) {
 
-            if (!conversation) {
-                throw new Error(
-                    "Conversation not found between users"
-                );
-            }
+      // ===================================================
+      // FIND B
+      // ===================================================
 
+      previousPartner =
+        receiverActiveRelationship.user1Id ===
+        receiverId
+          ? receiverActiveRelationship.user2
+          : receiverActiveRelationship.user1;
 
-            // ========================================
-            // 9. Create ACCEPTED chat message
-            // ========================================
+      // ===================================================
+      // END A + B RELATIONSHIP
+      // ===================================================
 
-            const chatMessage =
-                await tx.chatMessage.create({
-                    data: {
-                        conversationId: conversation.id,
+      await tx.userRelationship.update({
+        where: {
+          id: receiverActiveRelationship.id,
+        },
 
-                        // Receiver accepted the proposal
-                        senderId: userId,
+        data: {
+          status: "ENDED",
+          endedAt: new Date(),
+        },
+      });
 
-                        content:
-                            `Relationship tag "${proposal.tag}" accepted`,
+      // ===================================================
+      // FIND A + B CONVERSATION
+      // ===================================================
 
-                        messageType:
-                            "RELATIONSHIP_TAG_ACCEPTED",
+      const oldConversation =
+        await tx.conversation.findFirst({
+          where: {
+            AND: [
+              {
+                participants: {
+                  some: {
+                    userId: receiverId,
+                  },
+                },
+              },
 
-                        metadata: {
-                            proposalId: proposal.id,
+              {
+                participants: {
+                  some: {
+                    userId: previousPartner.id,
+                  },
+                },
+              },
+            ],
+          },
 
-                            relationshipId:
-                                relationship.id,
-
-                            tag: proposal.tag,
-
-                            status: "ACCEPTED",
-
-                            senderId:
-                                proposal.senderId,
-
-                            receiverId:
-                                proposal.receiverId,
-                        },
-                    },
-                });
-
-
-            // ========================================
-            // 10. Return everything
-            // ========================================
-
-            return {
-                relationship,
-
-                proposal: updatedProposal,
-
-                message: chatMessage,
-            };
+          select: {
+            id: true,
+          },
         });
-    },
+
+      // ===================================================
+      // CREATE DIRECT BREAKUP MESSAGE FOR B
+      // ===================================================
+
+      if (oldConversation) {
+
+        breakupMessage =
+          await tx.chatMessage.create({
+            data: {
+              conversationId:
+                oldConversation.id,
+
+              // A sends message to old partner B
+              senderId: receiverId,
+
+              content:
+                `${proposal.receiver.full_name ?? "Your partner"} has ended the relationship.`,
+
+              messageType: "TEXT",
+            },
+          });
+      }
+    }
+
+    // =====================================================
+    // 7. NORMALIZE NEW A + C IDs
+    // =====================================================
+
+    const [user1Id, user2Id] =
+      senderId < receiverId
+        ? [
+            senderId,
+            receiverId,
+          ]
+        : [
+            receiverId,
+            senderId,
+          ];
+
+    // =====================================================
+    // 8. CHECK A + C ACTIVE RELATIONSHIP
+    // =====================================================
+
+    const existingRelationship =
+      await tx.userRelationship.findFirst({
+        where: {
+          user1Id,
+          user2Id,
+          status: "ACTIVE",
+        },
+      });
+
+    if (existingRelationship) {
+      throw new Error(
+        "You already have an active relationship with this user"
+      );
+    }
+
+    // =====================================================
+    // 9. CREATE NEW A + C RELATIONSHIP
+    // =====================================================
+
+    const relationship =
+      await tx.userRelationship.create({
+        data: {
+          user1Id,
+          user2Id,
+
+          tag: proposal.tag,
+
+          status: "ACTIVE",
+
+          startedAt: new Date(),
+
+          proposalId: proposal.id,
+        },
+
+        include: {
+          user1: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+
+          user2: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+        },
+      });
+
+    // =====================================================
+    // 10. UPDATE PROPOSAL -> ACCEPTED
+    // =====================================================
+
+    const updatedProposal =
+      await tx.relationshipTagProposal.update({
+        where: {
+          id: proposal.id,
+        },
+
+        data: {
+          status: "ACCEPTED",
+          respondedAt: new Date(),
+        },
+
+        include: {
+          sender: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+
+          receiver: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+        },
+      });
+
+    // =====================================================
+    // 11. CANCEL A'S OTHER PENDING PROPOSALS
+    // =====================================================
+
+    await tx.relationshipTagProposal.updateMany({
+      where: {
+        id: {
+          not: proposal.id,
+        },
+
+        status: "PENDING",
+
+        OR: [
+          {
+            senderId: receiverId,
+          },
+          {
+            receiverId: receiverId,
+          },
+        ],
+      },
+
+      data: {
+        status: "CANCELLED",
+        respondedAt: new Date(),
+      },
+    });
+
+    // =====================================================
+    // 12. FIND A + C CONVERSATION
+    // =====================================================
+
+    const conversation =
+      await tx.conversation.findFirst({
+        where: {
+          AND: [
+            {
+              participants: {
+                some: {
+                  userId:
+                    proposal.senderId,
+                },
+              },
+            },
+
+            {
+              participants: {
+                some: {
+                  userId:
+                    proposal.receiverId,
+                },
+              },
+            },
+          ],
+        },
+
+        select: {
+          id: true,
+        },
+      });
+
+    if (!conversation) {
+      throw new Error(
+        "Conversation not found between users"
+      );
+    }
+
+    // =====================================================
+    // 13. CREATE EXISTING ACCEPTED MESSAGE
+    // =====================================================
+
+    const chatMessage =
+      await tx.chatMessage.create({
+        data: {
+          conversationId:
+            conversation.id,
+
+          // A accepted C
+          senderId: userId,
+
+          content:
+            `Relationship tag "${proposal.tag}" accepted`,
+
+          messageType:
+            "RELATIONSHIP_TAG_ACCEPTED",
+
+          metadata: {
+            proposalId:
+              proposal.id,
+
+            relationshipId:
+              relationship.id,
+
+            tag:
+              proposal.tag,
+
+            status:
+              "ACCEPTED",
+
+            senderId:
+              proposal.senderId,
+
+            receiverId:
+              proposal.receiverId,
+          },
+        },
+      });
+
+    // =====================================================
+    // 14. RETURN SAME DATA + OLD RELATIONSHIP INFO
+    // =====================================================
+
+    return {
+      relationship,
+
+      proposal:
+        updatedProposal,
+
+      message:
+        chatMessage,
+
+      previousRelationship:
+        receiverActiveRelationship
+          ? {
+              id:
+                receiverActiveRelationship.id,
+
+              status:
+                "ENDED",
+
+              partner:
+                previousPartner,
+
+              message:
+                breakupMessage,
+            }
+          : null,
+    };
+  });
+},
 
     async rejectProposal(
         proposalId: string,

@@ -43,11 +43,32 @@ const normalizePhoneNumber = (
     );
   }
 
-  const cleanedPhone = phoneNumber
-    .replace(/\s+/g, "")
-    .replace(/^\+91/, "")
-    .replace(/^91/, "");
+  // Remove spaces, -, (, )
+  let cleanedPhone =
+    phoneNumber.replace(
+      /[\s\-()]/g,
+      "",
+    );
 
+  // +91XXXXXXXXXX
+  if (
+    cleanedPhone.startsWith("+91") &&
+    cleanedPhone.length === 13
+  ) {
+    cleanedPhone =
+      cleanedPhone.slice(3);
+  }
+
+  // 91XXXXXXXXXX
+  else if (
+    cleanedPhone.startsWith("91") &&
+    cleanedPhone.length === 12
+  ) {
+    cleanedPhone =
+      cleanedPhone.slice(2);
+  }
+
+  // Validate final Indian mobile number
   if (!/^\d{10}$/.test(cleanedPhone)) {
     throw new Error(
       "Invalid Indian phone number",

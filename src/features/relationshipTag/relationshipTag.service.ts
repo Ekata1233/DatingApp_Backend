@@ -1,4 +1,4 @@
-import { RelationshipTag, UserRelationshipStatus } from "@prisma/client";
+import { RelationshipTag, RelationshipTagProposalStatus, UserRelationshipStatus } from "@prisma/client";
 import { calculateAge } from "../chat/chat.repository";
 import { endRelationshipRepository, findRelationshipByIdRepository, relationshipTagRepository } from "./relationshipTag.repository";
 import { RelationshipTagProposalInput } from "./relationshipTag.validation";
@@ -184,59 +184,51 @@ export const relationshipTagService = {
    * Accept proposal
    * ----------------------------------------
    */
-  async acceptProposal(
-    proposalId: string,
-    userId: string
-  ) {
-    const result =
-      await relationshipTagRepository.acceptProposal(
-        proposalId,
-        userId
-      );
+ async acceptProposal(
+  proposalId: string,
+  userId: string
+) {
+  const result =
+    await relationshipTagRepository.acceptProposal(
+      proposalId,
+      userId
+    );
 
-    const {
-      relationship,
-      proposal,
-      message,
-    } = result;
+  const {
+    relationship,
+    proposal,
+    message,
+  } = result;
 
+  // Determine partner
+  const partner =
+    userId === proposal.senderId
+      ? proposal.receiver
+      : proposal.sender;
 
-    // Determine partner
-    const partner =
-      userId === proposal.senderId
-        ? proposal.receiver
-        : proposal.sender;
+  return {
+    id: relationship.id,
 
+    tag: relationship.tag,
 
-    return {
-      id: relationship.id,
+    status: relationship.status,
 
-      tag: relationship.tag,
+    startedAt: relationship.startedAt,
 
-      status: relationship.status,
+    partner: {
+      id: partner.id,
+      fullName: partner.full_name,
+    },
 
-      startedAt: relationship.startedAt,
+    proposal: {
+      id: proposal.id,
+      status: proposal.status,
+      respondedAt: proposal.respondedAt,
+    },
 
-      partner: {
-        id: partner.id,
-
-        fullName:
-          partner.full_name,
-      },
-
-      proposal: {
-        id: proposal.id,
-
-        status: proposal.status,
-
-        respondedAt:
-          proposal.respondedAt,
-      },
-
-      // Important
-      message,
-    };
-  },
+    message,
+  };
+},
 
   async rejectProposal(
     proposalId: string,
@@ -667,6 +659,309 @@ export const endRelationshipService = async (
       fullName: partner.full_name,
       profilePhoto:
         partner.photos[0]?.media_url ?? null,
+    },
+  };
+};
+
+
+
+
+
+
+
+export const acceptRelationshipProposalService = async (
+  userId: string,
+  proposalId: string,
+) => {
+  if (!userId) {
+    throw new Error("USER_ID_REQUIRED");
+  }
+
+  if (!proposalId) {
+    throw new Error("PROPOSAL_ID_REQUIRED");
+  }
+
+  const result = await prisma.$transaction(
+    async (tx) => {
+      // =====================================================
+      // 1. GET RELATIONSHIP PROPOSAL
+      // =====================================================
+
+      const proposal =
+        await tx.relationshipTagProposal.findUnique({
+          where: {
+            id: proposalId,
+          },
+
+          include: {
+            sender: {
+              select: {
+                id: true,
+                full_name: true,
+              },
+            },
+
+            receiver: {
+              select: {
+                id: true,
+                full_name: true,
+              },
+            },
+          },
+        });
+
+      if (!proposal) {
+        throw new Error(
+          "RELATIONSHIP_PROPOSAL_NOT_FOUND",
+        );
+      }
+
+      console.log("====================================");
+console.log("RELATIONSHIP PROPOSAL ACCEPT CHECK");
+console.log("Logged-in userId :", userId);
+console.log("Proposal ID      :", proposal.id);
+console.log("Proposal sender  :", proposal.senderId);
+console.log("Proposal receiver:", proposal.receiverId);
+console.log("Proposal status  :", proposal.status);
+console.log("====================================");
+      // =====================================================
+      // 2. ONLY RECEIVER CAN ACCEPT
+      // =====================================================
+
+      if (proposal.receiverId !== userId) {
+        throw new Error(
+          "NOT_AUTHORIZED_TO_ACCEPT_PROPOSAL",
+        );
+      }
+
+      // =====================================================
+      // 3. PROPOSAL MUST BE PENDING
+      // =====================================================
+
+      if (
+        proposal.status !==
+        RelationshipTagProposalStatus.PENDING
+      ) {
+        throw new Error(
+          "RELATIONSHIP_PROPOSAL_ALREADY_RESPONDED",
+        );
+      }
+
+      const senderId = proposal.senderId; // C
+      const receiverId = proposal.receiverId; // A
+
+      // =====================================================
+      // 4. CHECK C IS NOT ALREADY IN ACTIVE RELATIONSHIP
+      // =====================================================
+
+      const senderActiveRelationship =
+        await tx.userRelationship.findFirst({
+          where: {
+            status:
+              UserRelationshipStatus.ACTIVE,
+
+            OR: [
+              {
+                user1Id: senderId,
+              },
+              {
+                user2Id: senderId,
+              },
+            ],
+          },
+        });
+
+      if (senderActiveRelationship) {
+        throw new Error(
+          "PROPOSAL_SENDER_ALREADY_IN_RELATIONSHIP",
+        );
+      }
+
+      // =====================================================
+      // 5. FIND A'S CURRENT ACTIVE RELATIONSHIP
+      // =====================================================
+
+      const receiverActiveRelationship =
+        await tx.userRelationship.findFirst({
+          where: {
+            status:
+              UserRelationshipStatus.ACTIVE,
+
+            OR: [
+              {
+                user1Id: receiverId,
+              },
+              {
+                user2Id: receiverId,
+              },
+            ],
+          },
+
+          include: {
+            user1: {
+              select: {
+                id: true,
+                full_name: true,
+              },
+            },
+
+            user2: {
+              select: {
+                id: true,
+                full_name: true,
+              },
+            },
+          },
+        });
+
+      let previousRelationship = null;
+
+      // =====================================================
+      // 6. IF A + B EXISTS -> END IT
+      // =====================================================
+
+      if (receiverActiveRelationship) {
+        const previousPartner =
+          receiverActiveRelationship.user1Id ===
+          receiverId
+            ? receiverActiveRelationship.user2
+            : receiverActiveRelationship.user1;
+
+        const breakupMessage =
+          `${proposal.receiver.full_name ?? "User"} accepted a new relationship request. Your relationship has ended.`;
+
+        const endedRelationship =
+  await tx.userRelationship.update({
+    where: {
+      id: receiverActiveRelationship.id,
+    },
+
+    data: {
+      status:
+        UserRelationshipStatus.ENDED,
+
+      endedAt: new Date(),
+    },
+  });
+
+        previousRelationship = {
+          id: endedRelationship.id,
+
+          partner: {
+            id: previousPartner.id,
+            name: previousPartner.full_name,
+          },
+
+          breakupMessage,
+        };
+      }
+
+      // =====================================================
+      // 7. ACCEPT C -> A PROPOSAL
+      // =====================================================
+
+      const acceptedProposal =
+        await tx.relationshipTagProposal.update({
+          where: {
+            id: proposal.id,
+          },
+
+          data: {
+            status:
+              RelationshipTagProposalStatus.ACCEPTED,
+
+            respondedAt: new Date(),
+          },
+        });
+
+      // =====================================================
+      // 8. CREATE A + C RELATIONSHIP
+      // =====================================================
+
+      const newRelationship =
+        await tx.userRelationship.create({
+          data: {
+            user1Id: receiverId,
+            user2Id: senderId,
+
+            tag: proposal.tag,
+
+            status:
+              UserRelationshipStatus.ACTIVE,
+
+            startedAt: new Date(),
+
+            proposalId: proposal.id,
+          },
+        });
+
+      // =====================================================
+      // 9. CANCEL A'S OTHER PENDING PROPOSALS
+      // =====================================================
+
+      await tx.relationshipTagProposal.updateMany({
+        where: {
+          id: {
+            not: proposal.id,
+          },
+
+          status:
+            RelationshipTagProposalStatus.PENDING,
+
+          OR: [
+            {
+              senderId: receiverId,
+            },
+            {
+              receiverId: receiverId,
+            },
+          ],
+        },
+
+        data: {
+          status:
+            RelationshipTagProposalStatus.CANCELLED,
+
+          respondedAt: new Date(),
+        },
+      });
+
+      // =====================================================
+      // 10. RETURN
+      // =====================================================
+
+      return {
+        acceptedProposal,
+        previousRelationship,
+        newRelationship,
+
+        newPartner: {
+          id: proposal.sender.id,
+          name: proposal.sender.full_name,
+        },
+      };
+    },
+  );
+
+  return {
+    message:
+      "Relationship request accepted successfully.",
+
+    previousRelationship:
+      result.previousRelationship,
+
+    currentRelationship: {
+      id: result.newRelationship.id,
+
+      tag: result.newRelationship.tag,
+
+      status:
+        result.newRelationship.status,
+
+      startedAt:
+        result.newRelationship.startedAt,
+
+      partner: result.newPartner,
     },
   };
 };
