@@ -24,6 +24,7 @@ import {
 import { createNotification } from "../notification/notification.service";
 import { chatRepository } from "../chat/chat.repository";
 import { dateNowInviteMessageRepo } from "./dateNow.repository";
+import { DATE_PLAN_WALLET_PRICE, deductDatePlanAmountFromWallet } from "./dateNow.helper";
 
 export const createDraftDatePlan = async (
   userId: string,
@@ -117,13 +118,21 @@ export const updateDraftDatePlan = async (
   return updatedPlan;
 };
 
-export const publishDatePlan = async (planId: string, userId: string) => {
+export const publishDatePlan = async (
+  planId: string,
+  userId: string
+) => {
   return prisma.$transaction(async (tx) => {
+    /* ------------------------------------------------------ */
+    /* GET DATE PLAN                                          */
+    /* ------------------------------------------------------ */
+
     const plan = await tx.datePlan.findFirst({
       where: {
         id: planId,
         userId,
       },
+
       include: {
         vibes: true,
       },
@@ -133,55 +142,174 @@ export const publishDatePlan = async (planId: string, userId: string) => {
       throw new Error("Plan not found");
     }
 
+    /* ------------------------------------------------------ */
+    /* VALIDATIONS                                            */
+    /* ------------------------------------------------------ */
+
     if (!plan.activityId) {
-      throw new Error("Activity is required");
+      throw new Error(
+        "Activity is required"
+      );
     }
 
     if (!plan.visibilityId) {
-      throw new Error("Visibility is required");
+      throw new Error(
+        "Visibility is required"
+      );
     }
 
-    if (plan.status === PlanStatus.ACTIVE) {
-      throw new Error("Plan is already published");
+    if (
+      plan.status === PlanStatus.ACTIVE
+    ) {
+      throw new Error(
+        "Plan is already published"
+      );
     }
 
-    const userPlanStats = await tx.datePlanUserStats.findUnique({
-      where: {
-        userId,
-      },
-    });
+    /* ------------------------------------------------------ */
+    /* GET DATE PLAN CREDITS                                  */
+    /* ------------------------------------------------------ */
 
-    if (!userPlanStats) {
-      throw new Error("User date plan stats not found");
-    }
-
-    if (userPlanStats.balance <= 0) {
-      throw new Error("You don't have any date plan credits.");
-    }
-
-    await tx.datePlanUserStats.update({
-      where: {
-        userId,
-      },
-      data: {
-        balance: {
-          decrement: 1,
+    const userPlanStats =
+      await tx.datePlanUserStats.findUnique({
+        where: {
+          userId,
         },
-      },
-    });
+      });
 
-    await tx.datePlan.update({
-      where: {
-        id: planId,
-      },
-      data: {
-        status: PlanStatus.ACTIVE,
-      },
-    });
+    let paymentMethod:
+      | "DATE_PLAN_CREDIT"
+      | "WALLET";
+
+    let remainingCredits = 0;
+
+    let walletDeduction:
+      | Awaited<
+        ReturnType<
+          typeof deductDatePlanAmountFromWallet
+        >
+      >
+      | null = null;
+
+    /* ------------------------------------------------------ */
+    /* OPTION 1: USE DATE PLAN CREDIT                         */
+    /* ------------------------------------------------------ */
+
+    if (
+      userPlanStats &&
+      userPlanStats.balance > 0
+    ) {
+      const updatedStats =
+        await tx.datePlanUserStats.update({
+          where: {
+            userId,
+          },
+
+          data: {
+            balance: {
+              decrement: 1,
+            },
+          },
+        });
+
+      remainingCredits =
+        updatedStats.balance;
+
+      paymentMethod =
+        "DATE_PLAN_CREDIT";
+    }
+
+    /* ------------------------------------------------------ */
+    /* OPTION 2: NO CREDIT -> DEDUCT ₹10 FROM WALLET          */
+    /* ------------------------------------------------------ */
+
+    else {
+      walletDeduction =
+        await deductDatePlanAmountFromWallet(
+          userId,
+          DATE_PLAN_WALLET_PRICE,
+          tx
+        );
+
+      paymentMethod = "WALLET";
+
+      remainingCredits =
+        userPlanStats?.balance ?? 0;
+    }
+
+    /* ------------------------------------------------------ */
+    /* PUBLISH DATE PLAN                                      */
+    /* ------------------------------------------------------ */
+
+    const publishedPlan =
+      await tx.datePlan.update({
+        where: {
+          id: planId,
+        },
+
+        data: {
+          status: PlanStatus.ACTIVE,
+        },
+      });
+
+    /* ------------------------------------------------------ */
+    /* LOG                                                    */
+    /* ------------------------------------------------------ */
+
+    console.log(
+      "Date plan published successfully",
+      {
+        userId,
+        planId,
+
+        paymentMethod,
+
+        remainingCredits,
+
+        walletAmountCharged:
+          paymentMethod === "WALLET"
+            ? DATE_PLAN_WALLET_PRICE
+            : 0,
+
+        walletBalanceAfter:
+          walletDeduction
+            ? walletDeduction.wallet.balance.toString()
+            : null,
+      }
+    );
+
+    /* ------------------------------------------------------ */
+    /* RESPONSE                                               */
+    /* ------------------------------------------------------ */
 
     return {
       success: true,
-      remainingCredits: userPlanStats.balance - 1,
+
+      message:
+        paymentMethod === "WALLET"
+          ? `Date plan published successfully. ₹${DATE_PLAN_WALLET_PRICE} deducted from wallet.`
+          : "Date plan published successfully.",
+
+      data: {
+        planId: publishedPlan.id,
+        status: publishedPlan.status,
+
+        payment: {
+          method: paymentMethod,
+
+          amount:
+            paymentMethod === "WALLET"
+              ? DATE_PLAN_WALLET_PRICE
+              : 0,
+
+          walletBalance:
+            walletDeduction
+              ? walletDeduction.wallet.balance.toString()
+              : null,
+        },
+
+        remainingCredits,
+      },
     };
   });
 };
@@ -1506,29 +1634,29 @@ export const getDatePlanHistory = async (
   console.log("QUERY:", query);
 
   const where = {
-  userId,
+    userId,
 
-  OR: [
-    {
-      status: {
-        in: [
-          PlanStatus.COMPLETED,
-          PlanStatus.CANCELLED,
-          PlanStatus.EXPIRED,
-        ],
-      },
-    },
-    {
-      feedbacks: {
-        some: {
-          reviewerId: userId,
-          attendanceStatus: DatePlanAttendanceStatus.NO_SHOW,
-          status: DatePlanFeedbackStatus.SUBMITTED,
+    OR: [
+      {
+        status: {
+          in: [
+            PlanStatus.COMPLETED,
+            PlanStatus.CANCELLED,
+            PlanStatus.EXPIRED,
+          ],
         },
       },
-    },
-  ],
-};
+      {
+        feedbacks: {
+          some: {
+            reviewerId: userId,
+            attendanceStatus: DatePlanAttendanceStatus.NO_SHOW,
+            status: DatePlanFeedbackStatus.SUBMITTED,
+          },
+        },
+      },
+    ],
+  };
 
   console.log("HISTORY WHERE:", JSON.stringify(where, null, 2));
 
@@ -1778,16 +1906,16 @@ export const getDatePlanHistory = async (
        */
       participant: participant
         ? {
-            id: participant.id,
+          id: participant.id,
 
-            name: participant.full_name,
+          name: participant.full_name,
 
-            age: participant.birth_date
-              ? calculateAge(participant.birth_date)
-              : null,
+          age: participant.birth_date
+            ? calculateAge(participant.birth_date)
+            : null,
 
-            photoUrl: participant.photos[0]?.media_url ?? null,
-          }
+          photoUrl: participant.photos[0]?.media_url ?? null,
+        }
         : null,
 
       /**
@@ -1829,12 +1957,12 @@ export const getDatePlanHistory = async (
        */
       confirmedDate: confirmed
         ? {
-            id: confirmed.id,
+          id: confirmed.id,
 
-            status: confirmed.status,
+          status: confirmed.status,
 
-            eventDateTime: confirmed.eventDateTime,
-          }
+          eventDateTime: confirmed.eventDateTime,
+        }
         : null,
 
       /**
@@ -2060,13 +2188,13 @@ export const getDatePlanHistoryDetails = async (
    * MET + SUBMITTED feedback has highest priority.
    */
   const historyStatus =
-  feedback?.attendanceStatus === DatePlanAttendanceStatus.NO_SHOW &&
-  feedback?.status === DatePlanFeedbackStatus.SUBMITTED
-    ? "NO_SHOW"
-    : feedback?.attendanceStatus === DatePlanAttendanceStatus.MET &&
+    feedback?.attendanceStatus === DatePlanAttendanceStatus.NO_SHOW &&
+      feedback?.status === DatePlanFeedbackStatus.SUBMITTED
+      ? "NO_SHOW"
+      : feedback?.attendanceStatus === DatePlanAttendanceStatus.MET &&
         feedback?.status === DatePlanFeedbackStatus.SUBMITTED
-      ? "COMPLETED"
-      : getHistoryStatus(
+        ? "COMPLETED"
+        : getHistoryStatus(
           plan.status,
           confirmed?.status ?? null,
           plan.eventDateTime,
