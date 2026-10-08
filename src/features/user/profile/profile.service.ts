@@ -151,51 +151,123 @@ export const updateInterestedInService = async (
 };
 
 //Religion
+
 export const updateReligionService = async (
   userId: string,
-  religionId: number,
-  communityId: number,
+  religionId?: number,
+  communityId?: number,
 ) => {
   if (!userId) {
     throw new Error("User ID is missing");
   }
 
-  // Validate community belongs to religion
-  const community = await prisma.community.findUnique({
-    where: {
-      id: communityId,
-    },
-  });
-
-  if (!community) {
-    throw new Error("Community not found");
+  if (
+    religionId === undefined &&
+    communityId === undefined
+  ) {
+    throw new Error(
+      "At least religionId or communityId is required",
+    );
   }
 
-  if (community.religionId !== religionId) {
-    throw new Error("Selected community does not belong to selected religion");
+  if (
+    religionId !== undefined &&
+    (!Number.isInteger(religionId) || religionId <= 0)
+  ) {
+    throw new Error("Invalid religionId");
+  }
+
+  if (
+    communityId !== undefined &&
+    (!Number.isInteger(communityId) || communityId <= 0)
+  ) {
+    throw new Error("Invalid communityId");
+  }
+
+  const existingProfile =
+    await prisma.userProfile.findUnique({
+      where: {
+        user_id: userId,
+      },
+    });
+
+  let finalReligionId =
+    religionId ?? existingProfile?.religionId ?? null;
+
+  let finalCommunityId: number | null =
+    communityId ?? existingProfile?.communityId ?? null;
+
+  if (religionId !== undefined) {
+    const religion = await prisma.religion.findUnique({
+      where: {
+        id: religionId,
+      },
+    });
+
+    if (!religion) {
+      throw new Error("Religion not found");
+    }
+  }
+
+  if (communityId !== undefined) {
+    const community = await prisma.community.findUnique({
+      where: {
+        id: communityId,
+      },
+    });
+
+    if (!community) {
+      throw new Error("Community not found");
+    }
+
+    if (community.religionId !== finalReligionId) {
+      throw new Error(
+        "Selected community does not belong to selected religion",
+      );
+    }
+  } else if (
+    religionId !== undefined &&
+    finalCommunityId !== null
+  ) {
+    // Religion changed without community:
+    // clear existing community if incompatible.
+    const existingCommunity =
+      await prisma.community.findUnique({
+        where: {
+          id: finalCommunityId,
+        },
+      });
+
+    if (
+      !existingCommunity ||
+      existingCommunity.religionId !== finalReligionId
+    ) {
+      finalCommunityId = null;
+    }
   }
 
   const currentStep = "RELIGION";
   const nextStep = getNextStep(currentStep);
 
-  const updatedProfile = await prisma.userProfile.upsert({
-    where: {
-      user_id: userId,
-    },
-    update: {
-      religionId,
-      communityId,
-    },
-    create: {
-      user_id: userId,
-      religionId,
-      communityId,
-    },
-    include: {
-      religion: true,
-      community: true,
-    },
-  });
+  const updatedProfile =
+    await prisma.userProfile.upsert({
+      where: {
+        user_id: userId,
+      },
+      update: {
+        religionId: finalReligionId,
+        communityId: finalCommunityId,
+      },
+      create: {
+        user_id: userId,
+        religionId: finalReligionId,
+        communityId: finalCommunityId,
+      },
+      include: {
+        religion: true,
+        community: true,
+      },
+    });
 
   const score = await calculateProfileScore(userId);
 
@@ -210,16 +282,16 @@ export const updateReligionService = async (
     },
   });
 
-  // await queueMatchScoreCalculation(
-  //   userId,
-  // );
+  // await queueMatchScoreCalculation(userId);
 
   await redis.del(`profile:edit:${userId}`);
-  // await redis.del(`feed:details:${userId}`);
+
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
+
   return updatedProfile;
 };
+
 
 //Looking For [FOR THE MARRIAGE , DATING , MATURE CONNECTIONS]
 // export const updateLookingForService = async (

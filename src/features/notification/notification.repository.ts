@@ -13,13 +13,13 @@ export const getNotificationsRepository = async (
     where: {
       receiver_id: userId,
 
-      ...(types && types.length > 0
-        ? {
-            type: {
-              in: types,
-            },
-          }
-        : {}),
+     // Exclude message notifications
+      type: {
+        not: "NEW_MESSAGE",
+        ...(types && types.length > 0
+          ? { in: types }
+          : {}),
+      },
     },
 
     include: {

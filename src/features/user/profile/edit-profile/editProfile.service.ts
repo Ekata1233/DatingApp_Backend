@@ -29,7 +29,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     birth_date,
     height,
     gender,
-
+    gender_option,
     religionId,
     communityId,
     languageIds,
@@ -38,6 +38,8 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     loveLanguage,
     communicationStyle,
   } = payload;
+
+  console.log("gender option : ", gender_option)
 
   const result = await prisma.$transaction(async (tx) => {
     //--------------------------------------------------
@@ -55,6 +57,8 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     if (height !== undefined) userData.height = height;
 
     if (gender !== undefined) userData.gender = gender;
+
+    if(gender_option!== undefined) userData.gender_option = gender_option;
 
     if (Object.keys(userData).length) {
       await tx.user.update({

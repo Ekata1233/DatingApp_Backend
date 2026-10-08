@@ -104,12 +104,34 @@ export const ReligionController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const { religionId, communityId } = req.body;
+
+    if (
+      religionId === undefined &&
+      communityId === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "At least religionId or communityId is required",
+      });
+    }
 
     const profile = await updateReligionService(
       userId,
-      Number(religionId),
-      Number(communityId),
+      religionId === undefined
+        ? undefined
+        : Number(religionId),
+      communityId === undefined
+        ? undefined
+        : Number(communityId),
     );
 
     return res.status(200).json({
