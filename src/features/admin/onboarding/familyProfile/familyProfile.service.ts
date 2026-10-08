@@ -311,7 +311,7 @@ const CATEGORY_MAP: Record<string, string> = {
   fatherOrganisation: "FATHER_ORGANISATION",
   motherOccupation: "MOTHER_OCCUPATION",
   motherOrganisation: "MOTHER_ORGANISATION",
-  siblingtype: "SIBLING_TYPE",
+  siblingtype: "SIBLING_RELATION",
   siblingOccupation: "SIBLING_OCCUPATION",
   siblingMarital: "SIBLING_MARITAL",
   familyHome: "FAMILY_HOME",

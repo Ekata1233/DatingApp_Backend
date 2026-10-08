@@ -283,16 +283,17 @@ export const verifyOtp = async ({
   // NORMALIZE PHONE NUMBER
   // =====================================================
 
-  const cleanedPhone = phoneNumber
-    .replace(/\s+/g, "")
-    .replace(/^\+91/, "")
-    .replace(/^91/, "");
+  const cleanedPhone =
+    normalizePhoneNumber(phoneNumber);
 
-  if (!/^\d{10}$/.test(cleanedPhone)) {
-    throw new Error(
-      "Invalid Indian phone number",
-    );
-  }
+  console.log(
+    "Verify OTP Phone:",
+    {
+      received: phoneNumber,
+      normalized: cleanedPhone,
+      msg91Mobile: `91${cleanedPhone}`,
+    },
+  );
 
   // Convert OTP to string
   const enteredOtp =
@@ -326,10 +327,6 @@ export const verifyOtp = async ({
       "======================================",
     );
 
-    // Hardcoded OTP is valid.
-    // Do NOT send this OTP to MSG91.
-    // Continue normal login/register flow.
-
     return await handleVerifiedUser({
       phoneNumber: cleanedPhone,
       referralCode,
@@ -337,8 +334,7 @@ export const verifyOtp = async ({
   }
 
   // =====================================================
-  // 2. NOT HARDCODED OTP
-  // VERIFY THROUGH MSG91
+  // 2. VERIFY THROUGH MSG91
   // =====================================================
 
   const authKey =
@@ -412,10 +408,6 @@ export const verifyOtp = async ({
                   msg91Response,
                 );
 
-                // ==========================================
-                // MSG91 HTTP ERROR
-                // ==========================================
-
                 if (
                   res.statusCode &&
                   res.statusCode >= 400
@@ -427,10 +419,6 @@ export const verifyOtp = async ({
                     ),
                   );
                 }
-
-                // ==========================================
-                // MSG91 OTP NOT VALID
-                // ==========================================
 
                 if (
                   msg91Response?.type !==
@@ -444,10 +432,6 @@ export const verifyOtp = async ({
                   );
                 }
 
-                // ==========================================
-                // MSG91 OTP VERIFIED
-                // ==========================================
-
                 console.log(
                   "✅ MSG91 OTP VERIFIED",
                 );
@@ -456,7 +440,6 @@ export const verifyOtp = async ({
                   await handleVerifiedUser({
                     phoneNumber:
                       cleanedPhone,
-
                     referralCode,
                   });
 
