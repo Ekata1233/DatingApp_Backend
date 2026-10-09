@@ -90,43 +90,50 @@ export const relationshipTagController = {
                 data: result.proposal,
             });
         } catch (error: any) {
-            console.error(
-                "createRelationshipTagProposalController error:",
-                error
-            );
+  console.error("CREATE PROPOSAL ERROR:", {
+    message: error?.message,
+    code: error?.code,
+    meta: error?.meta,
+  });
 
-            /**
-             * ----------------------------------------
-             * Business errors
-             * ----------------------------------------
-             */
-            const businessErrors = [
-                "You cannot send a relationship tag proposal to yourself",
-                "User not found",
-                "Sender user not found",
-                "This user is no longer available",
-                "You already have an active relationship with this user",
-                "A relationship tag proposal is already pending between you and this user",
-                "Proposal sender already has an active relationship",
-            ];
+  const errorMessages: Record<string, string> = {
+    "Conversation not found between users":
+      "You need to start a conversation with this user before sending a relationship proposal.",
 
-            if (businessErrors.includes(error.message)) {
-                return res.status(400).json({
-                    success: false,
-                    message: error.message,
-                });
-            }
+    "You cannot send a relationship tag proposal to yourself":
+      "You cannot send a relationship proposal to yourself.",
 
-            /**
-             * ----------------------------------------
-             * Unknown server error
-             * ----------------------------------------
-             */
-            return res.status(500).json({
-                success: false,
-                message: "Failed to send relationship tag proposal",
-            });
-        }
+    "User not found":
+      "The selected user could not be found.",
+
+    "Receiver not found":
+      "The selected user could not be found.",
+
+    "Sender user not found":
+      "Your account could not be found.",
+
+    "This user is no longer available":
+      "This user is no longer available.",
+
+    "You already have an active relationship with this user":
+      "You are already in a relationship with this user.",
+
+    "A relationship tag proposal is already pending between you and this user":
+      "You have already sent or received a pending relationship proposal with this user.",
+
+    "A pending relationship tag proposal already exists":
+      "A relationship proposal is already pending between you and this user.",
+  };
+
+  const message = errorMessages[error?.message];
+
+  return res.status(message ? 400 : 500).json({
+    success: false,
+    message:
+      message ??
+      "Something went wrong while sending your relationship proposal. Please try again.",
+  });
+}
     },
 
     /**

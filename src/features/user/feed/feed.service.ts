@@ -4,7 +4,7 @@ import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
-import { CurrentUser, FeedParams, UserFeedResponse } from "./feed.types";
+import { CurrentUser, DeletedUserResponse, FeedParams, UserFeedResponse } from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
 import { getReplyTimeLabel, MIN_REPLY_SAMPLES } from "../../chat/user-reply-stats.service";
@@ -2868,9 +2868,47 @@ export const getFeedService = async ({
 export const getFeedDetailsService = async (
   userId: string,
   currentUserId: string
-): Promise<UserFeedResponse> => {
+): Promise<UserFeedResponse | DeletedUserResponse> => {
   const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
 
+  // =====================================================
+  // 1. CHECK USER ACCOUNT STATUS FIRST
+  // =====================================================
+
+  const userStatus = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+      account_status: true,
+      deleted_at: true,
+    },
+  });
+
+  if (!userStatus) {
+    throw new Error("User not found");
+  }
+
+  // =====================================================
+  // 2. HANDLE DELETED USER
+  // =====================================================
+
+  const isDeleted =
+    userStatus.account_status === "DELETED" ||
+    userStatus.deleted_at !== null;
+
+  if (isDeleted) {
+
+    // Remove old profile cache
+    await redis.del(CACHE_KEY);
+
+    return {
+      isDeleted: true,
+      message:
+        "This account has been deleted and its profile is no longer available.",
+    };
+  }
   // =====================================================
   // 1. PREVENT SELF PROFILE VIEW
   // =====================================================
