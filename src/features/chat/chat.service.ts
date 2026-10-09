@@ -99,6 +99,26 @@ export const chatService = {
       throw new Error("You are not a participant of this conversation");
     }
 
+    // =====================================================
+    // CHECK OTHER USER ACCOUNT STATUS
+    // =====================================================
+
+    const otherParticipant =
+      await chatRepository.findOtherParticipantAccountStatus(
+        data.conversationId,
+        data.userId,
+      );
+
+    const otherUser = otherParticipant?.user;
+
+    const isDelete = otherUser
+      ? otherUser.account_status === "DELETED" || otherUser.deleted_at !== null
+      : false;
+
+    const deleteMessage = isDelete
+      ? "This account has been deleted. You can view your previous messages, but you can no longer send new messages to this user."
+      : null;
+
     // 2. Fetch messages
     const messages = await chatRepository.findMessages(
       data.conversationId,
@@ -185,6 +205,8 @@ export const chatService = {
 
     return {
       items: itemsWithProgress,
+      isDelete,
+      deleteMessage,
       pagination: {
         hasMore,
         nextCursor,
@@ -323,14 +345,13 @@ export const chatService = {
         //   data.conversationId,
         // );
       } else if (matchResult.alreadyMatched) {
-
-      /**
-       * Safety case:
-       * UserMatch already exists but
-       * conversation.match was false.
-       *
-       * Sync conversation state.
-       */
+        /**
+         * Safety case:
+         * UserMatch already exists but
+         * conversation.match was false.
+         *
+         * Sync conversation state.
+         */
         match = "match" in matchResult ? matchResult.match : null;
 
         console.log("match : ", match);

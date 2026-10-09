@@ -1,12 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
   extensions = [postgis]
 }
 
@@ -181,25 +181,25 @@ model UserSession {
 }
 
 model UserProfile {
-  user_id            String         @id @db.Uuid
+  user_id            String                                @id @db.Uuid
   religionId         Int?
-  religion           Religion?      @relation(fields: [religionId], references: [id])
+  religion           Religion?                             @relation(fields: [religionId], references: [id])
   communityId        Int?
-  community          Community?     @relation(fields: [communityId], references: [id])
+  community          Community?                            @relation(fields: [communityId], references: [id])
   languages          UserLanguage[]
   interested_in      Gender?
   sexual_orientation GenderOption?
-  country            String?        @db.VarChar(30)
-  state              String?        @db.VarChar(30)
-  city               String?        @db.VarChar(30)
-  area               String?        @db.VarChar(30)
+  country            String?                               @db.VarChar(30)
+  state              String?                               @db.VarChar(30)
+  city               String?                               @db.VarChar(30)
+  area               String?                               @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal?       @db.Decimal(10, 8)
-  longitude          Decimal?       @db.Decimal(11, 8)
+  latitude           Decimal?                              @db.Decimal(10, 8)
+  longitude          Decimal?                              @db.Decimal(11, 8)
   location           Unsupported("geography(Point,4326)")?
-  created_at         DateTime       @default(now())
-  updated_at         DateTime       @updatedAt
-  user               User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at         DateTime                              @default(now())
+  updated_at         DateTime                              @updatedAt
+  user               User                                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religionId])
   @@index([communityId])
@@ -3434,7 +3434,6 @@ model UserRelationship {
   user2    User                     @relation("RelationshipUser2", fields: [user2Id], references: [id], onDelete: Cascade)
   proposal RelationshipTagProposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
 
-  @@unique([user1Id, user2Id])
   @@index([user1Id, status])
   @@index([user2Id, status])
   @@map("user_relationships")

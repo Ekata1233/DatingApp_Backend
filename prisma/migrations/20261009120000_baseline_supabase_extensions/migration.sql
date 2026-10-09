@@ -1,0 +1,20 @@
+-- Supabase extension baseline
+
+CREATE SCHEMA IF NOT EXISTS "extensions";
+CREATE SCHEMA IF NOT EXISTS "vault";
+
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements"
+WITH SCHEMA "extensions"
+VERSION '1.11';
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto"
+WITH SCHEMA "extensions"
+VERSION '1.3';
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+WITH SCHEMA "extensions"
+VERSION '1.1';
+
+CREATE EXTENSION IF NOT EXISTS "supabase_vault"
+WITH SCHEMA "vault"
+VERSION '0.3.1';

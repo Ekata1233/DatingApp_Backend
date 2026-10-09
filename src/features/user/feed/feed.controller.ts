@@ -58,19 +58,16 @@ export const getFeedDetailsController = async (
     }
 
     // Validate userId parameter
-    if (!userId) {
+    if (!userId || typeof userId !== "string") {
       res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: "Valid user ID is required",
       });
       return;
     }
 
-    if (typeof userId !== "string") {
-      throw new Error("Invalid userId");
-    }
-
     const userDetails = await getFeedDetailsService(userId, currentUserId);
+    
 
     res.status(200).json({
       success: true,

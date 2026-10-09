@@ -115,6 +115,8 @@ export const getMessages = async (
 
     return res.status(200).json({
       success: true,
+       isDelete: result.isDelete,
+  deleteMessage: result.deleteMessage,
       data: result.items,
       pagination: result.pagination,
     });

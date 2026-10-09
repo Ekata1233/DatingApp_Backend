@@ -1876,6 +1876,29 @@ export const chatRepository = {
     return participant.userId;
   },
 
+  async findOtherParticipantAccountStatus(
+  conversationId: string,
+  userId: string,
+) {
+  return prisma.conversationParticipant.findFirst({
+    where: {
+      conversationId,
+      userId: {
+        not: userId,
+      },
+    },
+    select: {
+      user: {
+        select: {
+          id: true,
+          account_status: true,
+          deleted_at: true,
+        },
+      },
+    },
+  });
+},
+
   async hasPreviousMessages(conversationId: string) {
     const count = await prisma.chatMessage.count({
       where: {
