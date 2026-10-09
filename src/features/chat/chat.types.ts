@@ -89,3 +89,8 @@ export interface ConversationDetailsResponse {
   conversationId: string;
   user: ChatUserDetails;
 }
+
+export type TargetInput = {
+  targetType: string | null;
+  targetId: string | null;
+};
