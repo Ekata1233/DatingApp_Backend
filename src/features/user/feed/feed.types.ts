@@ -131,3 +131,8 @@ export interface SiblingInfo {
   occupation: string | null;
   marital: string | null;
 }
+
+export interface DeletedUserResponse {
+  isDeleted: true;
+  message: string;
+}

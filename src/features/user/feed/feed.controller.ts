@@ -6,11 +6,7 @@ export const getFeedController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
-    const {
-      cursor,
-      limit = 10,
-      mode,
-    } = req.query;
+    const { cursor, limit = 10, mode } = req.query;
 
     // ✅ SAFE BODY FILTERS (Postman support)
     let filters = req.body?.filters;
@@ -31,7 +27,6 @@ export const getFeedController = async (req: Request, res: Response) => {
       success: true,
       ...data,
     });
-
   } catch (error: any) {
     return res.status(500).json({
       success: false,
@@ -40,10 +35,9 @@ export const getFeedController = async (req: Request, res: Response) => {
   }
 };
 
-
 export const getFeedDetailsController = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { userId } = req.params;
@@ -52,7 +46,7 @@ export const getFeedDetailsController = async (
     if (!currentUserId) {
       res.status(401).json({
         success: false,
-        message: 'Unauthorized - User not authenticated'
+        message: "Unauthorized - User not authenticated",
       });
       return;
     }
@@ -67,21 +61,23 @@ export const getFeedDetailsController = async (
     }
 
     const userDetails = await getFeedDetailsService(userId, currentUserId);
-    
 
     res.status(200).json({
       success: true,
-      message: 'User feed details fetched successfully',
+      message:
+        "isDeleted" in userDetails && userDetails.isDeleted
+          ? userDetails.message
+          : "User feed details fetched successfully",
       data: userDetails,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('Error in getFeedDetailsController:', error);
+    console.error("Error in getFeedDetailsController:", error);
 
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to fetch user details',
-      timestamp: new Date().toISOString()
+      message: error.message || "Failed to fetch user details",
+      timestamp: new Date().toISOString(),
     });
   }
 };
