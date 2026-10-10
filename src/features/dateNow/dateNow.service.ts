@@ -1484,71 +1484,162 @@ interface HistoryQuery {
   status?: string;
 }
 
+
 export const getDatePlanHistory = async (
   userId: string,
   query: HistoryQuery,
 ) => {
-  console.log("========== DATE PLAN HISTORY DEBUG ==========");
-  console.log("USER ID:", userId);
-  console.log("QUERY:", query);
-
   const page = Math.max(Number(query.page) || 1, 1);
 
-  const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
+  const limit = Math.min(
+    Math.max(Number(query.limit) || 10, 1),
+    50,
+  );
 
   const skip = (page - 1) * limit;
 
-  /**
-   * History plans
-   */
-  console.log("========== DATE PLAN HISTORY DEBUG ==========");
+  type HistoryStatus =
+    | "MET"
+    | "NO_SHOW"
+    | "EXPIRED"
+    | "CANCELLED";
+
+  const requestedStatus = String(
+    query.status ?? "ALL",
+  ).toUpperCase();
+
+  const allowedStatuses = [
+    "ALL",
+    "MET",
+    "NO_SHOW",
+    "EXPIRED",
+    "CANCELLED",
+  ];
+
+  if (!allowedStatuses.includes(requestedStatus)) {
+    throw new Error(
+      "Invalid history status. Allowed: ALL, MET, NO_SHOW, EXPIRED, CANCELLED",
+    );
+  }
+
+  console.log("========== DATE PLAN HISTORY ==========");
   console.log("USER ID:", userId);
-  console.log("QUERY:", query);
+  console.log("STATUS:", requestedStatus);
+  console.log("PAGE:", page);
+  console.log("LIMIT:", limit);
+
+  /*
+   * Eligible feedback:
+   * Both PENDING and SUBMITTED attendance count.
+   */
+  const validFeedback = {
+    reviewerId: userId,
+    status: {
+      in: [
+        DatePlanFeedbackStatus.PENDING,
+        DatePlanFeedbackStatus.SUBMITTED,
+      ],
+    },
+  };
+
+  const metFeedback = {
+    ...validFeedback,
+    attendanceStatus: DatePlanAttendanceStatus.MET,
+  };
+
+  const noShowFeedback = {
+    ...validFeedback,
+    attendanceStatus: DatePlanAttendanceStatus.NO_SHOW,
+  };
+
+  /*
+   * Priority:
+   *
+   * 1. CANCELLED
+   * 2. MET
+   * 3. NO_SHOW
+   * 4. EXPIRED
+   *
+   * This same priority is used for:
+   * - Database filtering
+   * - Response status mapping
+   */
+
+  const cancelledWhere = {
+    status: PlanStatus.CANCELLED,
+  };
+
+  const metWhere = {
+    status: {
+      not: PlanStatus.CANCELLED,
+    },
+    feedbacks: {
+      some: metFeedback,
+    },
+  };
+
+  const noShowWhere = {
+    status: {
+      not: PlanStatus.CANCELLED,
+    },
+    feedbacks: {
+      some: noShowFeedback,
+    },
+  };
+
+  const expiredWhere = {
+    status: PlanStatus.EXPIRED,
+    feedbacks: {
+      none: validFeedback,
+    },
+  };
+
+  /*
+   * Build database filter BEFORE pagination.
+   */
+
+  let statusConditions: any[];
+
+  switch (requestedStatus) {
+    case "MET":
+      statusConditions = [metWhere];
+      break;
+
+    case "NO_SHOW":
+      statusConditions = [noShowWhere];
+      break;
+
+    case "EXPIRED":
+      statusConditions = [expiredWhere];
+      break;
+
+    case "CANCELLED":
+      statusConditions = [cancelledWhere];
+      break;
+
+    default:
+      statusConditions = [
+        cancelledWhere,
+        metWhere,
+        noShowWhere,
+        expiredWhere,
+      ];
+      break;
+  }
 
   const where = {
-  userId,
-
-  OR: [
-    {
-      status: {
-        in: [
-          PlanStatus.COMPLETED,
-          PlanStatus.CANCELLED,
-          PlanStatus.EXPIRED,
-        ],
-      },
-    },
-    {
-      feedbacks: {
-        some: {
-          reviewerId: userId,
-          attendanceStatus: DatePlanAttendanceStatus.NO_SHOW,
-          status: DatePlanFeedbackStatus.SUBMITTED,
-        },
-      },
-    },
-  ],
-};
-
-  console.log("HISTORY WHERE:", JSON.stringify(where, null, 2));
-
-  const allUserPlans = await prisma.datePlan.findMany({
-    where: {
-      userId,
-    },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      title: true,
-      eventDateTime: true,
-    },
-  });
+    userId,
+    OR: statusConditions,
+  };
 
   console.log(
-    "ALL USER DATE PLANS:",
-    JSON.stringify(allUserPlans, null, 2),
+    "HISTORY WHERE:",
+    JSON.stringify(where, null, 2),
   );
+
+  /*
+   * Fetch paginated plans and matching total.
+   */
 
   const [plans, total] = await prisma.$transaction([
     prisma.datePlan.findMany({
@@ -1557,9 +1648,14 @@ export const getDatePlanHistory = async (
       skip,
       take: limit,
 
-      orderBy: {
-        eventDateTime: "desc",
-      },
+      orderBy: [
+        {
+          eventDateTime: "desc",
+        },
+        {
+          id: "desc",
+        },
+      ],
 
       include: {
         activity: true,
@@ -1568,17 +1664,20 @@ export const getDatePlanHistory = async (
 
         whoPays: true,
 
+        /*
+         * Load both PENDING and SUBMITTED feedback.
+         */
         feedbacks: {
-          where: {
-            reviewerId: userId,
-            status: "SUBMITTED",
-          },
+          where: validFeedback,
+
           take: 1,
+
           select: {
             id: true,
             attendanceStatus: true,
             status: true,
             metUserId: true,
+            createdAt: true,
           },
         },
 
@@ -1599,10 +1698,12 @@ export const getDatePlanHistory = async (
                   where: {
                     is_primary: true,
                   },
+
                   select: {
                     id: true,
                     media_url: true,
                   },
+
                   take: 1,
                 },
               },
@@ -1622,10 +1723,12 @@ export const getDatePlanHistory = async (
                   where: {
                     is_primary: true,
                   },
+
                   select: {
                     id: true,
                     media_url: true,
                   },
+
                   take: 1,
                 },
               },
@@ -1654,66 +1757,69 @@ export const getDatePlanHistory = async (
     }),
   ]);
 
-  console.log("HISTORY PLANS FOUND:", plans.length);
   console.log("HISTORY TOTAL:", total);
+  console.log("HISTORY PLANS FOUND:", plans.length);
 
-  console.log("HISTORY PLANS:", JSON.stringify(plans, null, 2));
+  /*
+   * Map plans to frontend response.
+   */
 
   const data = plans.map((plan) => {
-    console.log("========== PROCESSING PLAN ==========");
-    console.log("PLAN ID:", plan.id);
-    console.log("PLAN STATUS:", plan.status);
-    console.log("PLAN TITLE:", plan.title);
-    console.log("EVENT DATE:", plan.eventDateTime);
-    console.log("CONFIRMED DATE:", plan.DateConfirmed);
-
     const confirmed = plan.DateConfirmed?.[0] ?? null;
 
-    /**
-     * 1. Calculate actual history status
+    const feedback = plan.feedbacks?.[0] ?? null;
+
+    /*
+     * Calculate history status.
      */
-    const feedback = (plan.feedbacks?.[0] ?? null) as {
-      attendanceStatus: string;
-      status: string;
-    } | null;
+    let historyStatus: HistoryStatus;
 
-    let historyStatus: string;
-
-    if (
-      feedback?.attendanceStatus === "NO_SHOW" &&
-      feedback?.status === "SUBMITTED"
+    if (plan.status === PlanStatus.CANCELLED) {
+      historyStatus = "CANCELLED";
+    } else if (
+      feedback?.attendanceStatus ===
+      DatePlanAttendanceStatus.MET
+    ) {
+      historyStatus = "MET";
+    } else if (
+      feedback?.attendanceStatus ===
+      DatePlanAttendanceStatus.NO_SHOW
     ) {
       historyStatus = "NO_SHOW";
-    } else if (
-      feedback?.attendanceStatus === "MET" &&
-      feedback?.status === "SUBMITTED"
-    ) {
-      historyStatus = "COMPLETED";
     } else {
-      historyStatus = getHistoryStatus(
-        plan.status,
-        confirmed?.status ?? null,
-        plan.eventDateTime,
-      );
+      historyStatus = "EXPIRED";
     }
 
-    /**
-     * 2. UI label
+    /*
+     * UI status label.
      */
-    const statusLabel = getHistoryStatusLabel(historyStatus);
+    const statusLabelMap: Record<
+      HistoryStatus,
+      string
+    > = {
+      MET: "Met",
+      NO_SHOW: "No Show",
+      EXPIRED: "Expired",
+      CANCELLED: "Cancelled",
+    };
 
-    /**
-     * 3. Static review
+    const statusLabel =
+      statusLabelMap[historyStatus];
+
+    /*
+     * Existing review helper.
      */
-    const review = getStaticHistoryReview(historyStatus);
+    const review =
+      getStaticHistoryReview(historyStatus);
 
-    /**
-     * 4. Participant
+    /*
+     * Confirmed participant.
      */
-    const participant = confirmed?.participant ?? null;
+    const participant =
+      confirmed?.participant ?? null;
 
-    /**
-     * 5. Request statistics
+    /*
+     * Request statistics.
      */
     const requestStats = {
       total: plan._count.requests,
@@ -1735,18 +1841,78 @@ export const getDatePlanHistory = async (
       ).length,
     };
 
+    /*
+     * History message.
+     */
+    const historyMessageMap: Record<
+      HistoryStatus,
+      string
+    > = {
+      MET: participant?.full_name
+        ? `You met ${participant.full_name}.`
+        : "You attended this date.",
+
+      NO_SHOW:
+        "This date was marked as a no-show.",
+
+      EXPIRED:
+        "This date plan has expired.",
+
+      CANCELLED:
+        "This date plan was cancelled.",
+    };
+
+    const message =
+      historyMessageMap[historyStatus];
+
+    console.log("HISTORY PLAN:", {
+      planId: plan.id,
+      planStatus: plan.status,
+      attendanceStatus:
+        feedback?.attendanceStatus ?? null,
+      feedbackStatus:
+        feedback?.status ?? null,
+      historyStatus,
+    });
+
     return {
       id: plan.id,
 
-      /**
-       * Status
+      /*
+       * History status
        */
       status: historyStatus,
 
       statusLabel,
 
-      /**
-       * Plan
+      /*
+       * Original database plan status
+       */
+      planStatus: plan.status,
+
+      /*
+       * Attendance feedback
+       */
+      attendance: feedback
+        ? {
+            id: feedback.id,
+
+            attendanceStatus:
+              feedback.attendanceStatus,
+
+            feedbackStatus:
+              feedback.status,
+
+            metUserId:
+              feedback.metUserId,
+
+            createdAt:
+              feedback.createdAt,
+          }
+        : null,
+
+      /*
+       * Plan details
        */
       title: plan.title,
 
@@ -1756,14 +1922,14 @@ export const getDatePlanHistory = async (
 
       quickTitle: plan.quickTitle,
 
-      /**
+      /*
        * Date
        */
       eventDateTime: plan.eventDateTime,
 
       duration: plan.duration,
 
-      /**
+      /*
        * Venue
        */
       venue: {
@@ -1773,7 +1939,7 @@ export const getDatePlanHistory = async (
         longitude: plan.venueLng,
       },
 
-      /**
+      /*
        * Participant
        */
       participant: participant
@@ -1783,14 +1949,18 @@ export const getDatePlanHistory = async (
             name: participant.full_name,
 
             age: participant.birth_date
-              ? calculateAge(participant.birth_date)
+              ? calculateAge(
+                  participant.birth_date,
+                )
               : null,
 
-            photoUrl: participant.photos[0]?.media_url ?? null,
+            photoUrl:
+              participant.photos[0]
+                ?.media_url ?? null,
           }
         : null,
 
-      /**
+      /*
        * Requests
        */
       requests: {
@@ -1804,27 +1974,35 @@ export const getDatePlanHistory = async (
 
         cancelled: requestStats.cancelled,
 
-        users: plan.requests.map((request) => ({
-          id: request.requester.id,
+        users: plan.requests.map(
+          (request) => ({
+            id: request.requester.id,
 
-          name: request.requester.full_name,
+            name:
+              request.requester.full_name,
 
-          age: request.requester.birth_date
-            ? calculateAge(request.requester.birth_date)
-            : null,
+            age:
+              request.requester.birth_date
+                ? calculateAge(
+                    request.requester.birth_date,
+                  )
+                : null,
 
-          photoUrl: request.requester.photos[0]?.media_url ?? null,
+            photoUrl:
+              request.requester.photos[0]
+                ?.media_url ?? null,
 
-          status: request.status,
-        })),
+            status: request.status,
+          }),
+        ),
       },
 
-      /**
+      /*
        * Payment
        */
       whoPays: plan.whoPays,
 
-      /**
+      /*
        * Confirmation
        */
       confirmedDate: confirmed
@@ -1833,23 +2011,20 @@ export const getDatePlanHistory = async (
 
             status: confirmed.status,
 
-            eventDateTime: confirmed.eventDateTime,
+            eventDateTime:
+              confirmed.eventDateTime,
           }
         : null,
 
-      /**
-       * STATIC REVIEW
+      /*
+       * Existing static review
        */
       review,
 
-      /**
-       * Static/history message
+      /*
+       * History message
        */
-      message: getHistoryMessage(
-        historyStatus,
-        participant?.full_name,
-        requestStats.total,
-      ),
+      message,
 
       createdAt: plan.createdAt,
 
@@ -1857,39 +2032,33 @@ export const getDatePlanHistory = async (
     };
   });
 
-  /**
-   * Optional status filter
+  /*
+   * Pagination
    */
-  const requestedStatus = query.status?.toUpperCase();
+  const totalPages = Math.ceil(total / limit);
 
-  const filteredData =
-    requestedStatus && requestedStatus !== "ALL"
-      ? data.filter((item) => item.status === requestedStatus)
-      : data;
-
-  console.log(
-    "FINAL HISTORY DATA:",
-    JSON.stringify(filteredData, null, 2),
-  );
-
-  console.log("========== END HISTORY DEBUG ==========");
+  console.log("FINAL HISTORY COUNT:", data.length);
+  console.log("TOTAL:", total);
+  console.log("TOTAL PAGES:", totalPages);
+  console.log("========== END HISTORY ==========");
 
   return {
-    data: filteredData,
+    data,
 
     pagination: {
       page,
       limit,
       total,
 
-      totalPages: Math.ceil(total / limit),
+      totalPages,
 
-      hasNextPage: page < Math.ceil(total / limit),
+      hasNextPage: page < totalPages,
 
       hasPreviousPage: page > 1,
     },
   };
 };
+
 
 export const getDatePlanHistoryDetails = async (
   userId: string,
