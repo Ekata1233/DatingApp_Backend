@@ -3,6 +3,7 @@ import { calculateAge } from "../chat/chat.repository";
 import { endRelationshipRepository, findRelationshipByIdRepository, relationshipTagRepository } from "./relationshipTag.repository";
 import { RelationshipTagProposalInput } from "./relationshipTag.validation";
 import { prisma } from "../../prisma/prismaClient";
+import { buildRelationshipEndedPayload } from "./relationshipTag.helper";
 
 export const relationshipTagService = {
 
@@ -211,7 +212,31 @@ async acceptProposal(
             ? proposal.receiver
             : proposal.sender;
 
+// =====================================================
+// BUILD OLD RELATIONSHIP ENDED SCREEN
+// =====================================================
 
+const relationshipEndedScreen =
+    previousRelationship &&
+    previousRelationship.partner &&
+    previousRelationship.endedAt
+        ? buildRelationshipEndedPayload({
+            relationshipId: previousRelationship.id,
+
+            endedById: userId,
+
+            endedByName:
+                proposal.receiver.full_name ?? "Your partner",
+
+            tag: previousRelationship.tag,
+
+            startedAt: previousRelationship.startedAt,
+
+            endedAt: previousRelationship.endedAt,
+
+            reachedLevel: null,
+        })
+        : null;
     // =====================================================
     // RETURN COMPLETE RESPONSE
     // =====================================================
@@ -222,71 +247,37 @@ async acceptProposal(
         // NEW ACTIVE RELATIONSHIP
         // =================================================
 
-        id:
-            relationship.id,
-
-        tag:
-            relationship.tag,
-
-        status:
-            relationship.status,
-
-        startedAt:
-            relationship.startedAt,
-
-
+        id:relationship.id,
+        tag:relationship.tag,
+        status:relationship.status,
+        startedAt:relationship.startedAt,
         // =================================================
         // NEW PARTNER
         // =================================================
-
         partner: {
-            id:
-                partner.id,
-
-            fullName:
-                partner.full_name,
+            id:partner.id,
+            fullName:partner.full_name,
         },
-
-
+        relationshipEndedScreen,
         // =================================================
         // ACCEPTED PROPOSAL
         // =================================================
-
         proposal: {
-            id:
-                proposal.id,
-
-            status:
-                proposal.status,
-
-            respondedAt:
-                proposal.respondedAt,
+            id:proposal.id,
+            status:proposal.status,
+            respondedAt:proposal.respondedAt,
         },
-
-
         // =================================================
         // OLD ENDED RELATIONSHIP
         // =================================================
-
         endedRelationship:
             previousRelationship
                 ? {
-                    id:
-                        previousRelationship.id,
-
-                    tag:
-                        previousRelationship.tag,
-
-                    status:
-                        previousRelationship.status,
-
-                    startedAt:
-                        previousRelationship.startedAt,
-
-                    endedAt:
-                        previousRelationship.endedAt,
-
-
+                    id:previousRelationship.id,
+                    tag:previousRelationship.tag,
+                    status:previousRelationship.status,
+                    startedAt:previousRelationship.startedAt,
+                    endedAt:previousRelationship.endedAt,
                     // =====================================
                     // OLD PARTNER B
                     // =====================================
@@ -294,11 +285,8 @@ async acceptProposal(
                     user:
                         previousRelationship.partner
                             ? {
-                                id:
-                                    previousRelationship.partner.id,
-
-                                fullName:
-                                    previousRelationship.partner.full_name,
+                                id:previousRelationship.partner.id,
+                                fullName:previousRelationship.partner.full_name,
                             }
                             : null,
 
@@ -310,23 +298,12 @@ async acceptProposal(
                     message:
                         previousRelationship.message
                             ? {
-                                id:
-                                    previousRelationship.message.id,
-
-                                conversationId:
-                                    previousRelationship.message.conversationId,
-
-                                senderId:
-                                    previousRelationship.message.senderId,
-
-                                content:
-                                    previousRelationship.message.content,
-
-                                messageType:
-                                    previousRelationship.message.messageType,
-
-                                createdAt:
-                                    previousRelationship.message.createdAt,
+                                id:previousRelationship.message.id,
+                                conversationId:previousRelationship.message.conversationId,
+                                senderId: previousRelationship.message.senderId,
+                                content:previousRelationship.message.content,
+                                messageType:previousRelationship.message.messageType,
+                                createdAt:previousRelationship.message.createdAt,
                             }
                             : null,
                 }
@@ -340,23 +317,12 @@ async acceptProposal(
         acceptedMessage:
             message
                 ? {
-                    id:
-                        message.id,
-
-                    conversationId:
-                        message.conversationId,
-
-                    senderId:
-                        message.senderId,
-
-                    content:
-                        message.content,
-
-                    messageType:
-                        message.messageType,
-
-                    createdAt:
-                        message.createdAt,
+                    id:message.id,
+                    conversationId:message.conversationId,
+                    senderId:message.senderId,
+                    content:message.content,
+                    messageType: message.messageType,
+                    createdAt: message.createdAt,
                 }
                 : null,
     };

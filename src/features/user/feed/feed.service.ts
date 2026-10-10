@@ -132,7 +132,7 @@ export const getFeedService = async ({
   filters,
 }: FeedParams) => {
 
-
+console.log("---------------userid : ", userId)
   const requestedLimit = limit ?? DEFAULT_PAGE_LIMIT;
 
   const decodedCursor =

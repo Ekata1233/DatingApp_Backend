@@ -38,7 +38,7 @@ export const profileValidation = z.object({
     .max(300, "Height too tall"),
 
   gender: z.nativeEnum(Gender),
-  gender_option: z.nativeEnum(GenderOption),
+  gender_option: z.nativeEnum(GenderOption).optional().nullable(),
 });
 
 export const locationValidation = z.object({
