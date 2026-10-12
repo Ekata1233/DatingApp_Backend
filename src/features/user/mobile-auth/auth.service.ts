@@ -7,7 +7,7 @@ import { prisma } from "../../../prisma/prismaClient";
 import { generateReferralCode } from "../../../utils/referral";
 import { getNextStep } from "../../../utils/onboardingFlows";
 const HARDCODED_OTP =
-  process.env.HARDCODED_OTP || "123456";
+  process.env.HARDCODED_OTP || "453525";
 /* =========================================================
    CONFIG
 ========================================================= */
@@ -282,7 +282,26 @@ export const verifyOtp = async ({
       "Invalid OTP. Enter a 6-digit OTP",
     );
   }
+  // =====================================================
+// DEVELOPMENT HARDCODED OTP VERIFICATION
+// =====================================================
 
+const hardcodedOtpAllowed =
+  isHardcodedOtpAllowed();
+
+if (
+  hardcodedOtpAllowed &&
+  enteredOtp === HARDCODED_OTP
+) {
+  console.log(
+    "Development test OTP verified",
+  );
+
+  return await handleVerifiedUser({
+    phoneNumber: formattedNumber,
+    referralCode,
+  });
+}
   // =====================================
   // MSG91 CONFIG
   // =====================================
