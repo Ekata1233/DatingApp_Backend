@@ -102,14 +102,47 @@ export const discoverDatePlanController = async (
   try {
     const userId = (req as any).user.id;
 
-    const plan = await discoverDatePlan(userId, req.query.filter as string);
+    const filter =
+      typeof req.query.filter === "string"
+        ? req.query.filter
+        : undefined;
 
-    res.json({
+    const cursor =
+      typeof req.query.cursor === "string"
+        ? req.query.cursor
+        : undefined;
+
+    const limit =
+      typeof req.query.limit === "string"
+        ? Number(req.query.limit)
+        : 10;
+
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 50
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Limit must be between 1 and 50",
+      });
+    }
+
+    const result = await discoverDatePlan(
+      userId,
+      filter,
+      cursor,
+      limit,
+    );
+
+    return res.status(200).json({
       success: true,
-      data: plan,
+      message: "Date plans fetched successfully",
+      data: result.plans,
+      pagination: result.pagination,
     });
   } catch (error: any) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error.message,
     });

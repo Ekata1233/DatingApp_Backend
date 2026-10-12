@@ -3606,3 +3606,34 @@ model UserDailyFeedView {
   @@index([userId, viewDate])
   @@index([targetUserId])
 }
+
+model ConversationPromptCategory {
+  id          String               @id @default(uuid()) @db.Uuid
+  name        String               @db.VarChar(100)
+  slug        String               @unique @db.VarChar(100)
+  description String?
+  sortOrder   Int                  @default(0)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  prompts     ConversationPrompt[]
+
+  @@index([isActive, sortOrder])
+  @@map("conversation_prompt_categories")
+}
+
+model ConversationPrompt {
+  id         String                     @id @default(uuid()) @db.Uuid
+  categoryId String                     @db.Uuid
+  message    String                     @db.Text
+  label      String?                    @db.VarChar(100)
+  sortOrder  Int                        @default(0)
+  isActive   Boolean                    @default(true)
+  usageCount Int                        @default(0)
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
+  category   ConversationPromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, isActive, sortOrder])
+  @@map("conversation_prompts")
+}
