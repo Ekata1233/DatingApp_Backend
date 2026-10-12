@@ -34,44 +34,39 @@ const isHardcodedOtpAllowed = () => {
    PHONE NORMALIZATION
 ========================================================= */
 
+/* =========================================================
+   INTERNATIONAL PHONE NORMALIZATION
+========================================================= */
+
 const normalizePhoneNumber = (
   phoneNumber: string,
 ): string => {
-  if (!phoneNumber) {
+
+  if (
+    typeof phoneNumber !== "string" ||
+    !phoneNumber.trim()
+  ) {
     throw new Error(
       "Phone number is required",
     );
   }
 
-  // Remove spaces, -, (, )
-  let cleanedPhone =
-    phoneNumber.replace(
-      /[\s\-()]/g,
-      "",
-    );
+  // Remove spaces, hyphens and brackets
+  const cleanedPhone =
+    phoneNumber
+      .trim()
+      .replace(/[\s\-()]/g, "");
 
-  // +91XXXXXXXXXX
+  // Require international format
+  // + followed by 2 to 15 digits total
+  // First digit cannot be zero
   if (
-    cleanedPhone.startsWith("+91") &&
-    cleanedPhone.length === 13
+    !/^\+[1-9]\d{1,14}$/.test(
+      cleanedPhone,
+    )
   ) {
-    cleanedPhone =
-      cleanedPhone.slice(3);
-  }
-
-  // 91XXXXXXXXXX
-  else if (
-    cleanedPhone.startsWith("91") &&
-    cleanedPhone.length === 12
-  ) {
-    cleanedPhone =
-      cleanedPhone.slice(2);
-  }
-
-  // Validate final Indian mobile number
-  if (!/^\d{10}$/.test(cleanedPhone)) {
     throw new Error(
-      "Invalid Indian phone number",
+      "Invalid phone number. Include country code, e.g. +918776787656",
     );
   }
 
@@ -87,21 +82,21 @@ export const sendOtp = async ({
 }: {
   phoneNumber: string;
 }) => {
-  // =====================================================
-  // NORMALIZE PHONE
-  // =====================================================
 
-  const cleanedPhone =
-    normalizePhoneNumber(phoneNumber);
-
-  const mobile = `91${cleanedPhone}`;
+  // =====================================
+  // NORMALIZE INTERNATIONAL NUMBER
+  // =====================================
 
   const formattedNumber =
-    `+91${cleanedPhone}`;
+    normalizePhoneNumber(phoneNumber);
 
-  // =====================================================
-  // CHECK WHETHER USER IS ALREADY REGISTERED
-  // =====================================================
+  // MSG91 mobile format without +
+  const mobile =
+    formattedNumber.slice(1);
+
+  // =====================================
+  // CHECK EXISTING USER
+  // =====================================
 
   const existingUser =
     await prisma.user.findFirst({
@@ -118,16 +113,15 @@ export const sendOtp = async ({
       select: {
         id: true,
         account_status: true,
-        deleted_at: true,
       },
     });
 
   const userAlreadyRegister =
     !!existingUser;
 
-  // =====================================================
+  // =====================================
   // MSG91 CONFIG
-  // =====================================================
+  // =====================================
 
   const authKey =
     process.env.MSG91_AUTH_KEY;
@@ -147,106 +141,110 @@ export const sendOtp = async ({
     );
   }
 
-  // =====================================================
-  // SEND REAL OTP THROUGH MSG91
-  // =====================================================
+  // =====================================
+  // SEND OTP
+  // =====================================
 
-  const otpResponse = await new Promise(
-    (resolve, reject) => {
-      const options = {
-        method: "POST",
-        hostname: "control.msg91.com",
-        path: "/api/v5/otp",
+  const otpResponse: any =
+    await new Promise(
+      (resolve, reject) => {
 
-        headers: {
-          authkey: authKey,
-          "Content-Type":
-            "application/json",
-        },
-      };
+        const options = {
+          method: "POST",
+          hostname: "control.msg91.com",
+          path: "/api/v5/otp",
 
-      const req = https.request(
-        options,
-        (res) => {
-          let data = "";
+          headers: {
+            authkey: authKey,
+            "Content-Type":
+              "application/json",
+          },
+        };
 
-          res.on("data", (chunk) => {
-            data += chunk;
-          });
+        const req = https.request(
+          options,
+          (res) => {
 
-          res.on("end", () => {
-            console.log(
-              "MSG91 Send OTP Status:",
-              res.statusCode,
-            );
+            let data = "";
 
-            console.log(
-              "MSG91 Send OTP Response:",
-              data,
-            );
+            res.on("data", (chunk) => {
+              data += chunk;
+            });
 
-            try {
-              const parsedData =
-                JSON.parse(data);
+            res.on("end", () => {
 
-              if (
-                res.statusCode &&
-                res.statusCode >= 400
-              ) {
-                return reject(
-                  new Error(
-                    parsedData?.message ||
+              try {
+                const parsedData =
+                  JSON.parse(data);
+
+                if (
+                  res.statusCode &&
+                  res.statusCode >= 400
+                ) {
+                  return reject(
+                    new Error(
+                      parsedData?.message ||
                       "Failed to send OTP",
+                    ),
+                  );
+                }
+
+                if (
+                  parsedData?.type !== "success"
+                ) {
+                  return reject(
+                    new Error(
+                      parsedData?.message ||
+                      "Failed to send OTP",
+                    ),
+                  );
+                }
+
+                resolve(parsedData);
+
+              } catch (error: any) {
+                reject(
+                  new Error(
+                    error?.message ||
+                    "Invalid MSG91 response",
                   ),
                 );
               }
+            });
+          },
+        );
 
-              resolve(parsedData);
-            } catch {
-              if (
-                res.statusCode &&
-                res.statusCode >= 400
-              ) {
-                return reject(
-                  new Error(data),
-                );
-              }
+        req.on("error", reject);
 
-              resolve(data);
-            }
-          });
-        },
-      );
+        req.setTimeout(15000, () => {
+          req.destroy(
+            new Error(
+              "OTP service request timed out",
+            ),
+          );
+        });
 
-      req.on("error", (error) => {
-        reject(error);
-      });
+        req.write(
+          JSON.stringify({
+            template_id: templateId,
+            mobile,
+            otp_length: 6,
+            otp_expiry: 10,
+          }),
+        );
 
-      req.write(
-        JSON.stringify({
-          template_id: templateId,
-          mobile,
-          otp_length: 6,
-          otp_expiry: 10,
-        }),
-      );
+        req.end();
+      },
+    );
 
-      req.end();
-    },
-  );
-
-  // =====================================================
+  // =====================================
   // RESPONSE
-  // =====================================================
+  // =====================================
 
   return {
-    ...(typeof otpResponse ===
-      "object" &&
-    otpResponse !== null
-      ? otpResponse
-      : {
-          response: otpResponse,
-        }),
+    ...otpResponse,
+
+    phoneNumber: formattedNumber,
 
     user_already_register:
       userAlreadyRegister,
@@ -269,73 +267,25 @@ export const verifyOtp = async ({
   referralCode,
 }: VerifyOtpParams): Promise<any> => {
 
-  // =====================================================
+  // =====================================
   // VALIDATION
-  // =====================================================
+  // =====================================
 
-  if (!phoneNumber || !otp) {
-    throw new Error(
-      "Phone & OTP required",
-    );
-  }
-
-  // =====================================================
-  // NORMALIZE PHONE NUMBER
-  // =====================================================
-
-  const cleanedPhone =
+  const formattedNumber =
     normalizePhoneNumber(phoneNumber);
 
-  console.log(
-    "Verify OTP Phone:",
-    {
-      received: phoneNumber,
-      normalized: cleanedPhone,
-      msg91Mobile: `91${cleanedPhone}`,
-    },
-  );
-
-  // Convert OTP to string
   const enteredOtp =
-    String(otp).trim();
+    String(otp ?? "").trim();
 
-  // =====================================================
-  // 1. CHECK HARDCODED OTP FIRST
-  // =====================================================
-
-  const hardcodedOtp =
-    process.env.HARDCODED_OTP ||
-    "123456";
-
-  if (
-    enteredOtp === hardcodedOtp
-  ) {
-    console.log(
-      "======================================",
+  if (!/^\d{6}$/.test(enteredOtp)) {
+    throw new Error(
+      "Invalid OTP. Enter a 6-digit OTP",
     );
-
-    console.log(
-      "✅ HARDCODED OTP VERIFIED",
-    );
-
-    console.log(
-      "Phone:",
-      cleanedPhone,
-    );
-
-    console.log(
-      "======================================",
-    );
-
-    return await handleVerifiedUser({
-      phoneNumber: cleanedPhone,
-      referralCode,
-    });
   }
 
-  // =====================================================
-  // 2. VERIFY THROUGH MSG91
-  // =====================================================
+  // =====================================
+  // MSG91 CONFIG
+  // =====================================
 
   const authKey =
     process.env.MSG91_AUTH_KEY;
@@ -346,8 +296,16 @@ export const verifyOtp = async ({
     );
   }
 
+  // =====================================
+  // INTERNATIONAL MOBILE
+  // =====================================
+
   const mobile =
-    `91${cleanedPhone}`;
+    formattedNumber.slice(1);
+
+  // =====================================
+  // VERIFY OTP
+  // =====================================
 
   const path =
     `/api/v5/otp/verify` +
@@ -364,49 +322,30 @@ export const verifyOtp = async ({
     },
   };
 
-  // =====================================================
-  // CALL MSG91 VERIFY API
-  // =====================================================
+  const msg91Response: any =
+    await new Promise(
+      (resolve, reject) => {
 
-  return new Promise(
-    (resolve, reject) => {
+        const req = https.request(
+          options,
+          (res) => {
 
-      const req = https.request(
-        options,
-        (res) => {
+            const chunks: Buffer[] = [];
 
-          const chunks: Buffer[] = [];
-
-          res.on(
-            "data",
-            (chunk) => {
+            res.on("data", (chunk) => {
               chunks.push(chunk);
-            },
-          );
+            });
 
-          res.on(
-            "end",
-            async () => {
-
-              const body =
-                Buffer.concat(
-                  chunks,
-                ).toString();
+            res.on("end", () => {
 
               try {
+                const body =
+                  Buffer.concat(
+                    chunks,
+                  ).toString();
 
-                const msg91Response =
+                const parsedData =
                   JSON.parse(body);
-
-                console.log(
-                  "MSG91 Verify OTP Status:",
-                  res.statusCode,
-                );
-
-                console.log(
-                  "MSG91 Verify OTP Response:",
-                  msg91Response,
-                );
 
                 if (
                   res.statusCode &&
@@ -414,61 +353,60 @@ export const verifyOtp = async ({
                 ) {
                   return reject(
                     new Error(
-                      msg91Response?.message ||
+                      parsedData?.message ||
                       "OTP verification failed",
                     ),
                   );
                 }
 
                 if (
-                  msg91Response?.type !==
-                  "success"
+                  parsedData?.type !== "success"
                 ) {
                   return reject(
                     new Error(
-                      msg91Response?.message ||
+                      parsedData?.message ||
                       "Invalid OTP",
                     ),
                   );
                 }
 
-                console.log(
-                  "✅ MSG91 OTP VERIFIED",
-                );
-
-                const result =
-                  await handleVerifiedUser({
-                    phoneNumber:
-                      cleanedPhone,
-                    referralCode,
-                  });
-
-                resolve(result);
+                resolve(parsedData);
 
               } catch (error: any) {
-
-                reject(
-                  new Error(
-                    error?.message ||
-                    "Invalid response from MSG91",
-                  ),
-                );
+                reject(error);
               }
-            },
+            });
+          },
+        );
+
+        req.on("error", reject);
+
+        req.setTimeout(15000, () => {
+          req.destroy(
+            new Error(
+              "OTP verification timed out",
+            ),
           );
-        },
-      );
+        });
 
-      req.on(
-        "error",
-        (error) => {
-          reject(error);
-        },
-      );
+        req.end();
+      },
+    );
 
-      req.end();
-    },
-  );
+  // =====================================
+  // VERIFIED USER
+  // =====================================
+
+  const result =
+    await handleVerifiedUser({
+      phoneNumber: formattedNumber,
+      referralCode,
+    });
+
+  return {
+    ...result,
+    phoneNumber: formattedNumber,
+  };
 };
 
 /* =========================================================
@@ -520,8 +458,12 @@ const handleVerifiedUser = async ({
   // FORMAT PHONE
   // =====================================================
 
-  const formattedNumber =
-    `+91${phoneNumber}`;
+// =====================================================
+// INTERNATIONAL PHONE NUMBER
+// =====================================================
+
+const formattedNumber =
+  normalizePhoneNumber(phoneNumber);
 
   // =====================================================
   // USER TRANSACTION
