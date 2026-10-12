@@ -67,7 +67,7 @@ export const getOrientationCompatibility = (
   orientation?: string | null,
 ): string[] => {
   const map: Record<string, string[]> = {
-    STRAIGHT: ["STRAIGHT", "BISEXUAL", "PANSEXUAL", "QUEER"],
+    STRAIGHT: ["STRAIGHT", "BISEXUAL", "PANSEXUAL", "QUEER", "NOT_LISTED",],
     GAY: ["GAY", "BISEXUAL", "PANSEXUAL", "QUEER"],
     LESBIAN: ["LESBIAN", "BISEXUAL", "PANSEXUAL", "QUEER"],
     BISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "QUEER"],
