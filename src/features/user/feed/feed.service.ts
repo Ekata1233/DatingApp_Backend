@@ -2460,6 +2460,8 @@ console.log("---------------userid : ", userId)
                 ?.country ||
               null,
 
+              area: user.profile?.area ?? null,
+
             latitude:
               user.profile
                 ?.latitude ||
