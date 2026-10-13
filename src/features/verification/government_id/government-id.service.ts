@@ -104,9 +104,9 @@ export const initGovernmentIdService = async (
     },
   });
 
-  if (activeAttempt) {
-    throw new Error("VERIFICATION_ALREADY_IN_PROGRESS");
-  }
+  // if (activeAttempt) {
+  //   throw new Error("VERIFICATION_ALREADY_IN_PROGRESS");
+  // }
 
   // 4. Create or update verification
   const verification = await prisma.userVerification.upsert({
@@ -348,26 +348,6 @@ export const handleGovernmentIdCallback = async (
     },
   });
 
-  console.log("========== DIGILOCKER CALLBACK DEBUG ==========");
-
-  console.log("Transaction ID received:", transactionId);
-
-  console.log("Transaction ID found:", Boolean(attempt));
-
-  console.log("Attempt ID:", attempt?.id);
-
-  console.log("Attempt status:", attempt?.status);
-
-  console.log("State received:", Boolean(state));
-
-  console.log(
-    "State hash matched:",
-    attempt ? attempt.callbackStateHash === hashState(state) : false,
-  );
-
-  console.log("Authorization code:", code);
-
-  console.log("==============================================");
 
   if (!attempt || attempt.callbackStateHash !== hashState(state)) {
     throw new Error("INVALID_KYC_CALLBACK");
