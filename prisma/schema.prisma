@@ -3484,11 +3484,18 @@ model SupportFaq {
 }
 
 model GlobalAmount {
-  id               String   @id @default(uuid()) @db.Uuid
-  gst              Decimal  @default(0) @db.Decimal(5, 2)
-  eventPlatformFee Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id               String  @id @default(uuid()) @db.Uuid
+  gst              Decimal @default(18) @db.Decimal(5, 2)
+  eventPlatformFee Decimal @default(2) @db.Decimal(10, 2)
+
+  // Home Page Profile Display Limits
+  freeProfileLimit     Int @default(0)
+  premiumProfileLimit  Int @default(25)
+  vipProfileLimit      Int @default(50)
+  vipEliteProfileLimit Int @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("global_amount")
 }

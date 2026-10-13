@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "global_amount" ADD COLUMN     "freeProfileLimit" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "premiumProfileLimit" INTEGER NOT NULL DEFAULT 25,
+ADD COLUMN     "vipEliteProfileLimit" INTEGER NOT NULL DEFAULT 100,
+ADD COLUMN     "vipProfileLimit" INTEGER NOT NULL DEFAULT 50,
+ALTER COLUMN "gst" SET DEFAULT 18,
+ALTER COLUMN "eventPlatformFee" SET DEFAULT 2;
