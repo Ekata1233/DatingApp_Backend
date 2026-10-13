@@ -24,32 +24,74 @@ export const validateReferralController = async (
   }
 };
 
-export const applyReferralController = async(
-req:Request,
-res:Response
-)=>{
 
-try{
+export const applyReferralController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user?.id;
 
-const {referralCode}=req.body;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized.",
+      });
+    }
 
-const result=await applyReferral(
-(req as any).user.id,
-referralCode
-);
+    const { referralCode } = req.body;
 
-return res.status(200).json(result);
+    if (
+      typeof referralCode !== "string" ||
+      !referralCode.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Referral code is required.",
+      });
+    }
 
-}catch(error:any){
+    const result = await applyReferral(
+      userId,
+      referralCode
+    );
 
-return res.status(400).json({
-success:false,
-message:error.message
-});
+    return res.status(200).json(result);
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message || "Unable to apply referral.",
+    });
+  }
+};
 
-}
+// export const applyReferralController = async(
+// req:Request,
+// res:Response
+// )=>{
 
-}
+// try{
+
+// const {referralCode}=req.body;
+
+// const result=await applyReferral(
+// (req as any).user.id,
+// referralCode
+// );
+
+// return res.status(200).json(result);
+
+// }catch(error:any){
+
+// return res.status(400).json({
+// success:false,
+// message:error.message
+// });
+
+// }
+
+// }
 
 export const referralDashboardController = async (
   req: Request,

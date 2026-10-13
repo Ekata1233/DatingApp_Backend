@@ -19,7 +19,7 @@ export const COMPLIMENT_CONSTANTS = {
     BLOCKED_USER: 'You cannot send a compliment to this user',
     ALREADY_MATCHED: 'You are already matched with this user',
     RATE_LIMIT_EXCEEDED: 'You have exceeded the daily compliment limit',
-    COOLDOWN_ACTIVE: 'Please wait before sending another compliment to this user',
+    COOLDOWN_ACTIVE: 'Please wait before sending another compliment to this user (1 min)',
     SAME_USER_LIMIT: 'You can only send 3 compliments per day to the same user',
     INVALID_COMPLIMENT_TYPE: 'Invalid compliment type',
     PURCHASED_COMPLIMENTS_UNAVAILABLE: 'You don\'t have purchased compliments available',

@@ -7,11 +7,12 @@ import {
   TransactionType,
 } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
+import { rewardReferrerOnPackagePurchase } from "../../user/referral/referral.helper";
 
 const calculatePackageEndDate = (
   startDate: Date,
   billingCycle: BillingCycle,
-  months: number | null
+  months: number | null,
 ): Date | null => {
   // Lifetime package never expires
   if (billingCycle === BillingCycle.LIFETIME) {
@@ -53,7 +54,7 @@ const calculatePackageEndDate = (
 
 export const purchasePackageWithWalletService = async (
   userId: string,
-  priceId: string
+  priceId: string,
 ) => {
   return prisma.$transaction(
     async (tx) => {
@@ -83,21 +84,20 @@ export const purchasePackageWithWalletService = async (
       // 2. Get PackagePrice + Package
       // ---------------------------------
 
-      const packagePrice =
-        await tx.packagePrice.findFirst({
-          where: {
-            id: priceId,
+      const packagePrice = await tx.packagePrice.findFirst({
+        where: {
+          id: priceId,
+          active: true,
+
+          package: {
             active: true,
-
-            package: {
-              active: true,
-            },
           },
+        },
 
-          include: {
-            package: true,
-          },
-        });
+        include: {
+          package: true,
+        },
+      });
 
       if (!packagePrice) {
         throw new Error("PACKAGE_PRICE_NOT_FOUND");
@@ -130,76 +130,64 @@ export const purchasePackageWithWalletService = async (
       // ---------------------------------
 
       if (wallet.balance.lt(purchaseAmount)) {
-        throw new Error(
-          "INSUFFICIENT_WALLET_BALANCE"
-        );
+        throw new Error("INSUFFICIENT_WALLET_BALANCE");
       }
 
       // ---------------------------------
       // 5. Atomically deduct wallet
       // ---------------------------------
 
-      const deduction =
-        await tx.wallet.updateMany({
-          where: {
-            id: wallet.id,
+      const deduction = await tx.wallet.updateMany({
+        where: {
+          id: wallet.id,
 
-            balance: {
-              gte: purchaseAmount,
-            },
+          balance: {
+            gte: purchaseAmount,
           },
+        },
 
-          data: {
-            balance: {
-              decrement: purchaseAmount,
-            },
+        data: {
+          balance: {
+            decrement: purchaseAmount,
           },
-        });
+        },
+      });
 
       if (deduction.count !== 1) {
-        throw new Error(
-          "INSUFFICIENT_WALLET_BALANCE"
-        );
+        throw new Error("INSUFFICIENT_WALLET_BALANCE");
       }
 
-      const updatedWallet =
-        await tx.wallet.findUniqueOrThrow({
-          where: {
-            id: wallet.id,
-          },
-        });
+      const updatedWallet = await tx.wallet.findUniqueOrThrow({
+        where: {
+          id: wallet.id,
+        },
+      });
 
       // ---------------------------------
       // 6. Wallet transaction
       // ---------------------------------
 
-      const walletTransaction =
-        await tx.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
+      const walletTransaction = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
 
-            amount: purchaseAmount,
+          amount: purchaseAmount,
 
-            type: TransactionType.PURCHASE,
+          type: TransactionType.PURCHASE,
 
-            status:
-              TransactionStatus.SUCCESS,
+          status: TransactionStatus.SUCCESS,
 
-            source:
-              TransactionSource.PREMIUM_PLAN,
+          source: TransactionSource.PREMIUM_PLAN,
 
-            referenceId:
-              selectedPackage.id,
+          referenceId: selectedPackage.id,
 
-            description:
-              `Purchased ${selectedPackage.name} package - ${packagePrice.billingCycle}`,
+          description: `Purchased ${selectedPackage.name} package - ${packagePrice.billingCycle}`,
 
-            balanceBefore: wallet.balance,
+          balanceBefore: wallet.balance,
 
-            balanceAfter:
-              updatedWallet.balance,
-          },
-        });
+          balanceAfter: updatedWallet.balance,
+        },
+      });
 
       // ---------------------------------
       // 7. Calculate package dates
@@ -210,7 +198,7 @@ export const purchasePackageWithWalletService = async (
       const endDate = calculatePackageEndDate(
         startDate,
         packagePrice.billingCycle,
-        packagePrice.months
+        packagePrice.months,
       );
 
       // ---------------------------------
@@ -233,47 +221,39 @@ export const purchasePackageWithWalletService = async (
       // 9. Create UserPackage
       // ---------------------------------
 
-      const userPackage =
-        await tx.userPackage.create({
-          data: {
-            user_id: userId,
+      const userPackage = await tx.userPackage.create({
+        data: {
+          user_id: userId,
+          packageId: selectedPackage.id,
+          priceId: packagePrice.id,
+          purchasePrice: packagePrice.price,
+          purchaseOriginalPrice: packagePrice.originalPrice,
+          purchaseDiscount: packagePrice.discountPercent,
+          startDate,
+          endDate,
+          status: PackageStatus.ACTIVE,
+          autoRenew: true,
+          currentPackageId: selectedPackage.id,
+          // paymentId is null because
+          // this is wallet payment.
+        },
 
-            packageId: selectedPackage.id,
+        include: {
+          package: true,
+          price: true,
+        },
+      });
 
-            priceId: packagePrice.id,
+      // ==========================================
+      // 10. CREDIT PACKAGE REFERRAL REWARD
+      // ==========================================
 
-            purchasePrice:
-              packagePrice.price,
-
-            purchaseOriginalPrice:
-              packagePrice.originalPrice,
-
-            purchaseDiscount:
-              packagePrice.discountPercent,
-
-            startDate,
-
-            endDate,
-
-            status: PackageStatus.ACTIVE,
-
-            autoRenew: true,
-
-            currentPackageId:
-              selectedPackage.id,
-
-            // paymentId is null because
-            // this is wallet payment.
-          },
-
-          include: {
-            package: true,
-            price: true,
-          },
-        });
-
+      const referralPackageReward = await rewardReferrerOnPackagePurchase(
+        tx,
+        userId,
+      );
       // ---------------------------------
-      // 10. Return
+      // 11. Return
       // ---------------------------------
 
       return {
@@ -286,55 +266,54 @@ export const purchasePackageWithWalletService = async (
           tagline: selectedPackage.tagline,
         },
 
+        referralReward: referralPackageReward
+          ? {
+              credited: true,
+              referrerId: referralPackageReward.referrerId,
+              amount: referralPackageReward.rewardAmount,
+              walletTransactionId: referralPackageReward.walletTransactionId,
+            }
+          : {
+              credited: false,
+            },
+
         billing: {
           priceId: packagePrice.id,
-          billingCycle:
-            packagePrice.billingCycle,
+          billingCycle: packagePrice.billingCycle,
           months: packagePrice.months,
 
-          originalPrice:
-            packagePrice.originalPrice,
+          originalPrice: packagePrice.originalPrice,
 
-          discountPercent:
-            packagePrice.discountPercent,
+          discountPercent: packagePrice.discountPercent,
 
-          purchasePrice:
-            packagePrice.price,
+          purchasePrice: packagePrice.price,
         },
 
         subscription: {
           status: userPackage.status,
-          startDate:
-            userPackage.startDate,
-          endDate:
-            userPackage.endDate,
-          autoRenew:
-            userPackage.autoRenew,
+          startDate: userPackage.startDate,
+          endDate: userPackage.endDate,
+          autoRenew: userPackage.autoRenew,
         },
 
         payment: {
           method: "WALLET",
           status: "SUCCESS",
 
-          amountPaid:
-            purchaseAmount,
+          amountPaid: purchaseAmount,
 
-          walletTransactionId:
-            walletTransaction.id,
+          walletTransactionId: walletTransaction.id,
 
-          balanceBefore:
-            wallet.balance,
+          balanceBefore: wallet.balance,
 
-          balanceAfter:
-            updatedWallet.balance,
+          balanceAfter: updatedWallet.balance,
         },
       };
     },
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       maxWait: 5000,
       timeout: 10000,
-    }
+    },
   );
 };

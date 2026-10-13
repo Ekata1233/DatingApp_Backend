@@ -552,7 +552,6 @@ export const relationshipTagRepository = {
 
         data: {
           status: "ACCEPTED",
-
           respondedAt: new Date(),
         },
 
@@ -572,6 +571,52 @@ export const relationshipTagRepository = {
           },
         },
       });
+
+      /**
+       * UPDATE ORIGINAL PROPOSAL CHAT MESSAGE
+       * PENDING -> ACCEPTED
+       */
+
+      const originalProposalMessages = await tx.chatMessage.findMany({
+        where: {
+          messageType: "RELATIONSHIP_TAG_PROPOSAL",
+          metadata: {
+            path: ["proposalId"],
+            equals: proposal.id,
+          },
+        },
+        select: {
+          id: true,
+          metadata: true,
+        },
+      });
+
+      const updatedProposalMessages = [];
+
+      for (const originalMessage of originalProposalMessages) {
+        const existingMetadata =
+          originalMessage.metadata &&
+          typeof originalMessage.metadata === "object" &&
+          !Array.isArray(originalMessage.metadata)
+            ? originalMessage.metadata
+            : {};
+
+        const updatedMessage = await tx.chatMessage.update({
+          where: {
+            id: originalMessage.id,
+          },
+          data: {
+            metadata: {
+              ...existingMetadata,
+              status: "ACCEPTED",
+              relationshipId: relationship.id,
+              respondedAt: updatedProposal.respondedAt?.toISOString(),
+            },
+          },
+        });
+
+        updatedProposalMessages.push(updatedMessage);
+      }
 
       // =====================================================
       // 11. CANCEL A'S OTHER PENDING PROPOSALS
@@ -674,25 +719,17 @@ export const relationshipTagRepository = {
 
       return {
         relationship,
-
         proposal: updatedProposal,
-
         message: chatMessage,
-
+        updatedProposalMessages,
         previousRelationship: receiverActiveRelationship
           ? {
               id: receiverActiveRelationship.id,
-
               tag: receiverActiveRelationship.tag,
-
               status: "ENDED",
-
               startedAt: receiverActiveRelationship.startedAt,
-
               endedAt: relationshipEndedAt,
-
               partner: previousPartner,
-
               message: breakupMessage,
             }
           : null,

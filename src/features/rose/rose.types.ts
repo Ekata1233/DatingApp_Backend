@@ -1,6 +1,6 @@
 // rose.types.ts
 
-import { TargetType } from "@prisma/client";
+import { Prisma, TargetType } from "@prisma/client";
 
 export interface SendRoseDTO {
   receiverId: string;
@@ -39,6 +39,15 @@ export interface SendRoseResponse {
   data: {
     rose: RoseResponse;
     remainingBalance: RoseBalanceResponse;
+     matched: boolean;
+    matchId: string | null;
+
+    // Payment details
+    payment: {
+      method: "ROSE_BALANCE" | "WALLET";
+      amount: number;
+      walletBalance: Prisma.Decimal | null;
+    };
   };
 }
 

@@ -13,6 +13,7 @@ import {
   validate,
 } from "./rose.validation";
 import { getIO } from "../../config/socket";
+import { prisma } from "../../prisma/prismaClient";
 
 export const sendRoseController = async (req: Request, res: Response) => {
   try {
@@ -23,13 +24,62 @@ export const sendRoseController = async (req: Request, res: Response) => {
       ...validatedData,
     });
 
+    // ========================================
+    // MATCH POPUP DATA
+    // ========================================
+
+    let matchPopup = null;
+
+    if (data.data.matched && data.data.matchId) {
+      const [senderPhoto, receiverPhoto] = await Promise.all([
+        prisma.userPhoto.findFirst({
+          where: {
+            user_id: senderId,
+            is_primary: true,
+            media_type: "IMAGE",
+          },
+          select: {
+            media_url: true,
+          },
+        }),
+
+        prisma.userPhoto.findFirst({
+          where: {
+            user_id: validatedData.receiverId,
+            is_primary: true,
+            media_type: "IMAGE",
+          },
+          select: {
+            media_url: true,
+          },
+        }),
+      ]);
+
+      matchPopup = {
+        title: "It's a Match! ❤️",
+
+        message:
+          "Two hearts beating to the same rhythm. Your connection is already written in the stars. ✨",
+
+        users: {
+          me: {
+            userId: senderId,
+            profilePhoto: senderPhoto?.media_url ?? null,
+          },
+
+          matchedUser: {
+            userId: validatedData.receiverId,
+            profilePhoto: receiverPhoto?.media_url ?? null,
+          },
+        },
+      };
+    }
+
     const receiverId = validatedData.receiverId;
     console.log("receiverId in sendRoseController : ", receiverId);
     // ========================================
     // SOCKET.IO
     // ========================================
-
-
 
     const io = getIO();
 
@@ -44,18 +94,19 @@ export const sendRoseController = async (req: Request, res: Response) => {
       sockets.map((socket) => ({
         socketId: socket.id,
         userId: (socket as any).user?.id,
-      }))
+      })),
     );
 
-    io.to(`user:${receiverId}`).emit(
-      "message:receive",
-      data.message,
-    );
+    io.to(`user:${receiverId}`).emit("message:receive", data.message);
 
     return res.status(201).json({
       success: true,
-      message: "Rose sent successfully",
-      data,
+      message: data.message,
+
+      data: {
+        ...data.data,
+        matchPopup,
+      },
     });
   } catch (error: any) {
     console.error("Send Rose Error:", error.message);
@@ -67,19 +118,36 @@ export const sendRoseController = async (req: Request, res: Response) => {
       INSUFFICIENT_ROSES: "You don't have enough roses",
       ALREADY_SENT: "Rose already sent",
       MATCH_NOT_FOUND: "You can only send roses to matched users",
+
+      // Rose restrictions
+      COOLDOWN_ACTIVE: "Please wait before sending another rose to this user",
+
+      RATE_LIMIT_EXCEEDED: "You have reached your daily rose limit",
+
+      SAME_USER_LIMIT: "You have reached the rose limit for this user",
+
+      BLOCKED_USER: "You cannot send a rose to this user",
+
+      ALREADY_MATCHED: "You are already matched with this user",
+
+      // Wallet
+      INSUFFICIENT_WALLET_BALANCE: "Insufficient wallet balance",
     };
 
-    return res.status(400).json({
+    const statusCode = error.statusCode ?? error.status ?? 500;
+
+    const isKnownError = statusCode >= 400 && statusCode < 500;
+
+    return res.status(statusCode).json({
       success: false,
-      message: errorMap[error.message] || "Something went wrong",
+      message:
+        errorMap[error.message] ||
+        (isKnownError ? error.message : "Something went wrong"),
     });
   }
 };
 
-export const getRoseBalanceController = async (
-  req: Request,
-  res: Response
-) => {
+export const getRoseBalanceController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const data = await getRoseBalanceService(userId);
@@ -99,10 +167,7 @@ export const getRoseBalanceController = async (
   }
 };
 
-export const getRoseHistoryController = async (
-  req: Request,
-  res: Response
-) => {
+export const getRoseHistoryController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const validatedQuery = validate(getHistoryQuerySchema, req.query);
@@ -130,16 +195,13 @@ export const getRoseHistoryController = async (
 
 export const addPurchasedRosesController = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user.id;
     const validatedData = validate(addPurchasedRosesSchema, req.body);
 
-    const data = await addPurchasedRosesService(
-      userId,
-      validatedData.amount
-    );
+    const data = await addPurchasedRosesService(userId, validatedData.amount);
 
     return res.status(200).json({
       success: true,

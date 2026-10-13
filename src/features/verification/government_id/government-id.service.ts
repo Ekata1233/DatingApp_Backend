@@ -9,12 +9,17 @@ import {
 
 import { prisma } from "../../../prisma/prismaClient";
 import { gridlinesClient } from "../../../utils/gridlines.client";
-import { deleteGovernmentIdPhoto, fetchAndVerifyGovernmentDocument } from "./government-id.provider";
+import {
+  deleteGovernmentIdPhoto,
+  fetchAndVerifyGovernmentDocument,
+} from "./government-id.provider";
 import axios from "axios";
 import { uploadGovernmentIdPhoto } from "./government-id.storage";
-import { getVerifiedGovernmentDocument, validateGovernmentIdentity } from "./government-id.helper";
+import {
+  getVerifiedGovernmentDocument,
+  validateGovernmentIdentity,
+} from "./government-id.helper";
 import { recalculateTrustScore } from "../trust-score/trust-score.service";
-
 
 const hashState = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -22,7 +27,7 @@ const hashState = (value: string) =>
 export const initGovernmentIdService = async (
   userId: string,
   documentType: GovernmentIdType,
-  consent: boolean
+  consent: boolean,
 ) => {
   if (consent !== true) {
     throw new Error("CONSENT_REQUIRED");
@@ -55,10 +60,7 @@ export const initGovernmentIdService = async (
   // Remove Indian country code if present
   if (mobileNumber.startsWith("+91")) {
     mobileNumber = mobileNumber.slice(3);
-  } else if (
-    mobileNumber.startsWith("91") &&
-    mobileNumber.length === 12
-  ) {
+  } else if (mobileNumber.startsWith("91") && mobileNumber.length === 12) {
     mobileNumber = mobileNumber.slice(2);
   }
 
@@ -68,15 +70,14 @@ export const initGovernmentIdService = async (
   }
 
   // 2. Check current verification
-  const existing =
-    await prisma.userVerification.findUnique({
-      where: {
-        userId_type: {
-          userId,
-          type: VerificationType.GOVERNMENT_ID,
-        },
+  const existing = await prisma.userVerification.findUnique({
+    where: {
+      userId_type: {
+        userId,
+        type: VerificationType.GOVERNMENT_ID,
       },
-    });
+    },
+  });
 
   if (existing?.status === VerificationStatus.VERIFIED) {
     throw new Error("GOVERNMENT_ID_ALREADY_VERIFIED");
@@ -87,67 +88,63 @@ export const initGovernmentIdService = async (
   }
 
   // 3. Do not allow another active attempt
-  const activeAttempt =
-    await prisma.governmentIdAttempt.findFirst({
-      where: {
-        userId,
-        status: {
-          in: [
-            GovernmentIdAttemptStatus.INITIATING,
-            GovernmentIdAttemptStatus.PENDING,
-            GovernmentIdAttemptStatus.AUTHORIZED,
-          ],
-        },
+  const activeAttempt = await prisma.governmentIdAttempt.findFirst({
+    where: {
+      userId,
+      status: {
+        in: [
+          GovernmentIdAttemptStatus.INITIATING,
+          GovernmentIdAttemptStatus.PENDING,
+          GovernmentIdAttemptStatus.AUTHORIZED,
+        ],
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
   if (activeAttempt) {
     throw new Error("VERIFICATION_ALREADY_IN_PROGRESS");
   }
 
   // 4. Create or update verification
-  const verification =
-    await prisma.userVerification.upsert({
-      where: {
-        userId_type: {
-          userId,
-          type: VerificationType.GOVERNMENT_ID,
-        },
-      },
-      create: {
+  const verification = await prisma.userVerification.upsert({
+    where: {
+      userId_type: {
         userId,
         type: VerificationType.GOVERNMENT_ID,
-        status: VerificationStatus.IN_PROGRESS,
-        points: 0,
-        maxPoints: 20,
-        governmentIdType: documentType,
-        provider: "GRIDLINES",
-        startedAt: new Date(),
       },
-      update: {
-        status: VerificationStatus.IN_PROGRESS,
-        points: 0,
-        governmentIdType: documentType,
-        provider: "GRIDLINES",
-        providerRef: null,
-        rejectionReason: null,
-        startedAt: new Date(),
-      },
-    });
+    },
+    create: {
+      userId,
+      type: VerificationType.GOVERNMENT_ID,
+      status: VerificationStatus.IN_PROGRESS,
+      points: 0,
+      maxPoints: 20,
+      governmentIdType: documentType,
+      provider: "GRIDLINES",
+      startedAt: new Date(),
+    },
+    update: {
+      status: VerificationStatus.IN_PROGRESS,
+      points: 0,
+      governmentIdType: documentType,
+      provider: "GRIDLINES",
+      providerRef: null,
+      rejectionReason: null,
+      startedAt: new Date(),
+    },
+  });
 
   // 5. Generate secure identifiers
   const referenceId = randomUUID();
 
-  const callbackState =
-    randomBytes(32).toString("hex");
+  const callbackState = randomBytes(32).toString("hex");
 
   const callbackStateHash = hashState(callbackState);
 
-  const callbackBase =
-    process.env.GRIDLINES_CALLBACK_URL;
+  const callbackBase = process.env.GRIDLINES_CALLBACK_URL;
 
   if (!callbackBase) {
     throw new Error("GRIDLINES_CALLBACK_URL_MISSING");
@@ -155,24 +152,20 @@ export const initGovernmentIdService = async (
 
   const callbackUrl = new URL(callbackBase);
 
-  callbackUrl.searchParams.set(
-    "state",
-    callbackState
-  );
+  callbackUrl.searchParams.set("state", callbackState);
 
   // 6. Create attempt before provider request
-  const attempt =
-    await prisma.governmentIdAttempt.create({
-      data: {
-        userId,
-        verificationId: verification.id,
-        documentType,
-        referenceId,
-        callbackStateHash,
-        consentGivenAt: new Date(),
-        status: GovernmentIdAttemptStatus.INITIATING,
-      },
-    });
+  const attempt = await prisma.governmentIdAttempt.create({
+    data: {
+      userId,
+      verificationId: verification.id,
+      documentType,
+      referenceId,
+      callbackStateHash,
+      consentGivenAt: new Date(),
+      status: GovernmentIdAttemptStatus.INITIATING,
+    },
+  });
 
   try {
     // 7. Call Gridlines DigiLocker Init
@@ -200,8 +193,8 @@ export const initGovernmentIdService = async (
           hasMobileNumber: Boolean(requestBody.mobile_number),
         },
         null,
-        2
-      )
+        2,
+      ),
     );
 
     const response = await gridlinesClient.post(
@@ -211,7 +204,7 @@ export const initGovernmentIdService = async (
         headers: {
           "X-Reference-ID": referenceId,
         },
-      }
+      },
     );
 
     const result = response.data;
@@ -231,11 +224,9 @@ export const initGovernmentIdService = async (
           id: attempt.id,
         },
         data: {
-          transactionId:
-            result.data.transaction_id,
+          transactionId: result.data.transaction_id,
 
-          providerRequestId:
-            result.request_id,
+          providerRequestId: result.request_id,
 
           status: GovernmentIdAttemptStatus.PENDING,
         },
@@ -246,8 +237,7 @@ export const initGovernmentIdService = async (
           id: verification.id,
         },
         data: {
-          providerRef:
-            result.data.transaction_id,
+          providerRef: result.data.transaction_id,
         },
       }),
     ]);
@@ -262,12 +252,9 @@ export const initGovernmentIdService = async (
 
       status: "IN_PROGRESS",
 
-      authorizationUrl:
-        result.data.authorization_url,
+      authorizationUrl: result.data.authorization_url,
     };
-
   } catch (error: unknown) {
-
     // -----------------------------------------
     // 1. Extract Gridlines API error
     // -----------------------------------------
@@ -275,7 +262,6 @@ export const initGovernmentIdService = async (
     let failureReason = "INIT_FAILED";
 
     if (axios.isAxiosError(error)) {
-
       const providerError = error.response?.data;
 
       console.error(
@@ -284,40 +270,28 @@ export const initGovernmentIdService = async (
           {
             httpStatus: error.response?.status,
 
-            requestId:
-              providerError?.request_id,
+            requestId: providerError?.request_id,
 
-            transactionId:
-              providerError?.transaction_id,
+            transactionId: providerError?.transaction_id,
 
-            referenceId:
-              providerError?.reference_id,
+            referenceId: providerError?.reference_id,
 
-            errorCode:
-              providerError?.error?.code,
+            errorCode: providerError?.error?.code,
 
-            errorMessage:
-              providerError?.error?.message,
+            errorMessage: providerError?.error?.message,
 
-            metadata:
-              providerError?.error?.metadata,
+            metadata: providerError?.error?.metadata,
           },
           null,
-          2
-        )
+          2,
+        ),
       );
 
-      failureReason =
-        providerError?.error?.code ||
-        "GRIDLINES_INIT_FAILED";
-
+      failureReason = providerError?.error?.code || "GRIDLINES_INIT_FAILED";
     } else {
-
       console.error(
         "Government ID Init Error:",
-        error instanceof Error
-          ? error.message
-          : "Unknown error"
+        error instanceof Error ? error.message : "Unknown error",
       );
     }
 
@@ -366,38 +340,52 @@ export const initGovernmentIdService = async (
 export const handleGovernmentIdCallback = async (
   transactionId: string,
   state: string,
-  code: string
+  code: string,
 ) => {
-  const attempt =
-    await prisma.governmentIdAttempt.findUnique({
-      where: {
-        transactionId,
-      },
-    });
+  const attempt = await prisma.governmentIdAttempt.findUnique({
+    where: {
+      transactionId,
+    },
+  });
 
-  if (
-    !attempt ||
-    attempt.callbackStateHash !== hashState(state)
-  ) {
+  console.log("========== DIGILOCKER CALLBACK DEBUG ==========");
+
+  console.log("Transaction ID received:", transactionId);
+
+  console.log("Transaction ID found:", Boolean(attempt));
+
+  console.log("Attempt ID:", attempt?.id);
+
+  console.log("Attempt status:", attempt?.status);
+
+  console.log("State received:", Boolean(state));
+
+  console.log(
+    "State hash matched:",
+    attempt ? attempt.callbackStateHash === hashState(state) : false,
+  );
+
+  console.log("Authorization code:", code);
+
+  console.log("==============================================");
+
+  if (!attempt || attempt.callbackStateHash !== hashState(state)) {
     throw new Error("INVALID_KYC_CALLBACK");
   }
 
   // Do not process completed or superseded attempts.
-  if (
-    attempt.status !== GovernmentIdAttemptStatus.PENDING
-  ) {
+  if (attempt.status !== GovernmentIdAttemptStatus.PENDING) {
     return {
       attemptId: attempt.id,
       status: attempt.status,
     };
   }
 
-  const verification =
-    await prisma.userVerification.findUnique({
-      where: {
-        id: attempt.verificationId,
-      },
-    });
+  const verification = await prisma.userVerification.findUnique({
+    where: {
+      id: attempt.verificationId,
+    },
+  });
 
   if (
     !verification ||
@@ -447,52 +435,44 @@ export const handleGovernmentIdCallback = async (
 
   // Authorization completed, but document verification
   // has not yet been performed.
-  const updated =
-    await prisma.governmentIdAttempt.updateMany({
-      where: {
-        id: attempt.id,
-        status: GovernmentIdAttemptStatus.PENDING,
-      },
-      data: {
-        status: GovernmentIdAttemptStatus.AUTHORIZED,
-        authorizedAt: new Date(),
-      },
-    });
+  const updated = await prisma.governmentIdAttempt.updateMany({
+    where: {
+      id: attempt.id,
+      status: GovernmentIdAttemptStatus.PENDING,
+    },
+    data: {
+      status: GovernmentIdAttemptStatus.AUTHORIZED,
+      authorizedAt: new Date(),
+    },
+  });
 
   return {
     attemptId: attempt.id,
-    status:
-      updated.count === 1
-        ? "AUTHORIZED"
-        : "PENDING",
+    status: updated.count === 1 ? "AUTHORIZED" : "PENDING",
   };
 };
 
 export const completeGovernmentIdService = async (
   userId: string,
-  attemptId: string
+  attemptId: string,
 ) => {
-
   // ==========================================
   // 1. Find verification attempt
   // ==========================================
 
-  const attempt =
-    await prisma.governmentIdAttempt.findFirst({
-      where: {
-        id: attemptId,
-        userId,
-      },
+  const attempt = await prisma.governmentIdAttempt.findFirst({
+    where: {
+      id: attemptId,
+      userId,
+    },
 
-      include: {
-        verification: true,
-      },
-    });
+    include: {
+      verification: true,
+    },
+  });
 
   if (!attempt) {
-    throw new Error(
-      "VERIFICATION_ATTEMPT_NOT_FOUND"
-    );
+    throw new Error("VERIFICATION_ATTEMPT_NOT_FOUND");
   }
 
   // ==========================================
@@ -500,29 +480,21 @@ export const completeGovernmentIdService = async (
   // ==========================================
 
   if (
-    attempt.status ===
-    GovernmentIdAttemptStatus.VERIFIED &&
-    attempt.verification.status ===
-    VerificationStatus.VERIFIED
+    attempt.status === GovernmentIdAttemptStatus.VERIFIED &&
+    attempt.verification.status === VerificationStatus.VERIFIED
   ) {
-
     return {
-      verificationId:
-        attempt.verificationId,
+      verificationId: attempt.verificationId,
 
-      attemptId:
-        attempt.id,
+      attemptId: attempt.id,
 
-      documentType:
-        attempt.documentType,
+      documentType: attempt.documentType,
 
-      verifiedName:
-        attempt.verification.verifiedName,
+      verifiedName: attempt.verification.verifiedName,
 
       status: "VERIFIED",
 
-      points:
-        attempt.verification.points,
+      points: attempt.verification.points,
     };
   }
 
@@ -530,95 +502,61 @@ export const completeGovernmentIdService = async (
   // 3. Validate current attempt
   // ==========================================
 
-  if (
-    attempt.status !==
-    GovernmentIdAttemptStatus.AUTHORIZED
-  ) {
-    throw new Error(
-      "DIGILOCKER_AUTHORIZATION_REQUIRED"
-    );
+  if (attempt.status !== GovernmentIdAttemptStatus.AUTHORIZED) {
+    throw new Error("DIGILOCKER_AUTHORIZATION_REQUIRED");
   }
 
-  if (
-    attempt.expiresAt &&
-    attempt.expiresAt <= new Date()
-  ) {
-    throw new Error(
-      "VERIFICATION_ATTEMPT_EXPIRED"
-    );
+  if (attempt.expiresAt && attempt.expiresAt <= new Date()) {
+    throw new Error("VERIFICATION_ATTEMPT_EXPIRED");
   }
 
   if (!attempt.transactionId) {
-    throw new Error(
-      "TRANSACTION_ID_MISSING"
-    );
+    throw new Error("TRANSACTION_ID_MISSING");
   }
 
   if (
     attempt.verification.userId !== userId ||
-    attempt.verification.type !==
-    VerificationType.GOVERNMENT_ID ||
-    attempt.verification.providerRef !==
-    attempt.transactionId ||
-    attempt.verification.status !==
-    VerificationStatus.IN_PROGRESS
+    attempt.verification.type !== VerificationType.GOVERNMENT_ID ||
+    attempt.verification.providerRef !== attempt.transactionId ||
+    attempt.verification.status !== VerificationStatus.IN_PROGRESS
   ) {
-    throw new Error(
-      "VERIFICATION_ATTEMPT_MISMATCH"
-    );
+    throw new Error("VERIFICATION_ATTEMPT_MISMATCH");
   }
 
   // ==========================================
   // 4. Fetch government document
   // ==========================================
 
-  const document =
-    await getVerifiedGovernmentDocument({
-      transactionId:
-        attempt.transactionId,
+  const document = await getVerifiedGovernmentDocument({
+    transactionId: attempt.transactionId,
 
-      referenceId:
-        attempt.referenceId,
+    referenceId: attempt.referenceId,
 
-      documentType:
-        attempt.documentType,
-    });
+    documentType: attempt.documentType,
+  });
 
   // ==========================================
   // 5. Validate government identity
   // ==========================================
 
-  const governmentIdentity =
-    validateGovernmentIdentity(
-      document,
-      attempt.documentType
-    );
+  const governmentIdentity = validateGovernmentIdentity(
+    document,
+    attempt.documentType,
+  );
 
-  const {
-    verifiedName,
-    birthDate,
-    gender,
-  } = governmentIdentity;
+  const { verifiedName, birthDate, gender } = governmentIdentity;
 
   // ==========================================
   // 6. Validate government ID portrait
   // ==========================================
 
-  const portrait =
-    document.portraitBuffer;
+  const portrait = document.portraitBuffer;
 
   if (
-    attempt.documentType ===
-    GovernmentIdType.AADHAAR &&
-    (
-      !portrait ||
-      !Buffer.isBuffer(portrait) ||
-      portrait.length === 0
-    )
+    attempt.documentType === GovernmentIdType.AADHAAR &&
+    (!portrait || !Buffer.isBuffer(portrait) || portrait.length === 0)
   ) {
-    throw new Error(
-      "AADHAAR_PORTRAIT_NOT_AVAILABLE"
-    );
+    throw new Error("AADHAAR_PORTRAIT_NOT_AVAILABLE");
   }
 
   // ==========================================
@@ -628,226 +566,157 @@ export const completeGovernmentIdService = async (
   let photoKey: string | null = null;
 
   if (portrait != null) {
-
-    if (
-      !Buffer.isBuffer(portrait) ||
-      portrait.length === 0
-    ) {
-      throw new Error(
-        "INVALID_GOVERNMENT_ID_PORTRAIT"
-      );
+    if (!Buffer.isBuffer(portrait) || portrait.length === 0) {
+      throw new Error("INVALID_GOVERNMENT_ID_PORTRAIT");
     }
 
-    photoKey =
-      await uploadGovernmentIdPhoto(
-        userId,
-        portrait
-      );
+    photoKey = await uploadGovernmentIdPhoto(userId, portrait);
   }
 
   try {
-
     // ==========================================
     // 8. Atomically finalize verification
     // ==========================================
 
-    return await prisma.$transaction(
-      async (tx) => {
+    return await prisma.$transaction(async (tx) => {
+      const now = new Date();
 
-        const now = new Date();
+      // --------------------------------------
+      // 8.1 Claim authorized attempt
+      // --------------------------------------
 
-        // --------------------------------------
-        // 8.1 Claim authorized attempt
-        // --------------------------------------
+      const updatedAttempt = await tx.governmentIdAttempt.updateMany({
+        where: {
+          id: attempt.id,
 
-        const updatedAttempt =
-          await tx.governmentIdAttempt.updateMany({
-
-            where: {
-              id: attempt.id,
-
-              userId,
-
-              status:
-                GovernmentIdAttemptStatus.AUTHORIZED,
-
-              transactionId:
-                attempt.transactionId,
-
-              OR: [
-                {
-                  expiresAt: null,
-                },
-                {
-                  expiresAt: {
-                    gt: now,
-                  },
-                },
-              ],
-            },
-
-            data: {
-              status:
-                GovernmentIdAttemptStatus.VERIFIED,
-
-              completedAt: now,
-
-              failureReason: null,
-            },
-          });
-
-        if (
-          updatedAttempt.count !== 1
-        ) {
-          throw new Error(
-            "VERIFICATION_ATTEMPT_STATE_CHANGED"
-          );
-        }
-
-        // --------------------------------------
-        // 8.2 Update UserVerification
-        // --------------------------------------
-
-        const updatedVerification =
-          await tx.userVerification.updateMany({
-
-            where: {
-              id:
-                attempt.verificationId,
-
-              userId,
-
-              type:
-                VerificationType.GOVERNMENT_ID,
-
-              status:
-                VerificationStatus.IN_PROGRESS,
-
-              providerRef:
-                attempt.transactionId,
-            },
-
-            data: {
-
-              status:
-                VerificationStatus.VERIFIED,
-
-              // Save government document name
-              verifiedName:
-                verifiedName,
-
-              governmentIdType:
-                attempt.documentType,
-
-              governmentIdPhotoKey:
-                photoKey,
-
-              points: 20,
-
-              verifiedAt: now,
-
-              rejectionReason: null,
-            },
-          });
-
-        if (
-          updatedVerification.count !== 1
-        ) {
-          throw new Error(
-            "VERIFICATION_STATE_CHANGED"
-          );
-        }
-
-        // --------------------------------------
-        // 8.3 Update user's DOB and gender
-        // --------------------------------------
-
-        const updatedUser =
-          await tx.user.updateMany({
-
-            where: {
-              id: userId,
-            },
-
-            data: {
-
-              // Government document DOB
-              birth_date:
-                birthDate,
-
-              // Government document gender
-              gender:
-                gender,
-
-              // full_name is NOT updated
-            },
-          });
-
-        if (
-          updatedUser.count !== 1
-        ) {
-          throw new Error(
-            "USER_NOT_FOUND"
-          );
-        }
-
-        const trustScore = await recalculateTrustScore(
           userId,
-          tx
-        );
-        // ======================================
-        // 9. Return verification result
-        // ======================================
 
-        return {
+          status: GovernmentIdAttemptStatus.AUTHORIZED,
 
-          verificationId:
-            attempt.verificationId,
+          transactionId: attempt.transactionId,
 
-          attemptId:
-            attempt.id,
+          OR: [
+            {
+              expiresAt: null,
+            },
+            {
+              expiresAt: {
+                gt: now,
+              },
+            },
+          ],
+        },
 
-          documentType:
-            attempt.documentType,
+        data: {
+          status: GovernmentIdAttemptStatus.VERIFIED,
 
-          verifiedName:
-            verifiedName,
+          completedAt: now,
 
-          birthDate:
-            birthDate,
+          failureReason: null,
+        },
+      });
 
-          gender:
-            gender,
+      if (updatedAttempt.count !== 1) {
+        throw new Error("VERIFICATION_ATTEMPT_STATE_CHANGED");
+      }
 
-          status: "VERIFIED",
+      // --------------------------------------
+      // 8.2 Update UserVerification
+      // --------------------------------------
+
+      const updatedVerification = await tx.userVerification.updateMany({
+        where: {
+          id: attempt.verificationId,
+
+          userId,
+
+          type: VerificationType.GOVERNMENT_ID,
+
+          status: VerificationStatus.IN_PROGRESS,
+
+          providerRef: attempt.transactionId,
+        },
+
+        data: {
+          status: VerificationStatus.VERIFIED,
+
+          // Save government document name
+          verifiedName: verifiedName,
+
+          governmentIdType: attempt.documentType,
+
+          governmentIdPhotoKey: photoKey,
 
           points: 20,
-          trustScore
-        };
 
+          verifiedAt: now,
+
+          rejectionReason: null,
+        },
+      });
+
+      if (updatedVerification.count !== 1) {
+        throw new Error("VERIFICATION_STATE_CHANGED");
       }
-    );
 
+      // --------------------------------------
+      // 8.3 Update user's DOB and gender
+      // --------------------------------------
+
+      const updatedUser = await tx.user.updateMany({
+        where: {
+          id: userId,
+        },
+
+        data: {
+          // Government document DOB
+          birth_date: birthDate,
+
+          // Government document gender
+          gender: gender,
+
+          // full_name is NOT updated
+        },
+      });
+
+      if (updatedUser.count !== 1) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      const trustScore = await recalculateTrustScore(userId, tx);
+      // ======================================
+      // 9. Return verification result
+      // ======================================
+
+      return {
+        verificationId: attempt.verificationId,
+
+        attemptId: attempt.id,
+
+        documentType: attempt.documentType,
+
+        verifiedName: verifiedName,
+
+        birthDate: birthDate,
+
+        gender: gender,
+
+        status: "VERIFIED",
+
+        points: 20,
+        trustScore,
+      };
+    });
   } catch (error) {
-
     // ==========================================
     // 10. Cleanup newly uploaded portrait
     // ==========================================
 
     if (photoKey) {
-
       try {
-
-        await deleteGovernmentIdPhoto(
-          photoKey
-        );
-
+        await deleteGovernmentIdPhoto(photoKey);
       } catch (cleanupError) {
-
-        console.error(
-          "Government ID portrait cleanup failed",
-          cleanupError
-        );
+        console.error("Government ID portrait cleanup failed", cleanupError);
       }
     }
 
@@ -857,34 +726,28 @@ export const completeGovernmentIdService = async (
 
 export const fetchGovernmentEAadhaar = async (
   transactionId: string,
-  referenceId: string
+  referenceId: string,
 ) => {
   try {
-    const response = await gridlinesClient.get(
-      "/digilocker/eaadhaar",
-      {
-        params: {
-          json: true,
-        },
+    const response = await gridlinesClient.get("/digilocker/eaadhaar", {
+      params: {
+        json: true,
+      },
 
-        headers: {
-          "X-Transaction-ID": transactionId,
-          "X-Reference-ID": referenceId,
-          "X-Auth-Type": "API-Key",
-        },
-      }
-    );
+      headers: {
+        "X-Transaction-ID": transactionId,
+        "X-Reference-ID": referenceId,
+        "X-Auth-Type": "API-Key",
+      },
+    });
 
     const result = response.data;
 
-    const providerCode = String(
-      result?.data?.code ?? ""
-    );
+    const providerCode = String(result?.data?.code ?? "");
 
     const responsePath = result?.path;
 
-    const responseTransactionId =
-      result?.data?.transaction_id;
+    const responseTransactionId = result?.data?.transaction_id;
 
     const eaadhaar = result?.data?.eaadhaar;
 
@@ -893,8 +756,7 @@ export const fetchGovernmentEAadhaar = async (
       responsePath,
       providerCode,
       providerMessage: result?.data?.message,
-      transactionMatches:
-        responseTransactionId === transactionId,
+      transactionMatches: responseTransactionId === transactionId,
       hasEAadhaar: eaadhaar != null,
       requestId: result?.request_id,
     });
@@ -911,9 +773,7 @@ export const fetchGovernmentEAadhaar = async (
     const acceptedCodes = ["1011", "1008"];
 
     if (!acceptedCodes.includes(providerCode)) {
-      throw new Error(
-        `EAADHAAR_FETCH_FAILED: ${providerCode}`
-      );
+      throw new Error(`EAADHAAR_FETCH_FAILED: ${providerCode}`);
     }
 
     // 2. Validate the response endpoint.
@@ -922,19 +782,13 @@ export const fetchGovernmentEAadhaar = async (
       responsePath !== "/digilocker/eaadhaar" &&
       responsePath !== "/eaadhaar"
     ) {
-      throw new Error(
-        "EAADHAAR_RESPONSE_ENDPOINT_MISMATCH"
-      );
+      throw new Error("EAADHAAR_RESPONSE_ENDPOINT_MISMATCH");
     }
 
     // 3. Validate transaction ID.
 
-    if (
-      responseTransactionId !== transactionId
-    ) {
-      throw new Error(
-        "EAADHAAR_TRANSACTION_MISMATCH"
-      );
+    if (responseTransactionId !== transactionId) {
+      throw new Error("EAADHAAR_TRANSACTION_MISMATCH");
     }
 
     // 4. Ensure the response contains data.
@@ -945,9 +799,7 @@ export const fetchGovernmentEAadhaar = async (
       Array.isArray(eaadhaar) ||
       Object.keys(eaadhaar).length === 0
     ) {
-      throw new Error(
-        "EAADHAAR_DOCUMENT_DATA_MISSING"
-      );
+      throw new Error("EAADHAAR_DOCUMENT_DATA_MISSING");
     }
 
     // 5. Return the actual E-Aadhaar data.
@@ -955,38 +807,26 @@ export const fetchGovernmentEAadhaar = async (
     // Do not mark the user VERIFIED here.
 
     return result.data;
-
   } catch (error: unknown) {
-
     if (axios.isAxiosError(error)) {
       const providerError = error.response?.data;
 
-      console.error(
-        "GRIDLINES EAADHAAR API ERROR:",
-        {
-          httpStatus: error.response?.status,
+      console.error("GRIDLINES EAADHAAR API ERROR:", {
+        httpStatus: error.response?.status,
 
-          providerCode:
-            providerError?.error?.code ??
-            providerError?.data?.code,
+        providerCode: providerError?.error?.code ?? providerError?.data?.code,
 
-          providerMessage:
-            providerError?.error?.message ??
-            providerError?.data?.message,
+        providerMessage:
+          providerError?.error?.message ?? providerError?.data?.message,
 
-          requestId:
-            providerError?.request_id,
+        requestId: providerError?.request_id,
 
-          networkCode: error.code,
-        }
-      );
-
+        networkCode: error.code,
+      });
     } else {
       console.error(
         "EAADHAAR FETCH ERROR:",
-        error instanceof Error
-          ? error.message
-          : "Unknown error"
+        error instanceof Error ? error.message : "Unknown error",
       );
     }
 
@@ -1059,72 +899,54 @@ export const fetchGovernmentEAadhaar = async (
 //   return document;
 // };
 
-
 export const fetchGovernmentIssuedFiles = async (
   transactionId: string,
-  referenceId: string
+  referenceId: string,
 ) => {
+  const response = await gridlinesClient.get("/digilocker/issued-files", {
+    headers: {
+      "X-Auth-Type": "API-Key",
 
-  const response = await gridlinesClient.get(
-    "/digilocker/issued-files",
-    {
-      headers: {
-        "X-Auth-Type": "API-Key",
+      "X-Transaction-ID": transactionId,
 
-        "X-Transaction-ID": transactionId,
-
-        "X-Reference-ID": referenceId,
-      },
-    }
-  );
+      "X-Reference-ID": referenceId,
+    },
+  });
 
   const result = response.data;
 
   // Check provider transaction
 
   const responseTransactionId =
-    result?.data?.transaction_id ??
-    result?.transaction_id;
+    result?.data?.transaction_id ?? result?.transaction_id;
 
-  if (
-    responseTransactionId !== transactionId
-  ) {
-    throw new Error(
-      "ISSUED_FILES_TRANSACTION_MISMATCH"
-    );
+  if (responseTransactionId !== transactionId) {
+    throw new Error("ISSUED_FILES_TRANSACTION_MISMATCH");
   }
 
   // Log only non-sensitive diagnostics.
 
-  console.log(
-    "GRIDLINES ISSUED FILES DIAGNOSTICS:",
-    {
-      httpStatus: response.status,
+  console.log("GRIDLINES ISSUED FILES DIAGNOSTICS:", {
+    httpStatus: response.status,
 
-      providerCode:
-        result?.data?.code,
+    providerCode: result?.data?.code,
 
-      providerMessage:
-        result?.data?.message,
+    providerMessage: result?.data?.message,
 
-      dataFields:
-        result?.data &&
-          typeof result.data === "object"
-          ? Object.keys(result.data)
-          : [],
-    }
-  );
+    dataFields:
+      result?.data && typeof result.data === "object"
+        ? Object.keys(result.data)
+        : [],
+  });
 
   return result.data;
 };
 
-
 export const fetchGovernmentIssuedFile = async (
   transactionId: string,
   referenceId: string,
-  fileUri: string
+  fileUri: string,
 ) => {
-
   const response = await gridlinesClient.post(
     "/digilocker/issued-file",
     {
@@ -1140,45 +962,26 @@ export const fetchGovernmentIssuedFile = async (
 
         "X-Reference-ID": referenceId,
       },
-    }
+    },
   );
 
   const result = response.data;
 
-  if (
-    String(result?.data?.code) !== "1008"
-  ) {
-    throw new Error(
-      "PAN_DOCUMENT_FETCH_FAILED"
-    );
+  if (String(result?.data?.code) !== "1008") {
+    throw new Error("PAN_DOCUMENT_FETCH_FAILED");
   }
 
-  if (
-    result?.data?.transaction_id !==
-    transactionId
-  ) {
-    throw new Error(
-      "PAN_TRANSACTION_MISMATCH"
-    );
+  if (result?.data?.transaction_id !== transactionId) {
+    throw new Error("PAN_TRANSACTION_MISMATCH");
   }
 
-  const document =
-    result?.data?.document;
+  const document = result?.data?.document;
 
-  if (
-    !document ||
-    typeof document !== "object" ||
-    Array.isArray(document)
-  ) {
-    throw new Error(
-      "PAN_DOCUMENT_NOT_AVAILABLE"
-    );
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    throw new Error("PAN_DOCUMENT_NOT_AVAILABLE");
   }
 
-  console.log(
-    "PAN DOCUMENT FIELDS:",
-    Object.keys(document)
-  );
+  console.log("PAN DOCUMENT FIELDS:", Object.keys(document));
 
   return document;
 };

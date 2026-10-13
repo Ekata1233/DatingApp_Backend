@@ -200,6 +200,7 @@ async acceptProposal(
         proposal,
         message,
         previousRelationship,
+        updatedProposalMessages,
     } = result;
 
 
@@ -251,6 +252,7 @@ const relationshipEndedScreen =
         tag:relationship.tag,
         status:relationship.status,
         startedAt:relationship.startedAt,
+         updatedProposalMessages, 
         // =================================================
         // NEW PARTNER
         // =================================================

@@ -1,13 +1,11 @@
-
-
 import https from "https";
 import jwt from "jsonwebtoken";
 
 import { prisma } from "../../../prisma/prismaClient";
 import { generateReferralCode } from "../../../utils/referral";
 import { getNextStep } from "../../../utils/onboardingFlows";
-const HARDCODED_OTP =
-  process.env.HARDCODED_OTP || "123456";
+import { applyReferralReward } from "../referral/referral.helper";
+const HARDCODED_OTP = process.env.HARDCODED_OTP || "123456";
 /* =========================================================
    CONFIG
 ========================================================= */
@@ -34,45 +32,27 @@ const isHardcodedOtpAllowed = () => {
    PHONE NORMALIZATION
 ========================================================= */
 
-const normalizePhoneNumber = (
-  phoneNumber: string,
-): string => {
+const normalizePhoneNumber = (phoneNumber: string): string => {
   if (!phoneNumber) {
-    throw new Error(
-      "Phone number is required",
-    );
+    throw new Error("Phone number is required");
   }
 
   // Remove spaces, -, (, )
-  let cleanedPhone =
-    phoneNumber.replace(
-      /[\s\-()]/g,
-      "",
-    );
+  let cleanedPhone = phoneNumber.replace(/[\s\-()]/g, "");
 
   // +91XXXXXXXXXX
-  if (
-    cleanedPhone.startsWith("+91") &&
-    cleanedPhone.length === 13
-  ) {
-    cleanedPhone =
-      cleanedPhone.slice(3);
+  if (cleanedPhone.startsWith("+91") && cleanedPhone.length === 13) {
+    cleanedPhone = cleanedPhone.slice(3);
   }
 
   // 91XXXXXXXXXX
-  else if (
-    cleanedPhone.startsWith("91") &&
-    cleanedPhone.length === 12
-  ) {
-    cleanedPhone =
-      cleanedPhone.slice(2);
+  else if (cleanedPhone.startsWith("91") && cleanedPhone.length === 12) {
+    cleanedPhone = cleanedPhone.slice(2);
   }
 
   // Validate final Indian mobile number
   if (!/^\d{10}$/.test(cleanedPhone)) {
-    throw new Error(
-      "Invalid Indian phone number",
-    );
+    throw new Error("Invalid Indian phone number");
   }
 
   return cleanedPhone;
@@ -82,174 +62,133 @@ const normalizePhoneNumber = (
    MSG91 SEND OTP
 ========================================================= */
 
-export const sendOtp = async ({
-  phoneNumber,
-}: {
-  phoneNumber: string;
-}) => {
+export const sendOtp = async ({ phoneNumber }: { phoneNumber: string }) => {
   // =====================================================
   // NORMALIZE PHONE
   // =====================================================
 
-  const cleanedPhone =
-    normalizePhoneNumber(phoneNumber);
+  const cleanedPhone = normalizePhoneNumber(phoneNumber);
 
   const mobile = `91${cleanedPhone}`;
 
-  const formattedNumber =
-    `+91${cleanedPhone}`;
+  const formattedNumber = `+91${cleanedPhone}`;
 
   // =====================================================
   // CHECK WHETHER USER IS ALREADY REGISTERED
   // =====================================================
 
-  const existingUser =
-    await prisma.user.findFirst({
-      where: {
-        phone_number: formattedNumber,
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      phone_number: formattedNumber,
 
-        account_status: {
-          not: "DELETED",
-        },
-
-        deleted_at: null,
+      account_status: {
+        not: "DELETED",
       },
 
-      select: {
-        id: true,
-        account_status: true,
-        deleted_at: true,
-      },
-    });
+      deleted_at: null,
+    },
 
-  const userAlreadyRegister =
-    !!existingUser;
+    select: {
+      id: true,
+      account_status: true,
+      deleted_at: true,
+    },
+  });
+
+  const userAlreadyRegister = !!existingUser;
 
   // =====================================================
   // MSG91 CONFIG
   // =====================================================
 
-  const authKey =
-    process.env.MSG91_AUTH_KEY;
+  const authKey = process.env.MSG91_AUTH_KEY;
 
-  const templateId =
-    process.env.MSG91_TEMPLATE_ID;
+  const templateId = process.env.MSG91_TEMPLATE_ID;
 
   if (!authKey) {
-    throw new Error(
-      "MSG91 auth key is not configured",
-    );
+    throw new Error("MSG91 auth key is not configured");
   }
 
   if (!templateId) {
-    throw new Error(
-      "MSG91 template ID is not configured",
-    );
+    throw new Error("MSG91 template ID is not configured");
   }
 
   // =====================================================
   // SEND REAL OTP THROUGH MSG91
   // =====================================================
 
-  const otpResponse = await new Promise(
-    (resolve, reject) => {
-      const options = {
-        method: "POST",
-        hostname: "control.msg91.com",
-        path: "/api/v5/otp",
+  const otpResponse = await new Promise((resolve, reject) => {
+    const options = {
+      method: "POST",
+      hostname: "control.msg91.com",
+      path: "/api/v5/otp",
 
-        headers: {
-          authkey: authKey,
-          "Content-Type":
-            "application/json",
-        },
-      };
+      headers: {
+        authkey: authKey,
+        "Content-Type": "application/json",
+      },
+    };
 
-      const req = https.request(
-        options,
-        (res) => {
-          let data = "";
+    const req = https.request(options, (res) => {
+      let data = "";
 
-          res.on("data", (chunk) => {
-            data += chunk;
-          });
-
-          res.on("end", () => {
-            console.log(
-              "MSG91 Send OTP Status:",
-              res.statusCode,
-            );
-
-            console.log(
-              "MSG91 Send OTP Response:",
-              data,
-            );
-
-            try {
-              const parsedData =
-                JSON.parse(data);
-
-              if (
-                res.statusCode &&
-                res.statusCode >= 400
-              ) {
-                return reject(
-                  new Error(
-                    parsedData?.message ||
-                      "Failed to send OTP",
-                  ),
-                );
-              }
-
-              resolve(parsedData);
-            } catch {
-              if (
-                res.statusCode &&
-                res.statusCode >= 400
-              ) {
-                return reject(
-                  new Error(data),
-                );
-              }
-
-              resolve(data);
-            }
-          });
-        },
-      );
-
-      req.on("error", (error) => {
-        reject(error);
+      res.on("data", (chunk) => {
+        data += chunk;
       });
 
-      req.write(
-        JSON.stringify({
-          template_id: templateId,
-          mobile,
-          otp_length: 6,
-          otp_expiry: 10,
-        }),
-      );
+      res.on("end", () => {
+        console.log("MSG91 Send OTP Status:", res.statusCode);
 
-      req.end();
-    },
-  );
+        console.log("MSG91 Send OTP Response:", data);
+
+        try {
+          const parsedData = JSON.parse(data);
+
+          if (res.statusCode && res.statusCode >= 400) {
+            return reject(
+              new Error(parsedData?.message || "Failed to send OTP"),
+            );
+          }
+
+          resolve(parsedData);
+        } catch {
+          if (res.statusCode && res.statusCode >= 400) {
+            return reject(new Error(data));
+          }
+
+          resolve(data);
+        }
+      });
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    req.write(
+      JSON.stringify({
+        template_id: templateId,
+        mobile,
+        otp_length: 6,
+        otp_expiry: 10,
+      }),
+    );
+
+    req.end();
+  });
 
   // =====================================================
   // RESPONSE
   // =====================================================
 
   return {
-    ...(typeof otpResponse ===
-      "object" &&
-    otpResponse !== null
+    ...(typeof otpResponse === "object" && otpResponse !== null
       ? otpResponse
       : {
           response: otpResponse,
         }),
 
-    user_already_register:
-      userAlreadyRegister,
+    user_already_register: userAlreadyRegister,
   };
 };
 
@@ -268,64 +207,43 @@ export const verifyOtp = async ({
   otp,
   referralCode,
 }: VerifyOtpParams): Promise<any> => {
-
   // =====================================================
   // VALIDATION
   // =====================================================
 
   if (!phoneNumber || !otp) {
-    throw new Error(
-      "Phone & OTP required",
-    );
+    throw new Error("Phone & OTP required");
   }
 
   // =====================================================
   // NORMALIZE PHONE NUMBER
   // =====================================================
 
-  const cleanedPhone =
-    normalizePhoneNumber(phoneNumber);
+  const cleanedPhone = normalizePhoneNumber(phoneNumber);
 
-  console.log(
-    "Verify OTP Phone:",
-    {
-      received: phoneNumber,
-      normalized: cleanedPhone,
-      msg91Mobile: `91${cleanedPhone}`,
-    },
-  );
+  console.log("Verify OTP Phone:", {
+    received: phoneNumber,
+    normalized: cleanedPhone,
+    msg91Mobile: `91${cleanedPhone}`,
+  });
 
   // Convert OTP to string
-  const enteredOtp =
-    String(otp).trim();
+  const enteredOtp = String(otp).trim();
 
   // =====================================================
   // 1. CHECK HARDCODED OTP FIRST
   // =====================================================
 
-  const hardcodedOtp =
-    process.env.HARDCODED_OTP ||
-    "123456";
+  const hardcodedOtp = process.env.HARDCODED_OTP || "123456";
 
-  if (
-    enteredOtp === hardcodedOtp
-  ) {
-    console.log(
-      "======================================",
-    );
+  if (enteredOtp === hardcodedOtp) {
+    console.log("======================================");
 
-    console.log(
-      "✅ HARDCODED OTP VERIFIED",
-    );
+    console.log("✅ HARDCODED OTP VERIFIED");
 
-    console.log(
-      "Phone:",
-      cleanedPhone,
-    );
+    console.log("Phone:", cleanedPhone);
 
-    console.log(
-      "======================================",
-    );
+    console.log("======================================");
 
     return await handleVerifiedUser({
       phoneNumber: cleanedPhone,
@@ -337,17 +255,13 @@ export const verifyOtp = async ({
   // 2. VERIFY THROUGH MSG91
   // =====================================================
 
-  const authKey =
-    process.env.MSG91_AUTH_KEY;
+  const authKey = process.env.MSG91_AUTH_KEY;
 
   if (!authKey) {
-    throw new Error(
-      "MSG91 auth key is not configured",
-    );
+    throw new Error("MSG91 auth key is not configured");
   }
 
-  const mobile =
-    `91${cleanedPhone}`;
+  const mobile = `91${cleanedPhone}`;
 
   const path =
     `/api/v5/otp/verify` +
@@ -368,107 +282,54 @@ export const verifyOtp = async ({
   // CALL MSG91 VERIFY API
   // =====================================================
 
-  return new Promise(
-    (resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      const chunks: Buffer[] = [];
 
-      const req = https.request(
-        options,
-        (res) => {
+      res.on("data", (chunk) => {
+        chunks.push(chunk);
+      });
 
-          const chunks: Buffer[] = [];
+      res.on("end", async () => {
+        const body = Buffer.concat(chunks).toString();
 
-          res.on(
-            "data",
-            (chunk) => {
-              chunks.push(chunk);
-            },
-          );
+        try {
+          const msg91Response = JSON.parse(body);
 
-          res.on(
-            "end",
-            async () => {
+          console.log("MSG91 Verify OTP Status:", res.statusCode);
 
-              const body =
-                Buffer.concat(
-                  chunks,
-                ).toString();
+          console.log("MSG91 Verify OTP Response:", msg91Response);
 
-              try {
+          if (res.statusCode && res.statusCode >= 400) {
+            return reject(
+              new Error(msg91Response?.message || "OTP verification failed"),
+            );
+          }
 
-                const msg91Response =
-                  JSON.parse(body);
+          if (msg91Response?.type !== "success") {
+            return reject(new Error(msg91Response?.message || "Invalid OTP"));
+          }
 
-                console.log(
-                  "MSG91 Verify OTP Status:",
-                  res.statusCode,
-                );
+          console.log("✅ MSG91 OTP VERIFIED");
 
-                console.log(
-                  "MSG91 Verify OTP Response:",
-                  msg91Response,
-                );
+          const result = await handleVerifiedUser({
+            phoneNumber: cleanedPhone,
+            referralCode,
+          });
 
-                if (
-                  res.statusCode &&
-                  res.statusCode >= 400
-                ) {
-                  return reject(
-                    new Error(
-                      msg91Response?.message ||
-                      "OTP verification failed",
-                    ),
-                  );
-                }
+          resolve(result);
+        } catch (error: any) {
+          reject(new Error(error?.message || "Invalid response from MSG91"));
+        }
+      });
+    });
 
-                if (
-                  msg91Response?.type !==
-                  "success"
-                ) {
-                  return reject(
-                    new Error(
-                      msg91Response?.message ||
-                      "Invalid OTP",
-                    ),
-                  );
-                }
+    req.on("error", (error) => {
+      reject(error);
+    });
 
-                console.log(
-                  "✅ MSG91 OTP VERIFIED",
-                );
-
-                const result =
-                  await handleVerifiedUser({
-                    phoneNumber:
-                      cleanedPhone,
-                    referralCode,
-                  });
-
-                resolve(result);
-
-              } catch (error: any) {
-
-                reject(
-                  new Error(
-                    error?.message ||
-                    "Invalid response from MSG91",
-                  ),
-                );
-              }
-            },
-          );
-        },
-      );
-
-      req.on(
-        "error",
-        (error) => {
-          reject(error);
-        },
-      );
-
-      req.end();
-    },
-  );
+    req.end();
+  });
 };
 
 /* =========================================================
@@ -520,486 +381,433 @@ const handleVerifiedUser = async ({
   // FORMAT PHONE
   // =====================================================
 
-  const formattedNumber =
-    `+91${phoneNumber}`;
+  const formattedNumber = `+91${phoneNumber}`;
 
   // =====================================================
   // USER TRANSACTION
   // =====================================================
 
-  const result =
-    await prisma.$transaction(
-      async (tx) => {
-        // =================================================
-        // FIND EXISTING USER
-        // =================================================
-
-        const existingUser =
-          await tx.user.findFirst({
-            where: {
-              phone_number:
-                formattedNumber,
-
-              account_status: {
-                not: "DELETED",
-              },
-
-              deleted_at: null,
-            },
-          });
-
-        // =================================================
-        // EXISTING USER
-        // =================================================
-
-        if (existingUser) {
-          isRegister = false;
-
-          // ===============================================
-          // MARK PHONE VERIFIED
-          // ===============================================
-
-          await tx.user.update({
-            where: {
-              id: existingUser.id,
-            },
-
-            data: {
-              is_phone_verified:
-                true,
-            },
-          });
-
-          // ===============================================
-          // GET COMPLETE USER
-          // ===============================================
-
-          const userData =
-            await tx.user.findUnique({
-              where: {
-                id: existingUser.id,
-              },
-
-              select: userSelect,
-            });
-
-          return userData;
-        }
-
-        // =================================================
-        // NEW USER
-        // =================================================
-
-        isRegister = true;
-
-        // =================================================
-        // REFERRAL VALIDATION
-        // =================================================
-
-        let referrer: {
-          id: string;
-        } | null = null;
-
-        if (referralCode) {
-          const normalizedReferralCode =
-            referralCode
-              .trim()
-              .toUpperCase();
-
-          referrer =
-            await tx.user.findFirst({
-              where: {
-                referralCode:
-                  normalizedReferralCode,
-
-                deleted_at: null,
-              },
-
-              select: {
-                id: true,
-              },
-            });
-
-          if (!referrer) {
-            throw new Error(
-              "Invalid referral code.",
-            );
-          }
-        }
-
-        // =================================================
-        // GENERATE REFERRAL CODE
-        // =================================================
-
-        const myReferralCode =
-          await generateReferralCode(
-            tx,
-          );
-
-        // =================================================
-        // ONBOARDING
-        // =================================================
-
-        const onboardingStep =
-          "VERIFY_PHONE";
-
-        const nextStep =
-          getNextStep(
-            onboardingStep,
-          );
-
-        // =================================================
-        // CREATE USER
-        // =================================================
-
-        const newUser =
-          await tx.user.create({
-            data: {
-              phone_number:
-                formattedNumber,
-
-              is_phone_verified:
-                true,
-
-              referralCode:
-                myReferralCode,
-
-              onboarding_step:
-                onboardingStep,
-
-              next_step: nextStep,
-
-              onboarding_completed:
-                false,
-            },
-          });
-
-        // =================================================
-        // INITIAL DATA
-        // =================================================
-
-        const now =
-          new Date();
-
-        const nextWeek =
-          new Date(now);
-
-        nextWeek.setDate(
-          nextWeek.getDate() + 7,
-        );
-
-        // =================================================
-        // WALLET
-        // =================================================
-
-        await tx.wallet.create({
-          data: {
-            userId: newUser.id,
-            balance: 0,
-          },
-        });
-
-        // =================================================
-        // DATE PLAN STATS
-        // =================================================
-
-        await tx.datePlanUserStats.create({
-          data: {
-            userId:
-              newUser.id,
-
-            totalDatePlan: 0,
-
-            balance: 0,
-
-            purchasedDataPlan: 0,
-
-            weeklyLimit: 0,
-
-            totalDetePlanUsed: 0,
-
-            lastResetAt:
-              now,
-
-            nextResetAt:
-              nextWeek,
-          },
-        });
-
-        // =================================================
-        // ROSE BALANCE
-        // =================================================
-
-        await tx.userRoseBalance.create({
-          data: {
-            userId:
-              newUser.id,
-
-            totalRoses: 0,
-
-            freeRoses: 0,
-
-            purchasedRoses: 0,
-
-            weeklyLimit: 0,
-
-            totalRosesSent: 0,
-
-            lastResetAt:
-              now,
-
-            nextResetAt:
-              nextWeek,
-          },
-        });
-
-        // =================================================
-        // COMPLIMENT BALANCE
-        // =================================================
-
-        await tx.userComplimentBalance.create({
-          data: {
-            userId:
-              newUser.id,
-
-            totalCompliments:
-              0,
-
-            freeCompliments:
-              0,
-
-            purchasedCompliments:
-              0,
-
-            weeklyLimit:
-              0,
-
-            totalComplimentsSent:
-              0,
-
-            lastResetAt:
-              now,
-
-            nextResetAt:
-              nextWeek,
-          },
-        });
-
-        // =================================================
-        // BOOST
-        // =================================================
-
-        // await tx.userBoost.create({
-        //   data: {
-        //     user_id:
-        //       newUser.id,
-
-        //     total_boosts:
-        //       0,
-
-        //     remaining_boosts:
-        //       0,
-
-        //     weeklyLimit:
-        //       0,
-
-        //     last_reset_at:
-        //       now,
-
-        //     next_reset_at:
-        //       nextWeek,
-
-        //     start_at:
-        //       now,
-
-        //     is_active:
-        //       true,
-        //   },
-        // });
-
-        // =================================================
-        // REFERRAL
-        // =================================================
-
-        if (referrer) {
-          // ===============================================
-          // PREVENT SELF REFERRAL
-          // ===============================================
-
-          if (
-            referrer.id ===
-            newUser.id
-          ) {
-            throw new Error(
-              "You cannot use your own referral code.",
-            );
-          }
-
-          // ===============================================
-          // CHECK ALREADY REFERRED
-          // ===============================================
-
-          const alreadyReferred =
-            await tx.userReferral.findUnique(
-              {
-                where: {
-                  referredUserId:
-                    newUser.id,
-                },
-              },
-            );
-
-          if (
-            alreadyReferred
-          ) {
-            throw new Error(
-              "Referral code has already been applied.",
-            );
-          }
-
-          // ===============================================
-          // PREVENT REFERRAL LOOP
-          // ===============================================
-
-          const reverseReferral =
-            await tx.userReferral.findFirst(
-              {
-                where: {
-                  referrerId:
-                    newUser.id,
-
-                  referredUserId:
-                    referrer.id,
-                },
-              },
-            );
-
-          if (
-            reverseReferral
-          ) {
-            throw new Error(
-              "Referral cannot be applied because you have already referred this user.",
-            );
-          }
-
-          // ===============================================
-          // CREATE REFERRAL
-          // ===============================================
-
-          await tx.userReferral.create({
-            data: {
-              referrerId:
-                referrer.id,
-
-              referredUserId:
-                newUser.id,
-
-              status:
-                "PENDING",
-            },
-          });
-
-          // ===============================================
-          // UPDATE REFERRAL STATS
-          // ===============================================
-
-          await tx.userReferralStats.upsert(
-            {
-              where: {
-                userId:
-                  referrer.id,
-              },
-
-              update: {
-                totalInvites: {
-                  increment: 1,
-                },
-
-                pendingRewards: {
-                  increment: 1,
-                },
-              },
-
-              create: {
-                userId:
-                  referrer.id,
-
-                totalInvites:
-                  1,
-
-                pendingRewards:
-                  1,
-              },
-            },
-          );
-        }
-
-        // =================================================
-        // GET COMPLETE NEW USER
-        // =================================================
-
-        const userData =
-          await tx.user.findUnique({
-            where: {
-              id: newUser.id,
-            },
-
-            select: userSelect,
-          });
-
-        return userData;
+  const result = await prisma.$transaction(async (tx) => {
+    // =================================================
+    // FIND EXISTING USER
+    // =================================================
+
+    const existingUser = await tx.user.findFirst({
+      where: {
+        phone_number: formattedNumber,
+
+        account_status: {
+          not: "DELETED",
+        },
+
+        deleted_at: null,
       },
-    );
+    });
+
+    // =================================================
+    // EXISTING USER
+    // =================================================
+
+    if (existingUser) {
+      isRegister = false;
+
+      // ===============================================
+      // MARK PHONE VERIFIED
+      // ===============================================
+
+      await tx.user.update({
+        where: {
+          id: existingUser.id,
+        },
+
+        data: {
+          is_phone_verified: true,
+        },
+      });
+
+      // ===============================================
+      // GET COMPLETE USER
+      // ===============================================
+
+      const userData = await tx.user.findUnique({
+        where: {
+          id: existingUser.id,
+        },
+
+        select: userSelect,
+      });
+
+      return userData;
+    }
+
+    // =================================================
+    // NEW USER
+    // =================================================
+
+    isRegister = true;
+
+    // =================================================
+    // REFERRAL VALIDATION
+    // =================================================
+
+    let referrer: {
+      id: string;
+    } | null = null;
+
+    if (referralCode) {
+      const normalizedReferralCode = referralCode.trim().toUpperCase();
+
+      referrer = await tx.user.findFirst({
+        where: {
+          referralCode: normalizedReferralCode,
+
+          deleted_at: null,
+        },
+
+        select: {
+          id: true,
+        },
+      });
+
+      if (!referrer) {
+        throw new Error("Invalid referral code.");
+      }
+    }
+
+    // =================================================
+    // GENERATE REFERRAL CODE
+    // =================================================
+
+    const myReferralCode = await generateReferralCode(tx);
+
+    // =================================================
+    // ONBOARDING
+    // =================================================
+
+    const onboardingStep = "VERIFY_PHONE";
+
+    const nextStep = getNextStep(onboardingStep);
+
+    // =================================================
+    // CREATE USER
+    // =================================================
+
+    const newUser = await tx.user.create({
+      data: {
+        phone_number: formattedNumber,
+
+        is_phone_verified: true,
+
+        referralCode: myReferralCode,
+
+        onboarding_step: onboardingStep,
+
+        next_step: nextStep,
+
+        onboarding_completed: false,
+      },
+    });
+
+    // =================================================
+    // INITIAL DATA
+    // =================================================
+
+    const now = new Date();
+
+    const nextWeek = new Date(now);
+
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    // =================================================
+    // WALLET
+    // =================================================
+
+    await tx.wallet.create({
+      data: {
+        userId: newUser.id,
+        balance: 0,
+      },
+    });
+
+    // =================================================
+    // DATE PLAN STATS
+    // =================================================
+
+    await tx.datePlanUserStats.create({
+      data: {
+        userId: newUser.id,
+
+        totalDatePlan: 0,
+
+        balance: 0,
+
+        purchasedDataPlan: 0,
+
+        weeklyLimit: 0,
+
+        totalDetePlanUsed: 0,
+
+        lastResetAt: now,
+
+        nextResetAt: nextWeek,
+      },
+    });
+
+    // =================================================
+    // ROSE BALANCE
+    // =================================================
+
+    await tx.userRoseBalance.create({
+      data: {
+        userId: newUser.id,
+
+        totalRoses: 0,
+
+        freeRoses: 0,
+
+        purchasedRoses: 0,
+
+        weeklyLimit: 0,
+
+        totalRosesSent: 0,
+
+        lastResetAt: now,
+
+        nextResetAt: nextWeek,
+      },
+    });
+
+    // =================================================
+    // COMPLIMENT BALANCE
+    // =================================================
+
+    await tx.userComplimentBalance.create({
+      data: {
+        userId: newUser.id,
+
+        totalCompliments: 0,
+
+        freeCompliments: 0,
+
+        purchasedCompliments: 0,
+
+        weeklyLimit: 0,
+
+        totalComplimentsSent: 0,
+
+        lastResetAt: now,
+
+        nextResetAt: nextWeek,
+      },
+    });
+
+    // =================================================
+    // BOOST
+    // =================================================
+
+    // await tx.userBoost.create({
+    //   data: {
+    //     user_id:
+    //       newUser.id,
+
+    //     total_boosts:
+    //       0,
+
+    //     remaining_boosts:
+    //       0,
+
+    //     weeklyLimit:
+    //       0,
+
+    //     last_reset_at:
+    //       now,
+
+    //     next_reset_at:
+    //       nextWeek,
+
+    //     start_at:
+    //       now,
+
+    //     is_active:
+    //       true,
+    //   },
+    // });
+
+    // =================================================
+    // REFERRAL
+    // =================================================
+
+    if (referralCode?.trim()) {
+      await applyReferralReward(tx, newUser.id, referralCode);
+    }
+
+    // if (referrer) {
+    //   // ===============================================
+    //   // PREVENT SELF REFERRAL
+    //   // ===============================================
+
+    //   if (
+    //     referrer.id ===
+    //     newUser.id
+    //   ) {
+    //     throw new Error(
+    //       "You cannot use your own referral code.",
+    //     );
+    //   }
+
+    //   // ===============================================
+    //   // CHECK ALREADY REFERRED
+    //   // ===============================================
+
+    //   const alreadyReferred =
+    //     await tx.userReferral.findUnique(
+    //       {
+    //         where: {
+    //           referredUserId:
+    //             newUser.id,
+    //         },
+    //       },
+    //     );
+
+    //   if (
+    //     alreadyReferred
+    //   ) {
+    //     throw new Error(
+    //       "Referral code has already been applied.",
+    //     );
+    //   }
+
+    //   // ===============================================
+    //   // PREVENT REFERRAL LOOP
+    //   // ===============================================
+
+    //   const reverseReferral =
+    //     await tx.userReferral.findFirst(
+    //       {
+    //         where: {
+    //           referrerId:
+    //             newUser.id,
+
+    //           referredUserId:
+    //             referrer.id,
+    //         },
+    //       },
+    //     );
+
+    //   if (
+    //     reverseReferral
+    //   ) {
+    //     throw new Error(
+    //       "Referral cannot be applied because you have already referred this user.",
+    //     );
+    //   }
+
+    //   // ===============================================
+    //   // CREATE REFERRAL
+    //   // ===============================================
+
+    //   await tx.userReferral.create({
+    //     data: {
+    //       referrerId:
+    //         referrer.id,
+
+    //       referredUserId:
+    //         newUser.id,
+
+    //       status:
+    //         "PENDING",
+    //     },
+    //   });
+
+    //   // ===============================================
+    //   // UPDATE REFERRAL STATS
+    //   // ===============================================
+
+    //   await tx.userReferralStats.upsert(
+    //     {
+    //       where: {
+    //         userId:
+    //           referrer.id,
+    //       },
+
+    //       update: {
+    //         totalInvites: {
+    //           increment: 1,
+    //         },
+
+    //         pendingRewards: {
+    //           increment: 1,
+    //         },
+    //       },
+
+    //       create: {
+    //         userId:
+    //           referrer.id,
+
+    //         totalInvites:
+    //           1,
+
+    //         pendingRewards:
+    //           1,
+    //       },
+    //     },
+    //   );
+    // }
+
+    // =================================================
+    // GET COMPLETE NEW USER
+    // =================================================
+
+    const userData = await tx.user.findUnique({
+      where: {
+        id: newUser.id,
+      },
+
+      select: userSelect,
+    });
+
+    return userData;
+  });
 
   // =====================================================
   // VALIDATE USER
   // =====================================================
 
   if (!result) {
-    throw new Error(
-      "Unable to retrieve user",
-    );
+    throw new Error("Unable to retrieve user");
   }
 
   // =====================================================
   // JWT CONFIG
   // =====================================================
 
-  const jwtSecret =
-    process.env.JWT_SECRET;
+  const jwtSecret = process.env.JWT_SECRET;
 
   if (!jwtSecret) {
-    throw new Error(
-      "JWT_SECRET is not configured",
-    );
+    throw new Error("JWT_SECRET is not configured");
   }
 
   // =====================================================
   // CREATE SESSION EXPIRY
   // =====================================================
 
-  const sessionExpiry =
-    new Date();
+  const sessionExpiry = new Date();
 
-  sessionExpiry.setDate(
-    sessionExpiry.getDate() + 30,
-  );
+  sessionExpiry.setDate(sessionExpiry.getDate() + 30);
 
   // =====================================================
   // CREATE USER SESSION
   // =====================================================
 
-  const session =
-    await prisma.userSession.create({
-      data: {
-        userId: result.id,
+  const session = await prisma.userSession.create({
+    data: {
+      userId: result.id,
 
-        isActive: true,
+      isActive: true,
 
-        expiresAt:
-          sessionExpiry,
-      },
-    });
+      expiresAt: sessionExpiry,
+    },
+  });
 
   // =====================================================
   // CREATE JWT
@@ -1027,15 +835,11 @@ const handleVerifiedUser = async ({
 
     token,
 
-    is_register:
-      isRegister,
+    is_register: isRegister,
 
-    account_status:
-      result.account_status,
+    account_status: result.account_status,
 
-    is_account_paused:
-      result.account_status ===
-      "PAUSED",
+    is_account_paused: result.account_status === "PAUSED",
   };
 };
 
@@ -1043,27 +847,21 @@ const handleVerifiedUser = async ({
    LOGOUT
 ========================================================= */
 
-export const logoutService = async (
-  userId: string,
-  sessionId: string,
-) => {
+export const logoutService = async (userId: string, sessionId: string) => {
   // =====================================================
   // FIND ACTIVE SESSION
   // =====================================================
 
-  const session =
-    await prisma.userSession.findFirst({
-      where: {
-        id: sessionId,
-        userId,
-        isActive: true,
-      },
-    });
+  const session = await prisma.userSession.findFirst({
+    where: {
+      id: sessionId,
+      userId,
+      isActive: true,
+    },
+  });
 
   if (!session) {
-    throw new Error(
-      "Session not found or already logged out",
-    );
+    throw new Error("Session not found or already logged out");
   }
 
   // =====================================================
@@ -1082,26 +880,15 @@ export const logoutService = async (
   });
 
   return {
-    message:
-      "Logged out successfully",
+    message: "Logged out successfully",
   };
 };
-
-
-
-
-
-
-
-
 
 // import https from "https";
 // import jwt from "jsonwebtoken";
 // import { prisma } from "../../../prisma/prismaClient";
 // import { generateReferralCode } from "../../../utils/referral";
 // import { getNextStep } from "../../../utils/onboardingFlows";
-
-
 
 // /* =========================================================
 //    MSG91 SEND OTP
@@ -1391,7 +1178,6 @@ export const logoutService = async (
 //   });
 // };
 
-
 // /* =========================================================
 //    USER SELECTION
 // ========================================================= */
@@ -1421,7 +1207,6 @@ export const logoutService = async (
 //     },
 //   },
 // };
-
 
 // /* =========================================================
 //    AFTER OTP VERIFIED
@@ -1497,7 +1282,6 @@ export const logoutService = async (
 //   return userData;
 // }
 
-
 //       /*
 //        * =====================================================
 //        * NEW USER
@@ -1505,7 +1289,6 @@ export const logoutService = async (
 //        */
 
 //       isRegister = true;
-
 
 //       /*
 //        * =====================================================
@@ -1538,7 +1321,6 @@ export const logoutService = async (
 //         }
 //       }
 
-
 //       /*
 //        * =====================================================
 //        * GENERATE NEW USER REFERRAL CODE
@@ -1547,7 +1329,6 @@ export const logoutService = async (
 
 //       const myReferralCode =
 //         await generateReferralCode(tx);
-
 
 //       /*
 //        * =====================================================
@@ -1569,7 +1350,6 @@ export const logoutService = async (
 //         },
 //       });
 
-
 //       /*
 //        * =====================================================
 //        * INITIALIZE BALANCES / STATS
@@ -1583,7 +1363,6 @@ export const logoutService = async (
 //       nextWeek.setDate(
 //         nextWeek.getDate() + 7,
 //       );
-
 
 //       /*
 //        * Create all initial records
@@ -1601,7 +1380,6 @@ export const logoutService = async (
 //         },
 //       });
 
-
 //       await tx.datePlanUserStats.create({
 //         data: {
 //           userId: newUser.id,
@@ -1615,7 +1393,6 @@ export const logoutService = async (
 //         },
 //       });
 
-
 //       await tx.userRoseBalance.create({
 //         data: {
 //           userId: newUser.id,
@@ -1628,7 +1405,6 @@ export const logoutService = async (
 //           nextResetAt: nextWeek,
 //         },
 //       });
-
 
 //       await tx.userComplimentBalance.create({
 //         data: {
@@ -1660,7 +1436,6 @@ export const logoutService = async (
 //           );
 //         }
 
-
 //         /*
 //          * Check whether already referred
 //          */
@@ -1676,7 +1451,6 @@ export const logoutService = async (
 //             "Referral code has already been applied.",
 //           );
 //         }
-
 
 //         /*
 //          * Prevent referral loop
@@ -1695,7 +1469,6 @@ export const logoutService = async (
 //           );
 //         }
 
-
 //         /*
 //          * Create referral
 //          */
@@ -1706,7 +1479,6 @@ export const logoutService = async (
 //             status: "PENDING",
 //           },
 //         });
-
 
 //         /*
 //          * Update referral statistics
@@ -1734,7 +1506,6 @@ export const logoutService = async (
 //         });
 //       }
 
-
 //       /*
 //        * =====================================================
 //        * FETCH COMPLETE USER
@@ -1751,7 +1522,6 @@ export const logoutService = async (
 //       return userData;
 //     },
 //   );
-
 
 //   /*
 //    * =======================================================
