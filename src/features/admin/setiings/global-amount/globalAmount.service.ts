@@ -43,6 +43,10 @@ export const createGlobalAmountService = async (
         gst: data.gst,
         eventPlatformFee:
           data.eventPlatformFee,
+          freeProfileLimit: data.freeProfileLimit,
+premiumProfileLimit: data.premiumProfileLimit,
+vipProfileLimit: data.vipProfileLimit,
+vipEliteProfileLimit: data.vipEliteProfileLimit,
       },
     });
 

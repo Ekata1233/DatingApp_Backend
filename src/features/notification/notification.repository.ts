@@ -1,8 +1,29 @@
 // Working on this file: src/features/notification/notification.repository.ts
 
-import { NotificationType } from "@prisma/client";
+import { NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
+const buildNotificationWhere = (
+  userId: string,
+  types?: NotificationType[],
+  unreadOnly = false,
+): Prisma.NotificationWhereInput => {
+  return {
+    receiver_id: userId,
 
+    // Always exclude chat message notifications
+    type: {
+      not: NotificationType.NEW_MESSAGE,
+
+      ...(types && types.length > 0
+        ? { in: types }
+        : {}),
+    },
+
+    ...(unreadOnly
+      ? { is_read: false }
+      : {}),
+  };
+};
 export const getNotificationsRepository = async (
   userId: string,
   skip: number,
@@ -10,17 +31,10 @@ export const getNotificationsRepository = async (
   types?: NotificationType[],
 ) => {
   return prisma.notification.findMany({
-    where: {
-      receiver_id: userId,
-
-     // Exclude message notifications
-      type: {
-        not: "NEW_MESSAGE",
-        ...(types && types.length > 0
-          ? { in: types }
-          : {}),
-      },
-    },
+    where: buildNotificationWhere(
+      userId,
+      types,
+    ),
 
     include: {
       sender: {
@@ -43,9 +57,10 @@ export const getNotificationsRepository = async (
       },
     },
 
-    orderBy: {
-      created_at: "desc",
-    },
+    orderBy: [
+      { created_at: "desc" },
+      { id: "desc" },
+    ],
 
     skip,
     take,
@@ -57,17 +72,10 @@ export const getNotificationCountRepository = async (
   types?: NotificationType[],
 ) => {
   return prisma.notification.count({
-    where: {
-      receiver_id: userId,
-
-      ...(types && types.length > 0
-          ? {
-              type: {
-                in: types,
-              },
-            }
-          : {}),
-      },
+    where: buildNotificationWhere(
+      userId,
+      types,
+    ),
   });
 };
 
@@ -76,17 +84,11 @@ export const getUnreadNotificationCountRepository = async (
   types?: NotificationType[],
 ) => {
   return prisma.notification.count({
-    where: {
-      receiver_id: userId,
-      is_read: false,
-       ...(types && types.length > 0
-          ? {
-              type: {
-                in: types,
-              },
-            }
-          : {}),
-    },
+    where: buildNotificationWhere(
+      userId,
+      types,
+      true,
+    ),
   });
 };
 
@@ -121,10 +123,11 @@ export const markAllNotificationsReadRepository = async (
   userId: string,
 ) => {
   return prisma.notification.updateMany({
-    where: {
-      receiver_id: userId,
-      is_read: false,
-    },
+    where: buildNotificationWhere(
+      userId,
+      undefined,
+      true,
+    ),
 
     data: {
       is_read: true,
