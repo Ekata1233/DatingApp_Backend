@@ -11,19 +11,12 @@ async findDatePlanById(
 
     include: {
       user: true,
-
       activity: true,
-
       quickTitle: true,
-
       whoPays: true,
-
       joinRequestGender: true,
-
       visibility: true,
-
       vibes: true,
-
       _count: {
         select: {
           requests: true,

@@ -151,8 +151,8 @@ const ALL_ORIENTATIONS = [
 const NEW_USER_BOOST_HOURS = 48;
 const DEFAULT_PAGE_LIMIT = 25;
 
-const FREE_DAILY_PROFILE_LIMIT = 5;
-const PAID_DAILY_PROFILE_LIMIT = 25;
+// const FREE_DAILY_PROFILE_LIMIT = 5;
+// const PAID_DAILY_PROFILE_LIMIT = 25;
 
 const FREE_LOCKED_PROFILE_COUNT = 20;
 const LOCKED_PREVIEW_COUNT = 3;
@@ -390,16 +390,74 @@ export const getFeedService = async ({
   });
 
   const hasActiveFeedPackage = !!activeFeedPackage;
-
   const isFreeUser = !hasActiveFeedPackage;
 
-  const dailyProfileLimit = isFreeUser
-    ? FREE_DAILY_PROFILE_LIMIT
-    : PAID_DAILY_PROFILE_LIMIT;
+  // ==========================================
+  // GET DYNAMIC PROFILE LIMITS FROM ADMIN
+  // ==========================================
 
-  const pageLimit = isFreeUser
-    ? PAID_DAILY_PROFILE_LIMIT
-    : Math.min(requestedLimit, PAID_DAILY_PROFILE_LIMIT);
+  const globalAmount = await prisma.globalAmount.findFirst({
+    select: {
+      freeProfileLimit: true,
+      premiumProfileLimit: true,
+      vipProfileLimit: true,
+      vipEliteProfileLimit: true,
+    },
+  });
+
+  if (!globalAmount) {
+    throw new Error("Global profile limit configuration not found");
+  }
+
+  const activePackageName = activeFeedPackage?.package?.name ?? "FREE";
+
+  // ==========================================
+  // PACKAGE BASED DAILY LIMIT
+  // ==========================================
+
+  let dailyProfileLimit: number;
+
+  switch (activePackageName) {
+    case "PREMIUM":
+      dailyProfileLimit = globalAmount.premiumProfileLimit;
+      break;
+
+    case "VIP":
+      dailyProfileLimit = globalAmount.vipProfileLimit;
+      break;
+
+    case "VIP_ELITE":
+      dailyProfileLimit = globalAmount.vipEliteProfileLimit;
+      break;
+
+    default:
+      dailyProfileLimit = globalAmount.freeProfileLimit;
+      break;
+  }
+
+  // ==========================================
+  // PAGE LIMIT
+  // ==========================================
+
+const pageLimit = isFreeUser
+  ? Math.max(
+      dailyProfileLimit + FREE_LOCKED_PROFILE_COUNT,
+      1,
+    )
+  : Math.max(
+      1,
+      Math.min(
+        requestedLimit,
+        dailyProfileLimit,
+      ),
+    );
+
+  console.log("DYNAMIC FEED PROFILE LIMIT:", {
+    userId,
+    package: activePackageName,
+    dailyProfileLimit,
+    pageLimit,
+  });
 
   // ==========================================
   // TODAY'S DATE (INDIA TIMEZONE)
@@ -1700,15 +1758,33 @@ export const getFeedService = async ({
   // STILL NO USERS
   // ========================================================
 
-  if (collected.length === 0) {
-    return {
-      users: [],
+if (collected.length === 0) {
+  return {
+    users: [],
+    nextCursor: null,
+    locationFallbackUsed,
 
-      nextCursor: null,
+    dailyLimit: {
+      plan: activePackageName,
+      limit: dailyProfileLimit,
+      seen: seenToday,
+      remaining: remainingToday,
+      resetAt: new Date(
+        viewDate.getTime() +
+          24 * 60 * 60 * 1000 -
+          330 * 60 * 1000,
+      ).toISOString(),
+    },
 
-      locationFallbackUsed,
-    };
-  }
+    upgradeGate: {
+      show: false,
+      lockedCount: 0,
+      title: null,
+      subtitle: null,
+      lockedProfiles: [],
+    },
+  };
+}
 
   // ========================================================
   // PAGE
@@ -2130,25 +2206,11 @@ export const getFeedService = async ({
 
   let lockedUsers: typeof sortedUsers = [];
 
+  // All packages follow their configured daily limit
+  visibleUsers = sortedUsers.slice(0, remainingToday);
+
+  // Locked profiles only for FREE users
   if (isFreeUser) {
-    /**
-     * IMPORTANT:
-     *
-     * Daily quota is consumed ONLY after:
-     *
-     * LIKE
-     * PASS
-     * SUPERLIKE
-     *
-     * Fetching /feed does NOT consume quota.
-     */
-
-    visibleUsers = sortedUsers.slice(0, remainingToday);
-
-    /**
-     * Everything after the remaining
-     * Free allowance is locked.
-     */
     lockedUsers = sortedUsers.slice(remainingToday);
   }
 
@@ -2231,33 +2293,27 @@ export const getFeedService = async ({
      * Free user should not paginate
      * beyond today's allowance.
      */
-    nextCursor: isFreeUser ? null : nextCursor,
-
+    nextCursor: remainingToday <= visibleUsers.length ? null : nextCursor,
     locationFallbackUsed,
 
     dailyLimit: {
-      plan: isFreeUser ? "FREE" : (activeVipPackage?.package?.name ?? "PAID"),
-
+      plan: activePackageName,
       limit: dailyProfileLimit,
-
       seen: finalSeenToday,
-
       remaining: finalRemainingToday,
-
-      resetAt: tomorrowStart.toISOString(),
-    },
+resetAt: new Date(
+  viewDate.getTime() +
+    24 * 60 * 60 * 1000 -
+    330 * 60 * 1000,
+).toISOString(),    },
 
     upgradeGate: {
       show: showUpgradeGate,
-
       lockedCount,
-
       title: showUpgradeGate ? "Your best matches are just behind this" : null,
-
       subtitle: showUpgradeGate
         ? `${lockedCount} more verified profiles picked for you today — upgrade to unlock more.`
         : null,
-
       lockedProfiles: showUpgradeGate ? lockedPreviews : [],
     },
   };

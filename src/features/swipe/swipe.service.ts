@@ -368,7 +368,6 @@ import { recordDailyFeedView } from "./swipe.helper";
 //   };
 // };
 
-
 const saveOrUpdateSwipe = async (
   tx: Prisma.TransactionClient,
   swiperId: string,
@@ -385,10 +384,16 @@ const saveOrUpdateSwipe = async (
   });
 
   if (existing) {
+    // Same action -> return success without updating DB
     if (existing.action === action) {
-      throw new Error("Already swiped on this user");
+      return {
+        updated: false,
+        alreadyExists: true,
+        previousAction: existing.action,
+      };
     }
 
+    // Different action -> update existing swipe
     await tx.userSwipe.update({
       where: {
         swiperId_targetUserId: {
@@ -403,10 +408,12 @@ const saveOrUpdateSwipe = async (
 
     return {
       updated: true,
+      alreadyExists: false,
       previousAction: existing.action,
     };
   }
 
+  // First swipe -> create new record
   await tx.userSwipe.create({
     data: {
       swiperId,
@@ -417,6 +424,7 @@ const saveOrUpdateSwipe = async (
 
   return {
     updated: false,
+    alreadyExists: false,
     previousAction: null,
   };
 };
@@ -445,11 +453,7 @@ export const handleSwipe = async (data: {
         action,
       );
 
-      await recordDailyFeedView(
-        tx,
-        swiperId,
-        targetUserId,
-      );
+      await recordDailyFeedView(tx, swiperId, targetUserId);
 
       // --------------------------------------------------------
       // PASS: remove existing match if present
@@ -501,8 +505,7 @@ export const handleSwipe = async (data: {
       });
 
       const reverse =
-        reverseSwipe?.action === "LIKE" ||
-        reverseSwipe?.action === "SUPERLIKE";
+        reverseSwipe?.action === "LIKE" || reverseSwipe?.action === "SUPERLIKE";
 
       if (!reverse) {
         return {
@@ -556,8 +559,7 @@ export const handleSwipe = async (data: {
       };
     },
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
 
@@ -573,10 +575,7 @@ export const handleSwipe = async (data: {
     // Replace with your actual Redis invalidation helper.
     // Do not call cacheSwipe() if it caches all swipes as likes.
   } else {
-    cacheSwipe(
-      swiperId,
-      targetUserId,
-    ).catch(console.error);
+    cacheSwipe(swiperId, targetUserId).catch(console.error);
   }
 
   // ============================================================
@@ -606,10 +605,7 @@ export const handleSwipe = async (data: {
     trackBoostEvent({
       targetUserId,
       actorId: swiperId,
-      type:
-        action === "SUPERLIKE"
-          ? "SUPERLIKE"
-          : "LIKE",
+      type: action === "SUPERLIKE" ? "SUPERLIKE" : "LIKE",
     }).catch(console.error);
 
     createNotification({
@@ -619,10 +615,7 @@ export const handleSwipe = async (data: {
         action === "SUPERLIKE"
           ? NotificationType.SUPER_LIKE
           : NotificationType.NEW_LIKE,
-      title:
-        action === "SUPERLIKE"
-          ? "New Super Like ⭐"
-          : "New Like ❤️",
+      title: action === "SUPERLIKE" ? "New Super Like ⭐" : "New Like ❤️",
       message:
         action === "SUPERLIKE"
           ? "Someone super liked your profile ⭐"
@@ -742,14 +735,12 @@ export const handleSwipe = async (data: {
       users: {
         me: {
           userId: swiperId,
-          profilePhoto:
-            swiperPhoto?.media_url ?? null,
+          profilePhoto: swiperPhoto?.media_url ?? null,
         },
 
         matchedUser: {
           userId: targetUserId,
-          profilePhoto:
-            targetPhoto?.media_url ?? null,
+          profilePhoto: targetPhoto?.media_url ?? null,
         },
       },
     },
