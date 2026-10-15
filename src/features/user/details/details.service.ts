@@ -101,7 +101,6 @@ export const getUserDetailsService = async (userId: string) => {
           is_primary: "desc", // primary photo first
         },
       },
-
     },
   });
 
@@ -127,19 +126,13 @@ const getAge = (birthDate: Date | null): number | null => {
 
   const today = new Date();
 
-  let age =
-    today.getFullYear() -
-    birthDate.getFullYear();
+  let age = today.getFullYear() - birthDate.getFullYear();
 
-  const monthDiff =
-    today.getMonth() -
-    birthDate.getMonth();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
 
   if (
     monthDiff < 0 ||
-    (monthDiff === 0 &&
-      today.getDate() <
-      birthDate.getDate())
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
   ) {
     age--;
   }
@@ -163,10 +156,7 @@ const getLocationFromLatLng = async (
   country: string | null;
   displayLocation: string | null;
 }> => {
-  if (
-    latitude === null ||
-    longitude === null
-  ) {
+  if (latitude === null || longitude === null) {
     return {
       city: null,
       state: null,
@@ -196,151 +186,128 @@ const getLocationFromLatLng = async (
   };
 };
 
-export const getProfileSummaryService = async (
-  userId: string,
-) => {
+export const getProfileSummaryService = async (userId: string) => {
   const now = new Date();
 
-  const user =
-    await prisma.user.findUnique({
-      where: {
-        id: userId,
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+
+    select: {
+      id: true,
+      full_name: true,
+      birth_date: true,
+      trust_score: true,
+      profile_completion: true,
+
+      profile: {
+        select: {
+          latitude: true,
+          longitude: true,
+          city: true,
+          state: true,
+          country: true,
+        },
       },
 
-      select: {
-        id: true,
-        full_name: true,
-        birth_date: true,
-        trust_score: true,
-        profile_completion: true,
-
-        profile: {
-          select: {
-            latitude: true,
-            longitude: true,
-            city: true,
-            state: true,
-            country: true,
-          },
+      photos: {
+        where: {
+          is_primary: true,
         },
 
-        photos: {
-          where: {
-            is_primary: true,
-          },
-
-          select: {
-            id: true,
-            media_url: true,
-            media_type: true,
-            is_primary: true,
-          },
-
-          take: 1,
+        select: {
+          id: true,
+          media_url: true,
+          media_type: true,
+          is_primary: true,
         },
 
-        userPackages: {
-          where: {
-            status: "ACTIVE",
+        take: 1,
+      },
 
-            startDate: {
-              lte: now,
+      userPackages: {
+        orderBy: {
+          startDate: "desc",
+        },
+
+        select: {
+          id: true,
+          status: true,
+          startDate: true,
+          endDate: true,
+
+          currentPackage: {
+            select: {
+              id: true,
+              name: true,
             },
-
-            OR: [
-              {
-                endDate: null,
-              },
-              {
-                endDate: {
-                  gte: now,
-                },
-              },
-            ],
           },
 
-          orderBy: {
-            startDate: "desc",
-          },
-
-          take: 1,
-
-          select: {
-            id: true,
-            startDate: true,
-            endDate: true,
-
-            currentPackage: {
-              select: {
-                id: true,
-                name: true,
-              },
+          package: {
+            select: {
+              id: true,
+              name: true,
             },
+          },
+        },
+      },
 
-            package: {
-              select: {
-                id: true,
-                name: true,
-              },
+      relationshipsAsUser1: {
+        where: {
+          status: "ACTIVE",
+
+          proposal: {
+            is: {
+              status: "ACCEPTED",
             },
           },
         },
 
-        relationshipsAsUser1: {
-  where: {
-    status: "ACTIVE",
+        take: 1,
 
-    proposal: {
-      is: {
-        status: "ACCEPTED",
+        select: {
+          id: true,
+          tag: true,
+          startedAt: true,
+
+          user2: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+        },
+      },
+
+      relationshipsAsUser2: {
+        where: {
+          status: "ACTIVE",
+
+          proposal: {
+            is: {
+              status: "ACCEPTED",
+            },
+          },
+        },
+
+        take: 1,
+
+        select: {
+          id: true,
+          tag: true,
+          startedAt: true,
+
+          user1: {
+            select: {
+              id: true,
+              full_name: true,
+            },
+          },
+        },
       },
     },
-  },
-
-  take: 1,
-
-  select: {
-    id: true,
-    tag: true,
-    startedAt: true,
-
-    user2: {
-      select: {
-        id: true,
-        full_name: true,
-      },
-    },
-  },
-},
-
-relationshipsAsUser2: {
-  where: {
-    status: "ACTIVE",
-
-    proposal: {
-      is: {
-        status: "ACCEPTED",
-      },
-    },
-  },
-
-  take: 1,
-
-  select: {
-    id: true,
-    tag: true,
-    startedAt: true,
-
-    user1: {
-      select: {
-        id: true,
-        full_name: true,
-      },
-    },
-  },
-},
-      },
-    });
+  });
 
   if (!user) {
     throw new Error("USER_NOT_FOUND");
@@ -348,126 +315,135 @@ relationshipsAsUser2: {
 
   const age = getAge(user.birth_date);
 
-  const relationshipAsUser1 =
-  user.relationshipsAsUser1[0];
+  const relationshipAsUser1 = user.relationshipsAsUser1[0];
 
-const relationshipAsUser2 =
-  user.relationshipsAsUser2[0];
+  const relationshipAsUser2 = user.relationshipsAsUser2[0];
 
-let relationship = null;
+  let relationship = null;
 
-if (relationshipAsUser1) {
-  relationship = {
-    id: relationshipAsUser1.id,
-    tag: relationshipAsUser1.tag,
+  if (relationshipAsUser1) {
+    relationship = {
+      id: relationshipAsUser1.id,
+      tag: relationshipAsUser1.tag,
 
-    partner: {
-      id: relationshipAsUser1.user2.id,
-      name:
-        relationshipAsUser1.user2.full_name ??
-        null,
-    },
+      partner: {
+        id: relationshipAsUser1.user2.id,
+        name: relationshipAsUser1.user2.full_name ?? null,
+      },
 
-    startedAt:
-      relationshipAsUser1.startedAt,
-  };
-} else if (relationshipAsUser2) {
-  relationship = {
-    id: relationshipAsUser2.id,
-    tag: relationshipAsUser2.tag,
+      startedAt: relationshipAsUser1.startedAt,
+    };
+  } else if (relationshipAsUser2) {
+    relationship = {
+      id: relationshipAsUser2.id,
+      tag: relationshipAsUser2.tag,
 
-    partner: {
-      id: relationshipAsUser2.user1.id,
-      name:
-        relationshipAsUser2.user1.full_name ??
-        null,
-    },
+      partner: {
+        id: relationshipAsUser2.user1.id,
+        name: relationshipAsUser2.user1.full_name ?? null,
+      },
 
-    startedAt:
-      relationshipAsUser2.startedAt,
-  };
-}
+      startedAt: relationshipAsUser2.startedAt,
+    };
+  }
   /**
    * Convert Prisma Decimal to number
    */
   const latitude =
-    user.profile?.latitude !== null &&
-      user.profile?.latitude !== undefined
+    user.profile?.latitude !== null && user.profile?.latitude !== undefined
       ? Number(user.profile.latitude)
       : null;
 
   const longitude =
-    user.profile?.longitude !== null &&
-      user.profile?.longitude !== undefined
+    user.profile?.longitude !== null && user.profile?.longitude !== undefined
       ? Number(user.profile.longitude)
       : null;
 
   /**
    * First try lat/lng reverse geocoding.
    */
-  const reverseLocation =
-    await getLocationFromLatLng(
-      latitude,
-      longitude,
-    );
+  const reverseLocation = await getLocationFromLatLng(latitude, longitude);
 
   /**
    * If reverse geocoding is unavailable/fails,
    * use the stored profile location.
    */
-  const city =
-    reverseLocation.city ??
-    user.profile?.city ??
-    null;
+  const city = reverseLocation.city ?? user.profile?.city ?? null;
 
-  const state =
-    reverseLocation.state ??
-    user.profile?.state ??
-    null;
+  const state = reverseLocation.state ?? user.profile?.state ?? null;
 
-  const country =
-    reverseLocation.country ??
-    user.profile?.country ??
-    null;
+  const country = reverseLocation.country ?? user.profile?.country ?? null;
 
   const displayLocation =
     reverseLocation.displayLocation ??
-    ([city, country]
-      .filter(Boolean)
-      .join(", ") || null);
+    ([city, country].filter(Boolean).join(", ") || null);
 
   /**
    * Active membership
    */
-  const activeMembership =
-    user.userPackages[0] ?? null;
+const activeMembership =
+  user.userPackages.find((item) => {
+    return (
+      item.status === "ACTIVE" &&
+      item.startDate <= now &&
+      (item.endDate === null ||
+        item.endDate >= now)
+    );
+  });
 
-  const membershipPackage =
-    activeMembership?.currentPackage ??
-    activeMembership?.package ??
-    null;
+const latestMembership =
+  activeMembership ??
+  user.userPackages.find((item) => {
+    return (
+      item.status === "EXPIRED" ||
+      (item.endDate !== null &&
+        item.endDate < now)
+    );
+  }) ??
+  null;
 
-  const membership = membershipPackage
-    ? {
+const membershipPackage =
+  latestMembership?.currentPackage ??
+  latestMembership?.package ??
+  null;
+
+const isActive =
+  latestMembership !== null &&
+  latestMembership.status === "ACTIVE" &&
+  latestMembership.startDate <= now &&
+  (latestMembership.endDate === null ||
+    latestMembership.endDate >= now);
+
+const membership = membershipPackage
+  ? {
       id: membershipPackage.id,
       name: membershipPackage.name,
+
+      status: isActive
+        ? "ACTIVE"
+        : "EXPIRED",
+
+      isActive: isActive,
+
+      startDate:
+        latestMembership?.startDate ?? null,
+
+      endDate:
+        latestMembership?.endDate ?? null,
     }
-    : null;
+  : null;
 
   return {
     id: user.id,
 
-    photo:
-      user.photos[0]?.media_url ?? null,
+    photo: user.photos[0]?.media_url ?? null,
 
-    fullName:
-      user.full_name ?? null,
+    fullName: user.full_name ?? null,
 
     age,
 
     displayName: user.full_name
-      ? `${user.full_name}${age !== null ? `, ${age}` : ""
-      }`
+      ? `${user.full_name}${age !== null ? `, ${age}` : ""}`
       : null,
 
     location: {
@@ -480,9 +456,8 @@ if (relationshipAsUser1) {
 
     trustScore: user.trust_score,
 
-    profileCompletion:
-      user.profile_completion,
+    profileCompletion: user.profile_completion,
 
-      relationship
+    relationship,
   };
 };
