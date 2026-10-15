@@ -1,20 +1,26 @@
-
 import { BoostEventType, Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
-import { CurrentUser, DeletedUserResponse, FeedParams, UserFeedResponse } from "./feed.types";
+import {
+  CurrentUser,
+  DeletedUserResponse,
+  FeedParams,
+  UserFeedResponse,
+} from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
-import { getReplyTimeLabel, MIN_REPLY_SAMPLES } from "../../chat/user-reply-stats.service";
+import {
+  getReplyTimeLabel,
+  MIN_REPLY_SAMPLES,
+} from "../../chat/user-reply-stats.service";
 import { maskAge, maskName } from "./feed.helper";
 
 // =========================
 // HELPERS
 // =========================
 const CACHE_TTL = 604800;
-
 
 type UserSiblingWithDetails = Prisma.UserSiblingGetPayload<{
   include: {
@@ -24,19 +30,14 @@ type UserSiblingWithDetails = Prisma.UserSiblingGetPayload<{
   };
 }>;
 
-type FeedCursorMode =
-  | "LOCATION"
-  | "FALLBACK";
+type FeedCursorMode = "LOCATION" | "FALLBACK";
 
 export const calculateAge = (
-  birthDate: Date | string | null
+  birthDate: Date | string | null,
 ): number | null => {
   if (!birthDate) return null;
 
-  const dob =
-    birthDate instanceof Date
-      ? birthDate
-      : new Date(birthDate);
+  const dob = birthDate instanceof Date ? birthDate : new Date(birthDate);
 
   if (isNaN(dob.getTime())) {
     return null;
@@ -46,10 +47,7 @@ export const calculateAge = (
   let age = today.getFullYear() - dob.getFullYear();
   const monthDiff = today.getMonth() - dob.getMonth();
 
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < dob.getDate())
-  ) {
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
     age--;
   }
 
@@ -67,16 +65,62 @@ export const getOrientationCompatibility = (
   orientation?: string | null,
 ): string[] => {
   const map: Record<string, string[]> = {
-    STRAIGHT: ["STRAIGHT", "BISEXUAL", "PANSEXUAL", "QUEER", "NOT_LISTED",],
+    STRAIGHT: ["STRAIGHT", "BISEXUAL", "PANSEXUAL", "QUEER", "NOT_LISTED"],
     GAY: ["GAY", "BISEXUAL", "PANSEXUAL", "QUEER", "NOT_LISTED"],
     LESBIAN: ["LESBIAN", "BISEXUAL", "PANSEXUAL", "QUEER", "NOT_LISTED"],
-    BISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "QUEER", "NOT_LISTED"],
-    PANSEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER", "NOT_LISTED"],
-    DEMISEXUAL: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER", "NOT_LISTED"],
-    QUEER: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER", "NOT_LISTED"],
+    BISEXUAL: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "QUEER",
+      "NOT_LISTED",
+    ],
+    PANSEXUAL: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+      "NOT_LISTED",
+    ],
+    DEMISEXUAL: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+      "NOT_LISTED",
+    ],
+    QUEER: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+      "NOT_LISTED",
+    ],
     ASEXUAL: ["ASEXUAL", "NOT_LISTED"],
     AROMATIC: ["AROMATIC", "NOT_LISTED"],
-    NOT_LISTED: ["STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL", "DEMISEXUAL", "QUEER", "ASEXUAL", "AROMATIC", "NOT_LISTED",],
+    NOT_LISTED: [
+      "STRAIGHT",
+      "GAY",
+      "LESBIAN",
+      "BISEXUAL",
+      "PANSEXUAL",
+      "DEMISEXUAL",
+      "QUEER",
+      "ASEXUAL",
+      "AROMATIC",
+      "NOT_LISTED",
+    ],
   };
   return map[orientation?.toUpperCase() ?? ""] ?? [];
 };
@@ -84,10 +128,24 @@ export const getOrientationCompatibility = (
 // =========================
 // CONFIG
 // =========================
-const ALL_INTEREST_VALUES = ["MEN", "WOMEN", "NON_BINARY", "PREFER_NOT_TO_SAY", "EVERYONE"];
+const ALL_INTEREST_VALUES = [
+  "MEN",
+  "WOMEN",
+  "NON_BINARY",
+  "PREFER_NOT_TO_SAY",
+  "EVERYONE",
+];
 const ALL_ORIENTATIONS = [
-  "STRAIGHT", "GAY", "LESBIAN", "BISEXUAL", "PANSEXUAL",
-  "DEMISEXUAL", "QUEER", "ASEXUAL", "AROMATIC", "NOT_LISTED",
+  "STRAIGHT",
+  "GAY",
+  "LESBIAN",
+  "BISEXUAL",
+  "PANSEXUAL",
+  "DEMISEXUAL",
+  "QUEER",
+  "ASEXUAL",
+  "AROMATIC",
+  "NOT_LISTED",
 ];
 
 const NEW_USER_BOOST_HOURS = 48;
@@ -103,11 +161,10 @@ const MAX_ROUNDS = 5;
 const STATIC_MATCH_SCORE = 78;
 const STATIC_TRUST = 75;
 
-
 // =========================
 // CURSOR (keyset)
 // =========================
-type Cursor = { k: number; id: string; mode?: FeedCursorMode; };
+type Cursor = { k: number; id: string; mode?: FeedCursorMode };
 
 const encodeCursor = (c: Cursor): string =>
   Buffer.from(JSON.stringify(c)).toString("base64url");
@@ -131,89 +188,66 @@ export const getFeedService = async ({
   limit,
   filters,
 }: FeedParams) => {
-
-console.log("---------------userid : ", userId)
+  console.log("---------------userid : ", userId);
   const requestedLimit = limit ?? DEFAULT_PAGE_LIMIT;
 
-  const decodedCursor =
-    decodeCursor(
-      cursor as string | undefined,
-    );
+  const decodedCursor = decodeCursor(cursor as string | undefined);
 
   const now = new Date();
 
   const todayStart = new Date(now);
 
-  todayStart.setHours(
-    0,
-    0,
-    0,
-    0,
-  );
+  todayStart.setHours(0, 0, 0, 0);
 
   const tomorrowStart = new Date(todayStart);
 
-  tomorrowStart.setDate(
-    tomorrowStart.getDate() + 1,
-  );
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
   // ========================================================
   // CURRENT USER
   // ========================================================
 
-  const USER_CACHE_TTL =
-    60 * 10;
+  const USER_CACHE_TTL = 60 * 10;
 
-  const USER_CACHE_KEY =
-    `feed:user:${userId}`;
+  const USER_CACHE_KEY = `feed:user:${userId}`;
 
   const currentUserPromise = async () => {
-    const cached =
-      await redis.get<any>(
-        USER_CACHE_KEY,
-      );
+    const cached = await redis.get<any>(USER_CACHE_KEY);
 
     if (cached) {
       return cached;
     }
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
 
-        select: {
-          id: true,
+      select: {
+        id: true,
 
-          gender: true,
+        gender: true,
 
-          profile: {
-            select: {
-              interested_in: true,
+        profile: {
+          select: {
+            interested_in: true,
 
-              sexual_orientation:
-                true,
+            sexual_orientation: true,
 
-              latitude: true,
+            latitude: true,
 
-              longitude: true,
+            longitude: true,
 
-              max_distance_km:
-                true,
-            },
+            max_distance_km: true,
           },
         },
-      });
+      },
+    });
 
     if (user) {
-      await redis.set(
-        USER_CACHE_KEY,
-        user,
-        {
-          ex: USER_CACHE_TTL,
-        },
-      );
+      await redis.set(USER_CACHE_KEY, user, {
+        ex: USER_CACHE_TTL,
+      });
     }
 
     return user;
@@ -223,37 +257,22 @@ console.log("---------------userid : ", userId)
   // DATE FORMAT
   // ========================================================
 
-  const formatBirthDate = (
-    date:
-      | Date
-      | string
-      | null,
-  ): string | null => {
+  const formatBirthDate = (date: Date | string | null): string | null => {
     if (!date) {
       return null;
     }
 
-    const d =
-      new Date(date);
+    const d = new Date(date);
 
-    if (
-      isNaN(d.getTime())
-    ) {
+    if (isNaN(d.getTime())) {
       return null;
     }
 
-    const day =
-      String(
-        d.getDate(),
-      ).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
 
-    const month =
-      String(
-        d.getMonth() + 1,
-      ).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
 
-    const year =
-      d.getFullYear();
+    const year = d.getFullYear();
 
     return `${day}-${month}-${year}`;
   };
@@ -262,90 +281,67 @@ console.log("---------------userid : ", userId)
   // DB HEALTH CHECK
   // ========================================================
 
-  const start =
-    performance.now();
+  const start = performance.now();
 
   await prisma.$queryRaw`
       SELECT 1;
     `;
 
-  console.log(
-    "SELECT 1:",
-    performance.now() - start,
-    "ms",
-  );
+  console.log("SELECT 1:", performance.now() - start, "ms");
 
   // ========================================================
   // LOAD CURRENT USER
   // ========================================================
 
-  const start1 =
-    performance.now();
+  const start1 = performance.now();
 
-  const [currentUser] =
-    await Promise.all([
-      currentUserPromise(),
-    ]);
+  const [currentUser] = await Promise.all([currentUserPromise()]);
 
-  console.log(
-    "current user:",
-    performance.now() - start1,
-    "ms",
-  );
+  console.log("current user:", performance.now() - start1, "ms");
 
-  if (
-    !currentUser ||
-    !currentUser.profile
-  ) {
-    throw new Error(
-      "User profile not found",
-    );
+  if (!currentUser || !currentUser.profile) {
+    throw new Error("User profile not found");
   }
 
   // ========================================================
   // VIP PACKAGE CHECK
   // ========================================================
 
-  const activeVipPackage = await prisma.userPackage.findFirst(
-    {
-      where: {
-        user_id: userId,
+  const activeVipPackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
 
-        status: "ACTIVE",
+      status: "ACTIVE",
 
-        package: {
-          name: {
-            in: [
-              "VIP",
-              "VIP_ELITE",
-            ],
-          },
+      package: {
+        name: {
+          in: ["VIP", "VIP_ELITE"],
         },
-
-        OR: [
-          {
-            endDate: null,
-          },
-
-          {
-            endDate: {
-              gt: new Date(),
-            },
-          },
-        ],
       },
 
-      select: {
-        id: true,
+      OR: [
+        {
+          endDate: null,
+        },
 
-        package: {
-          select: {
-            name: true,
+        {
+          endDate: {
+            gt: new Date(),
           },
+        },
+      ],
+    },
+
+    select: {
+      id: true,
+
+      package: {
+        select: {
+          name: true,
         },
       },
     },
-  );
+  });
 
   const hasActiveVip = !!activeVipPackage;
 
@@ -354,52 +350,46 @@ console.log("---------------userid : ", userId)
   // VIP + VIP_ELITE + PREMIUM
   // ========================================================
 
-  const activeFeedPackage =
-    await prisma.userPackage.findFirst({
-      where: {
-        user_id: userId,
+  const activeFeedPackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
 
-        status: "ACTIVE",
+      status: "ACTIVE",
 
-        package: {
-          name: {
-            in: [
-              "VIP",
-              "VIP_ELITE",
-              "PREMIUM",
-            ],
-          },
-        },
-
-        OR: [
-          {
-            endDate: null,
-          },
-          {
-            endDate: {
-              gt: now,
-            },
-          },
-        ],
-      },
-
-      select: {
-        id: true,
-
-        package: {
-          select: {
-            name: true,
-          },
+      package: {
+        name: {
+          in: ["VIP", "VIP_ELITE", "PREMIUM"],
         },
       },
 
-      orderBy: {
-        startDate: "desc",
-      },
-    });
+      OR: [
+        {
+          endDate: null,
+        },
+        {
+          endDate: {
+            gt: now,
+          },
+        },
+      ],
+    },
 
-  const hasActiveFeedPackage =
-    !!activeFeedPackage;
+    select: {
+      id: true,
+
+      package: {
+        select: {
+          name: true,
+        },
+      },
+    },
+
+    orderBy: {
+      startDate: "desc",
+    },
+  });
+
+  const hasActiveFeedPackage = !!activeFeedPackage;
 
   const isFreeUser = !hasActiveFeedPackage;
 
@@ -407,90 +397,91 @@ console.log("---------------userid : ", userId)
     ? FREE_DAILY_PROFILE_LIMIT
     : PAID_DAILY_PROFILE_LIMIT;
 
-  const pageLimit =
-    isFreeUser
-      ? PAID_DAILY_PROFILE_LIMIT
-      : Math.min(
-        requestedLimit,
-        PAID_DAILY_PROFILE_LIMIT,
-      );
+  const pageLimit = isFreeUser
+    ? PAID_DAILY_PROFILE_LIMIT
+    : Math.min(requestedLimit, PAID_DAILY_PROFILE_LIMIT);
+
+  // ==========================================
+  // TODAY'S DATE (INDIA TIMEZONE)
+  // ==========================================
+
+  const indiaDateParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const year = indiaDateParts.find((p) => p.type === "year")!.value;
+  const month = indiaDateParts.find((p) => p.type === "month")!.value;
+  const day = indiaDateParts.find((p) => p.type === "day")!.value;
+
+  // PostgreSQL @db.Date compatible
+  const viewDate = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+
+  console.log("////////////////////viewDate : ", viewDate.toISOString());
+
+  // ==========================================
+  // FETCH TODAY'S DAILY FEED VIEWS
+  // ==========================================
 
   const todayFeedViews = await prisma.userDailyFeedView.findMany({
     where: {
       userId,
-
-      viewDate: {
-        gte: todayStart,
-        lt: tomorrowStart,
-      },
+      viewDate: viewDate,
     },
-
     select: {
       targetUserId: true,
     },
   });
 
-  const seenTodayIds =
-    new Set(
-      todayFeedViews.map(
-        (item) =>
-          item.targetUserId,
-      ),
-    );
+  console.log("////////////////////todays views : ", todayFeedViews);
 
-  const seenToday =
-    seenTodayIds.size;
+  // ==========================================
+  // UNIQUE PROFILES VIEWED TODAY
+  // ==========================================
 
-  const remainingToday =
-    Math.max(
-      dailyProfileLimit - seenToday,
-      0,
-    );
+  const seenTodayIds = new Set(todayFeedViews.map((item) => item.targetUserId));
+
+  const seenToday = seenTodayIds.size;
+
+  console.log("////////////////////seenToday views : ", seenToday);
+
+  // ==========================================
+  // REMAINING DAILY PROFILE LIMIT
+  // ==========================================
+
+  const remainingToday = Math.max(dailyProfileLimit - seenToday, 0);
+
+  console.log("////////////////////remainingToday views : ", remainingToday);
 
   // ========================================================
   // BASIC USER PREFERENCES
   // ========================================================
 
-  const {
-    interested_in,
-    sexual_orientation,
-  } =
-    currentUser.profile;
+  const { interested_in, sexual_orientation } = currentUser.profile;
 
-  const { gender } =
-    currentUser;
+  const { gender } = currentUser;
 
-  if (
-    !gender ||
-    !interested_in
-  ) {
-    throw new Error(
-      "Required fields missing",
-    );
+  if (!gender || !interested_in) {
+    throw new Error("Required fields missing");
   }
 
-  const myGender =
-    gender.toUpperCase();
+  const myGender = gender.toUpperCase();
 
-  const myInterest =
-    interested_in.toUpperCase();
+  const myInterest = interested_in.toUpperCase();
 
-  const myOrientation = (
-    sexual_orientation ?? ""
-  ).toUpperCase();
+  const myOrientation = (sexual_orientation ?? "").toUpperCase();
 
-  const orientationGenderOptions =
-    getOrientationCompatibility(myOrientation);
+  const orientationGenderOptions = getOrientationCompatibility(myOrientation);
 
   // ========================================================
   // SAFE COORDINATE HANDLING
   // ========================================================
 
-  const rawLatitude =
-    currentUser.profile.latitude;
+  const rawLatitude = currentUser.profile.latitude;
 
-  const rawLongitude =
-    currentUser.profile.longitude;
+  const rawLongitude = currentUser.profile.longitude;
 
   /**
    * Convert coordinates safely.
@@ -503,14 +494,12 @@ console.log("---------------userid : ", userId)
    * then convert.
    */
   const myLatitude =
-    rawLatitude !== null &&
-      rawLatitude !== undefined
+    rawLatitude !== null && rawLatitude !== undefined
       ? Number(rawLatitude)
       : null;
 
   const myLongitude =
-    rawLongitude !== null &&
-      rawLongitude !== undefined
+    rawLongitude !== null && rawLongitude !== undefined
       ? Number(rawLongitude)
       : null;
 
@@ -533,58 +522,38 @@ console.log("---------------userid : ", userId)
     myLatitude <= 90 &&
     myLongitude >= -180 &&
     myLongitude <= 180 &&
-    !(
-      myLatitude === 0 &&
-      myLongitude === 0
-    );
+    !(myLatitude === 0 && myLongitude === 0);
 
-  console.log(
-    "CURRENT USER LOCATION:",
-    {
-      rawLatitude,
-      rawLongitude,
-      myLatitude,
-      myLongitude,
-      validCurrentUserCoordinates,
-    },
-  );
+  console.log("CURRENT USER LOCATION:", {
+    rawLatitude,
+    rawLongitude,
+    myLatitude,
+    myLongitude,
+    validCurrentUserCoordinates,
+  });
 
   // ========================================================
   // PRECOMPUTE MATCH FILTERS
   // ========================================================
 
-  const genderFilter =
-    getGenderFromInterest(
-      myInterest,
-    );
+  const genderFilter = getGenderFromInterest(myInterest);
 
-  const interestedInFilter =
-    ALL_INTEREST_VALUES.filter(
-      (v) =>
-        getGenderFromInterest(
-          v,
-        ).includes(
-          myGender,
-        ),
-    );
+  const interestedInFilter = ALL_INTEREST_VALUES.filter((v) =>
+    getGenderFromInterest(v).includes(myGender),
+  );
 
   // ========================================================
   // VIP FILTER: AMBITION
   // ========================================================
 
-  if (
-    filters?.ambitionIds &&
-    filters.ambitionIds
-      .length > 0
-  ) {
+  if (filters?.ambitionIds && filters.ambitionIds.length > 0) {
     if (!hasActiveVip) {
       return {
         users: [],
 
         nextCursor: null,
 
-        filterRestricted:
-          true,
+        filterRestricted: true,
 
         message:
           "Ambition filter is available only for VIP and VIP Elite users.",
@@ -596,14 +565,11 @@ console.log("---------------userid : ", userId)
   // VIP FILTER: FAMILY INCOME
   // ========================================================
 
-  let familyIncomeIds:
-    number[] = [];
+  let familyIncomeIds: number[] = [];
 
   if (
-    filters?.familyIncomeMin !==
-    undefined ||
-    filters?.familyIncomeMax !==
-    undefined
+    filters?.familyIncomeMin !== undefined ||
+    filters?.familyIncomeMax !== undefined
   ) {
     if (!hasActiveVip) {
       return {
@@ -611,99 +577,74 @@ console.log("---------------userid : ", userId)
 
         nextCursor: null,
 
-        filterRestricted:
-          true,
+        filterRestricted: true,
 
         message:
           "Family income filter is available only for VIP and VIP Elite users.",
       };
     }
 
-    const minAmount =
-      filters.familyIncomeMin ??
-      0;
+    const minAmount = filters.familyIncomeMin ?? 0;
 
-    const maxAmount =
-      filters.familyIncomeMax ??
-      Number.MAX_SAFE_INTEGER;
+    const maxAmount = filters.familyIncomeMax ?? Number.MAX_SAFE_INTEGER;
 
-    const matchingIncomeRanges =
-      await prisma.familyIncome.findMany(
-        {
-          where: {
-            active: true,
+    const matchingIncomeRanges = await prisma.familyIncome.findMany({
+      where: {
+        active: true,
 
-            AND: [
+        AND: [
+          {
+            minAmount: {
+              lte: maxAmount,
+            },
+          },
+
+          {
+            OR: [
               {
-                minAmount: {
-                  lte: maxAmount,
-                },
+                maxAmount: null,
               },
 
               {
-                OR: [
-                  {
-                    maxAmount:
-                      null,
-                  },
-
-                  {
-                    maxAmount:
-                    {
-                      gte: minAmount,
-                    },
-                  },
-                ],
+                maxAmount: {
+                  gte: minAmount,
+                },
               },
             ],
           },
+        ],
+      },
 
-          select: {
-            id: true,
+      select: {
+        id: true,
 
-            title: true,
+        title: true,
 
-            minAmount: true,
+        minAmount: true,
 
-            maxAmount: true,
-          },
-        },
-      );
+        maxAmount: true,
+      },
+    });
 
-    familyIncomeIds =
-      matchingIncomeRanges.map(
-        (income) =>
-          income.id,
-      );
+    familyIncomeIds = matchingIncomeRanges.map((income) => income.id);
 
-    console.log(
-      "MATCHING FAMILY INCOME:",
-      matchingIncomeRanges,
-    );
+    console.log("MATCHING FAMILY INCOME:", matchingIncomeRanges);
 
-    console.log(
-      "MATCHING FAMILY INCOME IDS:",
-      familyIncomeIds,
-    );
+    console.log("MATCHING FAMILY INCOME IDS:", familyIncomeIds);
   }
 
   // ========================================================
   // VIP FILTER: NETWORKING INTENT
   // ========================================================
 
-  if (
-    filters?.networkingIntentIds &&
-    filters.networkingIntentIds
-      .length > 0
-  ) {
+  if (filters?.networkingIntentIds && filters.networkingIntentIds.length > 0) {
     if (!hasActiveVip) {
       return {
         users: [],
 
         nextCursor: null,
 
-        filterRestricted:
-          true,
+        filterRestricted: true,
 
         message:
           "Networking Intent filter is available only for active VIP or VIP Elite users.",
@@ -716,39 +657,24 @@ console.log("---------------userid : ", userId)
   // Includes location when frontend provides location
   // ========================================================
 
-  const filterQuery =
-    filters
-      ? buildFilterQuery({
+  const filterQuery = filters
+    ? buildFilterQuery({
         ...filters,
         familyIncomeIds,
       })
-      : {
+    : {
         where: {},
       };
 
-  console.log(
-    "NORMAL FILTER QUERY:",
-    JSON.stringify(
-      filterQuery,
-      null,
-      2,
+  console.log("NORMAL FILTER QUERY:", JSON.stringify(filterQuery, null, 2));
+
+  const userFilters = Object.fromEntries(
+    Object.entries(filterQuery.where || {}).filter(
+      ([key]) => key !== "profile",
     ),
   );
 
-  const userFilters =
-    Object.fromEntries(
-      Object.entries(
-        filterQuery.where ||
-        {},
-      ).filter(
-        ([key]) =>
-          key !== "profile",
-      ),
-    );
-
-  const profileFilters =
-    filterQuery.where
-      ?.profile?.is || {};
+  const profileFilters = filterQuery.where?.profile?.is || {};
 
   // ========================================================
   // MANUAL LOCATION CHECK
@@ -765,92 +691,73 @@ console.log("---------------userid : ", userId)
   // RESOLVE MANUAL LOCATION → LAT/LNG
   // ========================================================
 
-  let manualLocation:
-    | {
-      latitude: number;
-      longitude: number;
-    }
-    | null = null;
+  let manualLocation: {
+    latitude: number;
+    longitude: number;
+  } | null = null;
 
   if (hasManualLocationFilter) {
-    const city =
-      filters?.location?.city?.trim();
+    const city = filters?.location?.city?.trim();
 
-    const state =
-      filters?.location?.state?.trim();
+    const state = filters?.location?.state?.trim();
 
-    const country =
-      filters?.location?.country?.trim();
+    const country = filters?.location?.country?.trim();
 
     if (!city) {
-      throw new Error(
-        "City is required for manual location search",
-      );
+      throw new Error("City is required for manual location search");
     }
 
-    const location =
-      await prisma.locationMaster.findFirst({
-        where: {
-          active: true,
+    const location = await prisma.locationMaster.findFirst({
+      where: {
+        active: true,
 
-          city: {
-            equals: city,
-            mode: "insensitive",
-          },
+        city: {
+          equals: city,
+          mode: "insensitive",
+        },
 
-          ...(state
-            ? {
+        ...(state
+          ? {
               state: {
                 equals: state,
                 mode: "insensitive",
               },
             }
-            : {}),
+          : {}),
 
-          ...(country
-            ? {
+        ...(country
+          ? {
               country: {
                 equals: country,
                 mode: "insensitive",
               },
             }
-            : {}),
-        },
+          : {}),
+      },
 
-        select: {
-          latitude: true,
-          longitude: true,
-        },
-      });
+      select: {
+        latitude: true,
+        longitude: true,
+      },
+    });
 
     if (!location) {
-      throw new Error(
-        `Location "${city}" not found`,
-      );
+      throw new Error(`Location "${city}" not found`);
     }
 
     manualLocation = {
-      latitude: Number(
-        location.latitude,
-      ),
+      latitude: Number(location.latitude),
 
-      longitude: Number(
-        location.longitude,
-      ),
+      longitude: Number(location.longitude),
     };
 
-    console.log(
-      "MANUAL LOCATION RESOLVED:",
-      {
-        city,
-        state,
-        country,
-        latitude:
-          manualLocation.latitude,
-        longitude:
-          manualLocation.longitude,
-      },
-    );
+    console.log("MANUAL LOCATION RESOLVED:", {
+      city,
+      state,
+      country,
+      latitude: manualLocation.latitude,
+      longitude: manualLocation.longitude,
+    });
   }
 
   // ========================================================
@@ -859,11 +766,9 @@ console.log("---------------userid : ", userId)
 
   const distanceKm =
     filters?.distanceKm ??
-    (
-      hasManualLocationFilter
-        ? 100
-        : currentUser.profile.max_distance_km ?? 1000
-    );
+    (hasManualLocationFilter
+      ? 100
+      : (currentUser.profile.max_distance_km ?? 1000));
 
   // ========================================================
   // FALLBACK FILTER QUERY
@@ -888,61 +793,44 @@ console.log("---------------userid : ", userId)
   // - etc.
   // ========================================================
 
-  let fallbackFilterQuery:
-    any = {
+  let fallbackFilterQuery: any = {
     where: {},
   };
 
   if (filters) {
     const {
-      location:
-      _ignoredLocation,
+      location: _ignoredLocation,
 
-      distanceKm:
-      _ignoredDistance,
+      distanceKm: _ignoredDistance,
 
       ...filtersWithoutLocation
     } = filters;
 
-    fallbackFilterQuery =
-      buildFilterQuery({
-        ...filtersWithoutLocation,
+    fallbackFilterQuery = buildFilterQuery({
+      ...filtersWithoutLocation,
 
-        familyIncomeIds,
-      });
+      familyIncomeIds,
+    });
   }
 
   console.log(
     "FALLBACK FILTER QUERY:",
-    JSON.stringify(
-      fallbackFilterQuery,
-      null,
-      2,
+    JSON.stringify(fallbackFilterQuery, null, 2),
+  );
+
+  const fallbackUserFilters = Object.fromEntries(
+    Object.entries(fallbackFilterQuery.where || {}).filter(
+      ([key]) => key !== "profile",
     ),
   );
 
-  const fallbackUserFilters =
-    Object.fromEntries(
-      Object.entries(
-        fallbackFilterQuery
-          .where || {},
-      ).filter(
-        ([key]) =>
-          key !== "profile",
-      ),
-    );
-
-  const fallbackProfileFilters =
-    fallbackFilterQuery
-      .where?.profile?.is ||
-    {};
+  const fallbackProfileFilters = fallbackFilterQuery.where?.profile?.is || {};
 
   // ========================================================
   // SQL MATCH CONDITIONS
   // ========================================================
 
-  const matchConditions =
-    Prisma.sql`
+  const matchConditions = Prisma.sql`
         u.deleted_at IS NULL
         AND u.account_status = 'ACTIVE'::"AccountStatus"
         AND u.id <> ${userId}::uuid
@@ -972,34 +860,29 @@ console.log("---------------userid : ", userId)
         AND u.gender::text =
           ANY(
             ARRAY[
-              ${Prisma.join(
-      genderFilter,
-    )}
+              ${Prisma.join(genderFilter)}
             ]::text[]
           )
 
         AND p.interested_in::text =
           ANY(
             ARRAY[
-              ${Prisma.join(
-      interestedInFilter,
-    )}
+              ${Prisma.join(interestedInFilter)}
             ]::text[]
           )
 
-       ${orientationGenderOptions.length > 0
-        ? Prisma.sql`
+       ${
+         orientationGenderOptions.length > 0
+           ? Prisma.sql`
           AND u.gender_option::text =
             ANY(
               ARRAY[
-                ${Prisma.join(
-          orientationGenderOptions,
-        )}
+                ${Prisma.join(orientationGenderOptions)}
               ]::text[]
             )
         `
-        : Prisma.empty
-      }
+           : Prisma.empty
+       }
       `;
 
   // ========================================================
@@ -1063,8 +946,7 @@ console.log("---------------userid : ", userId)
       },
 
       orderBy: {
-        order:
-          "asc" as const,
+        order: "asc" as const,
       },
 
       take: 1,
@@ -1118,34 +1000,17 @@ console.log("---------------userid : ", userId)
   // PAGINATION VARIABLES
   // ========================================================
 
-  const batchSize =
-    Math.max(
-      Math.ceil(
-        pageLimit *
-        OVERFETCH,
-      ),
-      30,
-    );
+  const batchSize = Math.max(Math.ceil(pageLimit * OVERFETCH), 30);
 
-  const collected:
-    any[] = [];
+  const collected: any[] = [];
 
-  const meterById =
-    new Map<
-      string,
-      number
-    >();
+  const meterById = new Map<string, number>();
 
-  let nextCursor:
-    string | null = null;
+  let nextCursor: string | null = null;
 
-  let filledCursor:
-    Cursor | null =
-    null;
+  let filledCursor: Cursor | null = null;
 
-  let locationFallbackUsed =
-    decodedCursor?.mode ===
-    "FALLBACK";
+  let locationFallbackUsed = decodedCursor?.mode === "FALLBACK";
 
   // ========================================================
   // NORMAL LOCATION SEARCH
@@ -1160,45 +1025,30 @@ console.log("---------------userid : ", userId)
    * results.
    */
 
-  const shouldRunNormalLocationSearch =
-    decodedCursor?.mode !==
-    "FALLBACK";
+  const shouldRunNormalLocationSearch = decodedCursor?.mode !== "FALLBACK";
 
-  if (
-    shouldRunNormalLocationSearch
-  ) {
-    let cursorState:
-      Cursor | null =
-      decodedCursor;
+  if (shouldRunNormalLocationSearch) {
+    let cursorState: Cursor | null = decodedCursor;
 
     // ======================================================
     // CASE 1:
     // MANUAL LOCATION → LOCATION MASTER → POSTGIS
     // ======================================================
 
-    if (
-      hasManualLocationFilter &&
-      manualLocation
-    ) {
-      console.log(
-        "LOCATION MODE: MANUAL LOCATION",
-        {
-          latitude:
-            manualLocation.latitude,
+    if (hasManualLocationFilter && manualLocation) {
+      console.log("LOCATION MODE: MANUAL LOCATION", {
+        latitude: manualLocation.latitude,
 
-          longitude:
-            manualLocation.longitude,
+        longitude: manualLocation.longitude,
 
-          distanceKm,
-        },
-      );
+        distanceKm,
+      });
 
       // ------------------------------------------------------
       // SEARCH POINT
       // ------------------------------------------------------
 
-      const searchPoint =
-        Prisma.sql`
+      const searchPoint = Prisma.sql`
       ST_SetSRID(
         ST_MakePoint(
           ${manualLocation.longitude},
@@ -1214,20 +1064,17 @@ console.log("---------------userid : ", userId)
 
       for (
         let round = 0;
-        round < MAX_ROUNDS &&
-        collected.length < pageLimit;
+        round < MAX_ROUNDS && collected.length < pageLimit;
         round++
       ) {
-        const candidateStart =
-          performance.now();
+        const candidateStart = performance.now();
 
-        const rows =
-          await prisma.$queryRaw<
-            {
-              id: string;
-              sort_val: number;
-            }[]
-          >`
+        const rows = await prisma.$queryRaw<
+          {
+            id: string;
+            sort_val: number;
+          }[]
+        >`
         SELECT
           u.id,
 
@@ -1252,7 +1099,8 @@ console.log("---------------userid : ", userId)
             ${distanceKm * 1000}
           )
 
-          ${cursorState
+          ${
+            cursorState
               ? Prisma.sql`
                   AND (
                     (
@@ -1272,7 +1120,7 @@ console.log("---------------userid : ", userId)
                   )
                 `
               : Prisma.empty
-            }
+          }
 
         ORDER BY
           p.location::geography
@@ -1285,8 +1133,7 @@ console.log("---------------userid : ", userId)
 
         console.log(
           `MANUAL LOCATION candidate round ${round}:`,
-          performance.now() -
-          candidateStart,
+          performance.now() - candidateStart,
           "ms",
           "rows:",
           rows.length,
@@ -1301,74 +1148,59 @@ console.log("---------------userid : ", userId)
         // ----------------------------------------------------
 
         for (const row of rows) {
-          meterById.set(
-            row.id,
-            Number(row.sort_val),
-          );
+          meterById.set(row.id, Number(row.sort_val));
         }
 
-        const idOrder =
-          rows.map(
-            (row) => row.id,
-          );
+        const idOrder = rows.map((row) => row.id);
 
         // ----------------------------------------------------
         // HYDRATE USERS
         // ----------------------------------------------------
 
-        const hydrateStart =
-          performance.now();
+        const hydrateStart = performance.now();
 
-        const hydrated =
-          await prisma.user.findMany({
-            where: {
-              id: {
-                in: idOrder,
-              },
-
-              account_status:
-                "ACTIVE",
-
-              deleted_at:
-                null,
-
-              /*
-               * IMPORTANT
-               *
-               * Use fallback filters here.
-               *
-               * These contain all selected
-               * filters EXCEPT:
-               *
-               * location
-               * distanceKm
-               *
-               * Therefore city/state/country
-               * are NOT compared against
-               * candidate profiles.
-               */
-              ...fallbackUserFilters,
-
-              ...(Object.keys(
-                fallbackProfileFilters,
-              ).length > 0
-                ? {
-                  profile: {
-                    is:
-                      fallbackProfileFilters,
-                  },
-                }
-                : {}),
+        const hydrated = await prisma.user.findMany({
+          where: {
+            id: {
+              in: idOrder,
             },
 
-            select:
-              userSelect,
-          });
+            account_status: "ACTIVE",
+
+            deleted_at: null,
+
+            /*
+             * IMPORTANT
+             *
+             * Use fallback filters here.
+             *
+             * These contain all selected
+             * filters EXCEPT:
+             *
+             * location
+             * distanceKm
+             *
+             * Therefore city/state/country
+             * are NOT compared against
+             * candidate profiles.
+             */
+            ...fallbackUserFilters,
+
+            ...(Object.keys(fallbackProfileFilters).length > 0
+              ? {
+                  profile: {
+                    is: fallbackProfileFilters,
+                  },
+                }
+              : {}),
+          },
+
+          select: userSelect,
+        });
 
         console.log(
           `MANUAL LOCATION hydration round ${round}:`,
-          performance.now() -
-          hydrateStart,
+          performance.now() - hydrateStart,
           "ms",
           "users:",
           hydrated.length,
@@ -1378,49 +1210,29 @@ console.log("---------------userid : ", userId)
         // PRESERVE SQL DISTANCE ORDER
         // ----------------------------------------------------
 
-        const byId =
-          new Map(
-            hydrated.map(
-              (user) => [
-                user.id,
-                user,
-              ],
-            ),
-          );
+        const byId = new Map(hydrated.map((user) => [user.id, user]));
 
-        let pageFilled =
-          false;
+        let pageFilled = false;
 
         for (const row of rows) {
-          const user =
-            byId.get(row.id);
+          const user = byId.get(row.id);
 
           if (!user) {
             continue;
           }
 
-          collected.push(
-            user,
-          );
+          collected.push(user);
 
-          if (
-            collected.length ===
-            pageLimit
-          ) {
+          if (collected.length === pageLimit) {
             filledCursor = {
-              k: Number(
-                row.sort_val,
-              ),
+              k: Number(row.sort_val),
 
-              id:
-                row.id,
+              id: row.id,
 
-              mode:
-                "LOCATION",
+              mode: "LOCATION",
             };
 
-            pageFilled =
-              true;
+            pageFilled = true;
 
             break;
           }
@@ -1434,27 +1246,17 @@ console.log("---------------userid : ", userId)
         // NEXT SQL BATCH
         // ----------------------------------------------------
 
-        const tail =
-          rows[
-          rows.length - 1
-          ];
+        const tail = rows[rows.length - 1];
 
         cursorState = {
-          k: Number(
-            tail.sort_val,
-          ),
+          k: Number(tail.sort_val),
 
-          id:
-            tail.id,
+          id: tail.id,
 
-          mode:
-            "LOCATION",
+          mode: "LOCATION",
         };
 
-        if (
-          rows.length <
-          batchSize
-        ) {
+        if (rows.length < batchSize) {
           break;
         }
       }
@@ -1464,17 +1266,10 @@ console.log("---------------userid : ", userId)
     // CASE 2:
     // DISTANCE / LAT / LNG
     // ======================================================
+    else if (validCurrentUserCoordinates) {
+      console.log("LOCATION MODE: DISTANCE", `${distanceKm} KM`);
 
-    else if (
-      validCurrentUserCoordinates
-    ) {
-      console.log(
-        "LOCATION MODE: DISTANCE",
-        `${distanceKm} KM`,
-      );
-
-      const me =
-        Prisma.sql`
+      const me = Prisma.sql`
             ST_SetSRID(
               ST_MakePoint(
                 ${myLongitude},
@@ -1486,21 +1281,17 @@ console.log("---------------userid : ", userId)
 
       for (
         let round = 0;
-        round < MAX_ROUNDS &&
-        collected.length <
-        pageLimit;
+        round < MAX_ROUNDS && collected.length < pageLimit;
         round++
       ) {
-        const candidateStart =
-          performance.now();
+        const candidateStart = performance.now();
 
-        const rows =
-          await prisma.$queryRaw<
-            {
-              id: string;
-              sort_val: number;
-            }[]
-          >`
+        const rows = await prisma.$queryRaw<
+          {
+            id: string;
+            sort_val: number;
+          }[]
+        >`
               SELECT
                 u.id,
 
@@ -1527,8 +1318,9 @@ console.log("---------------userid : ", userId)
                   ${distanceKm * 1000}
                 )
 
-                ${cursorState
-              ? Prisma.sql`
+                ${
+                  cursorState
+                    ? Prisma.sql`
                         AND (
                           (
                             p.location::geography
@@ -1546,8 +1338,8 @@ console.log("---------------userid : ", userId)
                           )
                         )
                       `
-              : Prisma.empty
-            }
+                    : Prisma.empty
+                }
 
               ORDER BY
                 p.location::geography
@@ -1560,121 +1352,76 @@ console.log("---------------userid : ", userId)
 
         console.log(
           `DISTANCE candidate round ${round}:`,
-          performance.now() -
-          candidateStart,
+          performance.now() - candidateStart,
           "ms",
           "rows:",
           rows.length,
         );
 
-        if (
-          rows.length === 0
-        ) {
+        if (rows.length === 0) {
           break;
         }
 
-        for (
-          const row of rows
-        ) {
-          meterById.set(
-            row.id,
-            Number(
-              row.sort_val,
-            ),
-          );
+        for (const row of rows) {
+          meterById.set(row.id, Number(row.sort_val));
         }
 
-        const idOrder =
-          rows.map(
-            (row) =>
-              row.id,
-          );
+        const idOrder = rows.map((row) => row.id);
 
-        const hydrateStart =
-          performance.now();
+        const hydrateStart = performance.now();
 
-        const hydrated =
-          await prisma.user.findMany(
-            {
-              where: {
-                id: {
-                  in: idOrder,
-                },
-                account_status: "ACTIVE",
-                deleted_at: null,
-                ...fallbackUserFilters,
-
-                ...(Object.keys(
-                  fallbackProfileFilters,
-                ).length > 0
-                  ? {
-                    profile: {
-                      is: fallbackProfileFilters,
-                    },
-                  }
-                  : {}),
-              },
-
-              select:
-                userSelect,
+        const hydrated = await prisma.user.findMany({
+          where: {
+            id: {
+              in: idOrder,
             },
-          );
+            account_status: "ACTIVE",
+            deleted_at: null,
+            ...fallbackUserFilters,
+
+            ...(Object.keys(fallbackProfileFilters).length > 0
+              ? {
+                  profile: {
+                    is: fallbackProfileFilters,
+                  },
+                }
+              : {}),
+          },
+
+          select: userSelect,
+        });
 
         console.log(
           `DISTANCE hydration round ${round}:`,
-          performance.now() -
-          hydrateStart,
+          performance.now() - hydrateStart,
           "ms",
           "users:",
           hydrated.length,
         );
 
-        const byId =
-          new Map(
-            hydrated.map(
-              (user) => [
-                user.id,
-                user,
-              ],
-            ),
-          );
+        const byId = new Map(hydrated.map((user) => [user.id, user]));
 
-        let pageFilled =
-          false;
+        let pageFilled = false;
 
-        for (
-          const row of rows
-        ) {
-          const user =
-            byId.get(
-              row.id,
-            );
+        for (const row of rows) {
+          const user = byId.get(row.id);
 
           if (!user) {
             continue;
           }
 
-          collected.push(
-            user,
-          );
+          collected.push(user);
 
-          if (
-            collected.length ===
-            pageLimit
-          ) {
+          if (collected.length === pageLimit) {
             filledCursor = {
-              k: Number(
-                row.sort_val,
-              ),
+              k: Number(row.sort_val),
 
               id: row.id,
 
-              mode:
-                "LOCATION",
+              mode: "LOCATION",
             };
 
-            pageFilled =
-              true;
+            pageFilled = true;
 
             break;
           }
@@ -1684,27 +1431,17 @@ console.log("---------------userid : ", userId)
           break;
         }
 
-        const tail =
-          rows[
-          rows.length -
-          1
-          ];
+        const tail = rows[rows.length - 1];
 
         cursorState = {
-          k: Number(
-            tail.sort_val,
-          ),
+          k: Number(tail.sort_val),
 
           id: tail.id,
 
-          mode:
-            "LOCATION",
+          mode: "LOCATION",
         };
 
-        if (
-          rows.length <
-          batchSize
-        ) {
+        if (rows.length < batchSize) {
           break;
         }
       }
@@ -1747,32 +1484,18 @@ console.log("---------------userid : ", userId)
    *    in FALLBACK mode.
    */
 
-  if (
-    collected.length === 0 &&
-    !hasManualLocationFilter
-  ) {
-    locationFallbackUsed =
-      true;
+  if (collected.length === 0 && !hasManualLocationFilter) {
+    locationFallbackUsed = true;
 
-    console.log(
-      "====================================",
-    );
+    console.log("====================================");
 
-    console.log(
-      "NO USERS FOUND WITH LOCATION.",
-    );
+    console.log("NO USERS FOUND WITH LOCATION.");
 
-    console.log(
-      "RUNNING FALLBACK WITHOUT LOCATION/DISTANCE.",
-    );
+    console.log("RUNNING FALLBACK WITHOUT LOCATION/DISTANCE.");
 
-    console.log(
-      "ALL OTHER FILTERS ARE STILL ACTIVE.",
-    );
+    console.log("ALL OTHER FILTERS ARE STILL ACTIVE.");
 
-    console.log(
-      "====================================",
-    );
+    console.log("====================================");
 
     /**
      * If we already returned
@@ -1784,12 +1507,8 @@ console.log("---------------userid : ", userId)
      * fresh.
      */
 
-    let fallbackCursorState:
-      Cursor | null =
-      decodedCursor?.mode ===
-        "FALLBACK"
-        ? decodedCursor
-        : null;
+    let fallbackCursorState: Cursor | null =
+      decodedCursor?.mode === "FALLBACK" ? decodedCursor : null;
 
     // clear distance because
     // fallback users may not have it
@@ -1797,13 +1516,10 @@ console.log("---------------userid : ", userId)
 
     for (
       let round = 0;
-      round < MAX_ROUNDS &&
-      collected.length <
-      pageLimit;
+      round < MAX_ROUNDS && collected.length < pageLimit;
       round++
     ) {
-      const candidateStart =
-        performance.now();
+      const candidateStart = performance.now();
 
       /**
        * IMPORTANT:
@@ -1820,13 +1536,12 @@ console.log("---------------userid : ", userId)
        * conditions here.
        */
 
-      const rows =
-        await prisma.$queryRaw<
-          {
-            id: string;
-            sort_val: number;
-          }[]
-        >`
+      const rows = await prisma.$queryRaw<
+        {
+          id: string;
+          sort_val: number;
+        }[]
+      >`
             SELECT
               u.id,
 
@@ -1845,8 +1560,9 @@ console.log("---------------userid : ", userId)
             WHERE
               ${matchConditions}
 
-              ${fallbackCursorState
-            ? Prisma.sql`
+              ${
+                fallbackCursorState
+                  ? Prisma.sql`
                       AND (
                         (
                           EXTRACT(
@@ -1866,8 +1582,8 @@ console.log("---------------userid : ", userId)
                         )
                       )
                     `
-            : Prisma.empty
-          }
+                  : Prisma.empty
+              }
 
             ORDER BY
               sort_val DESC,
@@ -1878,27 +1594,19 @@ console.log("---------------userid : ", userId)
 
       console.log(
         `FALLBACK candidate round ${round}:`,
-        performance.now() -
-        candidateStart,
+        performance.now() - candidateStart,
         "ms",
         "rows:",
         rows.length,
       );
 
-      if (
-        rows.length === 0
-      ) {
+      if (rows.length === 0) {
         break;
       }
 
-      const idOrder =
-        rows.map(
-          (row) =>
-            row.id,
-        );
+      const idOrder = rows.map((row) => row.id);
 
-      const hydrateStart =
-        performance.now();
+      const hydrateStart = performance.now();
 
       /**
        * Here we're using:
@@ -1911,89 +1619,58 @@ console.log("---------------userid : ", userId)
        * but every other filter stays.
        */
 
-      const hydrated =
-        await prisma.user.findMany(
-          {
-            where: {
-              id: {
-                in: idOrder,
-              },
-              account_status: "ACTIVE",
-              deleted_at: null,
-              ...fallbackUserFilters,
-
-              ...(Object.keys(
-                fallbackProfileFilters,
-              ).length > 0
-                ? {
-                  profile: {
-                    is:
-                      fallbackProfileFilters,
-                  },
-                }
-                : {}),
-            },
-
-            select:
-              userSelect,
+      const hydrated = await prisma.user.findMany({
+        where: {
+          id: {
+            in: idOrder,
           },
-        );
+          account_status: "ACTIVE",
+          deleted_at: null,
+          ...fallbackUserFilters,
+
+          ...(Object.keys(fallbackProfileFilters).length > 0
+            ? {
+                profile: {
+                  is: fallbackProfileFilters,
+                },
+              }
+            : {}),
+        },
+
+        select: userSelect,
+      });
 
       console.log(
         `FALLBACK hydration round ${round}:`,
-        performance.now() -
-        hydrateStart,
+        performance.now() - hydrateStart,
         "ms",
         "users:",
         hydrated.length,
       );
 
-      const byId =
-        new Map(
-          hydrated.map(
-            (user) => [
-              user.id,
-              user,
-            ],
-          ),
-        );
+      const byId = new Map(hydrated.map((user) => [user.id, user]));
 
-      let pageFilled =
-        false;
+      let pageFilled = false;
 
-      for (
-        const row of rows
-      ) {
-        const user =
-          byId.get(
-            row.id,
-          );
+      for (const row of rows) {
+        const user = byId.get(row.id);
 
         if (!user) {
           continue;
         }
 
-        collected.push(
-          user,
-        );
+        collected.push(user);
 
-        if (
-          collected.length ===
-          pageLimit
-        ) {
+        if (collected.length === pageLimit) {
           filledCursor = {
-            k: Number(
-              row.sort_val,
-            ),
+            k: Number(row.sort_val),
 
             id: row.id,
 
-            mode:
-              "FALLBACK",
+            mode: "FALLBACK",
           };
 
-          pageFilled =
-            true;
+          pageFilled = true;
 
           break;
         }
@@ -2003,28 +1680,17 @@ console.log("---------------userid : ", userId)
         break;
       }
 
-      const tail =
-        rows[
-        rows.length -
-        1
-        ];
+      const tail = rows[rows.length - 1];
 
-      fallbackCursorState =
-      {
-        k: Number(
-          tail.sort_val,
-        ),
+      fallbackCursorState = {
+        k: Number(tail.sort_val),
 
         id: tail.id,
 
-        mode:
-          "FALLBACK",
+        mode: "FALLBACK",
       };
 
-      if (
-        rows.length <
-        batchSize
-      ) {
+      if (rows.length < batchSize) {
         break;
       }
     }
@@ -2034,9 +1700,7 @@ console.log("---------------userid : ", userId)
   // STILL NO USERS
   // ========================================================
 
-  if (
-    collected.length === 0
-  ) {
+  if (collected.length === 0) {
     return {
       users: [],
 
@@ -2050,11 +1714,7 @@ console.log("---------------userid : ", userId)
   // PAGE
   // ========================================================
 
-  const page =
-    collected.slice(
-      0,
-      pageLimit,
-    );
+  const page = collected.slice(0, pageLimit);
 
   // ========================================================
   // ENSURE DISTANCE FOR FINAL PAGE USERS
@@ -2072,14 +1732,13 @@ console.log("---------------userid : ", userId)
       }
 
       const candidateLatitude =
-        user.profile?.latitude !== null &&
-          user.profile?.latitude !== undefined
+        user.profile?.latitude !== null && user.profile?.latitude !== undefined
           ? Number(user.profile.latitude)
           : null;
 
       const candidateLongitude =
         user.profile?.longitude !== null &&
-          user.profile?.longitude !== undefined
+        user.profile?.longitude !== undefined
           ? Number(user.profile.longitude)
           : null;
 
@@ -2092,10 +1751,7 @@ console.log("---------------userid : ", userId)
         candidateLatitude <= 90 &&
         candidateLongitude >= -180 &&
         candidateLongitude <= 180 &&
-        !(
-          candidateLatitude === 0 &&
-          candidateLongitude === 0
-        );
+        !(candidateLatitude === 0 && candidateLongitude === 0);
 
       if (!validCandidateCoordinates) {
         continue;
@@ -2104,238 +1760,170 @@ console.log("---------------userid : ", userId)
       // Haversine distance
       const R = 6371000; // Earth radius in meters
 
-      const toRadians = (degree: number) =>
-        (degree * Math.PI) / 180;
+      const toRadians = (degree: number) => (degree * Math.PI) / 180;
 
-      const lat1 =
-        toRadians(myLatitude);
+      const lat1 = toRadians(myLatitude);
 
-      const lat2 =
-        toRadians(candidateLatitude);
+      const lat2 = toRadians(candidateLatitude);
 
-      const deltaLat =
-        toRadians(
-          candidateLatitude -
-          myLatitude,
-        );
+      const deltaLat = toRadians(candidateLatitude - myLatitude);
 
-      const deltaLng =
-        toRadians(
-          candidateLongitude -
-          myLongitude,
-        );
+      const deltaLng = toRadians(candidateLongitude - myLongitude);
 
       const a =
-        Math.sin(deltaLat / 2) *
-        Math.sin(deltaLat / 2) +
+        Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
         Math.cos(lat1) *
-        Math.cos(lat2) *
-        Math.sin(deltaLng / 2) *
-        Math.sin(deltaLng / 2);
+          Math.cos(lat2) *
+          Math.sin(deltaLng / 2) *
+          Math.sin(deltaLng / 2);
 
-      const c =
-        2 *
-        Math.atan2(
-          Math.sqrt(a),
-          Math.sqrt(1 - a),
-        );
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-      const meters =
-        R * c;
+      const meters = R * c;
 
-      meterById.set(
-        user.id,
-        meters,
-      );
+      meterById.set(user.id, meters);
     }
   }
 
   if (filledCursor) {
-    nextCursor =
-      encodeCursor(
-        filledCursor,
-      );
+    nextCursor = encodeCursor(filledCursor);
   }
 
-  const candidateIds =
-    page.map(
-      (user) =>
-        user.id,
-    );
+  const candidateIds = page.map((user) => user.id);
 
   // ========================================================
   // REPLY TIME STATS
   // ========================================================
 
-  const replyStats =
-    await prisma.userReplyStats.findMany({
-      where: {
-        userId: {
-          in: candidateIds,
-        },
+  const replyStats = await prisma.userReplyStats.findMany({
+    where: {
+      userId: {
+        in: candidateIds,
       },
+    },
 
-      select: {
-        userId: true,
-        medianReplyMinutes: true,
-        sampleCount: true,
-      },
-    });
+    select: {
+      userId: true,
+      medianReplyMinutes: true,
+      sampleCount: true,
+    },
+  });
 
-  const replyStatsMap =
-    new Map(
-      replyStats.map(
-        (stat) => [
-          stat.userId,
-          stat,
-        ],
-      ),
-    );
+  const replyStatsMap = new Map(replyStats.map((stat) => [stat.userId, stat]));
   // ========================================================
   // BOOSTS
   // ========================================================
 
   const boostStart = performance.now();
 
-  const activeBoostUsages =
-    await prisma.boostUsage.findMany({
-      where: {
-        user_id: {
-          in: candidateIds,
-        },
-
-        is_active: true,
-
-        status: "ACTIVE",
-
-        started_at: {
-          lte: now,
-        },
-
-        expected_end_at: {
-          gt: now,
-        },
+  const activeBoostUsages = await prisma.boostUsage.findMany({
+    where: {
+      user_id: {
+        in: candidateIds,
       },
 
-      select: {
-        id: true,
-        user_id: true,
-        boost_id: true,
-        boost_type: true,
-        duration: true,
-        started_at: true,
-        expected_end_at: true,
+      is_active: true,
 
-        boost: {
-          select: {
-            id: true,
-            name: true,
-            title: true,
-            boostDuration: true,
-            visibilityMultiplier: true,
-          },
+      status: "ACTIVE",
+
+      started_at: {
+        lte: now,
+      },
+
+      expected_end_at: {
+        gt: now,
+      },
+    },
+
+    select: {
+      id: true,
+      user_id: true,
+      boost_id: true,
+      boost_type: true,
+      duration: true,
+      started_at: true,
+      expected_end_at: true,
+
+      boost: {
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          boostDuration: true,
+          visibilityMultiplier: true,
         },
       },
+    },
 
-      orderBy: {
-        started_at: "desc",
-      },
-    });
+    orderBy: {
+      started_at: "desc",
+    },
+  });
 
-  console.log(
-    "boosts:",
-    performance.now() - boostStart,
-    "ms",
-  );
-
+  console.log("boosts:", performance.now() - boostStart, "ms");
 
   // ========================================================
   // CREATE ACTIVE BOOST MAP
   // ========================================================
 
-  const activeBoostMap = new Map<
-    string,
-    (typeof activeBoostUsages)[number]
-  >();
+  const activeBoostMap = new Map<string, (typeof activeBoostUsages)[number]>();
 
   for (const usage of activeBoostUsages) {
     // If somehow multiple ACTIVE usages exist,
     // keep latest one because query is ordered DESC.
     if (!activeBoostMap.has(usage.user_id)) {
-      activeBoostMap.set(
-        usage.user_id,
-        usage,
-      );
+      activeBoostMap.set(usage.user_id, usage);
     }
   }
 
-  const boostedUserIds = new Set(
-    activeBoostMap.keys(),
-  );
+  const boostedUserIds = new Set(activeBoostMap.keys());
 
   // ========================================================
   // PRESENCE
   // ========================================================
 
-  const presenceStart =
-    performance.now();
+  const presenceStart = performance.now();
 
-  const presenceMap =
-    await getUsersPresence(
-      candidateIds,
-    );
+  const presenceMap = await getUsersPresence(candidateIds);
 
-  console.log(
-    "presence:",
-    performance.now() -
-    presenceStart,
-    "ms",
-  );
+  console.log("presence:", performance.now() - presenceStart, "ms");
 
   // ========================================================
   // COMPATIBILITY SCORE
   // ========================================================
 
-  const compatibilityStart =
-    performance.now();
+  const compatibilityStart = performance.now();
 
-  const compatibilityScores =
-    await prisma.userCompatibility.findMany(
-      {
-        where: {
-          userId,
+  const compatibilityScores = await prisma.userCompatibility.findMany({
+    where: {
+      userId,
 
-          targetUserId: {
-            in: candidateIds,
-          },
-        },
-
-        select: {
-          targetUserId: true,
-
-          score: true,
-
-          percentage: true,
-        },
+      targetUserId: {
+        in: candidateIds,
       },
-    );
+    },
+
+    select: {
+      targetUserId: true,
+
+      score: true,
+
+      percentage: true,
+    },
+  });
 
   console.log(
     "compatibility scores:",
-    performance.now() -
-    compatibilityStart,
+    performance.now() - compatibilityStart,
     "ms",
   );
 
-  const compatibilityMap =
-    new Map(
-      compatibilityScores.map(
-        (compatibility) => [
-          compatibility.targetUserId,
-          compatibility,
-        ],
-      ),
-    );
+  const compatibilityMap = new Map(
+    compatibilityScores.map((compatibility) => [
+      compatibility.targetUserId,
+      compatibility,
+    ]),
+  );
 
   // ========================================================
   // ENRICH USERS
@@ -2343,332 +1931,196 @@ console.log("---------------userid : ", userId)
 
   const nowMs = Date.now();
 
-  const boostWindow =
-    NEW_USER_BOOST_HOURS *
-    60 *
-    60 *
-    1000;
+  const boostWindow = NEW_USER_BOOST_HOURS * 60 * 60 * 1000;
 
-  const enriched =
-    page.map(
-      (user) => {
-        const presence =
-          presenceMap[
-          user.id
-          ];
+  const enriched = page.map((user) => {
+    const presence = presenceMap[user.id];
 
-        const meters =
-          meterById.get(
-            user.id,
-          );
+    const meters = meterById.get(user.id);
 
-        const compat =
-          compatibilityMap.get(
-            user.id,
-          );
+    const compat = compatibilityMap.get(user.id);
 
-        const replyStat =
-          replyStatsMap.get(
-            user.id,
-          );
+    const replyStat = replyStatsMap.get(user.id);
 
-        const replyTime =
-          replyStat &&
-            replyStat.medianReplyMinutes !== null &&
-            replyStat.sampleCount >= MIN_REPLY_SAMPLES
-            ? getReplyTimeLabel(
-              replyStat.medianReplyMinutes,
-            )
-            : null;
+    const replyTime =
+      replyStat &&
+      replyStat.medianReplyMinutes !== null &&
+      replyStat.sampleCount >= MIN_REPLY_SAMPLES
+        ? getReplyTimeLabel(replyStat.medianReplyMinutes)
+        : null;
 
-        const matchScore =
-          compat?.percentage ??
-          0;
+    const matchScore = compat?.percentage ?? 0;
 
-        const compatibilityScore =
-          compat?.score ?? 0;
+    const compatibilityScore = compat?.score ?? 0;
 
-        // ====================================================
-        // ACTIVE BOOST INFORMATION
-        // ====================================================
+    // ====================================================
+    // ACTIVE BOOST INFORMATION
+    // ====================================================
 
-        const activeBoost =
-          activeBoostMap.get(user.id);
+    const activeBoost = activeBoostMap.get(user.id);
 
-        const isBoosted =
-          !!activeBoost;
+    const isBoosted = !!activeBoost;
 
-        const boostType =
-          activeBoost?.boost_type ??
-          activeBoost?.boost?.name ??
-          null;
+    const boostType =
+      activeBoost?.boost_type ?? activeBoost?.boost?.name ?? null;
 
-        const boostEndsAt =
-          activeBoost?.expected_end_at ??
-          null;
+    const boostEndsAt = activeBoost?.expected_end_at ?? null;
 
-        const boostStartedAt =
-          activeBoost?.started_at ??
-          null;
+    const boostStartedAt = activeBoost?.started_at ?? null;
 
-        const boostDuration =
-          activeBoost?.duration ??
-          activeBoost?.boost?.boostDuration ??
-          null;
+    const boostDuration =
+      activeBoost?.duration ?? activeBoost?.boost?.boostDuration ?? null;
 
-        const visibilityMultiplier =
-          activeBoost?.boost?.visibilityMultiplier ??
-          1;
+    const visibilityMultiplier = activeBoost?.boost?.visibilityMultiplier ?? 1;
 
-        return {
-          id: user.id,
+    return {
+      id: user.id,
 
-          full_name:
-            user.full_name,
+      full_name: user.full_name,
 
-          birth_date:
-            formatBirthDate(
-              user.birth_date,
-            ),
+      birth_date: formatBirthDate(user.birth_date),
 
-          age: calculateAge(
-            user.birth_date,
-          ),
+      age: calculateAge(user.birth_date),
 
-          height:
-            user.height,
+      height: user.height,
 
-          created_at:
-            user.created_at,
+      created_at: user.created_at,
 
-          last_active_at:
-            user.last_active_at,
+      last_active_at: user.last_active_at,
 
-          profile: {
-            city:
-              user.profile
-                ?.city ||
-              null,
+      profile: {
+        city: user.profile?.city || null,
 
-            state:
-              user.profile
-                ?.state ||
-              null,
+        state: user.profile?.state || null,
 
-            country:
-              user.profile
-                ?.country ||
-              null,
+        country: user.profile?.country || null,
 
-              area: user.profile?.area ?? null,
+        area: user.profile?.area ?? null,
 
-            latitude:
-              user.profile
-                ?.latitude ||
-              null,
+        latitude: user.profile?.latitude || null,
 
-            longitude:
-              user.profile
-                ?.longitude ||
-              null,
-          },
-
-          eduWork: {
-            professionId:
-              user.eduWork
-                ?.professionId ||
-              null,
-
-            profession:
-              user.eduWork
-                ?.profession ||
-              null,
-          },
-
-          photos:
-            user.photos ||
-            [],
-
-          matchScore,
-
-          /**
-           * Distance is available
-           * only when actual
-           * distance mode was used.
-           *
-           * For:
-           *
-           * manual city mode
-           * fallback mode
-           *
-           * distance is null.
-           */
-
-          distanceKm:
-            meters != null
-              ? Math.round(
-                (
-                  meters /
-                  1000
-                ) *
-                100,
-              ) / 100
-              : null,
-
-          trust: user.trust_score ?? 0,
-
-          replyTime,
-
-          lookingFor: user.intention
-            ? {
-              id: user.intention.id,
-              option: user.intention.option,
-              optDescription:
-                user.intention.optDescription,
-            }
-            : null,
-
-          package: user.userPackages?.[0]
-            ? {
-              id: user.userPackages[0].package.id,
-              name: user.userPackages[0].package.name,
-              startDate:
-                user.userPackages[0].startDate,
-              endDate:
-                user.userPackages[0].endDate,
-            }
-            : {
-              id: null,
-              name: "FREE",
-              startDate: null,
-              endDate: null,
-            },
-
-          isOnline:
-            presence?.isOnline ||
-            false,
-
-          lastActiveAt:
-            presence?.lastActiveAt ||
-            null,
-
-          lastSeen:
-            formatLastSeen(
-              presence?.lastActiveAt,
-            ),
-
-          // ================================================
-          // DYNAMIC BOOST DATA
-          // ================================================
-
-          isBoosted,
-
-          boost: isBoosted
-            ? {
-              usageId:
-                activeBoost!.id,
-
-              type:
-                boostType,
-
-              title:
-                activeBoost!.boost?.title ??
-                null,
-
-              durationMinutes:
-                boostDuration,
-
-              visibilityMultiplier,
-
-              startedAt:
-                boostStartedAt,
-
-              endsAt:
-                boostEndsAt,
-            }
-            : null,
-        };
+        longitude: user.profile?.longitude || null,
       },
-    );
+
+      eduWork: {
+        professionId: user.eduWork?.professionId || null,
+
+        profession: user.eduWork?.profession || null,
+      },
+
+      photos: user.photos || [],
+
+      matchScore,
+
+      /**
+       * Distance is available
+       * only when actual
+       * distance mode was used.
+       *
+       * For:
+       *
+       * manual city mode
+       * fallback mode
+       *
+       * distance is null.
+       */
+
+      distanceKm:
+        meters != null ? Math.round((meters / 1000) * 100) / 100 : null,
+
+      trust: user.trust_score ?? 0,
+
+      replyTime,
+
+      lookingFor: user.intention
+        ? {
+            id: user.intention.id,
+            option: user.intention.option,
+            optDescription: user.intention.optDescription,
+          }
+        : null,
+
+      package: user.userPackages?.[0]
+        ? {
+            id: user.userPackages[0].package.id,
+            name: user.userPackages[0].package.name,
+            startDate: user.userPackages[0].startDate,
+            endDate: user.userPackages[0].endDate,
+          }
+        : {
+            id: null,
+            name: "FREE",
+            startDate: null,
+            endDate: null,
+          },
+
+      isOnline: presence?.isOnline || false,
+
+      lastActiveAt: presence?.lastActiveAt || null,
+
+      lastSeen: formatLastSeen(presence?.lastActiveAt),
+
+      // ================================================
+      // DYNAMIC BOOST DATA
+      // ================================================
+
+      isBoosted,
+
+      boost: isBoosted
+        ? {
+            usageId: activeBoost!.id,
+
+            type: boostType,
+
+            title: activeBoost!.boost?.title ?? null,
+
+            durationMinutes: boostDuration,
+
+            visibilityMultiplier,
+
+            startedAt: boostStartedAt,
+
+            endsAt: boostEndsAt,
+          }
+        : null,
+    };
+  });
 
   // ========================================================
   // SORT RETURNED PAGE
   // ========================================================
 
-  const sortedUsers = enriched.sort(
-    (a, b) => {
-      const aActivity =
-        a.lastActiveAt
-          ?.getTime() ||
-        0;
+  const sortedUsers = enriched.sort((a, b) => {
+    const aActivity = a.lastActiveAt?.getTime() || 0;
 
-      const bActivity =
-        b.lastActiveAt
-          ?.getTime() ||
-        0;
+    const bActivity = b.lastActiveAt?.getTime() || 0;
 
-      const aCreated =
-        a.created_at
-          ? new Date(
-            a.created_at,
-          ).getTime()
-          : 0;
+    const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
 
-      const bCreated =
-        b.created_at
-          ? new Date(
-            b.created_at,
-          ).getTime()
-          : 0;
+    const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
 
-      const aIsNew =
-        nowMs -
-        aCreated <
-        boostWindow;
+    const aIsNew = nowMs - aCreated < boostWindow;
 
-      const bIsNew =
-        nowMs -
-        bCreated <
-        boostWindow;
+    const bIsNew = nowMs - bCreated < boostWindow;
 
-      // 1. BOOSTED FIRST
-      if (
-        a.isBoosted !==
-        b.isBoosted
-      ) {
-        return a.isBoosted
-          ? -1
-          : 1;
-      }
+    // 1. BOOSTED FIRST
+    if (a.isBoosted !== b.isBoosted) {
+      return a.isBoosted ? -1 : 1;
+    }
 
-      // 2. NEW USERS
-      if (
-        aIsNew !==
-        bIsNew
-      ) {
-        return aIsNew
-          ? -1
-          : 1;
-      }
+    // 2. NEW USERS
+    if (aIsNew !== bIsNew) {
+      return aIsNew ? -1 : 1;
+    }
 
-      // 3. MATCH SCORE
-      if (
-        a.matchScore !==
-        b.matchScore
-      ) {
-        return (
-          b.matchScore -
-          a.matchScore
-        );
-      }
+    // 3. MATCH SCORE
+    if (a.matchScore !== b.matchScore) {
+      return b.matchScore - a.matchScore;
+    }
 
-      // 4. ACTIVE USERS
-      return (
-        bActivity -
-        aActivity
-      );
-    },
-  );
+    // 4. ACTIVE USERS
+    return bActivity - aActivity;
+  });
 
   // ========================================================
   // DAILY FEED ACCESS
@@ -2691,99 +2143,68 @@ console.log("---------------userid : ", userId)
      * Fetching /feed does NOT consume quota.
      */
 
-    visibleUsers =
-      sortedUsers.slice(
-        0,
-        remainingToday,
-      );
+    visibleUsers = sortedUsers.slice(0, remainingToday);
 
     /**
      * Everything after the remaining
      * Free allowance is locked.
      */
-    lockedUsers =
-      sortedUsers.slice(
-        remainingToday,
-      );
+    lockedUsers = sortedUsers.slice(remainingToday);
   }
 
   // ========================================================
   // LOCKED COUNT
   // ========================================================
 
-  const lockedCount =
-    isFreeUser
-      ? Math.min(
-        lockedUsers.length,
-        FREE_LOCKED_PROFILE_COUNT,
-      )
-      : 0;
+  const lockedCount = isFreeUser
+    ? Math.min(lockedUsers.length, FREE_LOCKED_PROFILE_COUNT)
+    : 0;
 
   // ========================================================
   // LOCKED PREVIEWS
   // ========================================================
 
-  const lockedPreviews =
-    isFreeUser
-      ? lockedUsers
-        .slice(
-          0,
-          LOCKED_PREVIEW_COUNT,
-        )
-        .map(
-          (user) => ({
-            displayName:
-              maskName(
-                user.full_name,
-              ),
+  const lockedPreviews = isFreeUser
+    ? lockedUsers.slice(0, LOCKED_PREVIEW_COUNT).map((user) => ({
+        displayName: maskName(user.full_name),
 
-            age:
-              maskAge(
-                user.age,
-              ),
+        age: maskAge(user.age),
 
-            /**
-             * Replace this with actual
-             * verification logic later.
-             */
-            verification: null,
+        /**
+         * Replace this with actual
+         * verification logic later.
+         */
+        verification: null,
 
-            matchScore:
-              user.matchScore,
+        matchScore: user.matchScore,
 
-            trustScore:
-              user.trust,
+        trustScore: user.trust,
 
-            locked: true,
-          }),
-        )
-      : [];
+        locked: true,
+      }))
+    : [];
 
   // ========================================================
   // FINAL DAILY LIMIT
   // ========================================================
 
-  const finalSeenToday =
-    isFreeUser
-      ? seenToday
-      : 0;
+  // ========================================================
+  // FINAL DAILY LIMIT
+  // ========================================================
 
-  const finalRemainingToday =
-    isFreeUser
-      ? remainingToday
-      : PAID_DAILY_PROFILE_LIMIT;
+  // Actual profiles swiped today
+  const finalSeenToday = seenToday;
 
+  // Actual remaining profiles based on package
+  const finalRemainingToday = remainingToday;
 
   // ========================================================
   // TRACK BOOST IMPRESSIONS
   // ========================================================
 
-  const boostedVisibleUsers =
-    visibleUsers.filter(
-      (feedUser) =>
-        feedUser.isBoosted &&
-        feedUser.id !== userId
-    );
+  const boostedVisibleUsers = visibleUsers.filter(
+    (feedUser) => feedUser.isBoosted && feedUser.id !== userId,
+  );
 
   Promise.all(
     boostedVisibleUsers.map((feedUser) =>
@@ -2791,18 +2212,13 @@ console.log("---------------userid : ", userId)
         targetUserId: feedUser.id,
         actorId: userId,
         type: "IMPRESSION", // see note below
-      })
-    )
+      }),
+    ),
   ).catch((error) => {
-    console.error(
-      "Boost impression tracking error:",
-      error
-    );
+    console.error("Boost impression tracking error:", error);
   });
 
-  const showUpgradeGate =
-    isFreeUser &&
-    lockedCount > 0;
+  const showUpgradeGate = isFreeUser && lockedCount > 0;
 
   // ========================================================
   // RESPONSE
@@ -2815,61 +2231,41 @@ console.log("---------------userid : ", userId)
      * Free user should not paginate
      * beyond today's allowance.
      */
-    nextCursor:
-      isFreeUser
-        ? null
-        : nextCursor,
+    nextCursor: isFreeUser ? null : nextCursor,
 
     locationFallbackUsed,
 
     dailyLimit: {
-      plan:
-        isFreeUser
-          ? "FREE"
-          : activeVipPackage
-            ?.package
-            ?.name ?? "PAID",
+      plan: isFreeUser ? "FREE" : (activeVipPackage?.package?.name ?? "PAID"),
 
-      limit:
-        dailyProfileLimit,
+      limit: dailyProfileLimit,
 
-      seen:
-        finalSeenToday,
+      seen: finalSeenToday,
 
-      remaining:
-        finalRemainingToday,
+      remaining: finalRemainingToday,
 
-      resetAt:
-        tomorrowStart.toISOString(),
+      resetAt: tomorrowStart.toISOString(),
     },
 
     upgradeGate: {
-      show:
-        showUpgradeGate,
+      show: showUpgradeGate,
 
       lockedCount,
 
-      title:
-        showUpgradeGate
-          ? "Your best matches are just behind this"
-          : null,
+      title: showUpgradeGate ? "Your best matches are just behind this" : null,
 
-      subtitle:
-        showUpgradeGate
-          ? `${lockedCount} more verified profiles picked for you today — upgrade to unlock more.`
-          : null,
+      subtitle: showUpgradeGate
+        ? `${lockedCount} more verified profiles picked for you today — upgrade to unlock more.`
+        : null,
 
-      lockedProfiles:
-        showUpgradeGate
-          ? lockedPreviews
-          : [],
+      lockedProfiles: showUpgradeGate ? lockedPreviews : [],
     },
   };
 };
 
 export const getFeedDetailsService = async (
   userId: string,
-  currentUserId: string
+  currentUserId: string,
 ): Promise<UserFeedResponse | DeletedUserResponse> => {
   const CACHE_KEY = `feed:details:${userId}:${currentUserId}`;
 
@@ -2897,11 +2293,9 @@ export const getFeedDetailsService = async (
   // =====================================================
 
   const isDeleted =
-    userStatus.account_status === "DELETED" ||
-    userStatus.deleted_at !== null;
+    userStatus.account_status === "DELETED" || userStatus.deleted_at !== null;
 
   if (isDeleted) {
-
     // Remove old profile cache
     await redis.del(CACHE_KEY);
 
@@ -2915,32 +2309,28 @@ export const getFeedDetailsService = async (
   // 1. PREVENT SELF PROFILE VIEW
   // =====================================================
 
-  const shouldTrackProfileView =
-    userId !== currentUserId;
+  const shouldTrackProfileView = userId !== currentUserId;
 
   // =====================================================
   // 2. CHECK REDIS
   // =====================================================
 
-  const cachedFeedDetails =
-    await redis.get<UserFeedResponse>(CACHE_KEY);
+  const cachedFeedDetails = await redis.get<UserFeedResponse>(CACHE_KEY);
 
   if (cachedFeedDetails) {
-
     console.log("✅ Feed Details from Redis");
 
     // Track even when profile comes from Redis
     if (shouldTrackProfileView) {
       await trackBoostEvent({
-        targetUserId: userId,       // Profile owner
-        actorId: currentUserId,      // Person viewing profile
+        targetUserId: userId, // Profile owner
+        actorId: currentUserId, // Person viewing profile
         type: "PROFILE_VIEW",
       });
     }
 
     return cachedFeedDetails;
   }
-
 
   // =====================================================
   // 3. GET PROFILE FROM DATABASE
@@ -2957,10 +2347,10 @@ export const getFeedDetailsService = async (
           community: true,
           languages: {
             include: {
-              language: true
-            }
-          }
-        }
+              language: true,
+            },
+          },
+        },
       },
       bio: true,
       intention: true,
@@ -2971,8 +2361,8 @@ export const getFeedDetailsService = async (
           employmentType: true,
           experience: true,
           ambition: true,
-          salaryRange: true
-        }
+          salaryRange: true,
+        },
       },
       familyProfile: {
         include: {
@@ -2992,36 +2382,36 @@ export const getFeedDetailsService = async (
               marital: true,
             },
           },
-        }
+        },
       },
       photos: {
         orderBy: {
-          order: 'asc'
-        }
+          order: "asc",
+        },
       },
       userPrompts: {
         include: {
           prompt: {
             include: {
-              category: true
-            }
-          }
+              category: true,
+            },
+          },
         },
         orderBy: {
-          displayOrder: 'asc'
-        }
+          displayOrder: "asc",
+        },
       },
       answer: {
         include: {
           question: true,
-          option: true
-        }
-      }
-    }
+          option: true,
+        },
+      },
+    },
   });
 
   if (!user) {
-    throw new Error('User not found');
+    throw new Error("User not found");
   }
 
   // =====================================================
@@ -3042,9 +2432,9 @@ export const getFeedDetailsService = async (
   // Same logic as your main Feed API
   const replyTime =
     replyStats &&
-      replyStats.medianReplyMinutes !== null &&
-      replyStats.sampleCount >= MIN_REPLY_SAMPLES
-      ? getReplyTimeLabel(replyStats.medianReplyMinutes) ?? ""
+    replyStats.medianReplyMinutes !== null &&
+    replyStats.sampleCount >= MIN_REPLY_SAMPLES
+      ? (getReplyTimeLabel(replyStats.medianReplyMinutes) ?? "")
       : "";
 
   // 3. Transform data
@@ -3062,7 +2452,6 @@ export const getFeedDetailsService = async (
   // =====================================================
 
   if (shouldTrackProfileView) {
-
     await trackBoostEvent({
       targetUserId: userId,
       actorId: currentUserId,
@@ -3080,24 +2469,25 @@ export const getFeedDetailsService = async (
 const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
   // Extract lifestyle answers (screen = LIFESTYLE)
   const lifestyleAnswers = user.answer.filter(
-    (a: any) => a.question.screen === 'LIFESTYLE'
+    (a: any) => a.question.screen === "LIFESTYLE",
   );
 
   // Extract interests (screen = THINGS_U_LOVE)
   const interestAnswers = user.answer.filter(
-    (a: any) => a.question.screen === 'THINGS_U_LOVE'
+    (a: any) => a.question.screen === "THINGS_U_LOVE",
   );
 
   // Extract networking (screen = NETWORKING)
   const networkingAnswers = user.answer.filter(
-    (a: any) => a.question.screen === 'NETWORKING_INTENT'
+    (a: any) => a.question.screen === "NETWORKING_INTENT",
   );
 
   // Calculate age from birth_date
   const age = calculateAge(user.birth_date);
 
   // Get primary photo
-  const primaryPhoto = user.photos.find((p: any) => p.is_primary) || user.photos[0];
+  const primaryPhoto =
+    user.photos.find((p: any) => p.is_primary) || user.photos[0];
 
   // Get mother tongue from languages
   const motherTongue = user.profile?.languages?.[0]?.language?.name || null;
@@ -3142,7 +2532,7 @@ const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
       url: photo.media_url,
       isPrimary: photo.is_primary,
       order: photo.order,
-      mediaType: photo.media_type
+      mediaType: photo.media_type,
     })),
 
     // Prompts
@@ -3151,7 +2541,7 @@ const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
       question: prompt.prompt.question,
       answer: prompt.answer,
       category: prompt.prompt.category?.name || null,
-      displayOrder: prompt.displayOrder
+      displayOrder: prompt.displayOrder,
     })),
 
     // Career
@@ -3166,27 +2556,27 @@ const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
       experience: user.eduWork?.experience?.title || null,
       ambition: user.eduWork?.ambition?.title || null,
       salaryRange: user.eduWork?.salaryRange?.title || null,
-      bigDreams: user.eduWork?.bigDreams || null
+      bigDreams: user.eduWork?.bigDreams || null,
     },
 
     // Lifestyle
     lifestyle: lifestyleAnswers.map((answer: any) => ({
       question: answer.question.title,
       answer: answer.option.label,
-      description: answer.description || null
+      description: answer.description || null,
     })),
 
     // Interests
     interests: interestAnswers.map((answer: any) => ({
       question: answer.question.title,
       answer: answer.option.label,
-      description: answer.description || null
+      description: answer.description || null,
     })),
 
     networkingAnswers: networkingAnswers.map((answer: any) => ({
       question: answer.question.title,
       answer: answer.option.label,
-      description: answer.description || null
+      description: answer.description || null,
     })),
 
     // Family
@@ -3206,10 +2596,8 @@ const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
             relation: sibling.siblingType?.value || null,
             occupation: sibling.occupation?.value || null,
             marital: sibling.marital?.value || null,
-          })
+          }),
         ) || [],
-    }
+    },
   };
 };
-
-
