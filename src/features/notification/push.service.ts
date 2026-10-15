@@ -49,6 +49,21 @@ export const sendPushNotification = async ({
     }
   });
 
+  // const notificationTag = data.senderId
+  //   ? `chat_${data.senderId}`
+  //   : data.conversationId
+  //   ? `chat_${data.conversationId}`
+  //   : undefined;
+
+  const notificationTag =
+  type === "NEW_MESSAGE"
+    ? data.conversationId
+      ? `chat_${data.conversationId}`
+      : data.senderId
+      ? `chat_${data.senderId}`
+      : undefined
+    : undefined;
+
   
   try {
     const response = await firebaseMessaging.send({
@@ -63,9 +78,11 @@ export const sendPushNotification = async ({
 
       android: {
         priority: "high",
-
+        ...(notificationTag ? { collapseKey: notificationTag } : {}),
         notification: {
           sound: "default",
+          channelId: "high_importance_channel", 
+          ...(notificationTag ? { tag: notificationTag } : {}),
         },
       },
 
@@ -74,6 +91,7 @@ export const sendPushNotification = async ({
           aps: {
             badge: user.badge_count,
             sound: "default",
+            ...(notificationTag ? { threadId: notificationTag } : {}),
           },
         },
       },
