@@ -1,4 +1,4 @@
-import { MessageType, Prisma, TargetType, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
+import { MessageType, Prisma, StoreFeatureType, TargetType, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { SendEngagementDTO } from "../engagement/engagement.validation";
 import { AppError } from "../rose/AppError";
@@ -348,9 +348,43 @@ export const createBundleCompliment = async (
 
   const complimentBalance =
     await getComplimentBalance(senderId, tx);
+// ============================================
+// GET DYNAMIC COMPLIMENT PRICE
+// ============================================
 
-  const COMPLIMENT_PRICE =
-    COMPLIMENT_CONSTANTS.WALLET_PRICE;
+const complimentFeature =
+  await tx.storeFeature.findUnique({
+    where: {
+      feature: StoreFeatureType.COMPLIMENT_SEND_COST,
+    },
+    select: {
+      intValue: true,
+      enabled: true,
+    },
+  });
+
+if (
+  !complimentFeature ||
+  !complimentFeature.enabled
+) {
+  throw new AppError(
+    400,
+    "Compliment sending is currently unavailable."
+  );
+}
+
+if (
+  complimentFeature.intValue === null ||
+  complimentFeature.intValue < 0
+) {
+  throw new AppError(
+    500,
+    "Invalid compliment send cost configuration."
+  );
+}
+
+const COMPLIMENT_PRICE =
+  complimentFeature.intValue;
 
   let deduction:
     Awaited<ReturnType<typeof deductCompliment>> | null =
