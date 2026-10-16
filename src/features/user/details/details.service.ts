@@ -113,9 +113,28 @@ export const getUserDetailsService = async (userId: string) => {
     ? new Date().getFullYear() - new Date(user.birth_date).getFullYear()
     : null;
 
+  const heightCm = user.height;
+
+  let heightFeet = null;
+  let heightInches = null;
+  let heightFormatted = null;
+
+  if (heightCm !== null && heightCm > 0) {
+    const totalInches = Math.round(heightCm / 2.54);
+
+    heightFeet = Math.floor(totalInches / 12);
+    heightInches = totalInches % 12;
+
+    heightFormatted = `${heightFeet}'${heightInches}"`;
+  }
+
   return {
     ...user,
     age,
+    heightCm,
+    heightFeet,
+    heightInches,
+    heightFormatted,
   };
 };
 
@@ -139,6 +158,8 @@ const getAge = (birthDate: Date | null): number | null => {
 
   return age;
 };
+
+// Convert height from CM to feet and inches
 
 /**
  * Reverse geocode latitude / longitude.
@@ -381,83 +402,60 @@ export const getProfileSummaryService = async (userId: string) => {
   /**
    * Active membership
    */
-const activeMembership =
-  user.userPackages.find((item) => {
+  const activeMembership = user.userPackages.find((item) => {
     return (
       item.status === "ACTIVE" &&
       item.startDate <= now &&
-      (item.endDate === null ||
-        item.endDate >= now)
+      (item.endDate === null || item.endDate >= now)
     );
   });
 
-const latestMembership =
-  activeMembership ??
-  user.userPackages.find((item) => {
-    return (
-      item.status === "EXPIRED" ||
-      (item.endDate !== null &&
-        item.endDate < now)
-    );
-  }) ??
-  null;
+  const latestMembership =
+    activeMembership ??
+    user.userPackages.find((item) => {
+      return (
+        item.status === "EXPIRED" ||
+        (item.endDate !== null && item.endDate < now)
+      );
+    }) ??
+    null;
 
-const membershipPackage =
-  latestMembership?.currentPackage ??
-  latestMembership?.package ??
-  null;
+  const membershipPackage =
+    latestMembership?.currentPackage ?? latestMembership?.package ?? null;
 
-const isActive =
-  latestMembership !== null &&
-  latestMembership.status === "ACTIVE" &&
-  latestMembership.startDate <= now &&
-  (latestMembership.endDate === null ||
-    latestMembership.endDate >= now);
+  const isActive =
+    latestMembership !== null &&
+    latestMembership.status === "ACTIVE" &&
+    latestMembership.startDate <= now &&
+    (latestMembership.endDate === null || latestMembership.endDate >= now);
 
-const membership = membershipPackage
-  ? {
-      id: membershipPackage.id,
-      name: membershipPackage.name,
-
-      status: isActive
-        ? "ACTIVE"
-        : "EXPIRED",
-
-      isActive: isActive,
-
-      startDate:
-        latestMembership?.startDate ?? null,
-
-      endDate:
-        latestMembership?.endDate ?? null,
-    }
-  : null;
+  const membership = membershipPackage
+    ? {
+        id: membershipPackage.id,
+        name: membershipPackage.name,
+        status: isActive ? "ACTIVE" : "EXPIRED",
+        isActive: isActive,
+        startDate: latestMembership?.startDate ?? null,
+        endDate: latestMembership?.endDate ?? null,
+      }
+    : null;
 
   return {
     id: user.id,
-
     photo: user.photos[0]?.media_url ?? null,
-
     fullName: user.full_name ?? null,
-
     age,
-
     displayName: user.full_name
       ? `${user.full_name}${age !== null ? `, ${age}` : ""}`
       : null,
-
     location: {
       latitude,
       longitude,
       display: displayLocation,
     },
-
     membership,
-
     trustScore: user.trust_score,
-
     profileCompletion: user.profile_completion,
-
     relationship,
   };
 };

@@ -6,6 +6,8 @@ import {
 
 export const getUserDetailsController = async (req: Request, res: Response) => {
   try {
+
+    console.log("GET USER DETAILS CONTROLLER CALLED");
     const id = req.params.id as string;
 
     if (!id) {

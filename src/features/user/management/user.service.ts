@@ -1,5 +1,9 @@
 import { prisma } from "../../../prisma/prismaClient";
 import { formatLastSeen } from "../../../utils/lastSeen";
+import {
+  getReplyTimeLabel,
+  MIN_REPLY_SAMPLES,
+} from "../../chat/user-reply-stats.service";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { calculateAge } from "../feed/feed.service";
 
@@ -277,8 +281,52 @@ export const getSingleUser = async (id: string, currentUserId?: string) => {
   // STATIC VALUES
   // ==========================================================
 
-  const STATIC_TRUST = 75;
-  const STATIC_REPLY_TIME = "5 m reply";
+  // ==========================================================
+  // DYNAMIC TRUST SCORE
+  // ==========================================================
+
+  const trustScore = user.trust_score ?? 0;
+
+  // ==========================================================
+  // DYNAMIC REPLY TIME
+  // ==========================================================
+
+  const replyStat = await prisma.userReplyStats.findUnique({
+    where: {
+      userId: user.id,
+    },
+
+    select: {
+      medianReplyMinutes: true,
+      sampleCount: true,
+    },
+  });
+
+  const replyTime =
+    replyStat &&
+    replyStat.medianReplyMinutes !== null &&
+    replyStat.sampleCount >= MIN_REPLY_SAMPLES
+      ? getReplyTimeLabel(replyStat.medianReplyMinutes)
+      : null;
+
+  // ==========================================================
+  // HEIGHT CONVERSION (CM TO FEET & INCHES)
+  // ==========================================================
+
+  const heightCm = user.height;
+
+  let heightFeet: number | null = null;
+  let heightInches: number | null = null;
+  let heightFormatted: string | null = null;
+
+  if (heightCm !== null && heightCm > 0) {
+    const totalInches = Math.round(heightCm / 2.54);
+
+    heightFeet = Math.floor(totalInches / 12);
+    heightInches = totalInches % 12;
+
+    heightFormatted = `${heightFeet}' ${heightInches}"`;
+  }
 
   // ==========================================================
   // FINAL RESPONSE
@@ -290,32 +338,24 @@ export const getSingleUser = async (id: string, currentUserId?: string) => {
     // ============================================
     id: user.id,
     full_name: user.full_name,
-
     birth_date: formatBirthDate(user.birth_date),
-
     age: calculateAge(user.birth_date),
-
     height: user.height,
-
+    heightFormatted,
     created_at: user.created_at,
-
     last_active_at: user.last_active_at,
-
     // ============================================
     // PROFILE
     // ============================================
     profile: user.profile,
-
     // ============================================
     // BIO
     // ============================================
     bio: user.bio,
-
     // ============================================
     // INTENTION
     // ============================================
     intention: user.intention,
-
     // ============================================
     // ABOUT
     // ============================================
@@ -323,12 +363,10 @@ export const getSingleUser = async (id: string, currentUserId?: string) => {
       ...user.about,
       relationshipTag: "Serious Relationship",
     },
-
     // ============================================
     // EDUCATION / WORK
     // ============================================
     eduWork: user.eduWork,
-
     // ============================================
     // FAMILY
     // ============================================
@@ -353,22 +391,16 @@ export const getSingleUser = async (id: string, currentUserId?: string) => {
     // FEED FIELDS
     // ============================================
     matchScore,
-
     compatibilityScore,
-
     distanceKm,
-
-    trust: STATIC_TRUST,
-
-    replyTime: STATIC_REPLY_TIME,
+    trust: trustScore,
+    replyTime,
 
     // ============================================
     // PRESENCE
     // ============================================
     isOnline,
-
     lastActiveAt: presenceLastActiveAt,
-
     lastSeen,
 
     // ============================================
