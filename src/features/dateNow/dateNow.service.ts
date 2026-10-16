@@ -8,6 +8,8 @@ import {
   PrismaClient,
   DatePlanAttendanceStatus,
   DatePlanFeedbackStatus,
+  PackageStatus,
+  PackageType,
 } from "@prisma/client";
 import {
   UpdateDatePlanActivityDTO,
@@ -117,10 +119,7 @@ export const updateDraftDatePlan = async (
   return updatedPlan;
 };
 
-export const publishDatePlan = async (
-  planId: string,
-  userId: string,
-) => {
+export const publishDatePlan = async (planId: string, userId: string) => {
   return prisma.$transaction(async (tx) => {
     // ============================================
     // 1. GET DATE PLAN
@@ -140,6 +139,45 @@ export const publishDatePlan = async (
       throw new Error("Plan not found");
     }
 
+    // ============================================
+    // CHECK USER ACTIVE PURCHASED PACKAGE
+    // ============================================
+
+    const now = new Date();
+
+    const activePackage = await tx.userPackage.findFirst({
+      where: {
+        user_id: userId,
+        status: PackageStatus.ACTIVE,
+        startDate: {
+          lte: now,
+        },
+        OR: [
+          {
+            endDate: null,
+          },
+          {
+            endDate: {
+              gt: now,
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!activePackage) {
+      throw new Error(
+        "Please purchase a package before publishing a date plan.",
+      );
+    }
+
+    // ============================================
+    // EXISTING VALIDATION
+    // ============================================
+
     if (!plan.activityId) {
       throw new Error("Activity is required");
     }
@@ -156,17 +194,14 @@ export const publishDatePlan = async (
     // 2. GET USER DATE PLAN STATS
     // ============================================
 
-    const userPlanStats =
-      await tx.datePlanUserStats.findUnique({
-        where: {
-          userId,
-        },
-      });
+    const userPlanStats = await tx.datePlanUserStats.findUnique({
+      where: {
+        userId,
+      },
+    });
 
     if (!userPlanStats) {
-      throw new Error(
-        "User date plan stats not found",
-      );
+      throw new Error("User date plan stats not found");
     }
 
     let paymentMethod: "DATE_PLAN_CREDIT" | "WALLET";
@@ -192,9 +227,7 @@ export const publishDatePlan = async (
       });
 
       if (updated.count !== 1) {
-        throw new Error(
-          "Date plan credit deduction failed",
-        );
+        throw new Error("Date plan credit deduction failed");
       }
 
       paymentMethod = "DATE_PLAN_CREDIT";
@@ -203,27 +236,20 @@ export const publishDatePlan = async (
       // 4. GET DATE PLAN POSTING COST
       // ============================================
 
-      const packageFeature =
-        await tx.datePlanPackageFeatures.findFirst({
-          select: {
-            costToPostPlan: true,
-          },
-        });
+      const packageFeature = await tx.datePlanPackageFeatures.findFirst({
+        select: {
+          costToPostPlan: true,
+        },
+      });
 
       if (!packageFeature) {
-        throw new Error(
-          "Date plan package feature not found",
-        );
+        throw new Error("Date plan package feature not found");
       }
 
-      const costToPostPlan = new Prisma.Decimal(
-        packageFeature.costToPostPlan,
-      );
+      const costToPostPlan = new Prisma.Decimal(packageFeature.costToPostPlan);
 
       if (costToPostPlan.lessThan(0)) {
-        throw new Error(
-          "Invalid date plan posting cost",
-        );
+        throw new Error("Invalid date plan posting cost");
       }
 
       // ============================================
@@ -244,14 +270,8 @@ export const publishDatePlan = async (
       // 6. CHECK WALLET BALANCE
       // ============================================
 
-      if (
-        new Prisma.Decimal(wallet.balance).lessThan(
-          costToPostPlan,
-        )
-      ) {
-        throw new Error(
-          "Insufficient wallet balance",
-        );
+      if (new Prisma.Decimal(wallet.balance).lessThan(costToPostPlan)) {
+        throw new Error("Insufficient wallet balance");
       }
 
       // ============================================
@@ -273,9 +293,7 @@ export const publishDatePlan = async (
       });
 
       if (updatedWallet.count !== 1) {
-        throw new Error(
-          "Insufficient wallet balance",
-        );
+        throw new Error("Insufficient wallet balance");
       }
 
       paymentMethod = "WALLET";
@@ -299,15 +317,14 @@ export const publishDatePlan = async (
     // 9. RETURN RESPONSE
     // ============================================
 
-    const updatedStats =
-      await tx.datePlanUserStats.findUnique({
-        where: {
-          userId,
-        },
-        select: {
-          balance: true,
-        },
-      });
+    const updatedStats = await tx.datePlanUserStats.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        balance: true,
+      },
+    });
 
     return {
       success: true,
@@ -416,6 +433,38 @@ export const discoverDatePlan = async (
     throw new Error("User not found");
   }
 
+  // ============================================
+  // GET CURRENT USER ACTIVE PACKAGE
+  // ============================================
+
+  const myActivePackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: PackageStatus.ACTIVE,
+      startDate: {
+        lte: now,
+      },
+      OR: [{ endDate: null }, { endDate: { gt: now } }],
+    },
+    orderBy: {
+      startDate: "desc",
+    },
+    select: {
+      package: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  const myPackageType: PackageType | "FREE" =
+    myActivePackage?.package.name ?? "FREE";
+
+  // ============================================
+  // EXISTING CODE
+  // ============================================
+
   const profile = me.profile;
 
   const latitude = profile?.latitude != null ? Number(profile.latitude) : null;
@@ -495,6 +544,34 @@ export const discoverDatePlan = async (
         not: userId,
       },
 
+      // ============================================
+      // PACKAGE-BASED DATE PLAN VISIBILITY
+      // ============================================
+
+      ...(myPackageType !== "FREE"
+        ? {
+            user: {
+              userPackages: {
+                some: {
+                  status: PackageStatus.ACTIVE,
+                  startDate: {
+                    lte: now,
+                  },
+                  OR: [{ endDate: null }, { endDate: { gt: now } }],
+                  package: {
+                    name: {
+                      in:
+                        myPackageType === PackageType.PREMIUM
+                          ? [PackageType.PREMIUM]
+                          : [PackageType.VIP, PackageType.VIP_ELITE],
+                    },
+                  },
+                },
+              },
+            },
+          }
+        : {}),
+
       DateConfirmed: {
         none: {},
       },
@@ -516,26 +593,51 @@ export const discoverDatePlan = async (
 
     include: {
       user: {
-        include: {
-          profile: true,
-          eduWork: true,
-          bio: true,
+  include: {
+    profile: true,
+    eduWork: true,
+    bio: true,
 
-          answer: {
-            include: {
-              question: true,
-              option: true,
-            },
-          },
+    answer: {
+      include: {
+        question: true,
+        option: true,
+      },
+    },
 
-          photos: {
-            where: {
-              order: 1,
-            },
-            take: 1,
+    photos: {
+      where: {
+        order: 1,
+      },
+      take: 1,
+    },
+
+    // GET DATE PLAN HOST ACTIVE PACKAGE
+    userPackages: {
+      where: {
+        status: PackageStatus.ACTIVE,
+        startDate: {
+          lte: now,
+        },
+        OR: [
+          { endDate: null },
+          { endDate: { gt: now } },
+        ],
+      },
+      orderBy: {
+        startDate: "desc",
+      },
+      take: 1,
+      select: {
+        package: {
+          select: {
+            name: true,
           },
         },
       },
+    },
+  },
+},
 
       activity: true,
       quickTitle: true,
@@ -558,7 +660,10 @@ export const discoverDatePlan = async (
   // ============================================
 
   const ranked = plans.map((plan) => {
-    const matchScore = calculateMatchScore(me, plan.user);
+    const matchScore = 75;
+    //  calculateMatchScore(me, plan.user);
+
+    console.log("////////////match score : ", matchScore)
 
     let distanceKm: number | null = null;
 
@@ -681,18 +786,17 @@ export const discoverDatePlan = async (
       ? `T${plan.eventDateTime.toISOString().split("T")[1]}`
       : null;
 
-const eventDay = plan.eventDateTime
-  ? new Intl.DateTimeFormat("en-US", {
-      weekday: "long",
-      timeZone: "Asia/Kolkata",
-    }).format(plan.eventDateTime)
-  : null;
+    const eventDay = plan.eventDateTime
+      ? new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+          timeZone: "Asia/Kolkata",
+        }).format(plan.eventDateTime)
+      : null;
 
     return {
       id: plan.id,
 
       matchScore: plan.matchScore,
-
 
       distanceKm: plan.distanceKm,
 
@@ -721,22 +825,28 @@ const eventDay = plan.eventDateTime
       duration: plan.duration,
 
       host: {
-        id: plan.user.id,
+  id: plan.user.id,
 
-        name: plan.user.full_name,
+  name: plan.user.full_name,
 
-        trustScore: plan.user.trust_score,
+  trustScore: plan.user.trust_score,
 
-        profilePhoto:
-          plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
+  profilePhoto:
+    plan.user.photos.length > 0
+      ? plan.user.photos[0].media_url
+      : null,
 
-        age: plan.user.birth_date
-          ? Math.floor(
-              (Date.now() - new Date(plan.user.birth_date).getTime()) /
-                (365.25 * 24 * 60 * 60 * 1000),
-            )
-          : null,
-      },
+  age: plan.user.birth_date
+    ? Math.floor(
+        (Date.now() - new Date(plan.user.birth_date).getTime()) /
+          (365.25 * 24 * 60 * 60 * 1000),
+      )
+    : null,
+
+  // HOST PURCHASED PACKAGE
+  package:
+    plan.user.userPackages[0]?.package.name ?? "FREE",
+},
     };
   });
 
@@ -801,6 +911,45 @@ export const requestToJoinDatePlan = async (
   if (!plan) {
     throw new Error("Date plan not found");
   }
+
+  // ============================================
+  // CHECK USER ACTIVE PURCHASED PACKAGE
+  // ============================================
+
+  const now = new Date();
+
+  const activePackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: PackageStatus.ACTIVE,
+      startDate: {
+        lte: now,
+      },
+      OR: [
+        {
+          endDate: null,
+        },
+        {
+          endDate: {
+            gt: now,
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!activePackage) {
+    throw new Error(
+      "Please purchase a package before sending a date plan request.",
+    );
+  }
+
+  // ============================================
+  // EXISTING VALIDATION
+  // ============================================
 
   if (plan.userId === userId) {
     throw new Error("Cannot join your own date");
@@ -1661,83 +1810,83 @@ export const withdrawDatePlanRequest = async (
 };
 // matchScore.service.ts
 
-export const testMatchScore = async (userId: string, targetUserId: string) => {
-  const [currentUser, targetUser] = await Promise.all([
-    prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-      include: {
-        profile: true,
-        about: true,
-        bio: true,
-        eduWork: true,
+// export const testMatchScore = async (userId: string, targetUserId: string) => {
+//   const [currentUser, targetUser] = await Promise.all([
+//     prisma.user.findUnique({
+//       where: {
+//         id: userId,
+//       },
+//       include: {
+//         profile: true,
+//         about: true,
+//         bio: true,
+//         eduWork: true,
 
-        skills: {
-          include: {
-            skill: true,
-          },
-        },
+//         skills: {
+//           include: {
+//             skill: true,
+//           },
+//         },
 
-        answer: {
-          include: {
-            option: true,
-            question: true,
-          },
-        },
-      },
-    }),
+//         answer: {
+//           include: {
+//             option: true,
+//             question: true,
+//           },
+//         },
+//       },
+//     }),
 
-    prisma.user.findUnique({
-      where: {
-        id: targetUserId,
-      },
-      include: {
-        profile: true,
-        about: true,
-        bio: true,
-        eduWork: true,
+//     prisma.user.findUnique({
+//       where: {
+//         id: targetUserId,
+//       },
+//       include: {
+//         profile: true,
+//         about: true,
+//         bio: true,
+//         eduWork: true,
 
-        skills: {
-          include: {
-            skill: true,
-          },
-        },
+//         skills: {
+//           include: {
+//             skill: true,
+//           },
+//         },
 
-        answer: {
-          include: {
-            option: true,
-            question: true,
-          },
-        },
-      },
-    }),
-  ]);
+//         answer: {
+//           include: {
+//             option: true,
+//             question: true,
+//           },
+//         },
+//       },
+//     }),
+//   ]);
 
-  if (!currentUser) {
-    throw new Error("Current user not found");
-  }
+//   if (!currentUser) {
+//     throw new Error("Current user not found");
+//   }
 
-  if (!targetUser) {
-    throw new Error("Target user not found");
-  }
+//   if (!targetUser) {
+//     throw new Error("Target user not found");
+//   }
 
-  const score = calculateMatchScore(currentUser, targetUser);
+//   const score = calculateMatchScore(currentUser, targetUser);
 
-  return {
-    currentUser: {
-      id: currentUser.id,
-      name: currentUser.full_name,
-    },
+//   return {
+//     currentUser: {
+//       id: currentUser.id,
+//       name: currentUser.full_name,
+//     },
 
-    targetUser: {
-      id: targetUser.id,
-      name: targetUser.full_name,
-    },
+//     targetUser: {
+//       id: targetUser.id,
+//       name: targetUser.full_name,
+//     },
 
-    matchScore: score,
-  };
-};
+//     matchScore: score,
+//   };
+// };
 
 const prisma = new PrismaClient();
 
