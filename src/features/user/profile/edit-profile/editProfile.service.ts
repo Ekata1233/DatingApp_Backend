@@ -33,7 +33,6 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     religionId,
     communityId,
     languageIds,
-
     zodiac,
     loveLanguage,
     communicationStyle,

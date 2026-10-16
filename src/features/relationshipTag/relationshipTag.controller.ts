@@ -631,11 +631,74 @@ export const endRelationshipController = async (
   res: Response,
 ) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
 
-    const relationshipId = String(req.params.relationshipId);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
 
-    const relationship = await endRelationshipService(userId, relationshipId);
+    const relationshipId = String(
+      req.params.relationshipId,
+    );
+
+    if (!relationshipId || relationshipId === "undefined") {
+      return res.status(400).json({
+        success: false,
+        message: "Relationship ID is required",
+      });
+    }
+
+    const relationship = await endRelationshipService(
+      userId,
+      relationshipId,
+    );
+
+    // ============================================
+    // SOCKET.IO REAL-TIME EVENT
+    // ============================================
+
+    try {
+      const io = getIO();
+
+      const partnerId = relationship.partner.id;
+
+      const breakupSocketPayload = {
+        messageType: "TEXT",
+        content: `Your relationship with ${relationship.self.fullName} has ended.`,
+        senderId: userId,
+        receiverId: partnerId,
+        relationshipId: relationship.id,
+        relationshipEndedScreen:
+          relationship.relationshipEndedScreen,
+        createdAt: relationship.endedAt,
+      };
+
+      // SEND TO PARTNER B
+      io.to(`user:${partnerId}`).emit(
+        "message:receive",
+        breakupSocketPayload,
+      );
+
+      // SEND TO CURRENT USER A
+      io.to(`user:${userId}`).emit(
+        "message:receive",
+        breakupSocketPayload,
+      );
+
+      console.log("Relationship ended socket sent:", {
+        senderId: userId,
+        receiverId: partnerId,
+        relationshipId: relationship.id,
+      });
+    } catch (socketError) {
+      console.error(
+        "Relationship ended socket emission error:",
+        socketError,
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -643,9 +706,15 @@ export const endRelationshipController = async (
       data: relationship,
     });
   } catch (error: any) {
+    console.error(
+      "END RELATIONSHIP ERROR:",
+      error,
+    );
+
     return res.status(400).json({
       success: false,
-      message: error.message || "Failed to end relationship",
+      message:
+        error.message || "Failed to end relationship",
     });
   }
 };

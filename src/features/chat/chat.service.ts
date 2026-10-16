@@ -67,9 +67,23 @@ export const chatService = {
       data.type,
     );
 
-    const hasMore = conversations.length > data.limit;
+    const sortedConversations = conversations.sort((a, b) => {
+      const timeA = a.lastMessage?.createdAt
+        ? new Date(a.lastMessage.createdAt).getTime()
+        : 0;
 
-    const items = hasMore ? conversations.slice(0, data.limit) : conversations;
+      const timeB = b.lastMessage?.createdAt
+        ? new Date(b.lastMessage.createdAt).getTime()
+        : 0;
+
+      return timeB - timeA;
+    });
+
+    const hasMore = sortedConversations.length > data.limit;
+
+    const items = hasMore
+      ? sortedConversations.slice(0, data.limit)
+      : sortedConversations;
 
     const nextCursor = hasMore
       ? (items[items.length - 1]?.conversationId ?? null)

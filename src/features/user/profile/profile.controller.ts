@@ -190,7 +190,7 @@ export const updateLookingForController = async (
 
     return res.status(200).json({
       success: true,
-      message: "Relationship preference saved successfully",
+      message: "Looking for saved successfully",
       intention: user.intention,
       onboarding_step: user.onboarding_step,
       next_step: user.next_step,

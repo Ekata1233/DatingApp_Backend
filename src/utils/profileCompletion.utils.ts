@@ -11,6 +11,7 @@ export const calculateProfileScore = async (userId: string) => {
     userBio,
     userAbout,
     photosCount,
+    videoCount,
     promptsCount,
     answers,
   ] = await Promise.all([
@@ -56,6 +57,14 @@ export const calculateProfileScore = async (userId: string) => {
       where: { user_id: userId },
     }),
 
+    // Count video (maximum 1)
+    prisma.userPhoto.count({
+      where: {
+        user_id: userId,
+        media_type: "VIDEO",
+      },
+    }),
+
     prisma.userPrompt.count({
       where: { userId: userId },
     }),
@@ -80,49 +89,41 @@ export const calculateProfileScore = async (userId: string) => {
   // BASIC INFO (15)
   // =========================================================
 
-  if (user?.full_name)
-    score += PROFILE_WEIGHTS.BASIC_INFO.FULL_NAME;
+  if (user?.full_name) score += PROFILE_WEIGHTS.BASIC_INFO.FULL_NAME;
 
-  if (user?.email)
-    score += PROFILE_WEIGHTS.BASIC_INFO.EMAIL;
+  if (user?.email) score += PROFILE_WEIGHTS.BASIC_INFO.EMAIL;
 
-  if (user?.birth_date)
-    score += PROFILE_WEIGHTS.BASIC_INFO.BIRTH_DATE;
+  if (user?.birth_date) score += PROFILE_WEIGHTS.BASIC_INFO.BIRTH_DATE;
 
-  if (user?.height)
-    score += PROFILE_WEIGHTS.BASIC_INFO.HEIGHT;
+  if (user?.height) score += PROFILE_WEIGHTS.BASIC_INFO.HEIGHT;
 
-  if (user?.gender)
-    score += PROFILE_WEIGHTS.BASIC_INFO.GENDER;
+  if (user?.gender) score += PROFILE_WEIGHTS.BASIC_INFO.GENDER;
 
-  if (user?.gender_option)
-    score += PROFILE_WEIGHTS.BASIC_INFO.GENDER_OPTION;
+  if (user?.gender_option) score += PROFILE_WEIGHTS.BASIC_INFO.GENDER_OPTION;
 
   if (userAbout?.maritalStatus)
     score += PROFILE_WEIGHTS.BASIC_INFO.MARITAL_STATUS;
 
-  if (userAbout?.zodiac)
-    score += PROFILE_WEIGHTS.BASIC_INFO.ZODIAC;
+  if (userAbout?.communicationStyle)
+    score += PROFILE_WEIGHTS.BASIC_INFO.COMMUNICATION_STYLE;
 
-  if (user?.intentionId)
-    score += PROFILE_WEIGHTS.INTENTION.INTENTION;
+  if (userAbout?.zodiac) score += PROFILE_WEIGHTS.BASIC_INFO.ZODIAC;
+
+  if (user?.intentionId) score += PROFILE_WEIGHTS.INTENTION.INTENTION;
 
   // =========================================================
   // PROFILE (13)
   // =========================================================
 
-  if (profile?.religionId)
-    score += PROFILE_WEIGHTS.BASIC_INFO.RELIGION;
+  if (profile?.religionId) score += PROFILE_WEIGHTS.BASIC_INFO.RELIGION;
 
-  if (profile?.communityId)
-    score += PROFILE_WEIGHTS.BASIC_INFO.COMMUNITY;
+  if (profile?.communityId) score += PROFILE_WEIGHTS.BASIC_INFO.COMMUNITY;
 
   if (profile?.interested_in)
     score += PROFILE_WEIGHTS.INTERESTED_IN.INTERESTED_IN;
 
   if (profile?.sexual_orientation)
     score += PROFILE_WEIGHTS.INTERESTED_IN.SEXUAL_ORIENTATION;
-
 
   if (profile?.latitude && profile?.longitude)
     score += PROFILE_WEIGHTS.LOCATION.LOCATION_COORDINATES;
@@ -138,11 +139,9 @@ export const calculateProfileScore = async (userId: string) => {
   if (education?.highestEdu)
     score += PROFILE_WEIGHTS.EDUCATION_WORK.HIGHEST_EDUCATION;
 
-  if (education?.degree)
-    score += PROFILE_WEIGHTS.EDUCATION_WORK.DEGREE;
+  if (education?.degree) score += PROFILE_WEIGHTS.EDUCATION_WORK.DEGREE;
 
-  if (education?.collegeName)
-    score += PROFILE_WEIGHTS.EDUCATION_WORK.COLLEGE;
+  if (education?.collegeName) score += PROFILE_WEIGHTS.EDUCATION_WORK.COLLEGE;
 
   if (education?.graduationYear)
     score += PROFILE_WEIGHTS.EDUCATION_WORK.YEAR_OF_PASSING;
@@ -150,8 +149,7 @@ export const calculateProfileScore = async (userId: string) => {
   if (education?.professionId)
     score += PROFILE_WEIGHTS.EDUCATION_WORK.PROFESSION;
 
-  if (education?.companyName)
-    score += PROFILE_WEIGHTS.EDUCATION_WORK.COMPANY;
+  if (education?.companyName) score += PROFILE_WEIGHTS.EDUCATION_WORK.COMPANY;
 
   if (education?.employmentTypeId)
     score += PROFILE_WEIGHTS.EDUCATION_WORK.EMPLOYMENT_TYPE;
@@ -159,24 +157,20 @@ export const calculateProfileScore = async (userId: string) => {
   if (education?.experienceId)
     score += PROFILE_WEIGHTS.EDUCATION_WORK.EXPERIENCE;
 
-  if (education?.ambitionId)
-    score += PROFILE_WEIGHTS.EDUCATION_WORK.AMBITION;
+  if (education?.ambitionId) score += PROFILE_WEIGHTS.EDUCATION_WORK.AMBITION;
 
   if (education?.salaryRangeId)
     score += PROFILE_WEIGHTS.EDUCATION_WORK.SALARY_RANGE;
 
-  if (education?.bigDreams)
-    score += PROFILE_WEIGHTS.EDUCATION_WORK.BIG_DREAMS;
+  if (education?.bigDreams) score += PROFILE_WEIGHTS.EDUCATION_WORK.BIG_DREAMS;
 
   // =========================================================
   // FAMILY (10)
   // =========================================================
 
-  if (family?.familyStatusId)
-    score += PROFILE_WEIGHTS.FAMILY.FAMILY_STATUS;
+  if (family?.familyStatusId) score += PROFILE_WEIGHTS.FAMILY.FAMILY_STATUS;
 
-  if (family?.familyTypeId)
-    score += PROFILE_WEIGHTS.FAMILY.FAMILY_TYPE;
+  if (family?.familyTypeId) score += PROFILE_WEIGHTS.FAMILY.FAMILY_TYPE;
 
   if (family?.fatherOccupationId)
     score += PROFILE_WEIGHTS.FAMILY.FATHER_OCCUPATION;
@@ -193,11 +187,9 @@ export const calculateProfileScore = async (userId: string) => {
   if (family?.siblings?.some((sibling) => sibling.siblingTypeId))
     score += PROFILE_WEIGHTS.FAMILY.SIBLING_RELATION;
 
-  if (family?.familyHomeId)
-    score += PROFILE_WEIGHTS.FAMILY.FAMILY_CITY;
+  if (family?.familyHomeId) score += PROFILE_WEIGHTS.FAMILY.FAMILY_CITY;
 
-  if (family?.familyIncomeId)
-    score += PROFILE_WEIGHTS.FAMILY.FAMILY_INCOME;
+  if (family?.familyIncomeId) score += PROFILE_WEIGHTS.FAMILY.FAMILY_INCOME;
 
   // =========================================================
   // INTERESTS (10)
@@ -206,7 +198,7 @@ export const calculateProfileScore = async (userId: string) => {
   const interestsAnswered = new Set(
     answers
       .filter((a: any) => a.question.screen === QuestionScreen.THINGS_U_LOVE)
-      .map((a: any) => a.question_id)
+      .map((a: any) => a.question_id),
   ).size;
 
   switch (Math.min(interestsAnswered, 6)) {
@@ -237,7 +229,7 @@ export const calculateProfileScore = async (userId: string) => {
   const lifestyleAnswered = new Set(
     answers
       .filter((a: any) => a.question.screen === QuestionScreen.LIFESTYLE)
-      .map((a: any) => a.question_id)
+      .map((a: any) => a.question_id),
   ).size;
 
   switch (Math.min(lifestyleAnswered, 5)) {
@@ -283,7 +275,8 @@ export const calculateProfileScore = async (userId: string) => {
       score += PROFILE_WEIGHTS.PHOTOS.ONE_PHOTO;
       break;
     case 2:
-      score += PROFILE_WEIGHTS.PHOTOS.ONE_PHOTO + PROFILE_WEIGHTS.PHOTOS.TWO_PHOTOS;
+      score +=
+        PROFILE_WEIGHTS.PHOTOS.ONE_PHOTO + PROFILE_WEIGHTS.PHOTOS.TWO_PHOTOS;
       break;
     case 3:
       score +=
@@ -305,17 +298,21 @@ export const calculateProfileScore = async (userId: string) => {
   }
 
   // =========================================================
+  // VIDEO (5)
+  // =========================================================
+
+  if (videoCount >= 1) {
+    score += PROFILE_WEIGHTS.VIDEO.VIDEO;
+  }
+  // =========================================================
   // BIO (10)
   // =========================================================
 
   const bioLength = userBio?.bio?.trim().length ?? 0;
 
-  if (bioLength >= 100)
-    score += PROFILE_WEIGHTS.BIO.MIN_100_CHARS;
-  else if (bioLength >= 50)
-    score += PROFILE_WEIGHTS.BIO.MIN_50_CHARS;
-  else if (bioLength >= 20)
-    score += PROFILE_WEIGHTS.BIO.MIN_20_CHARS;
+  if (bioLength >= 100) score += PROFILE_WEIGHTS.BIO.MIN_100_CHARS;
+  else if (bioLength >= 50) score += PROFILE_WEIGHTS.BIO.MIN_50_CHARS;
+  else if (bioLength >= 20) score += PROFILE_WEIGHTS.BIO.MIN_20_CHARS;
 
   // =========================================================
   // FINAL
