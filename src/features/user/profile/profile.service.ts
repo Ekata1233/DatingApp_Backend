@@ -21,6 +21,9 @@ import { queueMatchScoreCalculation } from "../../../queues/match-score.queue";
 import { QUESTION_SCREEN_TO_ONBOARDING_STEP } from "../../../config/onboardingFlows";
 import { clearFeedUserCache, clearUserFeedDetailsCache } from "../user.helper";
 
+const MAX_PHOTOS = 6;
+const MAX_VIDEOS = 1;
+
 //profile update service
 export const updateProfileService = async (
   userId: string,
@@ -1026,6 +1029,33 @@ export const uploadUserMediaService = async (
   });
 
   // ==================================================
+  // VALIDATE MEDIA UPLOAD LIMIT
+  // ==================================================
+
+  const maxAllowed = mediaType === "IMAGE" ? MAX_PHOTOS : MAX_VIDEOS;
+
+  const existingCount = existingMedia.length;
+
+  const incomingCount = files.length;
+
+  if (existingCount >= maxAllowed) {
+    throw new Error(
+      mediaType === "IMAGE"
+        ? "You can upload a maximum of 6 photos."
+        : "You can upload a maximum of 1 video.",
+    );
+  }
+
+  if (existingCount + incomingCount > maxAllowed) {
+    const remainingSlots = maxAllowed - existingCount;
+
+    throw new Error(
+      mediaType === "IMAGE"
+        ? `You can upload only ${remainingSlots} more photo(s). Maximum 6 photos allowed.`
+        : "You can upload a maximum of 1 video.",
+    );
+  }
+  // ==================================================
   // 2. FIND CURRENT HIGHEST ORDER
   // ==================================================
 
@@ -1174,6 +1204,16 @@ export const updateUserMediaService = async (
     throw new Error("Media not found");
   }
 
+  // ==================================================
+  // 2. PREVENT MEDIA TYPE CHANGE
+  // ==================================================
+
+  if (existingMedia.media_type !== mediaType) {
+    throw new Error(
+      "Media type cannot be changed. Please upload the correct media type.",
+    );
+  }
+  
   const base64File = file.data.toString("base64");
 
   const uploadResponse = await imagekit.upload({
