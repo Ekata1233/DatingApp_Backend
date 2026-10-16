@@ -548,12 +548,18 @@ export const discoverDatePlan = async (
       ? `T${plan.eventDateTime.toISOString().split("T")[1]}`
       : null;
 
+const eventDay = plan.eventDateTime
+  ? new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      timeZone: "Asia/Kolkata",
+    }).format(plan.eventDateTime)
+  : null;
+
     return {
       id: plan.id,
 
       matchScore: plan.matchScore,
 
-      venueName: plan.venueName,
 
       distanceKm: plan.distanceKm,
 
@@ -574,6 +580,8 @@ export const discoverDatePlan = async (
       eventDate,
 
       eventTime,
+
+      eventDay,
 
       whoPays: plan.whoPays?.label,
 

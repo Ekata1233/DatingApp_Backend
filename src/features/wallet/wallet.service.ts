@@ -13,6 +13,7 @@ import {
 } from "./wallet.types";
 import { prisma } from "../../prisma/prismaClient";
 
+
 export const getMyWalletService = async (
   userId: string,
   query: GetWalletQuery,
@@ -50,6 +51,18 @@ export const getMyWalletService = async (
       : "ALL";
 
   // ==========================================
+  // TRANSACTION SOURCE FILTER
+  // ==========================================
+
+  const source: TransactionSource | undefined =
+    query.source &&
+    Object.values(TransactionSource).includes(
+      query.source,
+    )
+      ? query.source
+      : undefined;
+
+  // ==========================================
   // WALLET
   // ==========================================
 
@@ -85,6 +98,10 @@ export const getMyWalletService = async (
         } left`,
       },
 
+      filter,
+
+      source: source ?? null,
+
       transactions: [],
 
       pagination: {
@@ -109,6 +126,7 @@ export const getMyWalletService = async (
     walletRepository.getTransactions({
       walletId: wallet.id,
       filter,
+      source,
       skip,
       take: limit,
     }),
@@ -220,6 +238,8 @@ export const getMyWalletService = async (
 
     filter,
 
+    source: source ?? null,
+
     transactions,
 
     pagination: {
@@ -236,6 +256,7 @@ export const getMyWalletService = async (
     },
   };
 };
+
 
 // ==========================================
 // GET TRANSACTION DIRECTION
@@ -503,3 +524,4 @@ export const addMoneyToWalletService = async (
       result.transaction.createdAt,
   };
 };
+

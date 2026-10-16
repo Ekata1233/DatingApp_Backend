@@ -448,6 +448,7 @@ export const applyReferral = async (
 //   });
 // };
 
+
 export const getReferralDashboard = async (
   userId: string,
   page = 1,
@@ -462,12 +463,75 @@ export const getReferralDashboard = async (
     select: {
       referralCode: true,
       referralStats: true,
+
+      // NEW: Find whose referral code this user applied
+      receivedReferral: {
+        select: {
+          referrer: {
+            select: {
+              id: true,
+              full_name: true,
+              birth_date: true,
+              photos: {
+                orderBy: {
+                  order: "asc",
+                },
+                take: 1,
+                select: {
+                  media_url: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
   if (!user) {
     throw new Error("User not found");
   }
+
+  // ==========================================
+  // NEW: REFERRER DETAILS
+  // ==========================================
+
+  const referrer = user.receivedReferral?.referrer;
+
+  let referredBy = null;
+
+  if (referrer) {
+    let age: number | null = null;
+
+    if (referrer.birth_date) {
+      const today = new Date();
+      const dob = new Date(referrer.birth_date);
+
+      age = today.getUTCFullYear() - dob.getUTCFullYear();
+
+      const monthDiff =
+        today.getUTCMonth() - dob.getUTCMonth();
+
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 &&
+          today.getUTCDate() < dob.getUTCDate())
+      ) {
+        age--;
+      }
+    }
+
+    referredBy = {
+      userId: referrer.id,
+      full_name: referrer.full_name ?? "Unknown User",
+      age,
+      photo: referrer.photos[0]?.media_url ?? null,
+    };
+  }
+
+  // ==========================================
+  // EXISTING REFERRAL HISTORY
+  // ==========================================
 
   const [history, total] = await prisma.$transaction([
     prisma.userReferral.findMany({
@@ -508,10 +572,17 @@ export const getReferralDashboard = async (
   return {
     referralCode: user.referralCode || "",
 
-    shareLink: `https://play.google.com/store/apps/details?id=com.fetchtrue.bizbooster2x&pcampaignid=web_share`,
+    shareLink:
+      "https://play.google.com/store/apps/details?id=com.fetchtrue.bizbooster2x&pcampaignid=web_share",
+
+    selfSignupReward: 50,
+
+    // NEW FIELD
+    referredBy,
 
     stats: {
-      totalEarned: user.referralStats?.totalCoinsEarned ?? 0,
+      totalEarned:
+        user.referralStats?.totalCoinsEarned ?? 0,
       joined: user.referralStats?.joinedUsers ?? 0,
       rewarded: user.referralStats?.rewardedUsers ?? 0,
       pending: user.referralStats?.pendingRewards ?? 0,
@@ -524,8 +595,10 @@ export const getReferralDashboard = async (
       return {
         id: item.id,
         userId: item.referredUser.id,
-        name: item.referredUser.full_name || "Unknown User",
-        profileImage: item.referredUser.photos[0]?.media_url ?? null,
+        name:
+          item.referredUser.full_name || "Unknown User",
+        profileImage:
+          item.referredUser.photos[0]?.media_url ?? null,
         status: item.status,
         signupReward,
         purchaseReward,
@@ -547,16 +620,24 @@ export const getReferralDashboard = async (
 };
 
 
+
 export const getReferralHistory = async (
   userId: string,
   status?: "joined" | "rewarded" | "pending",
   page = 1,
   limit = 20,
 ) => {
-  page = Math.max(1, Math.floor(page));
-  limit = Math.max(1, Math.min(100, Math.floor(limit)));
+  if (!Number.isInteger(page) || page < 1) {
+    throw new Error("Invalid page");
+  }
 
-  const skip = (page - 1) * limit;
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 100
+  ) {
+    throw new Error("Invalid limit");
+  }
 
   if (
     status &&
@@ -565,12 +646,15 @@ export const getReferralHistory = async (
     throw new Error("Invalid referral history filter");
   }
 
-  const where: any = {
+  const skip = (page - 1) * limit;
+
+  const where = {
     referrerId: userId,
   };
 
-  // Each referral can generate two history entries:
-  // SIGNUP and PURCHASE.
+  // ==========================================
+  // FETCH REFERRALS
+  // ==========================================
 
   const referrals = await prisma.userReferral.findMany({
     where,
@@ -602,7 +686,7 @@ export const getReferralHistory = async (
     const signupReward = Number(item.signupReward);
     const purchaseReward = Number(item.purchaseReward);
 
-    const baseData = {
+    const base = {
       userId: item.referredUser.id,
       name: item.referredUser.full_name ?? "Unknown User",
       profileImage:
@@ -611,99 +695,117 @@ export const getReferralHistory = async (
     };
 
     // ==========================================
-    // 1. SIGNUP REWARD ENTRY
+    // SIGNUP REWARD - SEPARATE ENTRY
     // ==========================================
 
     if (signupReward > 0 && item.rewardedAt) {
       history.push({
         id: `${item.id}-signup`,
-        referralId: item.id,
-        ...baseData,
-        rewardType: "SIGNUP",
-        status: "REWARDED",
-        rewardAmount: signupReward,
+        ...base,
+        status: "SIGNUP_REWARDED",
+        signupReward: item.signupReward,
+        purchaseReward: "0",
+        totalReward: signupReward,
         rewardedAt: item.rewardedAt,
       });
     }
 
     // ==========================================
-    // 2. PACKAGE PURCHASE REWARD ENTRY
+    // PURCHASE REWARD - SEPARATE ENTRY
     // ==========================================
 
     if (item.purchaseAt !== null) {
       history.push({
         id: `${item.id}-purchase`,
-        referralId: item.id,
-        ...baseData,
-        rewardType: "PURCHASE",
-        status: "REWARDED",
-        rewardAmount: purchaseReward,
+        ...base,
+        status: "PACKAGE_REWARDED",
+        signupReward: "0",
+        purchaseReward: item.purchaseReward,
+        totalReward: purchaseReward,
         rewardedAt: item.purchaseAt,
       });
     } else {
+      // Pending package purchase
       history.push({
-        id: `${item.id}-purchase`,
-        referralId: item.id,
-        ...baseData,
-        rewardType: "PURCHASE",
+        id: `${item.id}-purchase-pending`,
+        ...base,
         status: "PENDING",
-        rewardAmount: 0,
+        signupReward: "0",
+        purchaseReward: "0",
+        totalReward: 0,
         rewardedAt: null,
       });
     }
   }
 
   // ==========================================
-  // 3. APPLY FILTER
+  // FILTER
   // ==========================================
 
-  let filteredHistory = history;
+ // ==========================================
+// FILTER
+// ==========================================
 
-  if (status === "rewarded") {
-    filteredHistory = history.filter(
-      (item) => item.status === "REWARDED",
-    );
-  }
+// ==========================================
+// FILTER
+// ==========================================
 
-  if (status === "pending") {
-    filteredHistory = history.filter(
-      (item) =>
-        item.rewardType === "PURCHASE" &&
-        item.status === "PENDING",
-    );
-  }
+let filteredHistory = history;
 
-  // "joined" returns both reward types.
+if (status === "joined") {
+  // Only signup reward history
+  filteredHistory = history.filter(
+    (item) => item.status === "SIGNUP_REWARDED"
+  );
+}
+
+if (status === "rewarded") {
+  // Only package purchase reward history
+  filteredHistory = history.filter(
+    (item) => item.status === "PACKAGE_REWARDED"
+  );
+}
+
+if (status === "pending") {
+  // Only pending package purchase rewards
+  filteredHistory = history.filter(
+    (item) => item.status === "PENDING"
+  );
+}
+
+  // joined includes both reward types
+  // and pending purchase entries.
+
+  // No filter also includes all entries.
 
   // ==========================================
-  // 4. SORT NEWEST FIRST
+  // SORT
   // ==========================================
 
   filteredHistory.sort((a, b) => {
     const dateA = new Date(
-      a.rewardedAt ?? a.joinedAt,
+      a.rewardedAt ?? a.joinedAt
     ).getTime();
 
     const dateB = new Date(
-      b.rewardedAt ?? b.joinedAt,
+      b.rewardedAt ?? b.joinedAt
     ).getTime();
 
     return dateB - dateA;
   });
 
   // ==========================================
-  // 5. PAGINATION
+  // PAGINATION
   // ==========================================
 
   const total = filteredHistory.length;
 
-  const paginatedHistory = filteredHistory.slice(
-    skip,
-    skip + limit,
-  );
-
   return {
-    history: paginatedHistory,
+    history: filteredHistory.slice(
+      skip,
+      skip + limit
+    ),
+
     pagination: {
       page,
       limit,

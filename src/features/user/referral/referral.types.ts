@@ -51,7 +51,13 @@ export interface PaginationResponse {
 export interface ReferralDashboardResponse {
   referralCode: string;
   shareLink: string;
-
+selfSignupReward: number;
+referredBy: {
+  userId: string;
+  full_name: string;
+  age: number | null;
+  photo: string | null;
+} | null;
   stats: ReferralStatsResponse;
 
   history: ReferralHistoryItem[];

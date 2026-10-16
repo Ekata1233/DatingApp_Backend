@@ -1,84 +1,82 @@
 import { prisma } from "../../prisma/prismaClient";
 
 export const dateNowInviteMessageRepo = {
-async findDatePlanById(
-  datePlanId: string,
-) {
-  return prisma.datePlan.findUnique({
-    where: {
-      id: datePlanId,
-    },
+  async findDatePlanById(datePlanId: string) {
+    return prisma.datePlan.findUnique({
+      where: {
+        id: datePlanId,
+      },
 
-    include: {
-      user: true,
+      include: {
+        user: true,
 
-      activity: true,
+        activity: true,
 
-      quickTitle: true,
+        quickTitle: true,
 
-      whoPays: true,
+        whoPays: true,
 
-      joinRequestGender: true,
+        joinRequestGender: true,
 
-      visibility: true,
+        visibility: true,
 
-      vibes: true,
+        vibes: true,
 
-      _count: {
-        select: {
-          requests: true,
+        _count: {
+          select: {
+            requests: true,
+          },
         },
       },
-    },
-  });
-},
+    });
+  },
 
-async createDateInviteMessage(
-  conversationId: string,
-  senderId: string,
-  datePlanId: string,
-) {
-  return prisma.chatMessage.create({
-    data: {
-      conversationId,
-      senderId,
+  async createDateInviteMessage(
+    conversationId: string,
+    senderId: string,
+    datePlanId: string,
+  ) {
+    return prisma.chatMessage.create({
+      data: {
+        conversationId,
+        senderId,
 
-      messageType: "DATE_INVITE",
+        messageType: "DATE_INVITE",
 
-      datePlanId,
+        datePlanId,
 
-      metadata: {
-        status: "PENDING",
+        metadata: {
+          status: "PENDING",
+        },
       },
-    },
 
-    include: {
-      sender: true,
+      include: {
+        sender: true,
 
-      datePlan: {
-        include: {
-          user: true,
+        datePlan: {
+          include: {
+            user: true,
 
-          activity: true,
+            activity: true,
 
-          quickTitle: true,
+            quickTitle: true,
 
-          whoPays: true,
+            whoPays: true,
 
-          joinRequestGender: true,
+            joinRequestGender: true,
 
-          visibility: true,
+            visibility: true,
 
-          vibes: true,
+            vibes: true,
 
-          _count: {
-            select: {
-              requests: true,
+            _count: {
+              select: {
+                requests: true,
+              },
             },
           },
         },
       },
-    },
-  });
-},
-}
+    });
+  },
+};

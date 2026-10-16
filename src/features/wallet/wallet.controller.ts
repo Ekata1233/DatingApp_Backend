@@ -6,6 +6,7 @@ import {
 import { addMoneyToWalletService, getMyWalletService } from "./wallet.service";
 import { addMoneySchema } from "./wallet.validation";
 
+
 export const getMyWalletController = async (
   req: Request,
   res: Response,
@@ -16,6 +17,11 @@ export const getMyWalletController = async (
     const filter = req.query.filter
       ? String(req.query.filter)
       : "ALL";
+
+    // Transaction source filter
+    const source = req.query.source
+      ? String(req.query.source).toUpperCase()
+      : undefined;
 
     const page = req.query.page
       ? Number(req.query.page)
@@ -30,6 +36,7 @@ export const getMyWalletController = async (
         userId,
         {
           filter: filter as any,
+          source: source as any,
           page,
           limit,
         },
@@ -58,6 +65,7 @@ export const getMyWalletController = async (
     });
   }
 };
+
 
 export const addMoneyToWalletController =
   async (
