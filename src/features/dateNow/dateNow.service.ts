@@ -117,8 +117,15 @@ export const updateDraftDatePlan = async (
   return updatedPlan;
 };
 
-export const publishDatePlan = async (planId: string, userId: string) => {
+export const publishDatePlan = async (
+  planId: string,
+  userId: string,
+) => {
   return prisma.$transaction(async (tx) => {
+    // ============================================
+    // 1. GET DATE PLAN
+    // ============================================
+
     const plan = await tx.datePlan.findFirst({
       where: {
         id: planId,
@@ -145,30 +152,139 @@ export const publishDatePlan = async (planId: string, userId: string) => {
       throw new Error("Plan is already published");
     }
 
-    const userPlanStats = await tx.datePlanUserStats.findUnique({
-      where: {
-        userId,
-      },
-    });
+    // ============================================
+    // 2. GET USER DATE PLAN STATS
+    // ============================================
+
+    const userPlanStats =
+      await tx.datePlanUserStats.findUnique({
+        where: {
+          userId,
+        },
+      });
 
     if (!userPlanStats) {
-      throw new Error("User date plan stats not found");
+      throw new Error(
+        "User date plan stats not found",
+      );
     }
 
-    if (userPlanStats.balance <= 0) {
-      throw new Error("You don't have any date plan credits.");
-    }
+    let paymentMethod: "DATE_PLAN_CREDIT" | "WALLET";
+    let deductedAmount = new Prisma.Decimal(0);
 
-    await tx.datePlanUserStats.update({
-      where: {
-        userId,
-      },
-      data: {
-        balance: {
-          decrement: 1,
+    // ============================================
+    // 3. USE DATE PLAN CREDIT IF AVAILABLE
+    // ============================================
+
+    if (userPlanStats.balance > 0) {
+      const updated = await tx.datePlanUserStats.updateMany({
+        where: {
+          userId,
+          balance: {
+            gt: 0,
+          },
         },
-      },
-    });
+        data: {
+          balance: {
+            decrement: 1,
+          },
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new Error(
+          "Date plan credit deduction failed",
+        );
+      }
+
+      paymentMethod = "DATE_PLAN_CREDIT";
+    } else {
+      // ============================================
+      // 4. GET DATE PLAN POSTING COST
+      // ============================================
+
+      const packageFeature =
+        await tx.datePlanPackageFeatures.findFirst({
+          select: {
+            costToPostPlan: true,
+          },
+        });
+
+      if (!packageFeature) {
+        throw new Error(
+          "Date plan package feature not found",
+        );
+      }
+
+      const costToPostPlan = new Prisma.Decimal(
+        packageFeature.costToPostPlan,
+      );
+
+      if (costToPostPlan.lessThan(0)) {
+        throw new Error(
+          "Invalid date plan posting cost",
+        );
+      }
+
+      // ============================================
+      // 5. GET USER WALLET
+      // ============================================
+
+      const wallet = await tx.wallet.findUnique({
+        where: {
+          userId,
+        },
+      });
+
+      if (!wallet) {
+        throw new Error("Wallet not found");
+      }
+
+      // ============================================
+      // 6. CHECK WALLET BALANCE
+      // ============================================
+
+      if (
+        new Prisma.Decimal(wallet.balance).lessThan(
+          costToPostPlan,
+        )
+      ) {
+        throw new Error(
+          "Insufficient wallet balance",
+        );
+      }
+
+      // ============================================
+      // 7. DEDUCT WALLET AMOUNT
+      // ============================================
+
+      const updatedWallet = await tx.wallet.updateMany({
+        where: {
+          id: wallet.id,
+          balance: {
+            gte: costToPostPlan,
+          },
+        },
+        data: {
+          balance: {
+            decrement: costToPostPlan,
+          },
+        },
+      });
+
+      if (updatedWallet.count !== 1) {
+        throw new Error(
+          "Insufficient wallet balance",
+        );
+      }
+
+      paymentMethod = "WALLET";
+      deductedAmount = costToPostPlan;
+    }
+
+    // ============================================
+    // 8. PUBLISH DATE PLAN
+    // ============================================
 
     await tx.datePlan.update({
       where: {
@@ -179,9 +295,26 @@ export const publishDatePlan = async (planId: string, userId: string) => {
       },
     });
 
+    // ============================================
+    // 9. RETURN RESPONSE
+    // ============================================
+
+    const updatedStats =
+      await tx.datePlanUserStats.findUnique({
+        where: {
+          userId,
+        },
+        select: {
+          balance: true,
+        },
+      });
+
     return {
       success: true,
-      remainingCredits: userPlanStats.balance - 1,
+      message: "Date plan published successfully",
+      paymentMethod,
+      deductedAmount: deductedAmount.toNumber(),
+      remainingCredits: updatedStats?.balance ?? 0,
     };
   });
 };
