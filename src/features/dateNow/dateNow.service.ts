@@ -1810,83 +1810,83 @@ export const withdrawDatePlanRequest = async (
 };
 // matchScore.service.ts
 
-// export const testMatchScore = async (userId: string, targetUserId: string) => {
-//   const [currentUser, targetUser] = await Promise.all([
-//     prisma.user.findUnique({
-//       where: {
-//         id: userId,
-//       },
-//       include: {
-//         profile: true,
-//         about: true,
-//         bio: true,
-//         eduWork: true,
+export const testMatchScore = async (userId: string, targetUserId: string) => {
+  const [currentUser, targetUser] = await Promise.all([
+    prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      include: {
+        profile: true,
+        about: true,
+        bio: true,
+        eduWork: true,
 
-//         skills: {
-//           include: {
-//             skill: true,
-//           },
-//         },
+        skills: {
+          include: {
+            skill: true,
+          },
+        },
 
-//         answer: {
-//           include: {
-//             option: true,
-//             question: true,
-//           },
-//         },
-//       },
-//     }),
+        answer: {
+          include: {
+            option: true,
+            question: true,
+          },
+        },
+      },
+    }),
 
-//     prisma.user.findUnique({
-//       where: {
-//         id: targetUserId,
-//       },
-//       include: {
-//         profile: true,
-//         about: true,
-//         bio: true,
-//         eduWork: true,
+    prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      include: {
+        profile: true,
+        about: true,
+        bio: true,
+        eduWork: true,
 
-//         skills: {
-//           include: {
-//             skill: true,
-//           },
-//         },
+        skills: {
+          include: {
+            skill: true,
+          },
+        },
 
-//         answer: {
-//           include: {
-//             option: true,
-//             question: true,
-//           },
-//         },
-//       },
-//     }),
-//   ]);
+        answer: {
+          include: {
+            option: true,
+            question: true,
+          },
+        },
+      },
+    }),
+  ]);
 
-//   if (!currentUser) {
-//     throw new Error("Current user not found");
-//   }
+  if (!currentUser) {
+    throw new Error("Current user not found");
+  }
 
-//   if (!targetUser) {
-//     throw new Error("Target user not found");
-//   }
+  if (!targetUser) {
+    throw new Error("Target user not found");
+  }
 
-//   const score = calculateMatchScore(currentUser, targetUser);
+  const score = calculateMatchScore(currentUser, targetUser);
 
-//   return {
-//     currentUser: {
-//       id: currentUser.id,
-//       name: currentUser.full_name,
-//     },
+  return {
+    currentUser: {
+      id: currentUser.id,
+      name: currentUser.full_name,
+    },
 
-//     targetUser: {
-//       id: targetUser.id,
-//       name: targetUser.full_name,
-//     },
+    targetUser: {
+      id: targetUser.id,
+      name: targetUser.full_name,
+    },
 
-//     matchScore: score,
-//   };
-// };
+    matchScore: score,
+  };
+};
 
 const prisma = new PrismaClient();
 
