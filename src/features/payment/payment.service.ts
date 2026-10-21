@@ -956,7 +956,7 @@ const roundAmount = (
 // CREATE EVENT BOOKING FOR PAYMENT
 // ============================================
 
-const createEventBookingForPayment =
+export const createEventBookingForPayment =
   async (
     userId: string,
     data: CreatePaymentsOrderDTO,

@@ -101,6 +101,8 @@ import manualAadhaarRoutes from "../features/verification/manual-government-id/m
 import incomeVerificationRoutes from "../features/verification/income-verification/income.user.routes";
 import incomeVerificationAdminRoutes from "../features/verification/income-verification/income.admin.routes";
 import conversationPromtRoutes from "../features/admin/conversation/conversationPrompt/conversationPrompt.routes"
+
+import razorpayRoutes from "../features/payment/razorpayPayment/razorpay.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -125,6 +127,7 @@ router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRout
 router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes)
 router.use("/legal", legalRoutes);
 router.use("/chat", conversationPromtRoutes);
+router.use("/payment", razorpayRoutes);
 
 
 // router.use("/users",usersRoutes)
