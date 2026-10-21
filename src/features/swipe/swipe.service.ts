@@ -561,19 +561,18 @@ export const handleSwipe = async (data: {
       });
 
       // Create conversation when match occurs
-const conversationId =
-  await findOrCreateMatchConversation(
-    tx,
-    swiperId,
-    targetUserId,
-  );
+      const conversationId = await findOrCreateMatchConversation(
+        tx,
+        swiperId,
+        targetUserId,
+      );
 
       return {
         matched: true,
         updated: swipeResult.updated,
         previousAction: swipeResult.previousAction,
         match,
-        conversationId
+        conversationId,
       };
     },
     {
