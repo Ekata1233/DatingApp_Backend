@@ -7,7 +7,10 @@ import {
   checkReverseLikeRedis,
 } from "./swipe.repository";
 import { trackBoostEvent } from "../boost/boost.tracker";
-import { recordDailyFeedView } from "./swipe.helper";
+import {
+  findOrCreateMatchConversation,
+  recordDailyFeedView,
+} from "./swipe.helper";
 
 // export const handleSwipe = async (data: {
 //   swiperId: string;
@@ -536,11 +539,17 @@ export const handleSwipe = async (data: {
       });
 
       if (existingMatch) {
+        const conversationId = await findOrCreateMatchConversation(
+          tx,
+          swiperId,
+          targetUserId,
+        );
         return {
           matched: true,
           updated: swipeResult.updated,
           previousAction: swipeResult.previousAction,
           match: existingMatch,
+          conversationId,
         };
       }
 
@@ -551,11 +560,19 @@ export const handleSwipe = async (data: {
         },
       });
 
+      // Create conversation when match occurs
+      const conversationId = await findOrCreateMatchConversation(
+        tx,
+        swiperId,
+        targetUserId,
+      );
+
       return {
         matched: true,
         updated: swipeResult.updated,
         previousAction: swipeResult.previousAction,
         match,
+        conversationId,
       };
     },
     {
@@ -722,16 +739,15 @@ export const handleSwipe = async (data: {
   return {
     matched: true,
     matchId: match.id,
+    conversationId: result.conversationId,
     updated: result.updated,
     previousAction: result.previousAction,
     action,
 
     matchPopup: {
       title: "It's a Match! ❤️",
-
       message:
         "Two hearts beating to the same rhythm. Your connection is already written in the stars. ✨",
-
       users: {
         me: {
           userId: swiperId,

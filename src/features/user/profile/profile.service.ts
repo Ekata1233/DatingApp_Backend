@@ -327,18 +327,16 @@ export const updateLookingForService = async (
     throw new Error("Invalid option selected");
   }
 
-  const score = await calculateProfileScore(userId);
-
   const currentStep = "LOOKING_FOR";
   const nextStep = getNextStep(currentStep);
 
+  // 1. Update intention first
   const result = await prisma.user.update({
     where: { id: userId },
     data: {
-      intentionId: selectedOption.id, // ✅ Save the option ID
+      intentionId: selectedOption.id,
       onboarding_step: currentStep,
       next_step: nextStep,
-      profile_completion: score,
     },
     include: {
       intention: {
@@ -349,15 +347,27 @@ export const updateLookingForService = async (
     },
   });
 
-  // await queueMatchScoreCalculation(
-  //   userId,
-  // );
+  // 2. Calculate score after updating intention
+  const score = await calculateProfileScore(userId);
 
+  // 3. Update profile completion
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      profile_completion: score,
+    },
+  });
+
+  // 4. Clear cache
   await redis.del(`profile:edit:${userId}`);
-  // await redis.del(`feed:details:${userId}`);
+
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
-  return result;
+
+  return {
+    ...result,
+    profile_completion: score,
+  };
 };
 
 //Address
@@ -1213,7 +1223,7 @@ export const updateUserMediaService = async (
       "Media type cannot be changed. Please upload the correct media type.",
     );
   }
-  
+
   const base64File = file.data.toString("base64");
 
   const uploadResponse = await imagekit.upload({
