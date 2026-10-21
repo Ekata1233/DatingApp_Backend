@@ -421,15 +421,29 @@ export const createBundleRose = async (
   }
 
   // Required messages
-  const previousRoses = await tx.userRose.count({
-    where: {
-      senderId,
-      receiverId,
-    },
-  });
+  // const previousRoses = await tx.userRose.count({
+  //   where: {
+  //     senderId,
+  //     receiverId,
+  //   },
+  // });
+
+  // const requiredMessages =
+  //   previousRoses === 0 ? 25 : previousRoses === 1 ? 5 : 1;
+
+  const [previousRoses, previousGifts] = await Promise.all([
+    tx.userRose.count({
+      where: { senderId, receiverId },
+    }),
+    tx.userGift.count({
+      where: { senderId, receiverId },
+    }),
+  ]);
+
+  const totalPrevious = previousRoses + previousGifts;
 
   const requiredMessages =
-    previousRoses === 0 ? 25 : previousRoses === 1 ? 5 : 1;
+    totalPrevious === 0 ? 25 : totalPrevious === 1 ? 5 : 1;
 
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 

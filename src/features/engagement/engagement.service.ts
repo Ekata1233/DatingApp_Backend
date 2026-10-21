@@ -607,16 +607,12 @@ export const sendEngagementService = async (
           data: {
             conversationId: conversation.id,
             senderId,
-
             messageType,
-
             roseId,
             complimentId,
             giftId,
-
             content: complimentContent,
             mediaUrl: giftMediaUrl,
-
             metadata: {
               isBundle: engagementCount > 1,
               targetType,

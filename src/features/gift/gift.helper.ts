@@ -101,22 +101,36 @@ export const createBundleGift = async (
   /*                     Calculate Required Messages                            */
   /* -------------------------------------------------------------------------- */
 
-  const previousGift = await tx.userGift.count({
-    where: {
-      senderId,
-      receiverId,
-    },
-  });
+  // const previousGift = await tx.userGift.count({
+  //   where: {
+  //     senderId,
+  //     receiverId,
+  //   },
+  // });
 
-  let requiredMessages = 1;
+  // let requiredMessages = 1;
 
-  if (previousGift === 0) {
-    requiredMessages = 25;
-  } else if (previousGift === 1) {
-    requiredMessages = 5;
-  } else {
-    requiredMessages = 1;
-  }
+  // if (previousGift === 0) {
+  //   requiredMessages = 25;
+  // } else if (previousGift === 1) {
+  //   requiredMessages = 5;
+  // } else {
+  //   requiredMessages = 1;
+  // }
+
+  const [previousRoses, previousGifts] = await Promise.all([
+  tx.userRose.count({
+    where: { senderId, receiverId },
+  }),
+  tx.userGift.count({
+    where: { senderId, receiverId },
+  }),
+]);
+
+const totalPrevious = previousRoses + previousGifts;
+
+const requiredMessages =
+  totalPrevious === 0 ? 25 : totalPrevious === 1 ? 5 : 1;
 
   /* -------------------------------------------------------------------------- */
   /*                                Expiry                                      */
