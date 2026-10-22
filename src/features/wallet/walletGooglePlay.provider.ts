@@ -51,6 +51,9 @@ export const verifyWalletGooglePurchase = async (
 
   const purchase = response.data;
 
+  console.log("%%%%%%%%%%%%%%%%%% google play purchase data : ", purchase);
+  console.log("*******************product id : ", productId)
+
   if (purchase.purchaseState !== 0) {
     throw new Error(
       "Google Play purchase is not completed"

@@ -476,6 +476,8 @@ export const purchaseBoostWithGooglePlayService = async (
         },
       });
 
+
+      console.log("@@@@@@@@@boost purchase : ", purchase)
       const now = new Date();
 
       const existingUserBoost =
