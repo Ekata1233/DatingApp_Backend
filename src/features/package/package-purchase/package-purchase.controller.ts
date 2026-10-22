@@ -2,11 +2,12 @@ import { Request, Response, NextFunction } from "express";
 
 import { z } from "zod";
 
-import { purchasePackageWithWalletService } from "./package-purchase.service";
+import {
+  purchasePackageService,
+  purchasePackageWithWalletService,
+} from "./package-purchase.service";
+import { purchasePackageSchema } from "./package-purchase.validation";
 
-const purchasePackageSchema = z.object({
-  priceId: z.string().uuid("Invalid package price ID"),
-});
 
 export const purchasePackageWithWalletController = async (
   req: Request,
@@ -23,7 +24,10 @@ export const purchasePackageWithWalletController = async (
       });
     }
 
-    const parsed = purchasePackageSchema.safeParse(req.body);
+    const parsed = purchasePackageSchema.safeParse({
+      ...req.body,
+      paymentMethod: req.body?.paymentMethod ?? "WALLET",
+    });
 
     if (!parsed.success) {
       return res.status(400).json({
@@ -32,10 +36,14 @@ export const purchasePackageWithWalletController = async (
       });
     }
 
-    const result = await purchasePackageWithWalletService(
-      userId,
-      parsed.data.priceId,
-    );
+    const result = await purchasePackageService(userId, parsed.data);
+
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: "Package purchase could not be completed",
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -65,6 +73,25 @@ export const purchasePackageWithWalletController = async (
       INVALID_PACKAGE_REWARD: "Invalid package referral reward configuration",
 
       REFERRER_WALLET_NOT_FOUND: "Referrer's wallet not found",
+      LIFETIME_PACKAGE_ALREADY_OWNED: "You already own a lifetime package",
+
+      PENDING_PACKAGE_ALREADY_EXISTS: "You already have a pending package",
+
+      GOOGLE_PLAY_PRODUCT_NOT_FOUND: "Google Play product not found",
+
+      GOOGLE_PLAY_PRODUCT_MISMATCH:
+        "Google Play product does not match the selected package",
+
+      GOOGLE_PLAY_PAYMENT_NOT_COMPLETED: "Google Play payment is not completed",
+
+      GOOGLE_PLAY_ALREADY_PROCESSED:
+        "This Google Play purchase has already been processed",
+
+      GOOGLE_PLAY_ORDER_MISMATCH: "Google Play order verification failed",
+
+      GOOGLE_PLAY_VERIFICATION_FAILED: "Unable to verify Google Play payment",
+
+      GOOGLE_PLAY_NOT_CONFIGURED: "Google Play payment is not configured",
     };
 
     if (errorMessages[error.message]) {

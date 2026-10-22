@@ -12,7 +12,15 @@ export interface GetWalletQuery {
   limit?: number;
 }
 
+// export interface AddMoneyData {
+//   userId: string;
+//   amount: number;
+// }
+
 export interface AddMoneyData {
   userId: string;
   amount: number;
+  productId: string;
+  orderId: string;
+  purchaseToken: string;
 }

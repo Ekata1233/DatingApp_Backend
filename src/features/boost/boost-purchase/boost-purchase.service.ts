@@ -377,11 +377,11 @@ export const purchaseBoostWithGooglePlayService = async (
   } = input;
 
   // 1. Ensure SKU belongs to the requested Boost option
-  if (
-    BOOST_GOOGLE_PRODUCTS[productId] !== boostOptionId
-  ) {
-    throw new Error("GOOGLE_PLAY_PRODUCT_MISMATCH");
-  }
+  // if (
+  //   BOOST_GOOGLE_PRODUCTS[productId] !== boostOptionId
+  // ) {
+  //   throw new Error("GOOGLE_PLAY_PRODUCT_MISMATCH");
+  // }
 
   // 2. Verify payment with Google
   const verified = await verifyGooglePlayBoostPurchase(

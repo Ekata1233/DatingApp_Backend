@@ -5,8 +5,9 @@ export const addMoneySchema = z.object({
     .number()
     .positive("Amount must be greater than 0")
     .max(100000, "Maximum add money amount is 100000"),
+  productId: z.string().min(1),
+  orderId: z.string().min(1),
+  purchaseToken: z.string().min(1),
 });
 
-export type AddMoneyInput = z.infer<
-  typeof addMoneySchema
->;
+export type AddMoneyInput = z.infer<typeof addMoneySchema>;

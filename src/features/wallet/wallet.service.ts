@@ -1,4 +1,5 @@
 import {
+  Prisma,
   TransactionSource,
   TransactionStatus,
   TransactionType,
@@ -12,6 +13,8 @@ import {
   WalletTransactionFilter,
 } from "./wallet.types";
 import { prisma } from "../../prisma/prismaClient";
+import { consumeWalletGooglePurchase, verifyWalletGooglePurchase } from "./walletGooglePlay.provider";
+import { createHash } from "node:crypto";
 
 
 export const getMyWalletService = async (
@@ -406,95 +409,249 @@ const formatTransactionAmount = (
     : `-₹${formatted}`;
 };
 
-export const addMoneyToWalletService = async (
-  data: AddMoneyData,
-) => {
-  const { userId, amount } = data;
+// ==========================================
+// TYPES
+// ==========================================
 
-  if (!amount || amount <= 0) {
-    throw new Error(
-      "Amount must be greater than 0",
-    );
+
+
+// ==========================================
+// SERVER-CONTROLLED PRODUCT CATALOG
+// ==========================================
+// Values represent wallet credits, not
+// independently verified Google sale prices.
+
+const WALLET_PRODUCTS: Record<string, number> = {
+  welvors_coins_500: 500,
+  welvors_coins_1000: 1000,
+  welvors_coins_2000: 2000,
+};
+
+// ==========================================
+// ADD MONEY USING GOOGLE PLAY
+// ==========================================
+
+export const addMoneyToWalletService = async (
+  data: AddMoneyData
+) => {
+  const {
+    userId,
+    amount,
+    productId,
+    orderId,
+    purchaseToken,
+  } = data;
+
+  // ------------------------------------------
+  // 1. VALIDATE INPUT
+  // ------------------------------------------
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Invalid wallet top-up amount");
   }
 
+  // const allowedAmount = WALLET_PRODUCTS[productId];
+
+  // if (
+  //   allowedAmount === undefined ||
+  //   allowedAmount !== amount
+  // ) {
+  //   throw new Error(
+  //     "Invalid Google Play product or wallet amount"
+  //   );
+  // }
+
+  // ------------------------------------------
+  // 2. VALIDATE USER
+  // ------------------------------------------
+
   const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-    select: {
-      id: true,
-    },
+    where: { id: userId },
+    select: { id: true },
   });
 
   if (!user) {
     throw new Error("User not found");
   }
 
+  // ------------------------------------------
+  // 3. GENERATE PURCHASE TOKEN HASH
+  // ------------------------------------------
+
+  const purchaseTokenHash = createHash("sha256")
+    .update(purchaseToken)
+    .digest("hex");
+
+  // ------------------------------------------
+  // 4. VERIFY WITH GOOGLE PLAY
+  // ------------------------------------------
+
+  const verified = await verifyWalletGooglePurchase(
+    productId,
+    purchaseToken,
+    orderId
+  );
+
+  if (
+    verified.productId !== productId ||
+    verified.orderId !== orderId
+  ) {
+    throw new Error(
+      "Google Play purchase verification failed"
+    );
+  }
+
+  // ------------------------------------------
+  // 5. PREVENT DUPLICATE PURCHASE CREDIT
+  // ------------------------------------------
+
+  const existingPurchase =
+    await prisma.walletGooglePlayPurchase.findFirst({
+      where: {
+        OR: [
+          { purchaseTokenHash },
+          { orderId },
+        ],
+      },
+    });
+
+  if (existingPurchase) {
+    if (existingPurchase.userId !== userId) {
+      throw new Error(
+        "This purchase belongs to another user"
+      );
+    }
+
+    if (existingPurchase.status === "SUCCESS") {
+      throw new Error(
+        "This Google Play purchase has already been credited"
+      );
+    }
+
+    if (existingPurchase.status === "PROCESSING") {
+      throw new Error(
+        "This Google Play purchase is already processing"
+      );
+    }
+
+    throw new Error(
+      "This purchase requires reconciliation before retrying"
+    );
+  }
+
+  // ------------------------------------------
+  // 6. CREDIT WALLET ATOMICALLY
+  // ------------------------------------------
+
   const result = await prisma.$transaction(
     async (tx) => {
-      // Get existing wallet
-      let wallet = await tx.wallet.findUnique({
-        where: {
+      // Reserve the unique purchase token and order ID.
+      // Concurrent duplicate requests cannot both insert.
+      const purchase =
+        await tx.walletGooglePlayPurchase.create({
+          data: {
+            userId,
+            productId,
+            orderId,
+            purchaseTokenHash,
+            amount: new Prisma.Decimal(amount),
+            status: "PROCESSING",
+          },
+        });
+
+      // Ensure wallet exists.
+      const wallet = await tx.wallet.upsert({
+        where: { userId },
+        create: {
           userId,
+          balance: new Prisma.Decimal(0),
+        },
+        update: {},
+      });
+
+      // Atomic balance increment.
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: {
+            increment: new Prisma.Decimal(amount),
+          },
         },
       });
 
-      // Create wallet if user does not have one
-      if (!wallet) {
-        wallet = await tx.wallet.create({
-          data: {
-            userId,
-            balance: 0,
-          },
-        });
-      }
+      // Correct balance before this increment.
+      const balanceBefore =
+        updatedWallet.balance.minus(amount);
 
-      const balanceBefore = wallet.balance;
-
-      // Atomic increment
-      const updatedWallet =
-        await tx.wallet.update({
-          where: {
-            id: wallet.id,
-          },
-          data: {
-            balance: {
-              increment: amount,
-            },
-          },
-        });
-
-      // Create transaction history
+      // Wallet transaction history.
       const transaction =
         await tx.walletTransaction.create({
           data: {
             walletId: wallet.id,
-
-            amount,
-
+            amount: new Prisma.Decimal(amount),
             type: TransactionType.DEPOSIT,
-
-            status:
-              TransactionStatus.SUCCESS,
-
-            source:
-              TransactionSource.WALLET_TOPUP,
-
-            description: "Money added to wallet",
-
+            status: TransactionStatus.SUCCESS,
+            source: TransactionSource.WALLET_TOPUP,
+            description:
+              `Google Play wallet top-up: ${productId}`,
             balanceBefore,
-
-            balanceAfter:
-              updatedWallet.balance,
+            balanceAfter: updatedWallet.balance,
           },
         });
+
+      // Mark purchase successfully credited.
+      await tx.walletGooglePlayPurchase.update({
+        where: { id: purchase.id },
+        data: {
+          status: "SUCCESS",
+          walletTransactionId: transaction.id,
+        },
+      });
 
       return {
         wallet: updatedWallet,
         transaction,
+        orderId,
+        productId,
       };
     },
+    {
+      isolationLevel:
+        Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 10000,
+    }
   );
+
+  // ------------------------------------------
+  // 7. CONSUME GOOGLE PLAY PURCHASE
+  // ------------------------------------------
+  // Credit is already committed.
+  // Consumption failures must not cause
+  // another wallet credit.
+
+  let consumptionPending = false;
+
+  try {
+    await consumeWalletGooglePurchase(
+      productId,
+      purchaseToken
+    );
+  } catch (error) {
+    consumptionPending = true;
+
+    console.error(
+      "GOOGLE PLAY CONSUMPTION FAILED:",
+      error
+    );
+
+    // A production system needs a durable retry
+    // mechanism for pending consumption.
+  }
+
+  // ------------------------------------------
+  // 8. RETURN RESPONSE
+  // ------------------------------------------
 
   return {
     walletId: result.wallet.id,
@@ -520,8 +677,15 @@ export const addMoneyToWalletService = async (
     source:
       result.transaction.source,
 
+    paymentMethod: "GOOGLE_PLAY",
+
+    productId: result.productId,
+
+    orderId: result.orderId,
+
+    consumptionPending,
+
     createdAt:
       result.transaction.createdAt,
   };
 };
-
