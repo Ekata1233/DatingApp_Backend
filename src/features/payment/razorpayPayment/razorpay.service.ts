@@ -1,4 +1,3 @@
-
 import crypto from "node:crypto";
 
 import {
@@ -34,11 +33,7 @@ import type {
 
 const secret = process.env.RAZORPAY_KEY_SECRET!;
 
-type PurchaseType =
-  | "BOOST"
-  | "DATE_PLAN"
-  | "ROSE"
-  | "COMPLIMENT";
+type PurchaseType = "BOOST" | "DATE_PLAN" | "ROSE" | "COMPLIMENT";
 
 type PurchaseMetadata = {
   purchaseType?: PurchaseType;
@@ -72,15 +67,10 @@ function getPurchaseMetadata(
     return {};
   }
 
-  const metadata = (
-    gatewayResponse as Record<string, unknown>
-  ).purchaseMetadata;
+  const metadata = (gatewayResponse as Record<string, unknown>)
+    .purchaseMetadata;
 
-  if (
-    !metadata ||
-    typeof metadata !== "object" ||
-    Array.isArray(metadata)
-  ) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return {};
   }
 
@@ -127,10 +117,9 @@ export async function createRazorpayOrderService(
       currency: "INR",
     };
 
-  // ==========================================
-  // 2. PACKAGE
-  // ==========================================
-
+    // ==========================================
+    // 2. PACKAGE
+    // ==========================================
   } else if (data.purpose === PaymentPurpose.PACKAGE) {
     const price = await prisma.packagePrice.findFirst({
       where: {
@@ -162,24 +151,18 @@ export async function createRazorpayOrderService(
       currency: "INR",
     };
 
-  // ==========================================
-  // 3. EVENT BOOKING
-  // ==========================================
-
-  } else if (
-    data.purpose === PaymentPurpose.EVENT_BOOKING
-  ) {
-    const result = await createEventBookingForPayment(
-      userId,
-      {
-        purpose: PaymentPurpose.EVENT_BOOKING,
-        currency: "INR",
-        eventId: data.eventId,
-        menTicketCount: data.menTicketCount,
-        womenTicketCount: data.womenTicketCount,
-        otherTicketCount: data.otherTicketCount,
-      },
-    );
+    // ==========================================
+    // 3. EVENT BOOKING
+    // ==========================================
+  } else if (data.purpose === PaymentPurpose.EVENT_BOOKING) {
+    const result = await createEventBookingForPayment(userId, {
+      purpose: PaymentPurpose.EVENT_BOOKING,
+      currency: "INR",
+      eventId: data.eventId,
+      menTicketCount: data.menTicketCount,
+      womenTicketCount: data.womenTicketCount,
+      otherTicketCount: data.otherTicketCount,
+    });
 
     amount = new Prisma.Decimal(result.amount);
 
@@ -206,10 +189,9 @@ export async function createRazorpayOrderService(
       currency: "INR",
     };
 
-  // ==========================================
-  // 4. BOOST / SUPER BOOST
-  // ==========================================
-
+    // ==========================================
+    // 4. BOOST / SUPER BOOST
+    // ==========================================
   } else if (data.purpose === PaymentPurpose.BOOST) {
     const option = await prisma.boostOption.findFirst({
       where: {
@@ -256,10 +238,9 @@ export async function createRazorpayOrderService(
       boostOptionId: option.id,
     };
 
-  // ==========================================
-  // 5. DATE PLAN PACKAGE
-  // ==========================================
-
+    // ==========================================
+    // 5. DATE PLAN PACKAGE
+    // ==========================================
   } else if (
     data.purpose === PaymentPurpose.OTHER &&
     data.purchaseType === "DATE_PLAN"
@@ -297,17 +278,11 @@ export async function createRazorpayOrderService(
       datePlanPackageId: plan.id,
     };
 
-  // ==========================================
-  // 6. ROSE / COMPLIMENT
-  // ==========================================
-
-  } else if (
-    data.purpose === PaymentPurpose.PURCHASE_STORE
-  ) {
-    if (
-      data.purchaseType !== "ROSE" &&
-      data.purchaseType !== "COMPLIMENT"
-    ) {
+    // ==========================================
+    // 6. ROSE / COMPLIMENT
+    // ==========================================
+  } else if (data.purpose === PaymentPurpose.PURCHASE_STORE) {
+    if (data.purchaseType !== "ROSE" && data.purchaseType !== "COMPLIMENT") {
       throw new Error("Invalid store purchase type");
     }
 
@@ -340,12 +315,10 @@ export async function createRazorpayOrderService(
       currency: "INR",
     };
 
- purchaseMetadata = {
-  purchaseType:
-    data.purchaseType === "ROSE" ? "ROSE" : "COMPLIMENT",
-  storePackId: pack.id,
-};
-
+    purchaseMetadata = {
+      purchaseType: data.purchaseType === "ROSE" ? "ROSE" : "COMPLIMENT",
+      storePackId: pack.id,
+    };
   } else {
     throw new Error("Unsupported payment purpose");
   }
@@ -373,8 +346,7 @@ export async function createRazorpayOrderService(
 
       purchaseType: purchaseMetadata.purchaseType ?? "",
       boostOptionId: purchaseMetadata.boostOptionId ?? "",
-      datePlanPackageId:
-        purchaseMetadata.datePlanPackageId ?? "",
+      datePlanPackageId: purchaseMetadata.datePlanPackageId ?? "",
       storePackId: purchaseMetadata.storePackId ?? "",
     },
   });
@@ -427,18 +399,24 @@ export function verifyCheckoutSignature(
   orderId: string,
   paymentId: string,
   signature: string,
-) {
+): boolean {
+  const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!razorpaySecret) {
+    throw new Error("RAZORPAY_KEY_SECRET is missing");
+  }
+
   if (!/^[a-fA-F0-9]{64}$/.test(signature)) {
     return false;
   }
 
-  const expected = crypto
-    .createHmac("sha256", secret)
+  const expectedSignature = crypto
+    .createHmac("sha256", razorpaySecret)
     .update(`${orderId}|${paymentId}`)
     .digest("hex");
 
   return crypto.timingSafeEqual(
-    Buffer.from(expected, "hex"),
+    Buffer.from(expectedSignature, "hex"),
     Buffer.from(signature, "hex"),
   );
 }
@@ -455,8 +433,7 @@ export async function finalizeRazorpayPayment(
   // 1. VERIFY PAYMENT WITH RAZORPAY
   // ==========================================
 
-  const gatewayPayment =
-    await razorpay.payments.fetch(gatewayPaymentId);
+  const gatewayPayment = await razorpay.payments.fetch(gatewayPaymentId);
 
   if (
     gatewayPayment.order_id !== orderId ||
@@ -475,10 +452,7 @@ export async function finalizeRazorpayPayment(
         async (tx) => {
           const payment = await tx.payment.findFirst({
             where: {
-              OR: [
-                { payment_id: orderId },
-                { transactionId: orderId },
-              ],
+              OR: [{ payment_id: orderId }, { transactionId: orderId }],
             },
           });
 
@@ -492,21 +466,16 @@ export async function finalizeRazorpayPayment(
 
           if (
             payment.currency !== gatewayPayment.currency ||
-            toPaise(payment.amount) !==
-              Number(gatewayPayment.amount)
+            toPaise(payment.amount) !== Number(gatewayPayment.amount)
           ) {
-            throw new Error(
-              "Payment amount/currency mismatch",
-            );
+            throw new Error("Payment amount/currency mismatch");
           }
 
           // ==================================
           // 4. IDEMPOTENCY
           // ==================================
 
-          if (
-            payment.status === PaymentStatus.COMPLETED
-          ) {
+          if (payment.status === PaymentStatus.COMPLETED) {
             if (payment.payment_id !== gatewayPaymentId) {
               throw new Error("Payment ID mismatch");
             }
@@ -521,9 +490,7 @@ export async function finalizeRazorpayPayment(
           // 5. PRESERVE PURCHASE METADATA
           // ==================================
 
-          const purchaseMetadata = getPurchaseMetadata(
-            payment.gatewayResponse,
-          );
+          const purchaseMetadata = getPurchaseMetadata(payment.gatewayResponse);
 
           // ==================================
           // 6. CLAIM PAYMENT
@@ -533,10 +500,7 @@ export async function finalizeRazorpayPayment(
             where: {
               id: payment.id,
               status: {
-                in: [
-                  PaymentStatus.PENDING,
-                  PaymentStatus.PROCESSING,
-                ],
+                in: [PaymentStatus.PENDING, PaymentStatus.PROCESSING],
               },
               payment_id: orderId,
             },
@@ -564,12 +528,11 @@ export async function finalizeRazorpayPayment(
             );
           }
 
-          const updatedPayment =
-            await tx.payment.findUniqueOrThrow({
-              where: {
-                id: payment.id,
-              },
-            });
+          const updatedPayment = await tx.payment.findUniqueOrThrow({
+            where: {
+              id: payment.id,
+            },
+          });
 
           // ==================================
           // 7. FULFILL PURCHASE
@@ -581,10 +544,7 @@ export async function finalizeRazorpayPayment(
             // ================================
 
             case PaymentPurpose.WALLET:
-              await fulfillWalletTopup(
-                tx,
-                updatedPayment,
-              );
+              await fulfillWalletTopup(tx, updatedPayment);
               break;
 
             // ================================
@@ -592,10 +552,7 @@ export async function finalizeRazorpayPayment(
             // ================================
 
             case PaymentPurpose.PACKAGE:
-              await fulfillPackagePurchase(
-                tx,
-                updatedPayment,
-              );
+              await fulfillPackagePurchase(tx, updatedPayment);
               break;
 
             // ================================
@@ -603,10 +560,7 @@ export async function finalizeRazorpayPayment(
             // ================================
 
             case PaymentPurpose.EVENT_BOOKING:
-              await fulfillEventBooking(
-                tx,
-                updatedPayment,
-              );
+              await fulfillEventBooking(tx, updatedPayment);
               break;
 
             // ================================
@@ -616,18 +570,12 @@ export async function finalizeRazorpayPayment(
             case PaymentPurpose.BOOST:
               if (
                 purchaseMetadata.purchaseType !== "BOOST" ||
-                purchaseMetadata.boostOptionId !==
-                  updatedPayment.referenceId
+                purchaseMetadata.boostOptionId !== updatedPayment.referenceId
               ) {
-                throw new Error(
-                  "Invalid Boost purchase metadata",
-                );
+                throw new Error("Invalid Boost purchase metadata");
               }
 
-              await fulfillBoostPayment(
-                tx,
-                updatedPayment,
-              );
+              await fulfillBoostPayment(tx, updatedPayment);
               break;
 
             // ================================
@@ -640,15 +588,10 @@ export async function finalizeRazorpayPayment(
                 purchaseMetadata.datePlanPackageId !==
                   updatedPayment.referenceId
               ) {
-                throw new Error(
-                  "Invalid Date Plan purchase metadata",
-                );
+                throw new Error("Invalid Date Plan purchase metadata");
               }
 
-              await fulfillDatePlanPayment(
-                tx,
-                updatedPayment,
-              );
+              await fulfillDatePlanPayment(tx, updatedPayment);
               break;
 
             // ================================
@@ -656,16 +599,10 @@ export async function finalizeRazorpayPayment(
             // ================================
 
             case PaymentPurpose.PURCHASE_STORE: {
-              const storePackId =
-                purchaseMetadata.storePackId;
+              const storePackId = purchaseMetadata.storePackId;
 
-              if (
-                !storePackId ||
-                storePackId !== updatedPayment.referenceId
-              ) {
-                throw new Error(
-                  "Store pack reference missing or invalid",
-                );
+              if (!storePackId || storePackId !== updatedPayment.referenceId) {
+                throw new Error("Store pack reference missing or invalid");
               }
 
               const pack = await tx.storePack.findUnique({
@@ -678,30 +615,26 @@ export async function finalizeRazorpayPayment(
                 throw new Error("Store pack not found");
               }
 
-              if (
-                !updatedPayment.amount.equals(
-                  pack.totalPrice,
-                )
-              ) {
-                throw new Error(
-                  "Store pack payment amount mismatch",
-                );
+              if (!updatedPayment.amount.equals(pack.totalPrice)) {
+                throw new Error("Store pack payment amount mismatch");
               }
 
               if (
                 purchaseMetadata.purchaseType === "ROSE" &&
                 pack.itemType === StoreItemType.ROSE
               ) {
+                if (!updatedPayment.payment_id) {
+                  throw new Error("Razorpay payment ID missing");
+                }
+
                 await fulfillRosePayment(
                   tx,
                   updatedPayment.userId,
                   storePackId,
-                  updatedPayment.id,
+                  updatedPayment.payment_id,
                 );
-
               } else if (
-                purchaseMetadata.purchaseType ===
-                  "COMPLIMENT" &&
+                purchaseMetadata.purchaseType === "COMPLIMENT" &&
                 pack.itemType === StoreItemType.COMPLIMENT
               ) {
                 await fulfillComplimentPayment(
@@ -710,20 +643,15 @@ export async function finalizeRazorpayPayment(
                   storePackId,
                   updatedPayment.id,
                 );
-
               } else {
-                throw new Error(
-                  "Invalid store purchase type",
-                );
+                throw new Error("Invalid store purchase type");
               }
 
               break;
             }
 
             default:
-              throw new Error(
-                "Unsupported payment purpose",
-              );
+              throw new Error("Unsupported payment purpose");
           }
 
           // ==================================
@@ -741,11 +669,9 @@ export async function finalizeRazorpayPayment(
           timeout: 30000,
         },
       );
-
     } catch (error) {
       if (
-        error instanceof
-          Prisma.PrismaClientKnownRequestError &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2034" &&
         attempt < 2
       ) {
@@ -763,32 +689,244 @@ export async function finalizeRazorpayPayment(
 // VERIFY RAZORPAY PAYMENT SERVICE
 // ============================================
 
+
 export async function verifyRazorpayPaymentService(
   userId: string,
   data: VerifyRazorpayDTO,
 ) {
+  console.log(
+    "\n========== RAZORPAY VERIFY DEBUG ==========",
+  );
+
+  // ==========================================
+  // 1. REQUEST DEBUG
+  // ==========================================
+
+  console.log("REQUEST DATA:", {
+    userId,
+    razorpayOrderId: data.razorpay_order_id,
+    razorpayPaymentId: data.razorpay_payment_id,
+    signatureLength: data.razorpay_signature?.length,
+  });
+
+  console.log("RAZORPAY CONFIG:", {
+    keyId: process.env.RAZORPAY_KEY_ID,
+    secretConfigured: Boolean(
+      process.env.RAZORPAY_KEY_SECRET,
+    ),
+    secretLength:
+      process.env.RAZORPAY_KEY_SECRET?.length ?? 0,
+  });
+
+  // ==========================================
+  // 2. FIND PAYMENT IN DATABASE
+  // ==========================================
+
   const payment = await razorpayRepository.findByOrderId(
     data.razorpay_order_id,
   );
 
+  console.log(
+    "DATABASE PAYMENT:",
+    payment
+      ? {
+          id: payment.id,
+          userId: payment.userId,
+          payment_id: payment.payment_id,
+          transactionId: payment.transactionId,
+          status: payment.status,
+          purpose: payment.purpose,
+          amount: payment.amount.toString(),
+          currency: payment.currency,
+        }
+      : null,
+  );
+
   if (!payment || payment.userId !== userId) {
+    console.error(
+      "VERIFY FAILED: Payment order not found",
+    );
+
     throw new Error("Payment order not found");
   }
 
-  if (
-    !verifyCheckoutSignature(
-      data.razorpay_order_id,
-      data.razorpay_payment_id,
-      data.razorpay_signature,
-    )
-  ) {
+  // ==========================================
+  // 3. VERIFY ORDER & PAYMENT WITH RAZORPAY
+  // ==========================================
+
+  console.log("FETCHING RAZORPAY ORDER AND PAYMENT");
+
+  let gatewayOrder;
+  let gatewayPayment;
+
+  try {
+    [gatewayOrder, gatewayPayment] = await Promise.all([
+      razorpay.orders.fetch(data.razorpay_order_id),
+      razorpay.payments.fetch(data.razorpay_payment_id),
+    ]);
+  } catch (error: any) {
+    console.error("RAZORPAY GATEWAY ERROR:", {
+      statusCode: error?.statusCode,
+      description:
+        error?.error?.description ??
+        error?.message,
+    });
+
+    throw new Error(
+      "Unable to verify order/payment with Razorpay",
+    );
+  }
+
+  // ==========================================
+  // 4. CHECK ORDER AND AMOUNT
+  // ==========================================
+
+  const orderMatches =
+    gatewayPayment.order_id === data.razorpay_order_id;
+
+  const expectedAmountPaise = payment.amount
+    .mul(100)
+    .toNumber();
+
+  const amountMatches =
+    Number(gatewayPayment.amount) ===
+      expectedAmountPaise &&
+    Number(gatewayOrder.amount) ===
+      expectedAmountPaise;
+
+  const currencyMatches =
+    gatewayPayment.currency === payment.currency &&
+    gatewayOrder.currency === payment.currency;
+
+  console.log("RAZORPAY GATEWAY RESULT:", {
+    gatewayOrderId: gatewayOrder.id,
+    orderStatus: gatewayOrder.status,
+    orderAmount: gatewayOrder.amount,
+
+    gatewayPaymentId: gatewayPayment.id,
+    gatewayPaymentOrderId: gatewayPayment.order_id,
+    paymentStatus: gatewayPayment.status,
+    paymentAmount: gatewayPayment.amount,
+
+    expectedAmountPaise,
+
+    orderMatches,
+    amountMatches,
+    currencyMatches,
+  });
+
+  if (!orderMatches) {
+    console.error(
+      "VERIFY FAILED: Razorpay order mismatch",
+    );
+
+    throw new Error(
+      "Razorpay payment does not belong to this order",
+    );
+  }
+
+  if (!amountMatches || !currencyMatches) {
+    console.error(
+      "VERIFY FAILED: Payment amount/currency mismatch",
+    );
+
+    throw new Error(
+      "Razorpay payment amount or currency mismatch",
+    );
+  }
+
+  // ==========================================
+  // 5. VERIFY CHECKOUT SIGNATURE
+  // ==========================================
+
+  console.log("VERIFYING RAZORPAY SIGNATURE");
+
+  const isSignatureValid = verifyCheckoutSignature(
+    data.razorpay_order_id,
+    data.razorpay_payment_id,
+    data.razorpay_signature,
+  );
+
+  console.log("SIGNATURE VERIFICATION:", {
+    orderId: data.razorpay_order_id,
+    paymentId: data.razorpay_payment_id,
+    signatureLength: data.razorpay_signature.length,
+    signatureValid: isSignatureValid,
+  });
+
+  if (!isSignatureValid) {
+    console.error(
+      "VERIFY FAILED: Invalid Razorpay signature",
+    );
+
+    console.error("POSSIBLE REASONS:", [
+      "Incorrect RAZORPAY_KEY_SECRET",
+      "Order created using a different Razorpay key",
+      "Frontend signature does not match this checkout",
+      "Different Razorpay environments",
+    ]);
+
     throw new Error("Invalid Razorpay signature");
   }
 
-  const result = await finalizeRazorpayPayment(
-    data.razorpay_order_id,
-    data.razorpay_payment_id,
+  console.log("RAZORPAY SIGNATURE VERIFIED");
+
+  // ==========================================
+  // 6. CHECK PAYMENT CAPTURE STATUS
+  // ==========================================
+
+  console.log("PAYMENT CAPTURE CHECK:", {
+    status: gatewayPayment.status,
+    captured: gatewayPayment.captured,
+  });
+
+  if (gatewayPayment.status !== "captured") {
+    throw new Error(
+      `Razorpay payment is not captured: ${gatewayPayment.status}`,
+    );
+  }
+
+  // ==========================================
+  // 7. FINALIZE PAYMENT
+  // ==========================================
+
+  console.log("STARTING PAYMENT FINALIZATION");
+
+  let result;
+
+  try {
+    result = await finalizeRazorpayPayment(
+      data.razorpay_order_id,
+      data.razorpay_payment_id,
+    );
+  } catch (error) {
+    console.error(
+      "PAYMENT FINALIZATION FAILED:",
+      error,
+    );
+
+    throw error;
+  }
+
+  // ==========================================
+  // 8. FINAL DEBUG
+  // ==========================================
+
+  console.log("PAYMENT FINALIZATION RESULT:", {
+    paymentId: result.payment.id,
+    gatewayPaymentId: result.payment.payment_id,
+    status: result.payment.status,
+    purpose: result.payment.purpose,
+    alreadyProcessed: result.alreadyProcessed,
+  });
+
+  console.log(
+    "========== RAZORPAY VERIFY COMPLETED ==========\n",
   );
+
+  // ==========================================
+  // 9. RESPONSE
+  // ==========================================
 
   return {
     success: true,
@@ -801,6 +939,7 @@ export async function verifyRazorpayPaymentService(
   };
 }
 
+
 // ============================================
 // GET PAYMENT STATUS
 // ============================================
@@ -809,26 +948,19 @@ export async function getRazorpayPaymentStatusService(
   userId: string,
   paymentId: string,
 ) {
-  const payment =
-    await razorpayRepository.findUserPayment(
-      userId,
-      paymentId,
-    );
+  const payment = await razorpayRepository.findUserPayment(userId, paymentId);
 
   if (!payment) {
     throw new Error("Payment not found");
   }
 
-  const purchaseMetadata = getPurchaseMetadata(
-    payment.gatewayResponse,
-  );
+  const purchaseMetadata = getPurchaseMetadata(payment.gatewayResponse);
 
   return {
     id: payment.id,
     purpose: payment.purpose,
 
-    purchaseType:
-      purchaseMetadata.purchaseType ?? null,
+    purchaseType: purchaseMetadata.purchaseType ?? null,
 
     amount: payment.amount,
     currency: payment.currency,
