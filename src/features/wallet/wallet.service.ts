@@ -261,9 +261,7 @@ export const getMyWalletService = async (
 };
 
 
-// ==========================================
-// GET TRANSACTION DIRECTION
-// ==========================================
+
 
 const getTransactionDirection = (
   type: TransactionType,
@@ -418,8 +416,6 @@ const formatTransactionAmount = (
 // ==========================================
 // SERVER-CONTROLLED PRODUCT CATALOG
 // ==========================================
-// Values represent wallet credits, not
-// independently verified Google sale prices.
 
 const WALLET_PRODUCTS: Record<string, number> = {
   welvors_coins_500: 500,
