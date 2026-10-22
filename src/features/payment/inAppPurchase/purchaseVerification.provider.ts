@@ -127,49 +127,255 @@ export const verifyGooglePurchase = async (
   };
 };
 
-// ==========================================
-// APPLE APP STORE
-// ==========================================
+// // ==========================================
+// // APPLE APP STORE
+// // ==========================================
 
-const applePrivateKey = Buffer.from(
-  process.env.APPLE_PRIVATE_KEY_BASE64!,
-  "base64",
-).toString("utf8");
+// const applePrivateKey = Buffer.from(
+//   process.env.APPLE_PRIVATE_KEY_BASE64!,
+//   "base64",
+// ).toString("utf8");
 
-const appleRootCertificates = readdirSync(
-  process.env.APPLE_ROOT_CA_PATH!,
-)
-  .filter((file) => file.endsWith(".cer"))
-  .map((file) =>
-    readFileSync(
-      join(process.env.APPLE_ROOT_CA_PATH!, file),
-    ),
-  );
+// const appleRootCertificates = readdirSync(
+//   process.env.APPLE_ROOT_CA_PATH!,
+// )
+//   .filter((file) => file.endsWith(".cer"))
+//   .map((file) =>
+//     readFileSync(
+//       join(process.env.APPLE_ROOT_CA_PATH!, file),
+//     ),
+//   );
 
-const createAppleClient = (environment: Environment) =>
-  new AppStoreServerAPIClient(
+// const createAppleClient = (environment: Environment) =>
+//   new AppStoreServerAPIClient(
+//     applePrivateKey,
+//     process.env.APPLE_KEY_ID!,
+//     process.env.APPLE_ISSUER_ID!,
+//     process.env.APPLE_BUNDLE_ID!,
+//     environment,
+//   );
+
+// const createAppleVerifier = (environment: Environment) =>
+//   new SignedDataVerifier(
+//     appleRootCertificates,
+//     true,
+//     environment,
+//     process.env.APPLE_BUNDLE_ID!,
+//     environment === Environment.PRODUCTION
+//       ? Number(process.env.APPLE_APP_ID)
+//       : undefined,
+//   );
+
+// export const verifyApplePurchase = async (
+//   transactionId: string,
+//   expectedProductId: string,
+// ): Promise<VerifiedStorePurchase> => {
+//   let lastError: unknown;
+
+//   for (const environment of [
+//     Environment.PRODUCTION,
+//     Environment.SANDBOX,
+//   ]) {
+//     try {
+//       const client = createAppleClient(environment);
+//       const verifier = createAppleVerifier(environment);
+
+//       const response =
+//         await client.getAllSubscriptionStatuses(transactionId);
+
+//       const transactions = (response.data ?? []).flatMap(
+//         (group) => group.lastTransactions ?? [],
+//       );
+
+//       // Verify each signed transaction, not merely decode it.
+//       for (const item of transactions) {
+//         if (!item.signedTransactionInfo) continue;
+
+//         const tx = await verifier.verifyAndDecodeTransaction(
+//           item.signedTransactionInfo,
+//         );
+
+//         if (tx.productId !== expectedProductId) continue;
+
+//         if (
+//           !tx.expiresDate ||
+//           !tx.purchaseDate ||
+//           !tx.transactionId ||
+//           !tx.originalTransactionId
+//         ) {
+//           continue;
+//         }
+
+//         const expiryDate = new Date(tx.expiresDate);
+//         const purchaseDate = new Date(tx.purchaseDate);
+
+//         // Apple status 1 = active, 4 = billing grace period.
+//         // Status 3 = billing retry without grace entitlement.
+//         const eligibleStatus =
+//           item.status === 1 || item.status === 4;
+
+//         if (
+//           !eligibleStatus ||
+//           tx.revocationDate ||
+//           expiryDate <= new Date()
+//         ) {
+//           continue;
+//         }
+
+//         let autoRenew = false;
+
+//         if (item.signedRenewalInfo) {
+//           const renewal =
+//             await verifier.verifyAndDecodeRenewalInfo(
+//               item.signedRenewalInfo,
+//             );
+
+//           autoRenew = renewal.autoRenewStatus === 1;
+//         }
+
+//         return {
+//           platform: "IOS",
+//           productId: expectedProductId,
+//           transactionId: tx.transactionId,
+//           originalTransactionId:
+//             tx.originalTransactionId,
+//           purchaseDate,
+//           expiryDate,
+//           autoRenew,
+//           storeStatus: String(item.status),
+//           environment,
+//           rawResponse: {
+//             transaction: tx,
+//             status: item.status,
+//           },
+//         };
+//       }
+
+//       throw new Error(
+//         "No eligible Apple subscription for this product",
+//       );
+//     } catch (error) {
+//       lastError = error;
+
+//       // Production-to-sandbox fallback must only occur for
+//       // Apple's documented environment mismatch response.
+//       // Do not automatically retry all failures in sandbox.
+//       if (environment === Environment.PRODUCTION) {
+//         const code = (error as any)?.apiError;
+//         if (code === 4040010) continue;
+//       }
+
+//       break;
+//     }
+//   }
+
+//   throw lastError instanceof Error
+//     ? lastError
+//     : new Error("Apple subscription verification failed");
+// };
+
+
+ // ==========================================
+ // APPLE APP STORE
+ // ==========================================
+
+const getAppleConfig = () => {
+  const {
+    APPLE_PRIVATE_KEY_BASE64,
+    APPLE_ROOT_CA_PATH,
+    APPLE_KEY_ID,
+    APPLE_ISSUER_ID,
+    APPLE_BUNDLE_ID,
+    APPLE_APP_ID,
+  } = process.env;
+
+  if (
+    !APPLE_PRIVATE_KEY_BASE64 ||
+    !APPLE_ROOT_CA_PATH ||
+    !APPLE_KEY_ID ||
+    !APPLE_ISSUER_ID ||
+    !APPLE_BUNDLE_ID
+  ) {
+    throw new Error(
+      "Apple App Store purchase verification is not configured"
+    );
+  }
+
+  const applePrivateKey = Buffer.from(
+    APPLE_PRIVATE_KEY_BASE64,
+    "base64"
+  ).toString("utf8");
+
+  const appleRootCertificates = readdirSync(
+    APPLE_ROOT_CA_PATH
+  )
+    .filter((file) => file.endsWith(".cer"))
+    .map((file) =>
+      readFileSync(join(APPLE_ROOT_CA_PATH, file))
+    );
+
+  if (!appleRootCertificates.length) {
+    throw new Error(
+      "No Apple root certificates found"
+    );
+  }
+
+  return {
     applePrivateKey,
-    process.env.APPLE_KEY_ID!,
-    process.env.APPLE_ISSUER_ID!,
-    process.env.APPLE_BUNDLE_ID!,
-    environment,
+    appleRootCertificates,
+    keyId: APPLE_KEY_ID,
+    issuerId: APPLE_ISSUER_ID,
+    bundleId: APPLE_BUNDLE_ID,
+    appId: APPLE_APP_ID,
+  };
+};
+
+const createAppleClient = (
+  environment: Environment,
+  config: ReturnType<typeof getAppleConfig>
+) =>
+  new AppStoreServerAPIClient(
+    config.applePrivateKey,
+    config.keyId,
+    config.issuerId,
+    config.bundleId,
+    environment
   );
 
-const createAppleVerifier = (environment: Environment) =>
-  new SignedDataVerifier(
-    appleRootCertificates,
+const createAppleVerifier = (
+  environment: Environment,
+  config: ReturnType<typeof getAppleConfig>
+) => {
+  if (
+    environment === Environment.PRODUCTION &&
+    (!config.appId ||
+      !Number.isFinite(Number(config.appId)) ||
+      Number(config.appId) <= 0)
+  ) {
+    throw new Error(
+      "APPLE_APP_ID is required for production verification"
+    );
+  }
+
+  return new SignedDataVerifier(
+    config.appleRootCertificates,
     true,
     environment,
-    process.env.APPLE_BUNDLE_ID!,
+    config.bundleId,
     environment === Environment.PRODUCTION
-      ? Number(process.env.APPLE_APP_ID)
-      : undefined,
+      ? Number(config.appId)
+      : undefined
   );
+};
 
 export const verifyApplePurchase = async (
   transactionId: string,
-  expectedProductId: string,
+  expectedProductId: string
 ): Promise<VerifiedStorePurchase> => {
+  // Apple credentials are loaded only when
+  // an iOS purchase verification is requested.
+  const config = getAppleConfig();
+
   let lastError: unknown;
 
   for (const environment of [
@@ -177,25 +383,40 @@ export const verifyApplePurchase = async (
     Environment.SANDBOX,
   ]) {
     try {
-      const client = createAppleClient(environment);
-      const verifier = createAppleVerifier(environment);
-
-      const response =
-        await client.getAllSubscriptionStatuses(transactionId);
-
-      const transactions = (response.data ?? []).flatMap(
-        (group) => group.lastTransactions ?? [],
+      const client = createAppleClient(
+        environment,
+        config
       );
 
-      // Verify each signed transaction, not merely decode it.
-      for (const item of transactions) {
-        if (!item.signedTransactionInfo) continue;
+      const verifier = createAppleVerifier(
+        environment,
+        config
+      );
 
-        const tx = await verifier.verifyAndDecodeTransaction(
-          item.signedTransactionInfo,
+      const response =
+        await client.getAllSubscriptionStatuses(
+          transactionId
         );
 
-        if (tx.productId !== expectedProductId) continue;
+      const transactions = (
+        response.data ?? []
+      ).flatMap(
+        (group) => group.lastTransactions ?? []
+      );
+
+      for (const item of transactions) {
+        if (!item.signedTransactionInfo) {
+          continue;
+        }
+
+        const tx =
+          await verifier.verifyAndDecodeTransaction(
+            item.signedTransactionInfo
+          );
+
+        if (tx.productId !== expectedProductId) {
+          continue;
+        }
 
         if (
           !tx.expiresDate ||
@@ -206,13 +427,17 @@ export const verifyApplePurchase = async (
           continue;
         }
 
-        const expiryDate = new Date(tx.expiresDate);
-        const purchaseDate = new Date(tx.purchaseDate);
+        const expiryDate = new Date(
+          tx.expiresDate
+        );
 
-        // Apple status 1 = active, 4 = billing grace period.
-        // Status 3 = billing retry without grace entitlement.
+        const purchaseDate = new Date(
+          tx.purchaseDate
+        );
+
         const eligibleStatus =
-          item.status === 1 || item.status === 4;
+          item.status === 1 ||
+          item.status === 4;
 
         if (
           !eligibleStatus ||
@@ -227,10 +452,11 @@ export const verifyApplePurchase = async (
         if (item.signedRenewalInfo) {
           const renewal =
             await verifier.verifyAndDecodeRenewalInfo(
-              item.signedRenewalInfo,
+              item.signedRenewalInfo
             );
 
-          autoRenew = renewal.autoRenewStatus === 1;
+          autoRenew =
+            renewal.autoRenewStatus === 1;
         }
 
         return {
@@ -252,17 +478,19 @@ export const verifyApplePurchase = async (
       }
 
       throw new Error(
-        "No eligible Apple subscription for this product",
+        "No eligible Apple subscription for this product"
       );
     } catch (error) {
       lastError = error;
 
-      // Production-to-sandbox fallback must only occur for
-      // Apple's documented environment mismatch response.
-      // Do not automatically retry all failures in sandbox.
+      // Retry sandbox only for Apple's documented
+      // environment mismatch response.
       if (environment === Environment.PRODUCTION) {
         const code = (error as any)?.apiError;
-        if (code === 4040010) continue;
+
+        if (code === 4040010) {
+          continue;
+        }
       }
 
       break;
@@ -271,5 +499,7 @@ export const verifyApplePurchase = async (
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("Apple subscription verification failed");
+    : new Error(
+        "Apple subscription verification failed"
+      );
 };

@@ -67,48 +67,48 @@ export const getMyWalletController = async (
 };
 
 
-export const addMoneyToWalletController =
-  async (
-    req: Request,
-    res: Response,
-  ) => {
-    try {
-      const userId = (req as any).user.id;
+export const addMoneyToWalletController = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = (req as any).user?.id;
 
-      const parsed = addMoneySchema.safeParse(req.body);
-
-      if (!parsed.success) {
-        return res.status(400).json({
-          success: false,
-          message:
-            parsed.error.issues[0]?.message ||
-            "Invalid amount",
-        });
-      }
-
-      const result =
-        await addMoneyToWalletService({
-          userId,
-          amount: parsed.data.amount,
-        });
-
-      return res.status(200).json({
-        success: true,
-        message:
-          "Money added to wallet successfully",
-        data: result,
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
       });
-    } catch (error: any) {
-      console.error(
-        "ADD MONEY WALLET ERROR:",
-        error,
-      );
+    }
 
+    const parsed = addMoneySchema.safeParse(req.body);
+
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
         message:
-          error.message ||
-          "Failed to add money to wallet",
+          parsed.error.issues[0]?.message ||
+          "Invalid wallet top-up request",
       });
     }
-  };
+
+    const result = await addMoneyToWalletService({
+      userId,
+      ...parsed.data,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Wallet top-up processed successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("ADD MONEY WALLET ERROR:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message || "Failed to add money to wallet",
+    });
+  }
+};

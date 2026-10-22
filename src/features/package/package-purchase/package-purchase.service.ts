@@ -1,6 +1,9 @@
 import {
   BillingCycle,
+  InAppPlatform,
   PackageStatus,
+  PaymentPurpose,
+  PaymentStatus,
   Prisma,
   TransactionSource,
   TransactionStatus,
@@ -8,6 +11,10 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { rewardReferrerOnPackagePurchase } from "../../user/referral/referral.helper";
+import { GooglePlayPackageInput } from "./package-purchase.types";
+import { verifyGooglePlayPackage } from "./googlePlayPackage.service";
+import { PurchasePackageInput } from "./package-purchase.validation";
+import { createHash } from "node:crypto";
 
 type Tx = Prisma.TransactionClient;
 
@@ -329,6 +336,17 @@ const calculatePackageEndDate = (
 //     },
 //   );
 // };
+
+export const purchasePackageService = async (
+  userId: string,
+  input: PurchasePackageInput,
+) => {
+  if (input.paymentMethod === "WALLET") {
+    return await purchasePackageWithWalletService(userId, input.priceId);
+  }
+
+  return await purchasePackageWithGooglePlayService(userId, input);
+};
 
 export const purchasePackageWithWalletService = async (
   userId: string,
@@ -818,6 +836,486 @@ export const purchasePackageWithWalletService = async (
       };
     },
 
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+
+      maxWait: 5000,
+
+      timeout: 10000,
+    },
+  );
+};
+
+export const purchasePackageWithGooglePlayService = async (
+  userId: string,
+  input: GooglePlayPackageInput,
+) => {
+  const { priceId, productId, orderId, purchaseToken } = input;
+
+  // ==========================================
+  // 1. VERIFY PRODUCT MAPPING
+  // ==========================================
+
+  const inAppProduct = await prisma.inAppProduct.findFirst({
+    where: {
+      priceId,
+      productId,
+      platform: InAppPlatform.ANDROID,
+      active: true,
+
+      price: {
+        active: true,
+        package: {
+          active: true,
+        },
+      },
+    },
+
+    include: {
+      price: {
+        include: {
+          package: true,
+        },
+      },
+    },
+  });
+
+  if (!inAppProduct) {
+    throw new Error("GOOGLE_PLAY_PRODUCT_NOT_FOUND");
+  }
+
+  // ==========================================
+  // 2. VERIFY GOOGLE PLAY PURCHASE
+  // ==========================================
+
+  const verified = await verifyGooglePlayPackage(productId, purchaseToken);
+
+  if (orderId && verified.orderId && orderId !== verified.orderId) {
+    throw new Error("GOOGLE_PLAY_ORDER_MISMATCH");
+  }
+
+  // ==========================================
+  // 3. HASH PURCHASE TOKEN
+  // ==========================================
+
+  const purchaseTokenHash = createHash("sha256")
+    .update(purchaseToken)
+    .digest("hex");
+
+  // ==========================================
+  // 4. ATOMIC DATABASE TRANSACTION
+  // ==========================================
+
+  return prisma.$transaction(
+    async (tx) => {
+      // ========================================
+      // 5. VALIDATE USER
+      // ========================================
+
+      const user = await tx.user.findUnique({
+        where: {
+          id: userId,
+        },
+        select: {
+          id: true,
+          account_status: true,
+        },
+      });
+
+      if (!user) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      if (user.account_status !== "ACTIVE") {
+        throw new Error("ACCOUNT_NOT_ACTIVE");
+      }
+
+      // ========================================
+      // 6. GET PACKAGE PRICE
+      // ========================================
+
+      const packagePrice = await tx.packagePrice.findFirst({
+        where: {
+          id: priceId,
+          active: true,
+
+          package: {
+            active: true,
+          },
+        },
+
+        include: {
+          package: true,
+        },
+      });
+
+      if (!packagePrice) {
+        throw new Error("PACKAGE_PRICE_NOT_FOUND");
+      }
+
+      const selectedPackage = packagePrice.package;
+
+      if (packagePrice.price.lte(0)) {
+        throw new Error("INVALID_PACKAGE_PRICE");
+      }
+
+      const purchaseAmount = packagePrice.price;
+      const now = new Date();
+
+      // ========================================
+      // 7. PREVENT DUPLICATE GOOGLE PURCHASE
+      // ========================================
+
+      const existingPurchase = await tx.inAppPurchase.findUnique({
+        where: {
+          purchaseTokenHash,
+        },
+      });
+
+      if (existingPurchase) {
+        throw new Error("GOOGLE_PLAY_ALREADY_PROCESSED");
+      }
+
+      // ========================================
+      // 8. CHECK LIFETIME PACKAGE
+      // ========================================
+
+      const lifetimePackage = await tx.userPackage.findFirst({
+        where: {
+          user_id: userId,
+          status: PackageStatus.ACTIVE,
+
+          price: {
+            billingCycle: BillingCycle.LIFETIME,
+          },
+
+          OR: [
+            {
+              endDate: null,
+            },
+            {
+              endDate: {
+                gt: now,
+              },
+            },
+          ],
+        },
+      });
+
+      if (lifetimePackage) {
+        throw new Error("LIFETIME_PACKAGE_ALREADY_OWNED");
+      }
+
+      // ========================================
+      // 9. GET CURRENT ACTIVE PACKAGE
+      // ========================================
+
+      const activePackage = await tx.userPackage.findFirst({
+        where: {
+          user_id: userId,
+          status: PackageStatus.ACTIVE,
+          endDate: {
+            gt: now,
+          },
+        },
+
+        include: {
+          package: true,
+          price: true,
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      // ========================================
+      // 10. CHECK PENDING PACKAGE
+      // ========================================
+
+      const pendingPackage = await tx.userPackage.findFirst({
+        where: {
+          user_id: userId,
+          status: PackageStatus.PENDING,
+        },
+      });
+
+      // ========================================
+      // 11. DETERMINE SUBSCRIPTION ACTION
+      // ========================================
+
+      let action: SubscriptionAction = "NEW_PURCHASE";
+
+      if (activePackage) {
+        if (activePackage.packageId === selectedPackage.id) {
+          action = "RENEW";
+        } else {
+          const currentPriority = getPackagePriority(
+            activePackage.package.slug,
+          );
+
+          const newPriority = getPackagePriority(selectedPackage.slug);
+
+          if (currentPriority === 0 || newPriority === 0) {
+            throw new Error("UNKNOWN_PACKAGE_PRIORITY");
+          }
+
+          if (newPriority > currentPriority) {
+            action = "UPGRADE";
+          } else if (newPriority < currentPriority) {
+            action = "DOWNGRADE";
+          } else {
+            throw new Error("SAME_PRIORITY_PACKAGE_CONFLICT");
+          }
+        }
+      }
+
+      if (pendingPackage) {
+        throw new Error("PENDING_PACKAGE_ALREADY_EXISTS");
+      }
+
+      // ========================================
+      // 12. CREATE PAYMENT RECORD
+      // ========================================
+
+      const payment = await tx.payment.create({
+        data: {
+          userId,
+          amount: purchaseAmount,
+          currency: "INR",
+
+          payment_id: verified.orderId ?? `gplay_${purchaseTokenHash}`,
+
+          status: PaymentStatus.COMPLETED,
+          purpose: PaymentPurpose.PACKAGE,
+
+          packagePriceId: packagePrice.id,
+
+          paidAt: now,
+
+          gatewayResponse: {
+            provider: "GOOGLE_PLAY",
+            productId,
+            orderId: verified.orderId,
+            purchaseTokenHash,
+          },
+        },
+      });
+
+      // ========================================
+      // 13. CALCULATE SUBSCRIPTION DATES
+      // ========================================
+
+      let startDate = now;
+      let endDate: Date | null = null;
+
+      if (action === "RENEW") {
+        startDate = activePackage!.startDate;
+
+        endDate = calculatePackageEndDate(
+          activePackage!.endDate!,
+          packagePrice.billingCycle,
+          packagePrice.months,
+        );
+      } else if (action === "DOWNGRADE") {
+        startDate = activePackage!.endDate!;
+
+        endDate = calculatePackageEndDate(
+          startDate,
+          packagePrice.billingCycle,
+          packagePrice.months,
+        );
+      } else {
+        startDate = now;
+
+        endDate = calculatePackageEndDate(
+          startDate,
+          packagePrice.billingCycle,
+          packagePrice.months,
+        );
+      }
+
+      // ========================================
+      // 14. CREATE / UPDATE USER PACKAGE
+      // ========================================
+
+      let userPackage;
+
+      if (action === "RENEW") {
+        userPackage = await tx.userPackage.update({
+          where: {
+            id: activePackage!.id,
+          },
+
+          data: {
+            endDate,
+
+            priceId: packagePrice.id,
+
+            purchasePrice: packagePrice.price,
+
+            purchaseOriginalPrice: packagePrice.originalPrice,
+
+            purchaseDiscount: packagePrice.discountPercent,
+
+            paymentId: payment.id,
+          },
+
+          include: {
+            package: true,
+            price: true,
+          },
+        });
+      } else {
+        if (action === "UPGRADE") {
+          await tx.userPackage.updateMany({
+            where: {
+              user_id: userId,
+              status: PackageStatus.ACTIVE,
+            },
+
+            data: {
+              status: PackageStatus.EXPIRED,
+              endDate: now,
+              autoRenew: false,
+            },
+          });
+        }
+
+        userPackage = await tx.userPackage.create({
+          data: {
+            user_id: userId,
+
+            packageId: selectedPackage.id,
+            priceId: packagePrice.id,
+
+            purchasePrice: packagePrice.price,
+
+            purchaseOriginalPrice: packagePrice.originalPrice,
+
+            purchaseDiscount: packagePrice.discountPercent,
+
+            startDate,
+            endDate,
+
+            status:
+              action === "DOWNGRADE"
+                ? PackageStatus.PENDING
+                : PackageStatus.ACTIVE,
+
+            autoRenew: false,
+
+            currentPackageId: selectedPackage.id,
+
+            paymentId: payment.id,
+          },
+
+          include: {
+            package: true,
+            price: true,
+          },
+        });
+      }
+
+      // ========================================
+      // 15. CREATE IN-APP PURCHASE RECORD
+      // ========================================
+
+      const inAppPurchase = await tx.inAppPurchase.create({
+        data: {
+          userId,
+          paymentId: payment.id,
+          userPackageId: userPackage.id,
+          platform: InAppPlatform.ANDROID,
+          productId,
+          priceId: packagePrice.id,
+          purchaseTokenHash,
+          transactionId: verified.orderId ?? null,
+          originalTransactionId: verified.orderId ?? null,
+          environment: "PRODUCTION",
+          storeStatus: "PURCHASED",
+        },
+      });
+
+      // ========================================
+      // 16. CREDIT REFERRAL REWARD
+      // ========================================
+
+      const referralPackageReward = await rewardReferrerOnPackagePurchase(
+        tx,
+        userId,
+      );
+
+      // ========================================
+      // 17. RETURN RESPONSE
+      // ========================================
+
+      return {
+        success: true,
+
+        action,
+
+        userPackageId: userPackage.id,
+
+        inAppPurchaseId: inAppPurchase.id,
+
+        package: {
+          id: selectedPackage.id,
+          name: selectedPackage.name,
+          slug: selectedPackage.slug,
+          tagline: selectedPackage.tagline,
+        },
+
+        referralReward: referralPackageReward
+          ? {
+              credited: true,
+              referrerId: referralPackageReward.referrerId,
+              amount: referralPackageReward.rewardAmount,
+              walletTransactionId: referralPackageReward.walletTransactionId,
+            }
+          : {
+              credited: false,
+            },
+
+        billing: {
+          priceId: packagePrice.id,
+
+          billingCycle: packagePrice.billingCycle,
+
+          months: packagePrice.months,
+
+          originalPrice: packagePrice.originalPrice,
+
+          discountPercent: packagePrice.discountPercent,
+
+          purchasePrice: packagePrice.price,
+        },
+
+        subscription: {
+          status: userPackage.status,
+
+          startDate: userPackage.startDate,
+
+          endDate: userPackage.endDate,
+
+          autoRenew: userPackage.autoRenew,
+        },
+
+        payment: {
+          id: payment.id,
+
+          method: "GOOGLE_PLAY",
+
+          status: "SUCCESS",
+
+          amountPaid: purchaseAmount,
+
+          orderId: verified.orderId,
+
+          walletTransactionId: null,
+        },
+      };
+    },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
 
