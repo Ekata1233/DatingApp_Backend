@@ -1,16 +1,9 @@
-
 {
   "version": 2,
   "builds": [
     {
       "src": "src/server.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "node_modules/@ffprobe-installer/linux-x64/**",
-          "node_modules/@ffmpeg-installer/linux-x64/**"
-        ]
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -28,3 +21,4 @@
     }
   ]
 }
+

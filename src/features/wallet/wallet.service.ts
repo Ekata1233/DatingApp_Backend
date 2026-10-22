@@ -438,6 +438,8 @@ export const addMoneyToWalletService = async (
     purchaseToken,
   } = data;
 
+
+  console.log("product id : ", productId)
   // ------------------------------------------
   // 1. VALIDATE INPUT
   // ------------------------------------------

@@ -852,6 +852,11 @@ export const purchasePackageWithGooglePlayService = async (
 ) => {
   const { priceId, productId, orderId, purchaseToken } = input;
 
+  console.log("price id : ", priceId)
+  console.log("productId id : ", productId)
+  console.log("orderId id : ", orderId)
+  console.log("purchaseToken id : ", purchaseToken)
+
   // ==========================================
   // 1. VERIFY PRODUCT MAPPING
   // ==========================================
@@ -880,9 +885,9 @@ export const purchasePackageWithGooglePlayService = async (
     },
   });
 
-  if (!inAppProduct) {
-    throw new Error("GOOGLE_PLAY_PRODUCT_NOT_FOUND");
-  }
+  // if (!inAppProduct) {
+  //   throw new Error("GOOGLE_PLAY_PRODUCT_NOT_FOUND");
+  // }
 
   // ==========================================
   // 2. VERIFY GOOGLE PLAY PURCHASE

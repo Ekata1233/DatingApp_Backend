@@ -34,6 +34,61 @@ const getAndroidPublisher = () => {
   };
 };
 
+// export const verifyWalletGooglePurchase = async (
+//   productId: string,
+//   purchaseToken: string,
+//   orderId: string
+// ) => {
+//   const { publisher, packageName } =
+//     getAndroidPublisher();
+
+//   const response =
+//     await publisher.purchases.products.get({
+//       packageName,
+//       productId,
+//       token: purchaseToken,
+//     });
+
+//   const purchase = response.data;
+
+// console.log("========== GOOGLE PLAY DEBUG ==========");
+
+// console.log("Requested Product ID:", productId);
+// console.log("Google Product ID:", purchase.productId);
+
+// console.log("Full Google Response:", JSON.stringify(purchase, null, 2));
+
+// console.log("=======================================");
+
+//   if (purchase.purchaseState !== 0) {
+//     throw new Error(
+//       "Google Play purchase is not completed"
+//     );
+//   }
+
+//   // if (purchase.productId !== productId) {
+//   //   throw new Error("Google Play product mismatch");
+//   // }
+
+//   if (!purchase.orderId || purchase.orderId !== orderId) {
+//     throw new Error("Google Play order mismatch");
+//   }
+
+//   if (purchase.consumptionState === 1) {
+//     throw new Error("Purchase already consumed");
+//   }
+
+//   if (purchase.quantity && purchase.quantity !== 1) {
+//     throw new Error("Unsupported purchase quantity");
+//   }
+
+//   return {
+//     orderId: purchase.orderId,
+//     productId,
+//     purchaseTime: purchase.purchaseTimeMillis,
+//   };
+// };
+
 export const verifyWalletGooglePurchase = async (
   productId: string,
   purchaseToken: string,
@@ -51,34 +106,20 @@ export const verifyWalletGooglePurchase = async (
 
   const purchase = response.data;
 
-console.log("========== GOOGLE PLAY DEBUG ==========");
-
-console.log("Requested Product ID:", productId);
-console.log("Google Product ID:", purchase.productId);
-
-console.log("Full Google Response:", JSON.stringify(purchase, null, 2));
-
-console.log("=======================================");
-
   if (purchase.purchaseState !== 0) {
     throw new Error(
       "Google Play purchase is not completed"
     );
   }
 
-  if (purchase.productId !== productId) {
-    throw new Error("Google Play product mismatch");
-  }
-
   if (!purchase.orderId || purchase.orderId !== orderId) {
     throw new Error("Google Play order mismatch");
   }
 
-  if (purchase.consumptionState === 1) {
-    throw new Error("Purchase already consumed");
-  }
-
-  if (purchase.quantity && purchase.quantity !== 1) {
+  if (
+    purchase.quantity != null &&
+    purchase.quantity !== 1
+  ) {
     throw new Error("Unsupported purchase quantity");
   }
 
@@ -86,6 +127,8 @@ console.log("=======================================");
     orderId: purchase.orderId,
     productId,
     purchaseTime: purchase.purchaseTimeMillis,
+    consumptionState: purchase.consumptionState,
+    acknowledgementState: purchase.acknowledgementState,
   };
 };
 

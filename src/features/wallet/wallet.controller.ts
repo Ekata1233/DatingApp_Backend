@@ -83,6 +83,8 @@ export const addMoneyToWalletController = async (
 
     const parsed = addMoneySchema.safeParse(req.body);
 
+    console.log("parsed data : ", parsed)
+
     if (!parsed.success) {
       return res.status(400).json({
         success: false,
