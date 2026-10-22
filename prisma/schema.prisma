@@ -83,6 +83,7 @@ model User {
   referralStats    UserReferralStats?
   receivedReferral UserReferral?      @relation("ReferredUser")
   replyStats       UserReplyStats?
+  inAppPurchases   InAppPurchase[]
 
   //FEED
   dailyFeedViews       UserDailyFeedView[] @relation("DailyFeedViewer")
@@ -1418,9 +1419,11 @@ model PackagePrice {
   isHighlighted   Boolean      @default(false)
   active          Boolean      @default(true)
 
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  UserPackage UserPackage[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  UserPackage    UserPackage[]
+  inAppProducts  InAppProduct[]
+  inAppPurchases InAppPurchase[]
 
   @@unique([packageId, billingCycle])
   @@index([packageId])
@@ -1525,9 +1528,10 @@ model UserPackage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  package Package      @relation("packageRelation", fields: [packageId], references: [id])
-  price   PackagePrice @relation(fields: [priceId], references: [id])
+  user           User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  package        Package         @relation("packageRelation", fields: [packageId], references: [id])
+  price          PackagePrice    @relation(fields: [priceId], references: [id])
+  inAppPurchases InAppPurchase[]
 
   @@index([user_id])
   @@index([packageId])
@@ -1786,6 +1790,7 @@ model Payment {
   ComplimentPurchase ComplimentPurchase[]
   DatePlanPurchase   DatePlanPurchase[]
   eventbooking       EventBooking?
+  inAppPurchase      InAppPurchase?
 }
 
 model Notification {
@@ -3230,6 +3235,7 @@ enum PurchasePaymentMethod {
   PACKAGE
   WALLET
   PAYMENT_GATEWAY
+  GOOGLE_PLAY
 }
 
 enum StoreFeatureType {
@@ -3643,4 +3649,55 @@ model ConversationPrompt {
 
   @@index([categoryId, isActive, sortOrder])
   @@map("conversation_prompts")
+}
+
+enum InAppPlatform {
+  ANDROID
+  IOS
+}
+
+model InAppProduct {
+  id        String        @id @default(uuid()) @db.Uuid
+  priceId   String        @db.Uuid
+  platform  InAppPlatform
+  productId String
+  active    Boolean       @default(true)
+  price     PackagePrice  @relation(fields: [priceId], references: [id])
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([platform, productId])
+  @@unique([priceId, platform])
+  @@map("in_app_products")
+}
+
+model InAppPurchase {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @db.Uuid
+  paymentId             String        @unique @db.Uuid
+  userPackageId         String?       @db.Uuid
+  platform              InAppPlatform
+  productId             String
+  priceId               String        @db.Uuid
+  purchaseTokenHash     String?       @unique @db.VarChar(64)
+  transactionId         String?
+  originalTransactionId String?
+  environment           String?
+  storeStatus           String
+  purchaseDate          DateTime?
+  expiryDate            DateTime?
+  autoRenew             Boolean       @default(false)
+  rawResponse           Json?
+  verifiedAt            DateTime      @default(now())
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  user                  User          @relation(fields: [userId], references: [id])
+  payment               Payment       @relation(fields: [paymentId], references: [id])
+  packagePrice          PackagePrice  @relation(fields: [priceId], references: [id])
+  userPackage           UserPackage?  @relation(fields: [userPackageId], references: [id])
+
+  @@unique([platform, transactionId])
+  @@index([userId])
+  @@index([platform, originalTransactionId])
+  @@map("in_app_purchases")
 }

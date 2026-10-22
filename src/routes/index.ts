@@ -101,6 +101,7 @@ import manualAadhaarRoutes from "../features/verification/manual-government-id/m
 import incomeVerificationRoutes from "../features/verification/income-verification/income.user.routes";
 import incomeVerificationAdminRoutes from "../features/verification/income-verification/income.admin.routes";
 import conversationPromtRoutes from "../features/admin/conversation/conversationPrompt/conversationPrompt.routes"
+import inAppPurchaseRoutes from "../features/payment/inAppPurchase/purchaseVerification.route"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -223,4 +224,7 @@ router.use("/user", roseTopUpRoutes, complimentTopUpRoutes,datePlanTopUpRoutes, 
 
 //MATCH ANALYSIS
 router.use("/user", matchAnalysisRoutes)
+
+//IN APP PURCHASE
+router.use("/user", inAppPurchaseRoutes)
 export default router;

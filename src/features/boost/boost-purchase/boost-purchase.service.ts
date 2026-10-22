@@ -6,10 +6,36 @@ import {
   TransactionType,
 } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
+import { BoostPurchaseInput } from "./boost-purchase.validation";
+import { consumeGooglePlayBoostPurchase, verifyGooglePlayBoostPurchase } from "./googlePlayBoost.service";
+import { createHash } from "node:crypto";
+import { GooglePlayInput } from "./boost-purchase.types";
+import { BOOST_GOOGLE_PRODUCTS } from "./boostGoogleProducts";
 
 
 type WalletPurchaseInput = {
   boostOptionId: string;
+};
+
+export const purchaseBoostService = async (
+  userId: string,
+  input: BoostPurchaseInput
+) => {
+  if (input.paymentMethod === "WALLET") {
+    return purchaseBoostWithWalletService(
+      userId,
+      input
+    );
+  }
+
+  if (input.paymentMethod === "GOOGLE_PLAY") {
+    return purchaseBoostWithGooglePlayService(
+      userId,
+      input
+    );
+  }
+
+  throw new Error("INVALID_PAYMENT_METHOD");
 };
 
 export const purchaseBoostWithWalletService = async (
@@ -24,7 +50,6 @@ export const purchaseBoostWithWalletService = async (
       // -----------------------------------------
       // 1. Fetch selected Boost Option
       // -----------------------------------------
-
       const boostOption = await tx.boostOption.findUnique({
         where: {
           id: boostOptionId,
@@ -336,6 +361,213 @@ if (existingUserBoost) {
       timeout: 10000,
     }
   );
+
+  return result;
+};
+
+export const purchaseBoostWithGooglePlayService = async (
+  userId: string,
+  input: GooglePlayInput
+) => {
+  const {
+    boostOptionId,
+    productId,
+    purchaseToken,
+    orderId,
+  } = input;
+
+  // 1. Ensure SKU belongs to the requested Boost option
+  if (
+    BOOST_GOOGLE_PRODUCTS[productId] !== boostOptionId
+  ) {
+    throw new Error("GOOGLE_PLAY_PRODUCT_MISMATCH");
+  }
+
+  // 2. Verify payment with Google
+  const verified = await verifyGooglePlayBoostPurchase(
+    productId,
+    purchaseToken
+  );
+
+  if (
+    orderId &&
+    verified.orderId &&
+    orderId !== verified.orderId
+  ) {
+    throw new Error("GOOGLE_PLAY_ORDER_MISMATCH");
+  }
+
+  // 3. Deterministic idempotency key
+  const tokenHash = createHash("sha256")
+    .update(
+      `${process.env.GOOGLE_PLAY_PACKAGE_NAME}:${purchaseToken}`
+    )
+    .digest("hex");
+
+  const paymentReference = `gplay_boost_${tokenHash}`;
+
+  // 4. Atomic purchase and credit
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const boostOption =
+        await tx.boostOption.findUnique({
+          where: {
+            id: boostOptionId,
+          },
+          include: {
+            boost: true,
+          },
+        });
+
+      if (!boostOption) {
+        throw new Error("BOOST_OPTION_NOT_FOUND");
+      }
+
+      if (
+        !boostOption.is_active ||
+        !boostOption.boost.is_active
+      ) {
+        throw new Error("BOOST_OPTION_NOT_ACTIVE");
+      }
+
+      if (boostOption.boostCount <= 0) {
+        throw new Error("INVALID_BOOST_COUNT");
+      }
+
+      const amount = new Prisma.Decimal(
+        boostOption.totalPrice
+      );
+
+      if (!amount.isFinite() || amount.lte(0)) {
+        throw new Error("INVALID_BOOST_PRICE");
+      }
+
+      // Unique payment reference prevents replay
+      // Adapt field names to your existing Payment model.
+      const payment = await tx.payment.create({
+        data: {
+          userId,
+          amount,
+          currency: "INR",
+          payment_id: paymentReference,
+          status: "COMPLETED",
+          purpose: "BOOST",
+          paidAt: new Date(),
+          gatewayResponse: {
+            provider: "GOOGLE_PLAY",
+            orderId: verified.orderId ?? null,
+            productId,
+            purchaseTokenHash: tokenHash,
+          },
+        },
+      });
+
+      const purchase = await tx.boostPurchase.create({
+        data: {
+          userId,
+          boostOptionId: boostOption.id,
+          quantity: boostOption.boostCount,
+          amount,
+          paymentMethod:
+            PurchasePaymentMethod.GOOGLE_PLAY,
+
+          // Requires an existing paymentId field.
+          paymentId: payment.id,
+        },
+      });
+
+      const now = new Date();
+
+      const existingUserBoost =
+        await tx.userBoost.findFirst({
+          where: {
+            user_id: userId,
+            boostId: boostOption.boost_id,
+            is_active: true,
+          },
+          orderBy: {
+            created_at: "desc",
+          },
+        });
+
+      let userBoost;
+
+      if (existingUserBoost) {
+        userBoost = await tx.userBoost.update({
+          where: {
+            id: existingUserBoost.id,
+          },
+          data: {
+            total_boosts: {
+              increment: boostOption.boostCount,
+            },
+            remaining_boosts: {
+              increment: boostOption.boostCount,
+            },
+            boost_option_id: boostOption.id,
+          },
+        });
+      } else {
+        userBoost = await tx.userBoost.create({
+          data: {
+            user_id: userId,
+            boostId: boostOption.boost_id,
+            boost_option_id: boostOption.id,
+            total_boosts: boostOption.boostCount,
+            remaining_boosts: boostOption.boostCount,
+            weeklyLimit: 0,
+            last_reset_at: now,
+            next_reset_at: now,
+            start_at: now,
+            expires_at: null,
+            is_active: true,
+          },
+        });
+      }
+
+      return {
+        purchaseId: purchase.id,
+        paymentId: payment.id,
+        paymentMethod: "GOOGLE_PLAY",
+        orderId: verified.orderId,
+        boostOptionId: boostOption.id,
+        boostType: boostOption.boost.name,
+        packageName: boostOption.label,
+        purchasedBoosts: boostOption.boostCount,
+        boostDuration: boostOption.timePerBoost,
+        amountPaid: amount.toFixed(2),
+        userBoost: {
+          id: userBoost.id,
+          totalBoosts: userBoost.total_boosts,
+          remainingBoosts: userBoost.remaining_boosts,
+          expiresAt: userBoost.expires_at,
+        },
+      };
+    },
+    {
+      isolationLevel:
+        Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 5000,
+      timeout: 10000,
+    }
+  );
+
+  // 5. Consume after entitlement is committed.
+  // Production: persist/retry this operation if Google is unavailable.
+  try {
+    await consumeGooglePlayBoostPurchase(
+      productId,
+      purchaseToken
+    );
+  } catch (error) {
+    console.error(
+      "Google Play consumption pending retry",
+      {
+        purchaseId: result.purchaseId,
+        error,
+      }
+    );
+  }
 
   return result;
 };

@@ -581,6 +581,34 @@ export const handleSwipe = async (data: {
   );
 
   // ============================================================
+  // GET SWIPER AND TARGET USER NAMES
+  // ============================================================
+
+  const [swiper, targetUser] = await Promise.all([
+    prisma.user.findUnique({
+      where: {
+        id: swiperId,
+      },
+      select: {
+        full_name: true,
+      },
+    }),
+
+    prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      select: {
+        full_name: true,
+      },
+    }),
+  ]);
+
+  const swiperName = swiper?.full_name?.trim() || "Someone";
+
+  const targetUserName = targetUser?.full_name?.trim() || "Someone";
+
+  // ============================================================
   // 2. UPDATE REDIS CACHE
   // ============================================================
 
@@ -635,8 +663,8 @@ export const handleSwipe = async (data: {
       title: action === "SUPERLIKE" ? "New Super Like ⭐" : "New Like ❤️",
       message:
         action === "SUPERLIKE"
-          ? "Someone super liked your profile ⭐"
-          : "Someone liked your profile ❤️",
+          ? `${swiperName} super liked your profile ⭐`
+          : `${swiperName} liked your profile ❤️`,
       data: {
         userId: swiperId,
         targetUserId,
@@ -682,7 +710,7 @@ export const handleSwipe = async (data: {
       receiverId: targetUserId,
       type: NotificationType.NEW_MATCH,
       title: "It's a Match! 🎉",
-      message: "You both liked each other ❤️",
+      message: `You and ${swiperName} matched! ❤️`,
       data: {
         matchId: match.id,
         userId: swiperId,
@@ -695,7 +723,7 @@ export const handleSwipe = async (data: {
       receiverId: swiperId,
       type: NotificationType.NEW_MATCH,
       title: "It's a Match! 🎉",
-      message: "You both liked each other ❤️",
+      message: `You and ${targetUserName} matched! ❤️`,
       data: {
         matchId: match.id,
         userId: targetUserId,
