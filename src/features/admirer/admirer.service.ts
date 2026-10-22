@@ -39,56 +39,41 @@ const calculateAge = (birthDate: Date | null): number | null => {
 // GET TIME AGO
 // ==========================================
 
-const getTimeAgo = (date: Date): string => {
+export const getTimeAgo = (date: Date | string): string => {
   const now = new Date();
-
   const createdAt = new Date(date);
 
-  const diffMs = now.getTime() - createdAt.getTime();
+  const diffMs = Math.max(
+    0,
+    now.getTime() - createdAt.getTime()
+  );
+ console.log("-------------------Now",now);
+ console.log("create at",createdAt);
+ console.log("---------------diffms",diffMs);
+ 
+ 
+ 
 
-  const diffSeconds = Math.floor(diffMs / 1000);
 
-  const diffMinutes = Math.floor(diffSeconds / 60);
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
 
-  const diffHours = Math.floor(diffMinutes / 60);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
 
-  const diffDays = Math.floor(diffHours / 24);
-
-  const diffWeeks = Math.floor(diffDays / 7);
-
-  const diffMonths = Math.floor(diffDays / 30);
-
-  const diffYears = Math.floor(diffDays / 365);
-
-  if (diffSeconds < 60) {
+  if (totalMinutes < 1) {
     return "Just now";
   }
 
-  if (diffMinutes < 60) {
-    return `${diffMinutes}m ago`;
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m ago`;
   }
 
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ago`;
   }
 
-  if (diffDays === 1) {
-    return "Yesterday";
-  }
-
-  if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  }
-
-  if (diffWeeks < 4) {
-    return `${diffWeeks} week${diffWeeks > 1 ? "s" : ""} ago`;
-  }
-
-  if (diffMonths < 12) {
-    return `${diffMonths} month${diffMonths > 1 ? "s" : ""} ago`;
-  }
-
-  return `${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
+  return `${minutes}m ago`;
 };
 
 // ==========================================
