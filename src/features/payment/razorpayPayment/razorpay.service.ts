@@ -591,7 +591,22 @@ export async function finalizeRazorpayPayment(
                 throw new Error("Invalid Date Plan purchase metadata");
               }
 
-              await fulfillDatePlanPayment(tx, updatedPayment);
+              console.log("DATE PLAN FULFILLMENT START:", {
+  paymentId: updatedPayment.id,
+  gatewayPaymentId: updatedPayment.payment_id,
+  userId: updatedPayment.userId,
+  referenceId: updatedPayment.referenceId,
+  amount: updatedPayment.amount.toString(),
+});
+
+try {
+  await fulfillDatePlanPayment(tx, updatedPayment);
+
+  console.log("DATE PLAN FULFILLMENT SUCCESS");
+} catch (error) {
+  console.error("DATE PLAN FULFILLMENT FAILED:", error);
+  throw error;
+}
               break;
 
             // ================================
@@ -750,24 +765,63 @@ export async function verifyRazorpayPaymentService(
   // 3. VERIFY ORDER & PAYMENT WITH RAZORPAY
   // ==========================================
 
+  
+
+ 
+  // ==========================================
+  // 3. VERIFY ORDER & PAYMENT WITH RAZORPAY
+  // ==========================================
+
   console.log("FETCHING RAZORPAY ORDER AND PAYMENT");
 
   let gatewayOrder;
   let gatewayPayment;
 
+  // 1. FETCH ORDER
   try {
-    [gatewayOrder, gatewayPayment] = await Promise.all([
-      razorpay.orders.fetch(data.razorpay_order_id),
-      razorpay.payments.fetch(data.razorpay_payment_id),
-    ]);
+    gatewayOrder = await razorpay.orders.fetch(
+      data.razorpay_order_id
+    );
+
+    console.log("ORDER FOUND:", {
+      id: gatewayOrder.id,
+      status: gatewayOrder.status,
+      amount: gatewayOrder.amount,
+    });
   } catch (error: any) {
-    console.error("RAZORPAY GATEWAY ERROR:", {
+    console.error("ORDER FETCH FAILED:", {
+      orderId: data.razorpay_order_id,
       statusCode: error?.statusCode,
-      description: error?.error?.description ?? error?.message,
+      description:
+        error?.error?.description ?? error?.message,
     });
 
-    throw new Error("Unable to verify order/payment with Razorpay");
+    throw new Error("Razorpay order lookup failed");
   }
+
+  // 2. FETCH PAYMENT
+  try {
+    gatewayPayment = await razorpay.payments.fetch(
+      data.razorpay_payment_id
+    );
+
+    console.log("PAYMENT FOUND:", {
+      id: gatewayPayment.id,
+      orderId: gatewayPayment.order_id,
+      status: gatewayPayment.status,
+      amount: gatewayPayment.amount,
+    });
+  } catch (error: any) {
+    console.error("PAYMENT FETCH FAILED:", {
+      paymentId: data.razorpay_payment_id,
+      statusCode: error?.statusCode,
+      description:
+        error?.error?.description ?? error?.message,
+    });
+
+    throw new Error("Razorpay payment lookup failed");
+  }
+
 
   // ==========================================
   // 4. CHECK ORDER AND AMOUNT
