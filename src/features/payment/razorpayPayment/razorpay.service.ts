@@ -637,11 +637,15 @@ export async function finalizeRazorpayPayment(
                 purchaseMetadata.purchaseType === "COMPLIMENT" &&
                 pack.itemType === StoreItemType.COMPLIMENT
               ) {
+                if (!updatedPayment.payment_id) {
+                  throw new Error("Razorpay payment ID missing");
+                }
+
                 await fulfillComplimentPayment(
                   tx,
                   updatedPayment.userId,
                   storePackId,
-                  updatedPayment.id,
+                  updatedPayment.payment_id,
                 );
               } else {
                 throw new Error("Invalid store purchase type");
@@ -689,14 +693,11 @@ export async function finalizeRazorpayPayment(
 // VERIFY RAZORPAY PAYMENT SERVICE
 // ============================================
 
-
 export async function verifyRazorpayPaymentService(
   userId: string,
   data: VerifyRazorpayDTO,
 ) {
-  console.log(
-    "\n========== RAZORPAY VERIFY DEBUG ==========",
-  );
+  console.log("\n========== RAZORPAY VERIFY DEBUG ==========");
 
   // ==========================================
   // 1. REQUEST DEBUG
@@ -711,11 +712,8 @@ export async function verifyRazorpayPaymentService(
 
   console.log("RAZORPAY CONFIG:", {
     keyId: process.env.RAZORPAY_KEY_ID,
-    secretConfigured: Boolean(
-      process.env.RAZORPAY_KEY_SECRET,
-    ),
-    secretLength:
-      process.env.RAZORPAY_KEY_SECRET?.length ?? 0,
+    secretConfigured: Boolean(process.env.RAZORPAY_KEY_SECRET),
+    secretLength: process.env.RAZORPAY_KEY_SECRET?.length ?? 0,
   });
 
   // ==========================================
@@ -743,9 +741,7 @@ export async function verifyRazorpayPaymentService(
   );
 
   if (!payment || payment.userId !== userId) {
-    console.error(
-      "VERIFY FAILED: Payment order not found",
-    );
+    console.error("VERIFY FAILED: Payment order not found");
 
     throw new Error("Payment order not found");
   }
@@ -767,32 +763,23 @@ export async function verifyRazorpayPaymentService(
   } catch (error: any) {
     console.error("RAZORPAY GATEWAY ERROR:", {
       statusCode: error?.statusCode,
-      description:
-        error?.error?.description ??
-        error?.message,
+      description: error?.error?.description ?? error?.message,
     });
 
-    throw new Error(
-      "Unable to verify order/payment with Razorpay",
-    );
+    throw new Error("Unable to verify order/payment with Razorpay");
   }
 
   // ==========================================
   // 4. CHECK ORDER AND AMOUNT
   // ==========================================
 
-  const orderMatches =
-    gatewayPayment.order_id === data.razorpay_order_id;
+  const orderMatches = gatewayPayment.order_id === data.razorpay_order_id;
 
-  const expectedAmountPaise = payment.amount
-    .mul(100)
-    .toNumber();
+  const expectedAmountPaise = payment.amount.mul(100).toNumber();
 
   const amountMatches =
-    Number(gatewayPayment.amount) ===
-      expectedAmountPaise &&
-    Number(gatewayOrder.amount) ===
-      expectedAmountPaise;
+    Number(gatewayPayment.amount) === expectedAmountPaise &&
+    Number(gatewayOrder.amount) === expectedAmountPaise;
 
   const currencyMatches =
     gatewayPayment.currency === payment.currency &&
@@ -816,23 +803,15 @@ export async function verifyRazorpayPaymentService(
   });
 
   if (!orderMatches) {
-    console.error(
-      "VERIFY FAILED: Razorpay order mismatch",
-    );
+    console.error("VERIFY FAILED: Razorpay order mismatch");
 
-    throw new Error(
-      "Razorpay payment does not belong to this order",
-    );
+    throw new Error("Razorpay payment does not belong to this order");
   }
 
   if (!amountMatches || !currencyMatches) {
-    console.error(
-      "VERIFY FAILED: Payment amount/currency mismatch",
-    );
+    console.error("VERIFY FAILED: Payment amount/currency mismatch");
 
-    throw new Error(
-      "Razorpay payment amount or currency mismatch",
-    );
+    throw new Error("Razorpay payment amount or currency mismatch");
   }
 
   // ==========================================
@@ -855,9 +834,7 @@ export async function verifyRazorpayPaymentService(
   });
 
   if (!isSignatureValid) {
-    console.error(
-      "VERIFY FAILED: Invalid Razorpay signature",
-    );
+    console.error("VERIFY FAILED: Invalid Razorpay signature");
 
     console.error("POSSIBLE REASONS:", [
       "Incorrect RAZORPAY_KEY_SECRET",
@@ -900,10 +877,7 @@ export async function verifyRazorpayPaymentService(
       data.razorpay_payment_id,
     );
   } catch (error) {
-    console.error(
-      "PAYMENT FINALIZATION FAILED:",
-      error,
-    );
+    console.error("PAYMENT FINALIZATION FAILED:", error);
 
     throw error;
   }
@@ -920,9 +894,7 @@ export async function verifyRazorpayPaymentService(
     alreadyProcessed: result.alreadyProcessed,
   });
 
-  console.log(
-    "========== RAZORPAY VERIFY COMPLETED ==========\n",
-  );
+  console.log("========== RAZORPAY VERIFY COMPLETED ==========\n");
 
   // ==========================================
   // 9. RESPONSE
@@ -938,7 +910,6 @@ export async function verifyRazorpayPaymentService(
     payment: result.payment,
   };
 }
-
 
 // ============================================
 // GET PAYMENT STATUS
