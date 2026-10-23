@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import {
+  GovernmentIdAttemptStatus,
   GovernmentIdType,
   VerificationStatus,
   VerificationType,
@@ -368,7 +369,14 @@ export const submitManualGovernmentIdService = async (
       rejectionReason: null,
     },
   });
-
+const attempt = await prisma.governmentIdAttempt.create({
+  data: {
+    userId,
+    verificationId: verification.id,
+    documentType: input.documentType,
+    status: GovernmentIdAttemptStatus.PENDING,
+  },
+});
   return {
     id: manual.id,
 

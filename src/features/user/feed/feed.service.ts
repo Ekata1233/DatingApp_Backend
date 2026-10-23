@@ -61,6 +61,8 @@ export const getGenderFromInterest = (myInterest?: string): string[] => {
   return allGenders.includes(value) ? [value] : allGenders;
 };
 
+
+
 export const getOrientationCompatibility = (
   orientation?: string | null,
 ): string[] => {
@@ -439,18 +441,9 @@ export const getFeedService = async ({
   // PAGE LIMIT
   // ==========================================
 
-const pageLimit = isFreeUser
-  ? Math.max(
-      dailyProfileLimit + FREE_LOCKED_PROFILE_COUNT,
-      1,
-    )
-  : Math.max(
-      1,
-      Math.min(
-        requestedLimit,
-        dailyProfileLimit,
-      ),
-    );
+  const pageLimit = isFreeUser
+    ? Math.max(dailyProfileLimit + FREE_LOCKED_PROFILE_COUNT, 1)
+    : Math.max(1, Math.min(requestedLimit, dailyProfileLimit));
 
   console.log("DYNAMIC FEED PROFILE LIMIT:", {
     userId,
@@ -1758,33 +1751,31 @@ const pageLimit = isFreeUser
   // STILL NO USERS
   // ========================================================
 
-if (collected.length === 0) {
-  return {
-    users: [],
-    nextCursor: null,
-    locationFallbackUsed,
+  if (collected.length === 0) {
+    return {
+      users: [],
+      nextCursor: null,
+      locationFallbackUsed,
 
-    dailyLimit: {
-      plan: activePackageName,
-      limit: dailyProfileLimit,
-      seen: seenToday,
-      remaining: remainingToday,
-      resetAt: new Date(
-        viewDate.getTime() +
-          24 * 60 * 60 * 1000 -
-          330 * 60 * 1000,
-      ).toISOString(),
-    },
+      dailyLimit: {
+        plan: activePackageName,
+        limit: dailyProfileLimit,
+        seen: seenToday,
+        remaining: remainingToday,
+        resetAt: new Date(
+          viewDate.getTime() + 24 * 60 * 60 * 1000 - 330 * 60 * 1000,
+        ).toISOString(),
+      },
 
-    upgradeGate: {
-      show: false,
-      lockedCount: 0,
-      title: null,
-      subtitle: null,
-      lockedProfiles: [],
-    },
-  };
-}
+      upgradeGate: {
+        show: false,
+        lockedCount: 0,
+        title: null,
+        subtitle: null,
+        lockedProfiles: [],
+      },
+    };
+  }
 
   // ========================================================
   // PAGE
@@ -2301,11 +2292,10 @@ if (collected.length === 0) {
       limit: dailyProfileLimit,
       seen: finalSeenToday,
       remaining: finalRemainingToday,
-resetAt: new Date(
-  viewDate.getTime() +
-    24 * 60 * 60 * 1000 -
-    330 * 60 * 1000,
-).toISOString(),    },
+      resetAt: new Date(
+        viewDate.getTime() + 24 * 60 * 60 * 1000 - 330 * 60 * 1000,
+      ).toISOString(),
+    },
 
     upgradeGate: {
       show: showUpgradeGate,
@@ -2318,6 +2308,25 @@ resetAt: new Date(
     },
   };
 };
+// =====================================================
+// HEIGHT CONVERSION (CM TO FEET)
+// =====================================================
+
+export const convertCmToFeet = (
+  heightCm: number | null | undefined,
+): string | null => {
+  if (heightCm == null || !Number.isFinite(heightCm) || heightCm <= 0) {
+    return null;
+  }
+
+  const totalInches = Math.round(heightCm / 2.54);
+
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+
+  return `${feet}'${inches}"`;
+};
+
 
 export const getFeedDetailsService = async (
   userId: string,
@@ -2462,6 +2471,11 @@ export const getFeedDetailsService = async (
           question: true,
           option: true,
         },
+        orderBy: {
+          question: {
+            created_at: "asc",
+          },
+        },
       },
     },
   });
@@ -2494,12 +2508,50 @@ export const getFeedDetailsService = async (
       : "";
 
   // 3. Transform data
-  const response: UserFeedResponse = transformUserData(user, replyTime);
+// =====================================================
+// TRANSFORM USER DATA
+// =====================================================
 
+// =====================================================
+// TRANSFORM USER DATA
+// =====================================================
+
+const transformedResponse = transformUserData(
+  user,
+  replyTime,
+);
+
+// Add heightInFeet immediately after height
+const { height, ...remainingFields } = transformedResponse;
+
+const response: UserFeedResponse = {
+  ...transformedResponse,
+  height,
+  heightInFeet: convertCmToFeet(height),
+};
+
+// Reorder fields to place heightInFeet after height
+const responseEntries = Object.entries(response);
+const heightIndex = responseEntries.findIndex(
+  ([key]) => key === "height",
+);
+
+const orderedEntries = responseEntries.filter(
+  ([key]) => key !== "heightInFeet",
+);
+
+orderedEntries.splice(heightIndex + 1, 0, [
+  "heightInFeet",
+  response.heightInFeet,
+]);
+
+const orderedResponse = Object.fromEntries(
+  orderedEntries,
+) as unknown as UserFeedResponse;
   // 4. Save to Redis
-  await redis.set(CACHE_KEY, response, {
-    ex: CACHE_TTL,
-  });
+  await redis.set(CACHE_KEY, orderedResponse, {
+  ex: CACHE_TTL,
+});
 
   console.log("💾 Feed Details cached");
 
@@ -2518,7 +2570,7 @@ export const getFeedDetailsService = async (
   // =====================================================
   // 7. RETURN
   // =====================================================
-  return response;
+ return orderedResponse;
 };
 
 // Helper function to transform user data

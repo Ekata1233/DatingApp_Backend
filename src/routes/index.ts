@@ -103,6 +103,7 @@ import incomeVerificationAdminRoutes from "../features/verification/income-verif
 import conversationPromtRoutes from "../features/admin/conversation/conversationPrompt/conversationPrompt.routes"
 import razorpayRoutes from "../features/payment/razorpayPayment/razorpay.routes"
 import inAppPurchaseRoutes from "../features/payment/inAppPurchase/purchaseVerification.route"
+import purchaseHistoryRoutes from "../features/purchase-history/purchase-history.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -124,10 +125,11 @@ router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, a
 
 
 router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, eventPartnerRoutes);
-router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes)
+router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes,purchaseHistoryRoutes)
 router.use("/legal", legalRoutes);
 router.use("/chat", conversationPromtRoutes);
 router.use("/payment", razorpayRoutes);
+
 
 
 // router.use("/users",usersRoutes)
