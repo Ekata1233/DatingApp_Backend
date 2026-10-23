@@ -507,13 +507,16 @@ export const completeGovernmentIdService = async (
   // 4. Fetch government document
   // ==========================================
 
-  const document = await getVerifiedGovernmentDocument({
-    transactionId: attempt.transactionId,
+ // Validate referenceId before calling Gridlines
+if (!attempt.referenceId) {
+  throw new Error("REFERENCE_ID_MISSING");
+}
 
-    referenceId: attempt.referenceId,
-
-    documentType: attempt.documentType,
-  });
+const document = await getVerifiedGovernmentDocument({
+  transactionId: attempt.transactionId,
+  referenceId: attempt.referenceId,
+  documentType: attempt.documentType,
+});
 
   // ==========================================
   // 5. Validate government identity
