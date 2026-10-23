@@ -593,8 +593,21 @@ export async function finalizeRazorpayPayment(
   // 1. VERIFY PAYMENT WITH RAZORPAY
   // ==========================================
 
-  const gatewayPayment = await razorpay.payments.fetch(gatewayPaymentId);
+  // FIRST: Fetch payment from Razorpay
+  const gatewayPayment = await razorpay.payments.fetch(
+    gatewayPaymentId,
+  );
 
+  // SECOND: Log payment details
+  console.log("RAZORPAY PAYMENT DETAILS:", {
+    id: gatewayPayment.id,
+    method: gatewayPayment.method,
+    status: gatewayPayment.status,
+    bank: gatewayPayment.bank,
+    wallet: gatewayPayment.wallet,
+  });
+
+  // THIRD: Validate payment
   if (
     gatewayPayment.order_id !== orderId ||
     gatewayPayment.status !== "captured"
@@ -656,31 +669,47 @@ export async function finalizeRazorpayPayment(
           // 6. CLAIM PAYMENT
           // ==================================
 
-          const claim = await tx.payment.updateMany({
-            where: {
-              id: payment.id,
-              status: {
-                in: [PaymentStatus.PENDING, PaymentStatus.PROCESSING],
-              },
-              payment_id: orderId,
-            },
-            data: {
-              payment_id: gatewayPaymentId,
-              transactionId: orderId,
+          
+// ==================================
+// 6. CLAIM PAYMENT
+// ==================================
 
-              status: PaymentStatus.COMPLETED,
-              paidAt: new Date(),
+const claim = await tx.payment.updateMany({
+  where: {
+    id: payment.id,
+    status: {
+      in: [
+        PaymentStatus.PENDING,
+        PaymentStatus.PROCESSING,
+      ],
+    },
+    payment_id: orderId,
+  },
+  data: {
+    payment_id: gatewayPaymentId,
+    transactionId: orderId,
 
-              gatewayResponse: {
-                razorpay_order_id: orderId,
-                razorpay_payment_id: gatewayPaymentId,
-                gateway_status: gatewayPayment.status,
+    status: PaymentStatus.COMPLETED,
+    paidAt: new Date(),
 
-                // Keep metadata after verification
-                purchaseMetadata,
-              },
-            },
-          });
+    gatewayResponse: {
+      razorpay_order_id: orderId,
+      razorpay_payment_id: gatewayPaymentId,
+      gateway_status: gatewayPayment.status,
+
+      // NEW: Save actual Razorpay payment method
+      razorpayMethod: gatewayPayment.method ?? null,
+
+      // NEW: Save payment details
+      razorpayBank: gatewayPayment.bank ?? null,
+      razorpayWallet: gatewayPayment.wallet ?? null,
+
+      // Keep existing purchase metadata
+      purchaseMetadata,
+    },
+  },
+});
+
 
           if (claim.count !== 1) {
             throw new Error(
