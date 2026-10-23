@@ -1,4 +1,4 @@
-import { PrismaClient, UserRelationshipStatus } from "@prisma/client";
+import { MessageType, PrismaClient, UserRelationshipStatus } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -891,49 +891,203 @@ export const findRelationshipByIdRepository = async (
   });
 };
 
-export const endRelationshipRepository = async (relationshipId: string) => {
-  return prisma.userRelationship.update({
-    where: {
-      id: relationshipId,
-    },
-    data: {
-      status: UserRelationshipStatus.ENDED,
-      endedAt: new Date(),
-    },
-    include: {
-      user1: {
-        select: {
-          id: true,
-          full_name: true,
-          photos: {
-            orderBy: {
-              created_at: "asc",
-            },
-            take: 1,
-            select: {
-              id: true,
-              media_url: true,
-            },
-          },
-        },
-      },
+// export const endRelationshipRepository = async (relationshipId: string) => {
+//   return prisma.userRelationship.update({
+//     where: {
+//       id: relationshipId,
+//     },
+//     data: {
+//       status: UserRelationshipStatus.ENDED,
+//       endedAt: new Date(),
+//     },
+//     include: {
+//       user1: {
+//         select: {
+//           id: true,
+//           full_name: true,
+//           photos: {
+//             orderBy: {
+//               created_at: "asc",
+//             },
+//             take: 1,
+//             select: {
+//               id: true,
+//               media_url: true,
+//             },
+//           },
+//         },
+//       },
 
-      user2: {
-        select: {
-          id: true,
-          full_name: true,
-          photos: {
-            orderBy: {
-              created_at: "asc",
-            },
-            take: 1,
+//       user2: {
+//         select: {
+//           id: true,
+//           full_name: true,
+//           photos: {
+//             orderBy: {
+//               created_at: "asc",
+//             },
+//             take: 1,
+//             select: {
+//               id: true,
+//               media_url: true,
+//             },
+//           },
+//         },
+//       },
+//     },
+//   });
+// };
+
+export const endRelationshipRepository = async (
+  relationshipId: string,
+  endedByUserId: string,
+) => {
+  return prisma.$transaction(async (tx) => {
+    // ============================================
+    // 1. UPDATE RELATIONSHIP
+    // ============================================
+
+    const endedRelationship =
+      await tx.userRelationship.update({
+        where: {
+          id: relationshipId,
+          status: UserRelationshipStatus.ACTIVE,
+          OR: [
+            { user1Id: endedByUserId },
+            { user2Id: endedByUserId },
+          ],
+        },
+        data: {
+          status: UserRelationshipStatus.ENDED,
+          endedAt: new Date(),
+        },
+        include: {
+          user1: {
             select: {
               id: true,
-              media_url: true,
+              full_name: true,
+              photos: {
+                orderBy: {
+                  created_at: "asc",
+                },
+                take: 1,
+                select: {
+                  id: true,
+                  media_url: true,
+                },
+              },
+            },
+          },
+
+          user2: {
+            select: {
+              id: true,
+              full_name: true,
+              photos: {
+                orderBy: {
+                  created_at: "asc",
+                },
+                take: 1,
+                select: {
+                  id: true,
+                  media_url: true,
+                },
+              },
             },
           },
         },
-      },
-    },
+      });
+
+    // ============================================
+    // 2. IDENTIFY USERS
+    // ============================================
+
+    const partner =
+      endedRelationship.user1Id === endedByUserId
+        ? endedRelationship.user2
+        : endedRelationship.user1;
+
+    const self =
+      endedRelationship.user1Id === endedByUserId
+        ? endedRelationship.user1
+        : endedRelationship.user2;
+
+    // ============================================
+    // 3. FIND EXISTING CONVERSATION
+    // ============================================
+
+    const conversation =
+      await tx.conversation.findFirst({
+        where: {
+          AND: [
+            {
+              participants: {
+                some: {
+                  userId: self.id,
+                },
+              },
+            },
+            {
+              participants: {
+                some: {
+                  userId: partner.id,
+                },
+              },
+            },
+          ],
+        },
+        orderBy: {
+          updatedAt: "desc",
+        },
+      });
+
+    // ============================================
+    // 4. SAVE BREAKUP MESSAGE
+    // ============================================
+
+    let breakupMessage = null;
+
+    if (conversation) {
+      breakupMessage = await tx.chatMessage.create({
+        data: {
+          conversationId: conversation.id,
+
+          senderId: endedByUserId,
+
+          messageType: MessageType.RELATIONSHIP_TAG_CANCELLED,
+
+          content: `Your relationship with ${self.full_name} has ended.`,
+
+          metadata: {
+            event: "RELATIONSHIP_ENDED",
+            relationshipId: endedRelationship.id,
+            relationshipTag: endedRelationship.tag,
+            endedByUserId,
+            partnerId: partner.id,
+            endedAt:
+              endedRelationship.endedAt?.toISOString(),
+          },
+        },
+      });
+
+      // ============================================
+      // 5. UPDATE CONVERSATION TIMESTAMP
+      // ============================================
+
+      await tx.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      endedRelationship,
+      breakupMessage,
+      conversationId: conversation?.id ?? null,
+    };
   });
 };

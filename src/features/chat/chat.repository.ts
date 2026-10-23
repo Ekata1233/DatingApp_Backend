@@ -336,847 +336,847 @@ export const chatRepository = {
   //   return result.filter(Boolean);
   // },
 
-  async findUserConversations(
-    userId: string,
-    cursor?: string,
-    limit = 20,
-    type: ConversationFilter = "all",
-  ) {
-    // --------------------------------------------------
-    // 1. Get current user's location
-    // --------------------------------------------------
+    async findUserConversations(
+      userId: string,
+      cursor?: string,
+      limit = 20,
+      type: ConversationFilter = "all",
+    ) {
+      // --------------------------------------------------
+      // 1. Get current user's location
+      // --------------------------------------------------
 
-    let nearbyUserIds: string[] = [];
-    let onlineUserIds: string[] = [];
+      let nearbyUserIds: string[] = [];
+      let onlineUserIds: string[] = [];
 
-    if (type === "nearby") {
-      const currentUserProfile = await prisma.userProfile.findUnique({
-        where: {
-          user_id: userId,
-        },
-        select: {
-          latitude: true,
-          longitude: true,
-        },
-      });
-
-      if (
-        currentUserProfile?.latitude == null ||
-        currentUserProfile?.longitude == null
-      ) {
-        return [];
-      }
-
-      // 10 KM radius
-      const nearbyUsers = await prisma.$queryRaw<{ user_id: string }[]>`
-      SELECT up.user_id
-      FROM user_profiles up
-      WHERE
-        up.user_id <> ${userId}::uuid
-        AND up.location IS NOT NULL
-        AND ST_DWithin(
-          up.location,
-          ST_SetSRID(
-            ST_MakePoint(
-              ${Number(currentUserProfile.longitude)},
-              ${Number(currentUserProfile.latitude)}
-            ),
-            4326
-          )::geography,
-          25000
-        )
-    `;
-
-      nearbyUserIds = nearbyUsers.map((user) => user.user_id);
-
-      if (nearbyUserIds.length === 0) {
-        return [];
-      }
-    }
-
-    // --------------------------------------------------
-    // 2. Build conversation WHERE condition
-    // --------------------------------------------------
-
-    const where: Prisma.ConversationWhereInput = {
-      participants: {
-        some: {
-          userId,
-          deletedAt: null,
-        },
-      },
-    };
-
-    // --------------------------------------------------
-    // 3. Nearby filter
-    // --------------------------------------------------
-
-    if (type === "nearby") {
-      where.participants = {
-        some: {
-          userId: {
-            in: nearbyUserIds,
-          },
-          deletedAt: null,
-        },
-      };
-    }
-
-    // --------------------------------------------------
-    // 4. Date Invite filter
-    // --------------------------------------------------
-
-    if (type === "date_invite") {
-      where.messages = {
-        some: {
-          messageType: MessageType.DATE_CONFIRMED,
-          deletedAt: null,
-        },
-      };
-    }
-
-    // --------------------------------------------------
-    // 5. Gift filter
-    // --------------------------------------------------
-
-    if (type === "gift") {
-      where.messages = {
-        some: {
-          messageType: MessageType.GIFT,
-          deletedAt: null,
-        },
-      };
-    }
-
-    // --------------------------------------------------
-    // 6. Unread filter
-    // --------------------------------------------------
-
-    if (type === "unread") {
-      where.messages = {
-        some: {
-          senderId: {
-            not: userId,
-          },
-          readAt: null,
-          deletedAt: null,
-        },
-      };
-    }
-
-    // --------------------------------------------------
-    // 7. Get conversations
-    // --------------------------------------------------
-
-    const fetchLimit = type === "online" ? Math.max(limit * 3, 50) : limit + 1;
-
-    const conversations = await prisma.conversation.findMany({
-      where,
-
-      orderBy: {
-        updatedAt: "desc",
-      },
-
-      // IMPORTANT:
-      // Service will handle pagination.
-      // Repository returns limit + 1.
-      take: limit + 1,
-
-      ...(cursor
-        ? {
-            skip: 1,
-            cursor: {
-              id: cursor,
-            },
-          }
-        : {}),
-
-      include: {
-        // --------------------------------------------------
-        // Participants
-        // --------------------------------------------------
-
-        participants: {
+      if (type === "nearby") {
+        const currentUserProfile = await prisma.userProfile.findUnique({
           where: {
-            deletedAt: null,
+            user_id: userId,
           },
-
-          include: {
-            user: {
-              select: {
-                id: true,
-                full_name: true,
-                birth_date: true,
-
-                photos: {
-                  where: {
-                    is_primary: true,
-                  },
-
-                  take: 1,
-
-                  select: {
-                    id: true,
-                    media_url: true,
-                    media_type: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-
-        // --------------------------------------------------
-        // Latest message
-        // --------------------------------------------------
-
-        messages: {
-          where: {
-            deletedAt: null,
-            deletions: {
-              none: {
-                userId,
-              },
-            },
-          },
-
-          orderBy: {
-            createdAt: "desc",
-          },
-
-          take: 1,
-
           select: {
-            id: true,
-            senderId: true,
-            content: true,
-            messageType: true,
-            mediaUrl: true,
-            createdAt: true,
-            deliveredAt: true,
-            readAt: true,
-          },
-        },
-      },
-    });
-
-    // --------------------------------------------------
-    // 8. Get other participant IDs
-    // --------------------------------------------------
-
-    const candidateIds = conversations
-      .map((conversation) => {
-        const otherParticipant = conversation.participants.find(
-          (participant) => participant.userId !== userId,
-        );
-
-        return otherParticipant?.userId;
-      })
-      .filter((id): id is string => Boolean(id));
-
-    // --------------------------------------------------
-    // 8.1 Get presence from Redis
-    // --------------------------------------------------
-
-    const userPresence =
-      candidateIds.length > 0
-        ? await presenceService.getUsersPresence({
-            userIds: candidateIds,
-          })
-        : [];
-
-    console.log("user presence : ", userPresence);
-
-    // --------------------------------------------------
-    // 8.2 Convert presence into Map
-    // --------------------------------------------------
-
-    const presenceMap = new Map(
-      userPresence.map((item) => [
-        item.userId,
-        {
-          isOnline: item.isOnline,
-          lastSeenAt: item.lastSeenAt,
-        },
-      ]),
-    );
-
-    // --------------------------------------------------
-    // 8.3 ONLINE FILTER
-    // --------------------------------------------------
-
-    let filteredConversations = conversations;
-
-    if (type === "online") {
-      filteredConversations = conversations.filter((conversation) => {
-        const otherParticipant = conversation.participants.find(
-          (participant) => participant.userId !== userId,
-        );
-
-        if (!otherParticipant) {
-          return false;
-        }
-
-        const presence = presenceMap.get(otherParticipant.userId);
-
-        return presence?.isOnline === true;
-      });
-    }
-    // --------------------------------------------------
-    // 9. Get compatibility scores
-    // --------------------------------------------------
-
-    const matchScores =
-      candidateIds.length > 0
-        ? await prisma.userCompatibility.findMany({
-            where: {
-              userId,
-
-              targetUserId: {
-                in: candidateIds,
-              },
-            },
-
-            select: {
-              targetUserId: true,
-              score: true,
-              percentage: true,
-            },
-          })
-        : [];
-
-    // --------------------------------------------------
-    // 10. Convert scores into Map
-    // --------------------------------------------------
-
-    const matchScoreMap = new Map(
-      matchScores.map((item) => [
-        item.targetUserId,
-        {
-          score: item.score,
-          percentage: item.percentage,
-        },
-      ]),
-    );
-
-    // ==================================================
-    // 13. GET GIFT / ROSE PROGRESS
-    // ==================================================
-
-    const conversationIds = conversations.map(
-      (conversation) => conversation.id,
-    );
-
-    // --------------------------------------------------
-    // 13.1 Get all active gifts
-    // --------------------------------------------------
-
-    const giftProgress =
-      candidateIds.length > 0
-        ? await prisma.userGift.findMany({
-            where: {
-              // Gift sent by current user OR
-              // received by current user
-              OR: [
-                {
-                  senderId: userId,
-                  receiverId: {
-                    in: candidateIds,
-                  },
-                },
-                {
-                  receiverId: userId,
-                  senderId: {
-                    in: candidateIds,
-                  },
-                },
-              ],
-
-              // Only pending gifts
-              isUnlocked: false,
-
-              // Only non-expired gifts
-              expiresAt: {
-                gt: new Date(),
-              },
-            },
-
-            // VERY IMPORTANT
-            // Oldest gift first
-            orderBy: {
-              createdAt: "asc",
-            },
-
-            select: {
-              id: true,
-              senderId: true,
-              receiverId: true,
-              giftName: true,
-              requiredMessages: true,
-              messagesSent: true,
-              isUnlocked: true,
-              expiresAt: true,
-              createdAt: true,
-
-              chatMessage: {
-                select: {
-                  conversationId: true,
-                },
-              },
-            },
-          })
-        : [];
-
-    console.log("gift progress : ", giftProgress);
-    // --------------------------------------------------
-    // 13.2 Get active locked roses
-    // --------------------------------------------------
-
-    const roseProgress =
-      candidateIds.length > 0
-        ? await prisma.userRose.findMany({
-            where: {
-              // Rose sent by current user OR received by current user
-              OR: [
-                {
-                  senderId: userId,
-                  receiverId: {
-                    in: candidateIds,
-                  },
-                },
-                {
-                  receiverId: userId,
-                  senderId: {
-                    in: candidateIds,
-                  },
-                },
-              ],
-
-              // Only pending roses
-              isUnlocked: false,
-
-              // Only non-expired roses (combine with the first OR using AND)
-              AND: [
-                {
-                  OR: [
-                    {
-                      expiresAt: null,
-                    },
-                    {
-                      expiresAt: {
-                        gt: new Date(),
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-
-            // Oldest Rose first
-            orderBy: {
-              createdAt: "asc",
-            },
-
-            select: {
-              id: true,
-              senderId: true,
-              receiverId: true,
-              requiredMessages: true,
-              messagesSent: true,
-              isUnlocked: true,
-              expiresAt: true,
-              createdAt: true,
-
-              chatMessage: {
-                select: {
-                  conversationId: true,
-                },
-              },
-            },
-          })
-        : [];
-
-    console.log("rose progress : ", roseProgress);
-    // ==================================================
-    // 14. BUILD PROGRESS MAP
-    // ==================================================
-
-    const progressMap = new Map<
-      string,
-      {
-        current: number;
-        target: number;
-        percentage: number;
-        label: string;
-        type: "GIFT" | "ROSE";
-        giftName: string | null;
-        expiresAt: Date | null;
-      }
-    >();
-
-    // --------------------------------------------------
-    // Sequential Gift progress
-    // --------------------------------------------------
-
-    for (const gift of giftProgress) {
-      // ------------------------------------------------
-      // Gift must have a ChatMessage / conversation
-      // ------------------------------------------------
-
-      const conversationId = gift.chatMessage?.conversationId;
-
-      if (!conversationId) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // If this conversation already has a pending gift,
-      // skip newer gifts.
-      //
-      // Because giftProgress is ordered by
-      // UserGift.createdAt ASC, the first one is
-      // always the oldest pending gift.
-      // ------------------------------------------------
-
-      if (progressMap.has(conversationId)) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // Safety check
-      // ------------------------------------------------
-
-      if (gift.isUnlocked) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // Safety check for completed gift
-      //
-      // If messagesSent has already reached target,
-      // this gift should be unlocked by your message
-      // sending logic.
-      // ------------------------------------------------
-
-      if (gift.messagesSent >= gift.requiredMessages) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // Calculate progress
-      // ------------------------------------------------
-
-      const current = Math.min(gift.messagesSent, gift.requiredMessages);
-
-      const target = gift.requiredMessages;
-
-      const percentage =
-        target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-
-      // ------------------------------------------------
-      // Set active progress
-      // ------------------------------------------------
-
-      progressMap.set(conversationId, {
-        current,
-        target,
-        percentage,
-        label: `${current}/${target} for ${gift.giftName}`,
-        type: "GIFT",
-        giftName: gift.giftName,
-        expiresAt: gift.expiresAt,
-      });
-    }
-
-    // --------------------------------------------------
-    // 14.2 Add Rose progress
-    // --------------------------------------------------
-
-    for (const rose of roseProgress) {
-      // ------------------------------------------------
-      // Rose must have a ChatMessage / conversation
-      // ------------------------------------------------
-
-      const conversationId = rose.chatMessage?.conversationId;
-
-      if (!conversationId) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // If this conversation already has a Gift progress,
-      // keep Gift progress.
-      // ------------------------------------------------
-
-      if (progressMap.has(conversationId)) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // Safety check
-      // ------------------------------------------------
-
-      if (rose.isUnlocked) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // If completed, it should be unlocked
-      // by message sending logic.
-      // ------------------------------------------------
-
-      if (rose.messagesSent >= rose.requiredMessages) {
-        continue;
-      }
-
-      // ------------------------------------------------
-      // Calculate progress
-      // ------------------------------------------------
-
-      const current = Math.min(rose.messagesSent, rose.requiredMessages);
-
-      const target = rose.requiredMessages;
-
-      const percentage =
-        target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-
-      // ------------------------------------------------
-      // Set Rose progress
-      // ------------------------------------------------
-
-      progressMap.set(conversationId, {
-        current,
-        target,
-        percentage,
-        label: `${current}/${target} for Rose`,
-        type: "ROSE",
-        giftName: null,
-        expiresAt: rose.expiresAt,
-      });
-    }
-
-    // --------------------------------------------------
-    // 15. Convert conversations
-    // --------------------------------------------------
-
-    const result = await Promise.all(
-      filteredConversations.map(async (conversation) => {
-        const currentParticipant = conversation.participants.find(
-          (participant) => participant.userId === userId,
-        );
-
-        const otherParticipant = conversation.participants.find(
-          (participant) => participant.userId !== userId,
-        );
-
-        if (!currentParticipant || !otherParticipant) {
-          return null;
-        }
-
-        // --------------------------------------------------
-        // 12. Unread count
-        // --------------------------------------------------
-
-        const unreadCount = await prisma.chatMessage.count({
-          where: {
-            conversationId: conversation.id,
-            senderId: { not: userId },
-            readAt: null,
-            deletedAt: null,
-            deletions: {
-              none: {
-                userId,
-              },
-            },
-            ...(currentParticipant.lastReadAt
-              ? {
-                  createdAt: {
-                    gt: currentParticipant.lastReadAt,
-                  },
-                }
-              : {}),
+            latitude: true,
+            longitude: true,
           },
         });
 
-        // --------------------------------------------------
-        // 16. Other user
-        // --------------------------------------------------
+        if (
+          currentUserProfile?.latitude == null ||
+          currentUserProfile?.longitude == null
+        ) {
+          return [];
+        }
 
-        const otherUser = otherParticipant.user;
+        // 10 KM radius
+        const nearbyUsers = await prisma.$queryRaw<{ user_id: string }[]>`
+        SELECT up.user_id
+        FROM user_profiles up
+        WHERE
+          up.user_id <> ${userId}::uuid
+          AND up.location IS NOT NULL
+          AND ST_DWithin(
+            up.location,
+            ST_SetSRID(
+              ST_MakePoint(
+                ${Number(currentUserProfile.longitude)},
+                ${Number(currentUserProfile.latitude)}
+              ),
+              4326
+            )::geography,
+            25000
+          )
+      `;
 
-        const compatibility = matchScoreMap.get(otherUser.id);
+        nearbyUserIds = nearbyUsers.map((user) => user.user_id);
 
-        // --------------------------------------------------
-        // 17. Final response
-        // --------------------------------------------------
+        if (nearbyUserIds.length === 0) {
+          return [];
+        }
+      }
 
-        const presence = presenceMap.get(otherUser.id);
+      // --------------------------------------------------
+      // 2. Build conversation WHERE condition
+      // --------------------------------------------------
 
-        // --------------------------------------------------
-        // Progress
-        // --------------------------------------------------
+      const where: Prisma.ConversationWhereInput = {
+        participants: {
+          some: {
+            userId,
+            deletedAt: null,
+          },
+        },
+      };
 
-        const progress = progressMap.get(conversation.id) ?? null;
+      // --------------------------------------------------
+      // 3. Nearby filter
+      // --------------------------------------------------
 
-        // --------------------------------------------------
-        // 18. Latest message - Chat list display content
-        // --------------------------------------------------
+      if (type === "nearby") {
+        where.participants = {
+          some: {
+            userId: {
+              in: nearbyUserIds,
+            },
+            deletedAt: null,
+          },
+        };
+      }
 
-        const lastMessage = (() => {
-          const message = conversation.messages[0];
+      // --------------------------------------------------
+      // 4. Date Invite filter
+      // --------------------------------------------------
 
-          if (!message) {
+      if (type === "date_invite") {
+        where.messages = {
+          some: {
+            messageType: MessageType.DATE_CONFIRMED,
+            deletedAt: null,
+          },
+        };
+      }
+
+      // --------------------------------------------------
+      // 5. Gift filter
+      // --------------------------------------------------
+
+      if (type === "gift") {
+        where.messages = {
+          some: {
+            messageType: MessageType.GIFT,
+            deletedAt: null,
+          },
+        };
+      }
+
+      // --------------------------------------------------
+      // 6. Unread filter
+      // --------------------------------------------------
+
+      if (type === "unread") {
+        where.messages = {
+          some: {
+            senderId: {
+              not: userId,
+            },
+            readAt: null,
+            deletedAt: null,
+          },
+        };
+      }
+
+      // --------------------------------------------------
+      // 7. Get conversations
+      // --------------------------------------------------
+
+      const fetchLimit = type === "online" ? Math.max(limit * 3, 50) : limit + 1;
+
+      const conversations = await prisma.conversation.findMany({
+        where,
+
+        orderBy: {
+          updatedAt: "desc",
+        },
+
+        // IMPORTANT:
+        // Service will handle pagination.
+        // Repository returns limit + 1.
+        take: limit + 1,
+
+        ...(cursor
+          ? {
+              skip: 1,
+              cursor: {
+                id: cursor,
+              },
+            }
+          : {}),
+
+        include: {
+          // --------------------------------------------------
+          // Participants
+          // --------------------------------------------------
+
+          participants: {
+            where: {
+              deletedAt: null,
+            },
+
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  full_name: true,
+                  birth_date: true,
+
+                  photos: {
+                    where: {
+                      is_primary: true,
+                    },
+
+                    take: 1,
+
+                    select: {
+                      id: true,
+                      media_url: true,
+                      media_type: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+
+          // --------------------------------------------------
+          // Latest message
+          // --------------------------------------------------
+
+          messages: {
+            where: {
+              deletedAt: null,
+              deletions: {
+                none: {
+                  userId,
+                },
+              },
+            },
+
+            orderBy: {
+              createdAt: "desc",
+            },
+
+            take: 1,
+
+            select: {
+              id: true,
+              senderId: true,
+              content: true,
+              messageType: true,
+              mediaUrl: true,
+              createdAt: true,
+              deliveredAt: true,
+              readAt: true,
+            },
+          },
+        },
+      });
+
+      // --------------------------------------------------
+      // 8. Get other participant IDs
+      // --------------------------------------------------
+
+      const candidateIds = conversations
+        .map((conversation) => {
+          const otherParticipant = conversation.participants.find(
+            (participant) => participant.userId !== userId,
+          );
+
+          return otherParticipant?.userId;
+        })
+        .filter((id): id is string => Boolean(id));
+
+      // --------------------------------------------------
+      // 8.1 Get presence from Redis
+      // --------------------------------------------------
+
+      const userPresence =
+        candidateIds.length > 0
+          ? await presenceService.getUsersPresence({
+              userIds: candidateIds,
+            })
+          : [];
+
+      console.log("user presence : ", userPresence);
+
+      // --------------------------------------------------
+      // 8.2 Convert presence into Map
+      // --------------------------------------------------
+
+      const presenceMap = new Map(
+        userPresence.map((item) => [
+          item.userId,
+          {
+            isOnline: item.isOnline,
+            lastSeenAt: item.lastSeenAt,
+          },
+        ]),
+      );
+
+      // --------------------------------------------------
+      // 8.3 ONLINE FILTER
+      // --------------------------------------------------
+
+      let filteredConversations = conversations;
+
+      if (type === "online") {
+        filteredConversations = conversations.filter((conversation) => {
+          const otherParticipant = conversation.participants.find(
+            (participant) => participant.userId !== userId,
+          );
+
+          if (!otherParticipant) {
+            return false;
+          }
+
+          const presence = presenceMap.get(otherParticipant.userId);
+
+          return presence?.isOnline === true;
+        });
+      }
+      // --------------------------------------------------
+      // 9. Get compatibility scores
+      // --------------------------------------------------
+
+      const matchScores =
+        candidateIds.length > 0
+          ? await prisma.userCompatibility.findMany({
+              where: {
+                userId,
+
+                targetUserId: {
+                  in: candidateIds,
+                },
+              },
+
+              select: {
+                targetUserId: true,
+                score: true,
+                percentage: true,
+              },
+            })
+          : [];
+
+      // --------------------------------------------------
+      // 10. Convert scores into Map
+      // --------------------------------------------------
+
+      const matchScoreMap = new Map(
+        matchScores.map((item) => [
+          item.targetUserId,
+          {
+            score: item.score,
+            percentage: item.percentage,
+          },
+        ]),
+      );
+
+      // ==================================================
+      // 13. GET GIFT / ROSE PROGRESS
+      // ==================================================
+
+      const conversationIds = conversations.map(
+        (conversation) => conversation.id,
+      );
+
+      // --------------------------------------------------
+      // 13.1 Get all active gifts
+      // --------------------------------------------------
+
+      const giftProgress =
+        candidateIds.length > 0
+          ? await prisma.userGift.findMany({
+              where: {
+                // Gift sent by current user OR
+                // received by current user
+                OR: [
+                  {
+                    senderId: userId,
+                    receiverId: {
+                      in: candidateIds,
+                    },
+                  },
+                  {
+                    receiverId: userId,
+                    senderId: {
+                      in: candidateIds,
+                    },
+                  },
+                ],
+
+                // Only pending gifts
+                isUnlocked: false,
+
+                // Only non-expired gifts
+                expiresAt: {
+                  gt: new Date(),
+                },
+              },
+
+              // VERY IMPORTANT
+              // Oldest gift first
+              orderBy: {
+                createdAt: "asc",
+              },
+
+              select: {
+                id: true,
+                senderId: true,
+                receiverId: true,
+                giftName: true,
+                requiredMessages: true,
+                messagesSent: true,
+                isUnlocked: true,
+                expiresAt: true,
+                createdAt: true,
+
+                chatMessage: {
+                  select: {
+                    conversationId: true,
+                  },
+                },
+              },
+            })
+          : [];
+
+      console.log("gift progress : ", giftProgress);
+      // --------------------------------------------------
+      // 13.2 Get active locked roses
+      // --------------------------------------------------
+
+      const roseProgress =
+        candidateIds.length > 0
+          ? await prisma.userRose.findMany({
+              where: {
+                // Rose sent by current user OR received by current user
+                OR: [
+                  {
+                    senderId: userId,
+                    receiverId: {
+                      in: candidateIds,
+                    },
+                  },
+                  {
+                    receiverId: userId,
+                    senderId: {
+                      in: candidateIds,
+                    },
+                  },
+                ],
+
+                // Only pending roses
+                isUnlocked: false,
+
+                // Only non-expired roses (combine with the first OR using AND)
+                AND: [
+                  {
+                    OR: [
+                      {
+                        expiresAt: null,
+                      },
+                      {
+                        expiresAt: {
+                          gt: new Date(),
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+
+              // Oldest Rose first
+              orderBy: {
+                createdAt: "asc",
+              },
+
+              select: {
+                id: true,
+                senderId: true,
+                receiverId: true,
+                requiredMessages: true,
+                messagesSent: true,
+                isUnlocked: true,
+                expiresAt: true,
+                createdAt: true,
+
+                chatMessage: {
+                  select: {
+                    conversationId: true,
+                  },
+                },
+              },
+            })
+          : [];
+
+      console.log("rose progress : ", roseProgress);
+      // ==================================================
+      // 14. BUILD PROGRESS MAP
+      // ==================================================
+
+      const progressMap = new Map<
+        string,
+        {
+          current: number;
+          target: number;
+          percentage: number;
+          label: string;
+          type: "GIFT" | "ROSE";
+          giftName: string | null;
+          expiresAt: Date | null;
+        }
+      >();
+
+      // --------------------------------------------------
+      // Sequential Gift progress
+      // --------------------------------------------------
+
+      for (const gift of giftProgress) {
+        // ------------------------------------------------
+        // Gift must have a ChatMessage / conversation
+        // ------------------------------------------------
+
+        const conversationId = gift.chatMessage?.conversationId;
+
+        if (!conversationId) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // If this conversation already has a pending gift,
+        // skip newer gifts.
+        //
+        // Because giftProgress is ordered by
+        // UserGift.createdAt ASC, the first one is
+        // always the oldest pending gift.
+        // ------------------------------------------------
+
+        if (progressMap.has(conversationId)) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // Safety check
+        // ------------------------------------------------
+
+        if (gift.isUnlocked) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // Safety check for completed gift
+        //
+        // If messagesSent has already reached target,
+        // this gift should be unlocked by your message
+        // sending logic.
+        // ------------------------------------------------
+
+        if (gift.messagesSent >= gift.requiredMessages) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // Calculate progress
+        // ------------------------------------------------
+
+        const current = Math.min(gift.messagesSent, gift.requiredMessages);
+
+        const target = gift.requiredMessages;
+
+        const percentage =
+          target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+
+        // ------------------------------------------------
+        // Set active progress
+        // ------------------------------------------------
+
+        progressMap.set(conversationId, {
+          current,
+          target,
+          percentage,
+          label: `${current}/${target} for ${gift.giftName}`,
+          type: "GIFT",
+          giftName: gift.giftName,
+          expiresAt: gift.expiresAt,
+        });
+      }
+
+      // --------------------------------------------------
+      // 14.2 Add Rose progress
+      // --------------------------------------------------
+
+      for (const rose of roseProgress) {
+        // ------------------------------------------------
+        // Rose must have a ChatMessage / conversation
+        // ------------------------------------------------
+
+        const conversationId = rose.chatMessage?.conversationId;
+
+        if (!conversationId) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // If this conversation already has a Gift progress,
+        // keep Gift progress.
+        // ------------------------------------------------
+
+        if (progressMap.has(conversationId)) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // Safety check
+        // ------------------------------------------------
+
+        if (rose.isUnlocked) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // If completed, it should be unlocked
+        // by message sending logic.
+        // ------------------------------------------------
+
+        if (rose.messagesSent >= rose.requiredMessages) {
+          continue;
+        }
+
+        // ------------------------------------------------
+        // Calculate progress
+        // ------------------------------------------------
+
+        const current = Math.min(rose.messagesSent, rose.requiredMessages);
+
+        const target = rose.requiredMessages;
+
+        const percentage =
+          target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+
+        // ------------------------------------------------
+        // Set Rose progress
+        // ------------------------------------------------
+
+        progressMap.set(conversationId, {
+          current,
+          target,
+          percentage,
+          label: `${current}/${target} for Rose`,
+          type: "ROSE",
+          giftName: null,
+          expiresAt: rose.expiresAt,
+        });
+      }
+
+      // --------------------------------------------------
+      // 15. Convert conversations
+      // --------------------------------------------------
+
+      const result = await Promise.all(
+        filteredConversations.map(async (conversation) => {
+          const currentParticipant = conversation.participants.find(
+            (participant) => participant.userId === userId,
+          );
+
+          const otherParticipant = conversation.participants.find(
+            (participant) => participant.userId !== userId,
+          );
+
+          if (!currentParticipant || !otherParticipant) {
             return null;
           }
 
-          let displayContent = message.content;
+          // --------------------------------------------------
+          // 12. Unread count
+          // --------------------------------------------------
 
-          switch (message.messageType) {
-            case MessageType.IMAGE:
-              displayContent = message.content
-                ? `📷 ${message.content}`
-                : "📷 Photo";
-              break;
+          const unreadCount = await prisma.chatMessage.count({
+            where: {
+              conversationId: conversation.id,
+              senderId: { not: userId },
+              readAt: null,
+              deletedAt: null,
+              deletions: {
+                none: {
+                  userId,
+                },
+              },
+              ...(currentParticipant.lastReadAt
+                ? {
+                    createdAt: {
+                      gt: currentParticipant.lastReadAt,
+                    },
+                  }
+                : {}),
+            },
+          });
 
-            case MessageType.VIDEO:
-              displayContent = message.content
-                ? `🎥 ${message.content}`
-                : "🎥 Video";
-              break;
+          // --------------------------------------------------
+          // 16. Other user
+          // --------------------------------------------------
 
-            case MessageType.TEXT:
-              displayContent = message.content ?? "";
-              break;
+          const otherUser = otherParticipant.user;
 
-            case MessageType.AUDIO:
-              displayContent = message.content
-                ? `🎵 ${message.content}`
-                : "🎵 Audio";
-              break;
+          const compatibility = matchScoreMap.get(otherUser.id);
 
-            case MessageType.FILE:
-              displayContent = message.content
-                ? `📎 ${message.content}`
-                : "📎 File";
-              break;
+          // --------------------------------------------------
+          // 17. Final response
+          // --------------------------------------------------
 
-            case MessageType.CONTACT:
-              displayContent = message.content
-                ? `👤 ${message.content}`
-                : "👤 Contact";
-              break;
+          const presence = presenceMap.get(otherUser.id);
 
-            case MessageType.LOCATION:
-              displayContent = message.content
-                ? `📍 ${message.content}`
-                : "📍 Location";
-              break;
+          // --------------------------------------------------
+          // Progress
+          // --------------------------------------------------
 
-            case MessageType.GIFT:
-              displayContent =
-                message.senderId === userId
-                  ? "🎁 You sent a gift"
-                  : "🎁 You received a gift";
-              break;
+          const progress = progressMap.get(conversation.id) ?? null;
 
-            case MessageType.ROSE:
-              displayContent =
-                message.senderId === userId
-                  ? "🌹 You sent a Rose"
-                  : "🌹 You received a Rose";
-              break;
+          // --------------------------------------------------
+          // 18. Latest message - Chat list display content
+          // --------------------------------------------------
 
-            case MessageType.COMPLIMENT:
-              displayContent =
-                message.senderId === userId
-                  ? "💬 You sent a compliment"
-                  : "💬 You received a compliment";
-              break;
+          const lastMessage = (() => {
+            const message = conversation.messages[0];
 
-            case MessageType.ENGAGEMENT:
-              displayContent =
-                message.senderId === userId
-                  ? "✨ You sent a special interaction"
-                  : "✨ You received a special interaction";
-              break;
+            if (!message) {
+              return null;
+            }
 
-            case MessageType.DATE_INVITE:
-              displayContent =
-                message.senderId === userId
-                  ? "📅 You sent a date invite"
-                  : "📅 You received a date invite";
-              break;
+            let displayContent = message.content;
 
-            case MessageType.DATE_CONFIRMED:
-              displayContent = "✅ Date confirmed";
-              break;
+            switch (message.messageType) {
+              case MessageType.IMAGE:
+                displayContent = message.content
+                  ? `📷 ${message.content}`
+                  : "📷 Photo";
+                break;
 
-            case MessageType.DATE_CANCELLED:
-              displayContent = "❌ Date cancelled";
-              break;
+              case MessageType.VIDEO:
+                displayContent = message.content
+                  ? `🎥 ${message.content}`
+                  : "🎥 Video";
+                break;
 
-            case MessageType.EVENT_INVITE:
-              displayContent =
-                message.senderId === userId
-                  ? "📅 You sent an event invite"
-                  : "📅 You received an event invite";
-              break;
+              case MessageType.TEXT:
+                displayContent = message.content ?? "";
+                break;
 
-            case MessageType.EVENT_CONFIRM:
-              displayContent = "✅ Event confirmed";
-              break;
+              case MessageType.AUDIO:
+                displayContent = message.content
+                  ? `🎵 ${message.content}`
+                  : "🎵 Audio";
+                break;
 
-            case MessageType.EVENT_CANCEL:
-              displayContent = "❌ Event cancelled";
-              break;
+              case MessageType.FILE:
+                displayContent = message.content
+                  ? `📎 ${message.content}`
+                  : "📎 File";
+                break;
 
-            case MessageType.SYSTEM:
-              displayContent = "ℹ️ System message";
-              break;
+              case MessageType.CONTACT:
+                displayContent = message.content
+                  ? `👤 ${message.content}`
+                  : "👤 Contact";
+                break;
 
-            default:
-              displayContent = message.content ?? "New message";
-              break;
-          }
+              case MessageType.LOCATION:
+                displayContent = message.content
+                  ? `📍 ${message.content}`
+                  : "📍 Location";
+                break;
+
+              case MessageType.GIFT:
+                displayContent =
+                  message.senderId === userId
+                    ? "🎁 You sent a gift"
+                    : "🎁 You received a gift";
+                break;
+
+              case MessageType.ROSE:
+                displayContent =
+                  message.senderId === userId
+                    ? "🌹 You sent a Rose"
+                    : "🌹 You received a Rose";
+                break;
+
+              case MessageType.COMPLIMENT:
+                displayContent =
+                  message.senderId === userId
+                    ? "💬 You sent a compliment"
+                    : "💬 You received a compliment";
+                break;
+
+              case MessageType.ENGAGEMENT:
+                displayContent =
+                  message.senderId === userId
+                    ? "✨ You sent a special interaction"
+                    : "✨ You received a special interaction";
+                break;
+
+              case MessageType.DATE_INVITE:
+                displayContent =
+                  message.senderId === userId
+                    ? "📅 You sent a date invite"
+                    : "📅 You received a date invite";
+                break;
+
+              case MessageType.DATE_CONFIRMED:
+                displayContent = "✅ Date confirmed";
+                break;
+
+              case MessageType.DATE_CANCELLED:
+                displayContent = "❌ Date cancelled";
+                break;
+
+              case MessageType.EVENT_INVITE:
+                displayContent =
+                  message.senderId === userId
+                    ? "📅 You sent an event invite"
+                    : "📅 You received an event invite";
+                break;
+
+              case MessageType.EVENT_CONFIRM:
+                displayContent = "✅ Event confirmed";
+                break;
+
+              case MessageType.EVENT_CANCEL:
+                displayContent = "❌ Event cancelled";
+                break;
+
+              case MessageType.SYSTEM:
+                displayContent = "ℹ️ System message";
+                break;
+
+              default:
+                displayContent = message.content ?? "New message";
+                break;
+            }
+
+            return {
+              ...message,
+              content: displayContent,
+            };
+          })();
+
+          // --------------------------------------------------
+          // Final response
+          // --------------------------------------------------
 
           return {
-            ...message,
-            content: displayContent,
+            conversationId: conversation.id,
+            user: {
+              id: otherUser.id,
+              fullName: otherUser.full_name,
+              age: calculateAge(otherUser.birth_date),
+              profilePhoto: otherUser.photos[0]?.media_url ?? null,
+              matchPercentage: compatibility?.percentage ?? 0,
+              trustPercentage: 85,
+              isOnline: presence?.isOnline ?? false,
+              lastSeenAt: presence?.lastSeenAt ?? null,
+            },
+            lastMessage,
+            unreadCount,
+            progress,
+            updatedAt: conversation.updatedAt,
           };
-        })();
+        }),
+      );
 
-        // --------------------------------------------------
-        // Final response
-        // --------------------------------------------------
+      // --------------------------------------------------
+      // 15. Return plain array
+      // --------------------------------------------------
 
-        return {
-          conversationId: conversation.id,
-          user: {
-            id: otherUser.id,
-            fullName: otherUser.full_name,
-            age: calculateAge(otherUser.birth_date),
-            profilePhoto: otherUser.photos[0]?.media_url ?? null,
-            matchPercentage: compatibility?.percentage ?? 0,
-            trustPercentage: 85,
-            isOnline: presence?.isOnline ?? false,
-            lastSeenAt: presence?.lastSeenAt ?? null,
-          },
-          lastMessage,
-          unreadCount,
-          progress,
-          updatedAt: conversation.updatedAt,
-        };
-      }),
-    );
-
-    // --------------------------------------------------
-    // 15. Return plain array
-    // --------------------------------------------------
-
-    return result.filter(
-      (item): item is NonNullable<typeof item> => item !== null,
-    );
-  },
+      return result.filter(
+        (item): item is NonNullable<typeof item> => item !== null,
+      );
+    },
   /**
    * Get messages using cursor pagination.
    */

@@ -1,16 +1,10 @@
-import {
-  Prisma,
-  VerificationStatus,
-  VerificationType,
-} from "@prisma/client";
+import { Prisma, VerificationStatus, VerificationType } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 
 const isVerified = (status?: VerificationStatus | null) =>
   status === VerificationStatus.VERIFIED;
 
-const formatGovernmentIdType = (
-  type?: string | null
-) => {
+const formatGovernmentIdType = (type?: string | null) => {
   switch (type) {
     case "AADHAAR":
       return "Aadhaar card";
@@ -26,23 +20,18 @@ const formatGovernmentIdType = (
   }
 };
 
-const calculateAge = (
-  birthDate?: Date | null
-): number | null => {
+const calculateAge = (birthDate?: Date | null): number | null => {
   if (!birthDate) return null;
 
   const today = new Date();
 
-  let age =
-    today.getFullYear() - birthDate.getFullYear();
+  let age = today.getFullYear() - birthDate.getFullYear();
 
-  const monthDiff =
-    today.getMonth() - birthDate.getMonth();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
 
   if (
     monthDiff < 0 ||
-    (monthDiff === 0 &&
-      today.getDate() < birthDate.getDate())
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
   ) {
     age--;
   }
@@ -50,13 +39,8 @@ const calculateAge = (
   return age;
 };
 
-const getVerification = (
-  verifications: any[],
-  type: VerificationType
-) => {
-  return verifications.find(
-    (item) => item.type === type
-  );
+const getVerification = (verifications: any[], type: VerificationType) => {
+  return verifications.find((item) => item.type === type);
 };
 
 const safeMetadata = (verification: any) => {
@@ -68,15 +52,10 @@ const safeMetadata = (verification: any) => {
     return {};
   }
 
-  return verification.metadata as Record<
-    string,
-    any
-  >;
+  return verification.metadata as Record<string, any>;
 };
 
-const maskPhoneNumber = (
-  phone?: string | null
-): string | null => {
+const maskPhoneNumber = (phone?: string | null): string | null => {
   if (!phone) return null;
 
   // Remove spaces/hyphens
@@ -91,10 +70,7 @@ const maskPhoneNumber = (
   if (cleaned.startsWith("+91")) {
     countryCode = "+91";
     number = cleaned.slice(3);
-  } else if (
-    cleaned.startsWith("91") &&
-    cleaned.length === 12
-  ) {
+  } else if (cleaned.startsWith("91") && cleaned.length === 12) {
     countryCode = "+91";
     number = cleaned.slice(2);
   }
@@ -105,13 +81,10 @@ const maskPhoneNumber = (
 
   const lastThree = number.slice(-3);
 
-  return `${countryCode ? `${countryCode} ` : ""
-    }••••• ••${lastThree}`;
+  return `${countryCode ? `${countryCode} ` : ""}••••• ••${lastThree}`;
 };
 
-const maskEmail = (
-  email?: string | null
-): string | null => {
+const maskEmail = (email?: string | null): string | null => {
   if (!email) return null;
 
   const [username, domain] = email.split("@");
@@ -123,24 +96,16 @@ const maskEmail = (
   // Example:
   // aanya@gmail.com -> aa•••@gmail.com
 
-  const visibleLength = Math.min(
-    2,
-    username.length
-  );
+  const visibleLength = Math.min(2, username.length);
 
-  const visible = username.slice(
-    0,
-    visibleLength
-  );
+  const visible = username.slice(0, visibleLength);
 
   return `${visible}•••@${domain}`;
 };
 
-
-
 export const getPublicTrustScoreService = async (
   viewerUserId: string,
-  profileUserId: string
+  profileUserId: string,
 ) => {
   /**
    * viewerUserId  = User A
@@ -158,12 +123,12 @@ export const getPublicTrustScoreService = async (
 
   const VERIFICATION_POINTS = {
     GOVERNMENT_ID: 20,
-    FACE_VERIFICATION: 12,
-    VIDEO_VERIFICATION: 12,
-    EDUCATION_VERIFICATION: 12,
-    PROFESSIONAL_VERIFICATION: 14,
-    INCOME_VERIFICATION: 12,
-    CRIMINAL_BACKGROUND_CHECK: 18,
+    FACE_VERIFICATION: 10,
+    VIDEO_VERIFICATION: 10,
+    EDUCATION_VERIFICATION: 10,
+    PROFESSIONAL_VERIFICATION: 10,
+    INCOME_VERIFICATION: 10,
+    CRIMINAL_BACKGROUND_CHECK: 30,
     EMERGENCY_CONTACT: 0,
   } as const;
 
@@ -177,7 +142,7 @@ export const getPublicTrustScoreService = async (
           status?: string | null;
         }
       | null
-      | undefined
+      | undefined,
   ) => {
     if (!verification) {
       return "NOT_VERIFIED";
@@ -207,7 +172,7 @@ export const getPublicTrustScoreService = async (
       is_phone_verified: true,
       birth_date: true,
       gender: true,
-  created_at: true,
+      created_at: true,
       profile: {
         select: {
           city: true,
@@ -247,32 +212,31 @@ export const getPublicTrustScoreService = async (
   // 2. Get all verification records of User B
   // ---------------------------------------------------
 
-  const verifications =
-    await prisma.userVerification.findMany({
-      where: {
-        userId: profileUserId,
-      },
+  const verifications = await prisma.userVerification.findMany({
+    where: {
+      userId: profileUserId,
+    },
 
-      select: {
-        id: true,
-        type: true,
-        status: true,
-        points: true,
-        maxPoints: true,
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      points: true,
+      maxPoints: true,
 
-        governmentIdType: true,
-        verifiedName: true,
-        startedAt: true,
-        verifiedAt: true,
-        expiresAt: true,
+      governmentIdType: true,
+      verifiedName: true,
+      startedAt: true,
+      verifiedAt: true,
+      expiresAt: true,
 
-        provider: true,
+      provider: true,
 
-        // Used internally only.
-        // Never return raw metadata directly.
-        metadata: true,
-      },
-    });
+      // Used internally only.
+      // Never return raw metadata directly.
+      metadata: true,
+    },
+  });
 
   // ---------------------------------------------------
   // 3. Find individual verification records
@@ -280,26 +244,25 @@ export const getPublicTrustScoreService = async (
 
   const governmentId = getVerification(
     verifications,
-    VerificationType.GOVERNMENT_ID
+    VerificationType.GOVERNMENT_ID,
   );
 
   const face = getVerification(
     verifications,
-    VerificationType.FACE_VERIFICATION
+    VerificationType.FACE_VERIFICATION,
   );
 
   const video = getVerification(
     verifications,
-    VerificationType.VIDEO_VERIFICATION
+    VerificationType.VIDEO_VERIFICATION,
   );
 
   const education = getVerification(
     verifications,
-    VerificationType.EDUCATION_VERIFICATION
+    VerificationType.EDUCATION_VERIFICATION,
   );
 
-  const educationVerification =
-  await prisma.educationVerification.findFirst({
+  const educationVerification = await prisma.educationVerification.findFirst({
     where: {
       userId: profileUserId,
       status: VerificationStatus.VERIFIED,
@@ -317,11 +280,10 @@ export const getPublicTrustScoreService = async (
 
   const profession = getVerification(
     verifications,
-    VerificationType.PROFESSIONAL_VERIFICATION
+    VerificationType.PROFESSIONAL_VERIFICATION,
   );
 
-  const manualEmployment =
-  await prisma.employmentVerification.findUnique({
+  const manualEmployment = await prisma.employmentVerification.findUnique({
     where: {
       userId: profileUserId,
     },
@@ -337,73 +299,58 @@ export const getPublicTrustScoreService = async (
 
   const income = getVerification(
     verifications,
-    VerificationType.INCOME_VERIFICATION
+    VerificationType.INCOME_VERIFICATION,
   );
 
   const criminal = getVerification(
     verifications,
-    VerificationType.CRIMINAL_BACKGROUND_CHECK
+    VerificationType.CRIMINAL_BACKGROUND_CHECK,
   );
 
   const emergencyContact = getVerification(
     verifications,
-    VerificationType.EMERGENCY_CONTACT
+    VerificationType.EMERGENCY_CONTACT,
   );
 
   // ---------------------------------------------------
   // 4. Metadata
   // ---------------------------------------------------
 
-  const governmentMetadata =
-    safeMetadata(governmentId);
+  const governmentMetadata = safeMetadata(governmentId);
 
-  const faceMetadata =
-    safeMetadata(face);
+  const faceMetadata = safeMetadata(face);
 
-  const videoMetadata =
-    safeMetadata(video);
+  const videoMetadata = safeMetadata(video);
 
-  const educationMetadata =
-    safeMetadata(education);
+  const educationMetadata = safeMetadata(education);
 
-  const professionMetadata =
-    safeMetadata(profession);
-   const latestEmployment =
-  professionMetadata?.latestEmployment &&
-  typeof professionMetadata.latestEmployment === "object"
-    ? professionMetadata.latestEmployment
-    : null;
+  const professionMetadata = safeMetadata(profession);
+  const latestEmployment =
+    professionMetadata?.latestEmployment &&
+    typeof professionMetadata.latestEmployment === "object"
+      ? professionMetadata.latestEmployment
+      : null;
 
-const isGridlinesEmployment =
-  profession?.provider === "GRIDLINES_EPFO";
-  const incomeMetadata =
-    safeMetadata(income);
+  const isGridlinesEmployment = profession?.provider === "GRIDLINES_EPFO";
+  const incomeMetadata = safeMetadata(income);
 
-  const criminalMetadata =
-    safeMetadata(criminal);
+  const criminalMetadata = safeMetadata(criminal);
 
   // ---------------------------------------------------
   // 5. Basic verification
   // ---------------------------------------------------
 
-  const mobileVerified =
-    user.is_phone_verified === true;
+  const mobileVerified = user.is_phone_verified === true;
 
   /**
    * Replace this when you have
    * is_email_verified.
    */
-  const emailVerified =
-    Boolean(user.email);
+  const emailVerified = Boolean(user.email);
 
-  const mobileEmailVerified =
-    mobileVerified && emailVerified;
+  const mobileEmailVerified = mobileVerified && emailVerified;
 
-  const locationVerified =
-    Boolean(
-      user.profile?.city &&
-      user.profile?.state
-    );
+  const locationVerified = Boolean(user.profile?.city && user.profile?.state);
 
   // ---------------------------------------------------
   // 6. Score
@@ -420,28 +367,21 @@ const isGridlinesEmployment =
     emergencyContact,
   ].filter(Boolean);
 
-  const earnedPoints =
-    pointBasedVerifications.reduce(
-      (total, verification) => {
-        if (!verification) {
-          return total;
-        }
+  const earnedPoints = pointBasedVerifications.reduce((total, verification) => {
+    if (!verification) {
+      return total;
+    }
 
-        if (!isVerified(verification.status)) {
-          return total;
-        }
+    if (!isVerified(verification.status)) {
+      return total;
+    }
 
-        return total + (verification.points ?? 0);
-      },
-      0
-    );
+    return total + (verification.points ?? 0);
+  }, 0);
 
   const maxScore = 100;
 
-  const trustScore = Math.min(
-    earnedPoints,
-    maxScore
-  );
+  const trustScore = Math.min(earnedPoints, maxScore);
 
   // ---------------------------------------------------
   // 7. Total checks
@@ -460,68 +400,48 @@ const isGridlinesEmployment =
 
     {
       type: "GOVERNMENT_ID",
-      verified: isVerified(
-        governmentId?.status
-      ),
+      verified: isVerified(governmentId?.status),
     },
 
     {
       type: "FACE_VERIFICATION",
-      verified: isVerified(
-        face?.status
-      ),
+      verified: isVerified(face?.status),
     },
 
     {
       type: "VIDEO_VERIFICATION",
-      verified: isVerified(
-        video?.status
-      ),
+      verified: isVerified(video?.status),
     },
 
     {
       type: "EDUCATION_VERIFICATION",
-      verified: isVerified(
-        education?.status
-      ),
+      verified: isVerified(education?.status),
     },
 
     {
       type: "PROFESSIONAL_VERIFICATION",
-      verified: isVerified(
-        profession?.status
-      ),
+      verified: isVerified(profession?.status),
     },
 
     {
       type: "INCOME_VERIFICATION",
-      verified: isVerified(
-        income?.status
-      ),
+      verified: isVerified(income?.status),
     },
 
     {
       type: "CRIMINAL_BACKGROUND_CHECK",
-      verified: isVerified(
-        criminal?.status
-      ),
+      verified: isVerified(criminal?.status),
     },
 
     {
       type: "EMERGENCY_CONTACT",
-      verified: isVerified(
-        emergencyContact?.status
-      ),
+      verified: isVerified(emergencyContact?.status),
     },
   ];
 
-  const totalChecks =
-    checks.length;
+  const totalChecks = checks.length;
 
-  const verifiedChecks =
-    checks.filter(
-      (check) => check.verified
-    ).length;
+  const verifiedChecks = checks.filter((check) => check.verified).length;
 
   // ---------------------------------------------------
   // 8. Badge
@@ -559,44 +479,31 @@ const isGridlinesEmployment =
 
       title: "Mobile & Email",
 
-      description:
-        "Confirmed real contact details",
+      description: "Confirmed real contact details",
 
       required: true,
 
       points: 0,
 
-      status: mobileEmailVerified
-        ? "VERIFIED"
-        : "NOT_VERIFIED",
+      status: mobileEmailVerified ? "VERIFIED" : "NOT_VERIFIED",
 
-    verifiedAt:
-  mobileEmailVerified
-    ? user.created_at
-    : null,
+      verifiedAt: mobileEmailVerified ? user.created_at : null,
 
-      verifiedBy:
-        mobileEmailVerified
-          ? "OTP + email link"
-          : null,
+      verifiedBy: mobileEmailVerified ? "OTP + email link" : null,
 
       details: [
         {
           label: "Mobile",
 
           value: mobileVerified
-            ? maskPhoneNumber(
-                user.phone_number
-              )
+            ? maskPhoneNumber(user.phone_number)
             : "Not verified",
         },
 
         {
           label: "Email",
 
-          value: emailVerified
-            ? maskEmail(user.email)
-            : "Not verified",
+          value: emailVerified ? maskEmail(user.email) : "Not verified",
         },
 
         {
@@ -614,52 +521,38 @@ const isGridlinesEmployment =
 
       title: "Location check",
 
-      description:
-        "City-level authenticity confirmed",
+      description: "City-level authenticity confirmed",
 
       required: true,
 
       points: 0,
 
-      status: locationVerified
-        ? "VERIFIED"
-        : "NOT_VERIFIED",
+      status: locationVerified ? "VERIFIED" : "NOT_VERIFIED",
 
       verifiedAt: null,
 
-      verifiedBy:
-        locationVerified
-          ? "Profile location"
-          : null,
+      verifiedBy: locationVerified ? "Profile location" : null,
 
       details: [
         {
           label: "City",
 
           value:
-            [
-              user.profile?.city,
-              user.profile?.state,
-            ]
+            [user.profile?.city, user.profile?.state]
               .filter(Boolean)
-              .join(", ") ||
-            "Not verified",
+              .join(", ") || "Not verified",
         },
 
         {
           label: "Area",
 
-          value:
-            user.profile?.area ??
-            "Not verified",
+          value: user.profile?.area ?? "Not verified",
         },
 
         {
           label: "Matches profile",
 
-          value: locationVerified
-            ? "Yes"
-            : "Not verified",
+          value: locationVerified ? "Yes" : "Not verified",
         },
       ],
     },
@@ -689,95 +582,62 @@ const isGridlinesEmployment =
 
       title: "Government ID",
 
-      description:
-        "Identity checked against an official ID",
+      description: "Identity checked against an official ID",
 
-      points:
-        governmentId?.maxPoints ??
-        VERIFICATION_POINTS.GOVERNMENT_ID,
+      points: governmentId?.maxPoints ?? VERIFICATION_POINTS.GOVERNMENT_ID,
 
-      status:
-        getDisplayStatus(governmentId),
+      status: getDisplayStatus(governmentId),
 
-      verifiedAt:
-        governmentId?.verifiedAt ??
-        null,
+      verifiedAt: governmentId?.verifiedAt ?? null,
 
-      verifiedBy:
-        isVerified(governmentId?.status)
-          ? governmentId?.provider ===
-            "GRIDLINES"
-            ? "DigiLocker API"
-            : governmentId?.provider ??
-              null
-          : null,
+      verifiedBy: isVerified(governmentId?.status)
+        ? governmentId?.provider === "GRIDLINES"
+          ? "DigiLocker API"
+          : (governmentId?.provider ?? null)
+        : null,
 
-      details:
-        isVerified(
-          governmentId?.status
-        )
-          ? [
-              {
-                label: "Document",
+      details: isVerified(governmentId?.status)
+        ? [
+            {
+              label: "Document",
 
-                value:
-                  formatGovernmentIdType(
-                    governmentId
-                      ?.governmentIdType
-                  ),
-              },
+              value: formatGovernmentIdType(governmentId?.governmentIdType),
+            },
 
-              {
-                label: "Name on ID",
+            {
+              label: "Name on ID",
 
-                value:
-                  governmentId
-                    ?.verifiedName ??
-                  "Verified",
-              },
+              value: governmentId?.verifiedName ?? "Verified",
+            },
 
-              {
-                label: "Age on ID",
+            {
+              label: "Age on ID",
 
-                value:
-                  governmentMetadata.age ??
-                  (user.birth_date
-                    ? `${calculateAge(
-                        user.birth_date
-                      )} years`
-                    : null),
-              },
+              value:
+                governmentMetadata.age ??
+                (user.birth_date
+                  ? `${calculateAge(user.birth_date)} years`
+                  : null),
+            },
 
-              {
-                label: "Gender",
+            {
+              label: "Gender",
 
-                value:
-                  governmentMetadata.gender ??
-                  user.gender ??
-                  null,
-              },
+              value: governmentMetadata.gender ?? user.gender ?? null,
+            },
 
-              {
-                label:
-                  "Profile details match",
+            {
+              label: "Profile details match",
 
-                value:
-                  governmentMetadata
-                    .profileMatched ===
-                  false
-                    ? "No"
-                    : "Yes",
-              },
-            ].filter(
-              (item) =>
-                item.value != null
-            )
-          : [
-              {
-                label: "Status",
-                value: "Not verified",
-              },
-            ],
+              value: governmentMetadata.profileMatched === false ? "No" : "Yes",
+            },
+          ].filter((item) => item.value != null)
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
     },
 
     // =================================================
@@ -789,59 +649,44 @@ const isGridlinesEmployment =
 
       title: "Face match",
 
-      description:
-        "Profile photo matched with the government ID photo",
+      description: "Profile photo matched with the government ID photo",
 
-      points:
-        face?.maxPoints ??
-        VERIFICATION_POINTS
-          .FACE_VERIFICATION,
+      points: face?.maxPoints ?? VERIFICATION_POINTS.FACE_VERIFICATION,
 
-      status:
-        getDisplayStatus(face),
+      status: getDisplayStatus(face),
 
-      verifiedAt:
-        face?.verifiedAt ??
-        null,
+      verifiedAt: face?.verifiedAt ?? null,
 
-      verifiedBy:
-        isVerified(face?.status)
-          ? face?.provider ??
-            "AI face match"
-          : null,
+      verifiedBy: isVerified(face?.status)
+        ? (face?.provider ?? "AI face match")
+        : null,
 
-      details:
-        isVerified(face?.status)
-          ? [
-              {
-                label: "Match with ID",
+      details: isVerified(face?.status)
+        ? [
+            {
+              label: "Match with ID",
 
-                value:
-                  faceMetadata
-                    .matchPercentage !=
-                  null
-                    ? `${faceMetadata.matchPercentage}% match`
-                    : "Matched",
-              },
+              value:
+                faceMetadata.matchPercentage != null
+                  ? `${faceMetadata.matchPercentage}% match`
+                  : "Matched",
+            },
 
-              {
-                label:
-                  "Profile photos",
+            {
+              label: "Profile photos",
 
-                value:
-                  faceMetadata
-                    .samePerson ===
-                  false
-                    ? "Not matched"
-                    : "Same person",
-              },
-            ]
-          : [
-              {
-                label: "Status",
-                value: "Not verified",
-              },
-            ],
+              value:
+                faceMetadata.samePerson === false
+                  ? "Not matched"
+                  : "Same person",
+            },
+          ]
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
     },
 
     // =================================================
@@ -853,56 +698,41 @@ const isGridlinesEmployment =
 
       title: "Video liveness",
 
-      description:
-        "Live verification confirmed a present person",
+      description: "Live verification confirmed a present person",
 
-      points:
-        video?.maxPoints ??
-        VERIFICATION_POINTS
-          .VIDEO_VERIFICATION,
+      points: video?.maxPoints ?? VERIFICATION_POINTS.VIDEO_VERIFICATION,
 
-      status:
-        getDisplayStatus(video),
+      status: getDisplayStatus(video),
 
-      verifiedAt:
-        video?.verifiedAt ??
-        null,
+      verifiedAt: video?.verifiedAt ?? null,
 
-      verifiedBy:
-        isVerified(video?.status)
-          ? video?.provider ??
-            "Live video check"
-          : null,
+      verifiedBy: isVerified(video?.status)
+        ? (video?.provider ?? "Live video check")
+        : null,
 
-      details:
-        isVerified(video?.status)
-          ? [
-              {
-                label: "Liveness",
+      details: isVerified(video?.status)
+        ? [
+            {
+              label: "Liveness",
 
-                value:
-                  videoMetadata
-                    .livenessResult ??
-                  "Real person, live",
-              },
+              value: videoMetadata.livenessResult ?? "Real person, live",
+            },
 
-              {
-                label: "Gestures",
+            {
+              label: "Gestures",
 
-                value:
-                  videoMetadata
-                    .gesturesCompleted !=
-                  null
-                    ? `${videoMetadata.gesturesCompleted} completed`
-                    : "Completed",
-              },
-            ]
-          : [
-              {
-                label: "Status",
-                value: "Not verified",
-              },
-            ],
+              value:
+                videoMetadata.gesturesCompleted != null
+                  ? `${videoMetadata.gesturesCompleted} completed`
+                  : "Completed",
+            },
+          ]
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
     },
   ];
 
@@ -917,144 +747,120 @@ const isGridlinesEmployment =
     // =================================================
     // EDUCATION
     // =================================================
-{
-  type: "EDUCATION_VERIFICATION",
+    {
+      type: "EDUCATION_VERIFICATION",
 
-  title: "Education",
+      title: "Education",
 
-  description: "Education details verified",
+      description: "Education details verified",
 
-  points:
-    education?.maxPoints ??
-    VERIFICATION_POINTS.EDUCATION_VERIFICATION,
+      points:
+        education?.maxPoints ?? VERIFICATION_POINTS.EDUCATION_VERIFICATION,
 
-  status: getDisplayStatus(education),
+      status: getDisplayStatus(education),
 
-  verifiedAt:
-    educationVerification?.verifiedAt ??
-    education?.verifiedAt ??
-    null,
+      verifiedAt:
+        educationVerification?.verifiedAt ?? education?.verifiedAt ?? null,
 
-  verifiedBy:
-    isVerified(education?.status)
-      ? education?.provider ??
-        "Reviewed by Welvors team"
-      : null,
+      verifiedBy: isVerified(education?.status)
+        ? (education?.provider ?? "Reviewed by Welvors team")
+        : null,
 
-  details:
-    isVerified(education?.status)
-      ? [
-          {
-            label: "Degree",
-            value:
-              educationVerification?.degreeName ??
-              "Not available",
-          },
-          {
-            label: "Institution",
-            value:
-              educationVerification?.institutionName ??
-              "Not available",
-          },
-          {
-            label: "Graduation year",
-            value:
-              educationVerification?.isCurrentlyStudying
+      details: isVerified(education?.status)
+        ? [
+            {
+              label: "Degree",
+              value: educationVerification?.degreeName ?? "Not available",
+            },
+            {
+              label: "Institution",
+              value: educationVerification?.institutionName ?? "Not available",
+            },
+            {
+              label: "Graduation year",
+              value: educationVerification?.isCurrentlyStudying
                 ? "Currently studying"
                 : educationVerification?.graduationYear != null
-                  ? String(
-                      educationVerification.graduationYear
-                    )
+                  ? String(educationVerification.graduationYear)
                   : "Not available",
-          },
-        ]
-      : [
-          {
-            label: "Status",
-            value: "Not verified",
-          },
-        ],
-},
+            },
+          ]
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
+    },
 
     // =================================================
     // PROFESSION
     // =================================================
 
-{
-  type: "PROFESSIONAL_VERIFICATION",
+    {
+      type: "PROFESSIONAL_VERIFICATION",
 
-  title: "Profession",
+      title: "Profession",
 
-  description:
-    "Employment details verified",
+      description: "Employment details verified",
 
-  points:
-    profession?.maxPoints ??
-    VERIFICATION_POINTS.PROFESSIONAL_VERIFICATION,
+      points:
+        profession?.maxPoints ?? VERIFICATION_POINTS.PROFESSIONAL_VERIFICATION,
 
-  status:
-    getDisplayStatus(profession),
+      status: getDisplayStatus(profession),
 
-  verifiedAt:
-    profession?.verifiedAt ??
-    manualEmployment?.verifiedAt ??
-    null,
+      verifiedAt:
+        profession?.verifiedAt ?? manualEmployment?.verifiedAt ?? null,
 
-  verifiedBy:
-    isVerified(profession?.status)
-      ? isGridlinesEmployment
-        ? "GRIDLINES_EPFO"
-        : "Reviewed by Welvors team"
-      : null,
+      verifiedBy: isVerified(profession?.status)
+        ? isGridlinesEmployment
+          ? "GRIDLINES_EPFO"
+          : "Reviewed by Welvors team"
+        : null,
 
-  details:
-    isVerified(profession?.status)
-      ? [
-          {
-            label: "Company",
+      details: isVerified(profession?.status)
+        ? [
+            {
+              label: "Company",
 
-            value: isGridlinesEmployment
-              ? latestEmployment?.establishmentName ?? null
-              : manualEmployment?.companyName ?? null,
-          },
+              value: isGridlinesEmployment
+                ? (latestEmployment?.establishmentName ?? null)
+                : (manualEmployment?.companyName ?? null),
+            },
 
-          {
-            label: "Date of joining",
+            {
+              label: "Date of joining",
 
-            value: isGridlinesEmployment
-              ? latestEmployment?.dateOfJoining ?? null
-              : manualEmployment?.joiningDate
-                ? manualEmployment.joiningDate
-                    .toISOString()
-                    .split("T")[0]
-                : null,
-          },
-
-          {
-            label: "Currently employed",
-
-            value: isGridlinesEmployment
-              ? latestEmployment?.isCurrentlyEmployed === true
-                ? "Yes"
-                : latestEmployment?.isCurrentlyEmployed === false
-                  ? "No"
-                  : null
-              : manualEmployment?.isCurrentlyWorking === true
-                ? "Yes"
-                : manualEmployment?.isCurrentlyWorking === false
-                  ? "No"
+              value: isGridlinesEmployment
+                ? (latestEmployment?.dateOfJoining ?? null)
+                : manualEmployment?.joiningDate
+                  ? manualEmployment.joiningDate.toISOString().split("T")[0]
                   : null,
-          },
-        ].filter(
-          (item) => item.value != null
-        )
-      : [
-          {
-            label: "Status",
-            value: "Not verified",
-          },
-        ],
-}, 
+            },
+
+            {
+              label: "Currently employed",
+
+              value: isGridlinesEmployment
+                ? latestEmployment?.isCurrentlyEmployed === true
+                  ? "Yes"
+                  : latestEmployment?.isCurrentlyEmployed === false
+                    ? "No"
+                    : null
+                : manualEmployment?.isCurrentlyWorking === true
+                  ? "Yes"
+                  : manualEmployment?.isCurrentlyWorking === false
+                    ? "No"
+                    : null,
+            },
+          ].filter((item) => item.value != null)
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
+    },
     // =================================================
     // INCOME
     // =================================================
@@ -1064,80 +870,52 @@ const isGridlinesEmployment =
 
       title: "Income",
 
-      description:
-        "Declared income bracket confirmed",
+      description: "Declared income bracket confirmed",
 
-      points:
-        income?.maxPoints ??
-        VERIFICATION_POINTS
-          .INCOME_VERIFICATION,
+      points: income?.maxPoints ?? VERIFICATION_POINTS.INCOME_VERIFICATION,
 
-      status:
-        getDisplayStatus(income),
+      status: getDisplayStatus(income),
 
-      verifiedAt:
-        income?.verifiedAt ??
-        null,
+      verifiedAt: income?.verifiedAt ?? null,
 
-      verifiedBy:
-        isVerified(income?.status)
-          ? income?.provider ??
-            "Income verification"
-          : null,
+      verifiedBy: isVerified(income?.status)
+        ? (income?.provider ?? "Income verification")
+        : null,
 
-      details:
-        isVerified(income?.status)
-          ? [
-              {
-                label:
-                  "Income bracket",
+      details: isVerified(income?.status)
+        ? [
+            {
+              label: "Income bracket",
 
-                value:
-                  incomeMetadata
-                    .incomeBracket ??
-                  null,
-              },
+              value: incomeMetadata.incomeBracket ?? null,
+            },
 
-              {
-                label:
-                  "Matches declared",
+            {
+              label: "Matches declared",
 
-                value:
-                  incomeMetadata
-                    .matchesDeclared ===
-                  true
-                    ? "Yes"
-                    : incomeMetadata
-                          .matchesDeclared ===
-                        false
-                      ? "No"
-                      : null,
-              },
-
-              {
-                label:
-                  "Sources verified",
-
-                value:
-                  incomeMetadata
-                    .sourcesVerified !=
-                  null
-                    ? String(
-                        incomeMetadata
-                          .sourcesVerified
-                      )
+              value:
+                incomeMetadata.matchesDeclared === true
+                  ? "Yes"
+                  : incomeMetadata.matchesDeclared === false
+                    ? "No"
                     : null,
-              },
-            ].filter(
-              (item) =>
-                item.value != null
-            )
-          : [
-              {
-                label: "Status",
-                value: "Not verified",
-              },
-            ],
+            },
+
+            {
+              label: "Sources verified",
+
+              value:
+                incomeMetadata.sourcesVerified != null
+                  ? String(incomeMetadata.sourcesVerified)
+                  : null,
+            },
+          ].filter((item) => item.value != null)
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
     },
   ];
 
@@ -1154,75 +932,51 @@ const isGridlinesEmployment =
     // =================================================
 
     {
-      type:
-        "CRIMINAL_BACKGROUND_CHECK",
+      type: "CRIMINAL_BACKGROUND_CHECK",
 
-      title:
-        "Criminal background",
+      title: "Criminal background",
 
-      description:
-        "Background records were checked",
+      description: "Background records were checked",
 
       points:
-        criminal?.maxPoints ??
-        VERIFICATION_POINTS
-          .CRIMINAL_BACKGROUND_CHECK,
+        criminal?.maxPoints ?? VERIFICATION_POINTS.CRIMINAL_BACKGROUND_CHECK,
 
-      status:
-        getDisplayStatus(criminal),
+      status: getDisplayStatus(criminal),
 
-      verifiedAt:
-        criminal?.verifiedAt ??
-        null,
+      verifiedAt: criminal?.verifiedAt ?? null,
 
-      verifiedBy:
-        isVerified(
-          criminal?.status
-        )
-          ? criminal?.provider ??
-            "Background-check partner"
-          : null,
+      verifiedBy: isVerified(criminal?.status)
+        ? (criminal?.provider ?? "Background-check partner")
+        : null,
 
-      details:
-        isVerified(
-          criminal?.status
-        )
-          ? [
-              {
-                label:
-                  "Court records",
+      details: isVerified(criminal?.status)
+        ? [
+            {
+              label: "Court records",
 
-                value:
-                  criminalMetadata
-                    .courtRecords ??
-                  "No records found",
-              },
+              value: criminalMetadata.courtRecords ?? "No records found",
+            },
 
-              {
-                label:
-                  "Police records",
+            {
+              label: "Police records",
 
-                value:
-                  criminalMetadata
-                    .policeRecords ??
-                  "No records found",
-              },
+              value: criminalMetadata.policeRecords ?? "No records found",
+            },
 
-              {
-                label: "Result",
+            {
+              label: "Result",
 
-                value:
-                  criminalMetadata
-                    .result ??
-                  "No records found in checked sources",
-              },
-            ]
-          : [
-              {
-                label: "Status",
-                value: "Not verified",
-              },
-            ],
+              value:
+                criminalMetadata.result ??
+                "No records found in checked sources",
+            },
+          ]
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
     },
 
     // =================================================
@@ -1234,50 +988,32 @@ const isGridlinesEmployment =
 
       title: "Emergency contact",
 
-      description:
-        "Emergency contact has been verified",
+      description: "Emergency contact has been verified",
 
       points:
-        emergencyContact
-          ?.maxPoints ??
-        VERIFICATION_POINTS
-          .EMERGENCY_CONTACT,
+        emergencyContact?.maxPoints ?? VERIFICATION_POINTS.EMERGENCY_CONTACT,
 
-      status:
-        getDisplayStatus(
-          emergencyContact
-        ),
+      status: getDisplayStatus(emergencyContact),
 
-      verifiedAt:
-        emergencyContact
-          ?.verifiedAt ??
-        null,
+      verifiedAt: emergencyContact?.verifiedAt ?? null,
 
-      verifiedBy:
-        isVerified(
-          emergencyContact?.status
-        )
-          ? emergencyContact
-              ?.provider ??
-            "Contact verification"
-          : null,
+      verifiedBy: isVerified(emergencyContact?.status)
+        ? (emergencyContact?.provider ?? "Contact verification")
+        : null,
 
-      details:
-        isVerified(
-          emergencyContact?.status
-        )
-          ? [
-              {
-                label: "Status",
-                value: "Verified",
-              },
-            ]
-          : [
-              {
-                label: "Status",
-                value: "Not verified",
-              },
-            ],
+      details: isVerified(emergencyContact?.status)
+        ? [
+            {
+              label: "Status",
+              value: "Verified",
+            },
+          ]
+        : [
+            {
+              label: "Status",
+              value: "Not verified",
+            },
+          ],
     },
   ];
 
@@ -1289,38 +1025,22 @@ const isGridlinesEmployment =
     key: string,
     number: string,
     title: string,
-    items: any[]
+    items: any[],
   ) => {
-    const completed =
-      items.filter(
-        (item) =>
-          item.status === "VERIFIED"
-      ).length;
+    const completed = items.filter((item) => item.status === "VERIFIED").length;
 
-    const sectionEarnedPoints =
-      items.reduce(
-        (total, item) => {
-          if (
-            item.status !== "VERIFIED"
-          ) {
-            return total;
-          }
+    const sectionEarnedPoints = items.reduce((total, item) => {
+      if (item.status !== "VERIFIED") {
+        return total;
+      }
 
-          return (
-            total +
-            (item.points ?? 0)
-          );
-        },
-        0
-      );
+      return total + (item.points ?? 0);
+    }, 0);
 
-    const maxPoints =
-      items.reduce(
-        (total, item) =>
-          total +
-          (item.points ?? 0),
-        0
-      );
+    const maxPoints = items.reduce(
+      (total, item) => total + (item.points ?? 0),
+      0,
+    );
 
     return {
       key,
@@ -1328,16 +1048,13 @@ const isGridlinesEmployment =
       title,
 
       status:
-        completed ===
-          items.length &&
-        items.length > 0
+        completed === items.length && items.length > 0
           ? "VERIFIED"
           : completed > 0
             ? "PARTIALLY_VERIFIED"
             : "NOT_VERIFIED",
 
-      earnedPoints:
-        sectionEarnedPoints,
+      earnedPoints: sectionEarnedPoints,
 
       maxPoints,
 
@@ -1357,20 +1074,11 @@ const isGridlinesEmployment =
     user: {
       id: user.id,
 
-      name:
-        user.full_name?.split(
-          " "
-        )[0] ?? "User",
+      name: user.full_name?.split(" ")[0] ?? "User",
 
-      age:
-        calculateAge(
-          user.birth_date
-        ),
+      age: calculateAge(user.birth_date),
 
-      profilePhoto:
-        user.photos[0]
-          ?.media_url ??
-        null,
+      profilePhoto: user.photos[0]?.media_url ?? null,
     },
 
     trustScore: {
@@ -1384,61 +1092,40 @@ const isGridlinesEmployment =
 
       badge,
 
-      description:
-        `A higher Trust Score means more of ${
-          user.full_name?.split(
-            " "
-          )[0] ??
-          "this user's"
-        } identity and profile information has been independently checked.`,
+      description: `A higher Trust Score means more of ${
+        user.full_name?.split(" ")[0] ?? "this user's"
+      } identity and profile information has been independently checked.`,
     },
 
     privacyNotice: {
-      title:
-        "Verification documents stay private",
+      title: "Verification documents stay private",
 
       message:
         "You only see the verification result — never the documents. Verification documents and sensitive data are not shared with other users.",
     },
 
     sections: [
-      createSection(
-        "BASIC",
-        "01",
-        "Basic verification",
-        basicItems
-      ),
+      createSection("BASIC", "01", "Basic verification", basicItems),
 
-      createSection(
-        "IDENTITY",
-        "02",
-        "Identity verification",
-        identityItems
-      ),
+      createSection("IDENTITY", "02", "Identity verification", identityItems),
 
       createSection(
         "HIGH_TRUST",
         "03",
         "High-trust verification",
-        highTrustItems
+        highTrustItems,
       ),
 
-      createSection(
-        "PLATINUM",
-        "04",
-        "Platinum verification",
-        platinumItems
-      ),
+      createSection("PLATINUM", "04", "Platinum verification", platinumItems),
     ],
   };
 };
-
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
 export const recalculateTrustScore = async (
   userId: string,
-  db: DbClient = prisma
+  db: DbClient = prisma,
 ): Promise<number> => {
   const result = await db.userVerification.aggregate({
     where: {
@@ -1451,10 +1138,7 @@ export const recalculateTrustScore = async (
   });
 
   // Prevent invalid values such as > 100.
-  const trustScore = Math.min(
-    Math.max(result._sum.points ?? 0, 0),
-    100
-  );
+  const trustScore = Math.min(Math.max(result._sum.points ?? 0, 0), 100);
 
   await db.user.update({
     where: {

@@ -623,8 +623,14 @@ export const endRelationshipService = async (
     throw new Error("Relationship is already ended");
   }
 
-  const endedRelationship = await endRelationshipRepository(relationshipId);
-
+const {
+    endedRelationship,
+    breakupMessage,
+    conversationId,
+  } = await endRelationshipRepository(
+    relationshipId,
+    userId,
+  );
   const partner =
     endedRelationship.user1Id === userId
       ? endedRelationship.user2
@@ -672,6 +678,8 @@ export const endRelationshipService = async (
       profilePhoto: partner.photos[0]?.media_url ?? null,
     },
     relationshipEndedScreen,
+     conversationId,
+    breakupMessage,
   };
 };
 

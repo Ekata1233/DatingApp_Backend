@@ -1,7 +1,4 @@
-import {
-  VerificationStatus,
-  VerificationType,
-} from "@prisma/client";
+import { VerificationStatus, VerificationType } from "@prisma/client";
 
 import {
   getEarnedPoints,
@@ -14,9 +11,7 @@ import {
 } from "./verification.helper";
 import { prisma } from "../../prisma/prismaClient";
 
-export const getTrustVerificationStatusService = async (
-  userId: string
-) => {
+export const getTrustVerificationStatusService = async (userId: string) => {
   // --------------------------------------------------
   // 1. Fetch user + location + all verification records
   // --------------------------------------------------
@@ -64,35 +59,21 @@ export const getTrustVerificationStatusService = async (
   // --------------------------------------------------
 
   const verificationMap = new Map(
-    user.verifications.map((verification) => [
-      verification.type,
-      verification,
-    ])
+    user.verifications.map((verification) => [verification.type, verification]),
   );
 
   // --------------------------------------------------
   // 3. Helper for UserVerification based items
   // --------------------------------------------------
 
-  const buildVerificationItem = (
-    type: VerificationType
-  ) => {
-    const verification =
-      verificationMap.get(type);
+  const buildVerificationItem = (type: VerificationType) => {
+    const verification = verificationMap.get(type);
 
-    const config =
-      VERIFICATION_CONFIG[type];
+    const config = VERIFICATION_CONFIG[type];
 
-    const status =
-      getVerificationStatus(
-        verification?.status
-      );
+    const status = getVerificationStatus(verification?.status);
 
-    const earnedPoints =
-      getEarnedPoints(
-        status,
-        config.points
-      );
+    const earnedPoints = getEarnedPoints(status, config.points);
 
     return {
       type,
@@ -101,11 +82,10 @@ export const getTrustVerificationStatusService = async (
       earnedPoints,
       status,
       verifiedAt:
-      status === VerificationStatus.VERIFIED
-        ? verification?.verifiedAt ?? null
-        : null,
-      action:
-        getVerificationAction(status),
+        status === VerificationStatus.VERIFIED
+          ? (verification?.verifiedAt ?? null)
+          : null,
+      action: getVerificationAction(status),
     };
   };
 
@@ -131,9 +111,7 @@ export const getTrustVerificationStatusService = async (
    * update this condition.
    */
 
-  const mobileEmailVerified =
-    user.is_phone_verified === true &&
-    !!user.email;
+  const mobileEmailVerified = user.is_phone_verified === true && !!user.email;
 
   /**
    * As requested:
@@ -141,74 +119,39 @@ export const getTrustVerificationStatusService = async (
    */
 
   const locationVerified =
-    user.profile?.latitude != null &&
-    user.profile?.longitude != null;
+    user.profile?.latitude != null && user.profile?.longitude != null;
 
   const basicItems = [
     {
       type: "MOBILE_EMAIL",
       title: "Mobile & Email Verification",
-      description:
-        "Prevents mass fake signups and builds baseline trust",
-
-      points: TRUST_POINTS.MOBILE_EMAIL,
-
-      earnedPoints:
-        mobileEmailVerified
-          ? TRUST_POINTS.MOBILE_EMAIL
-          : 0,
-
-      status:
-        mobileEmailVerified
-          ? "VERIFIED"
-          : "NOT_STARTED",
-
-      verifiedAt:
-    mobileEmailVerified
-      ? user.created_at
-      : null,
-
-      action: mobileEmailVerified
-        ? null
-        : "VERIFY",
+      description: "Prevents mass fake signups and builds baseline trust",
+      points: 0,
+      earnedPoints: 0,
+      status: mobileEmailVerified ? "VERIFIED" : "NOT_STARTED",
+      verifiedAt: mobileEmailVerified ? user.created_at : null,
+      action: mobileEmailVerified ? null : "VERIFY",
     },
 
     {
       type: "BASIC_LOCATION",
       title: "Basic Location Check",
-      description:
-        "Confirm city-level authenticity",
-
-      points: TRUST_POINTS.BASIC_LOCATION,
-
-      earnedPoints:
-        locationVerified
-          ? TRUST_POINTS.BASIC_LOCATION
-          : 0,
-
-      status:
-        locationVerified
-          ? "VERIFIED"
-          : "NOT_STARTED",
-
-      action: locationVerified
-        ? null
-        : "VERIFY",
+      description: "Confirm city-level authenticity",
+      points: 0,
+      earnedPoints: 0,
+      status: locationVerified ? "VERIFIED" : "NOT_STARTED",
+      action: locationVerified ? null : "VERIFY",
     },
   ];
 
-  const basicCompleted =
-    basicItems.filter(
-      (item) =>
-        item.status === "VERIFIED"
-    ).length;
+  const basicCompleted = basicItems.filter(
+    (item) => item.status === "VERIFIED",
+  ).length;
 
-  const basicEarnedPoints =
-    basicItems.reduce(
-      (sum, item) =>
-        sum + item.earnedPoints,
-      0
-    );
+  const basicEarnedPoints = basicItems.reduce(
+    (sum, item) => sum + item.earnedPoints,
+    0,
+  );
 
   const basicSection = {
     key: "BASIC",
@@ -216,16 +159,12 @@ export const getTrustVerificationStatusService = async (
 
     title: "Basic Verification",
 
-    subtitle:
-      "Auto-verified on signup · Everyone",
+    subtitle: "Auto-verified on signup · Everyone",
 
-    status: getSectionStatus(
-      basicCompleted,
-      basicItems.length
-    ),
+    status: getSectionStatus(basicCompleted, basicItems.length),
 
-    earnedPoints: basicEarnedPoints,
-    maxPoints: 20,
+    earnedPoints: 0,
+    maxPoints: 0,
 
     completed: basicCompleted,
     total: basicItems.length,
@@ -238,32 +177,21 @@ export const getTrustVerificationStatusService = async (
   // ==================================================
 
   const identityItems = [
-    buildVerificationItem(
-      VerificationType.GOVERNMENT_ID
-    ),
+    buildVerificationItem(VerificationType.GOVERNMENT_ID),
 
-    buildVerificationItem(
-      VerificationType.FACE_VERIFICATION
-    ),
+    buildVerificationItem(VerificationType.FACE_VERIFICATION),
 
-    buildVerificationItem(
-      VerificationType.VIDEO_VERIFICATION
-    ),
+    buildVerificationItem(VerificationType.VIDEO_VERIFICATION),
   ];
 
-  const identityCompleted =
-    identityItems.filter(
-      (item) =>
-        item.status ===
-        VerificationStatus.VERIFIED
-    ).length;
+  const identityCompleted = identityItems.filter(
+    (item) => item.status === VerificationStatus.VERIFIED,
+  ).length;
 
-  const identityEarnedPoints =
-    identityItems.reduce(
-      (sum, item) =>
-        sum + item.earnedPoints,
-      0
-    );
+  const identityEarnedPoints = identityItems.reduce(
+    (sum, item) => sum + item.earnedPoints,
+    0,
+  );
 
   const identitySection = {
     key: "IDENTITY",
@@ -271,27 +199,19 @@ export const getTrustVerificationStatusService = async (
 
     title: "Identity Verification",
 
-    subtitle:
-      "Real person, real face · +20 pts",
+    subtitle: "Real person, real face · +20 pts",
 
-    status: getSectionStatus(
-      identityCompleted,
-      identityItems.length
-    ),
+    status: getSectionStatus(identityCompleted, identityItems.length),
 
-    earnedPoints:
-      identityEarnedPoints,
+    earnedPoints: identityEarnedPoints,
 
     maxPoints: 20,
 
-    completed:
-      identityCompleted,
+    completed: identityCompleted,
 
-    total:
-      identityItems.length,
+    total: identityItems.length,
 
-    items:
-      identityItems,
+    items: identityItems,
   };
 
   // ==================================================
@@ -299,46 +219,31 @@ export const getTrustVerificationStatusService = async (
   // ==================================================
 
   const highTrustItems = [
-    buildVerificationItem(
-      VerificationType.EDUCATION_VERIFICATION
-    ),
+    buildVerificationItem(VerificationType.EDUCATION_VERIFICATION),
 
-    buildVerificationItem(
-      VerificationType.PROFESSIONAL_VERIFICATION
-    ),
+    buildVerificationItem(VerificationType.PROFESSIONAL_VERIFICATION),
   ];
 
-  const highTrustCompleted =
-    highTrustItems.filter(
-      (item) =>
-        item.status ===
-        VerificationStatus.VERIFIED
-    ).length;
+  const highTrustCompleted = highTrustItems.filter(
+    (item) => item.status === VerificationStatus.VERIFIED,
+  ).length;
 
-  const highTrustEarnedPoints =
-    highTrustItems.reduce(
-      (sum, item) =>
-        sum + item.earnedPoints,
-      0
-    );
+  const highTrustEarnedPoints = highTrustItems.reduce(
+    (sum, item) => sum + item.earnedPoints,
+    0,
+  );
 
   const highTrustSection = {
     key: "HIGH_TRUST",
     number: "03",
 
-    title:
-      "High Trust Verification",
+    title: "High Trust Verification",
 
-    subtitle:
-      "Stops catfishing & bots · +30 pts",
+    subtitle: "Stops catfishing & bots · +30 pts",
 
-    status: getSectionStatus(
-      highTrustCompleted,
-      highTrustItems.length
-    ),
+    status: getSectionStatus(highTrustCompleted, highTrustItems.length),
 
-    earnedPoints:
-      highTrustEarnedPoints,
+    earnedPoints: highTrustEarnedPoints,
 
     /**
      * Keeping 30 because this is the response
@@ -348,8 +253,7 @@ export const getTrustVerificationStatusService = async (
      */
     maxPoints: 30,
 
-    completed:
-      highTrustCompleted,
+    completed: highTrustCompleted,
 
     /**
      * You requested total: 4, although currently
@@ -357,8 +261,7 @@ export const getTrustVerificationStatusService = async (
      */
     total: 4,
 
-    items:
-      highTrustItems,
+    items: highTrustItems,
   };
 
   // ==================================================
@@ -372,9 +275,7 @@ export const getTrustVerificationStatusService = async (
    * displayed High Trust items are VERIFIED.
    */
 
-  const platinumUnlocked =
-    highTrustCompleted ===
-    highTrustItems.length;
+  const platinumUnlocked = highTrustCompleted === highTrustItems.length;
 
   const platinumTypes = [
     VerificationType.CRIMINAL_BACKGROUND_CHECK,
@@ -382,70 +283,57 @@ export const getTrustVerificationStatusService = async (
     VerificationType.INCOME_VERIFICATION,
   ];
 
-  const platinumItems =
-    platinumTypes.map((type) => {
-      const item =
-        buildVerificationItem(type);
+  const platinumItems = platinumTypes.map((type) => {
+    const item = buildVerificationItem(type);
 
-      /**
-       * Force LOCKED for dashboard display until
-       * Platinum has been unlocked.
-       */
-      if (!platinumUnlocked) {
-        return {
-          ...item,
-          earnedPoints: 0,
-          status: "LOCKED" as const,
-          action: null,
-        };
-      }
+    /**
+     * Force LOCKED for dashboard display until
+     * Platinum has been unlocked.
+     */
+    if (!platinumUnlocked) {
+      return {
+        ...item,
+        earnedPoints: 0,
+        status: "LOCKED" as const,
+        action: null,
+      };
+    }
 
-      return item;
-    });
+    return item;
+  });
 
-  const platinumCompleted =
-    platinumItems.filter(
-      (item) =>
-        item.status ===
-        VerificationStatus.VERIFIED
-    ).length;
+  const platinumCompleted = platinumItems.filter(
+    (item) => item.status === VerificationStatus.VERIFIED,
+  ).length;
 
-  const platinumEarnedPoints =
-    platinumItems.reduce(
-      (sum, item) =>
-        sum + item.earnedPoints,
-      0
-    );
+  const platinumEarnedPoints = platinumItems.reduce(
+    (sum, item) => sum + item.earnedPoints,
+    0,
+  );
 
   const platinumSection = {
     key: "PLATINUM",
     number: "04",
 
-    title:
-      "Platinum Verification",
+    title: "Platinum Verification",
 
-    subtitle:
-      "For serious long-term · +26 pts",
+    subtitle: "For serious long-term · +26 pts",
 
     status: getSectionStatus(
       platinumCompleted,
       platinumItems.length,
-      !platinumUnlocked
+      !platinumUnlocked,
     ),
 
-    earnedPoints:
-      platinumEarnedPoints,
+    earnedPoints: platinumEarnedPoints,
 
     maxPoints: 26,
 
-    completed:
-      platinumCompleted,
+    completed: platinumCompleted,
 
-    total:
-      platinumItems.length,
+    total: platinumItems.length,
 
-    items:
-      platinumItems,
+    items: platinumItems,
   };
 
   // ==================================================
@@ -461,23 +349,11 @@ export const getTrustVerificationStatusService = async (
   /**
    * Never allow score above 100.
    */
-  const safeEarned = Math.min(
-    earned,
-    TRUST_SCORE_TOTAL
-  );
+  const safeEarned = Math.min(earned, TRUST_SCORE_TOTAL);
 
-  const remaining = Math.max(
-    TRUST_SCORE_TOTAL -
-      safeEarned,
-    0
-  );
+  const remaining = Math.max(TRUST_SCORE_TOTAL - safeEarned, 0);
 
-  const percentage =
-    Math.round(
-      (safeEarned /
-        TRUST_SCORE_TOTAL) *
-        100
-    );
+  const percentage = Math.round((safeEarned / TRUST_SCORE_TOTAL) * 100);
 
   // ==================================================
   // NEXT RECOMMENDED VERIFICATION
@@ -512,21 +388,13 @@ export const getTrustVerificationStatusService = async (
   } | null = null;
 
   for (const type of recommendationOrder) {
-    const verification =
-      verificationMap.get(type);
+    const verification = verificationMap.get(type);
 
-    if (
-      verification?.status !==
-      VerificationStatus.VERIFIED
-    ) {
+    if (verification?.status !== VerificationStatus.VERIFIED) {
       nextRecommended = {
         type,
-        title:
-          VERIFICATION_CONFIG[type]
-            .title,
-        points:
-          VERIFICATION_CONFIG[type]
-            .points,
+        title: VERIFICATION_CONFIG[type].title,
+        points: VERIFICATION_CONFIG[type].points,
       };
 
       break;
