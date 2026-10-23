@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 
 import {
+  BillingCycle,
+  PackageStatus,
   PaymentPurpose,
   PaymentStatus,
   Prisma,
@@ -120,41 +122,199 @@ export async function createRazorpayOrderService(
     // ==========================================
     // 2. PACKAGE
     // ==========================================
-  } else if (data.purpose === PaymentPurpose.PACKAGE) {
-    const price = await prisma.packagePrice.findFirst({
-      where: {
-        id: data.packagePriceId,
+  
+} else if (data.purpose === PaymentPurpose.PACKAGE) {
+
+  // ==========================================
+  // 1. VALIDATE USER
+  // ==========================================
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      account_status: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  if (user.account_status !== "ACTIVE") {
+    throw new Error("ACCOUNT_NOT_ACTIVE");
+  }
+
+  // ==========================================
+  // 2. GET PACKAGE PRICE
+  // ==========================================
+
+  const price = await prisma.packagePrice.findFirst({
+    where: {
+      id: data.packagePriceId,
+      active: true,
+      package: {
         active: true,
-        package: {
-          active: true,
-        },
       },
-      include: {
-        package: true,
-      },
-    });
+    },
+    include: {
+      package: true,
+    },
+  });
 
-    if (!price) {
-      throw new Error("Package price unavailable");
+  if (!price) {
+    throw new Error("PACKAGE_PRICE_NOT_FOUND");
+  }
+
+  if (price.price.lte(0)) {
+    throw new Error("INVALID_PACKAGE_PRICE");
+  }
+
+  const selectedPackage = price.package;
+  const now = new Date();
+
+  // ==========================================
+  // 3. CHECK LIFETIME PACKAGE
+  // ==========================================
+
+  const lifetimePackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: PackageStatus.ACTIVE,
+      price: {
+        billingCycle: BillingCycle.LIFETIME,
+      },
+      OR: [
+        { endDate: null },
+        { endDate: { gt: now } },
+      ],
+    },
+  });
+
+  if (lifetimePackage) {
+    throw new Error("LIFETIME_PACKAGE_ALREADY_OWNED");
+  }
+
+  // ==========================================
+  // 4. GET CURRENT ACTIVE PACKAGE
+  // ==========================================
+
+  const activePackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: PackageStatus.ACTIVE,
+      endDate: {
+        gt: now,
+      },
+    },
+    include: {
+      package: true,
+      price: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  // ==========================================
+  // 5. CHECK PENDING PACKAGE
+  // ==========================================
+
+  const pendingPackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
+      status: PackageStatus.PENDING,
+    },
+  });
+
+  if (pendingPackage) {
+    throw new Error("PENDING_PACKAGE_ALREADY_EXISTS");
+  }
+
+  // ==========================================
+  // 6. DETERMINE SUBSCRIPTION ACTION
+  // ==========================================
+
+  type SubscriptionAction =
+    | "NEW_PURCHASE"
+    | "RENEW"
+    | "UPGRADE"
+    | "DOWNGRADE";
+
+  let action: SubscriptionAction = "NEW_PURCHASE";
+
+  const packagePriority: Record<string, number> = {
+    premium: 1,
+    vip: 2,
+    "vip-elite": 3,
+  };
+
+  if (activePackage) {
+    if (activePackage.packageId === selectedPackage.id) {
+      action = "RENEW";
+    } else {
+      const currentPriority =
+        packagePriority[activePackage.package.slug.toLowerCase()] ?? 0;
+
+      const newPriority =
+        packagePriority[selectedPackage.slug.toLowerCase()] ?? 0;
+
+      if (!currentPriority || !newPriority) {
+        throw new Error("UNKNOWN_PACKAGE_PRIORITY");
+      }
+
+      if (newPriority > currentPriority) {
+        action = "UPGRADE";
+      } else if (newPriority < currentPriority) {
+        action = "DOWNGRADE";
+      } else {
+        throw new Error("SAME_PRIORITY_PACKAGE_CONFLICT");
+      }
     }
+  }
 
-    amount = price.price;
-    packagePriceId = price.id;
+  // ==========================================
+  // 7. SET PAYMENT AMOUNT
+  // ==========================================
 
-    packageDetails = {
-      packageId: price.packageId,
-      packagePriceId: price.id,
-      packageName: price.package.name,
-      packageSlug: price.package.slug,
-      billingCycle: price.billingCycle,
-      totalAmount: Number(price.price),
-      currency: "INR",
-    };
+  amount = price.price;
+  packagePriceId = price.id;
 
-    // ==========================================
-    // 3. EVENT BOOKING
-    // ==========================================
-  } else if (data.purpose === PaymentPurpose.EVENT_BOOKING) {
+  // ==========================================
+  // 8. PACKAGE RESPONSE DETAILS
+  // ==========================================
+
+  packageDetails = {
+    packageId: price.packageId,
+    packagePriceId: price.id,
+    packageName: selectedPackage.name,
+    packageSlug: selectedPackage.slug,
+
+    action,
+
+    billingCycle: price.billingCycle,
+    months: price.months,
+
+    originalPrice: Number(price.originalPrice),
+    discountPercent: price.discountPercent,
+    totalAmount: Number(price.price),
+
+    currentPackageId: activePackage?.packageId ?? null,
+    currentPackageEndDate: activePackage?.endDate ?? null,
+
+    subscriptionStartDate:
+      action === "DOWNGRADE"
+        ? activePackage?.endDate ?? now
+        : now,
+
+    currency: "INR",
+  };
+
+  // ==========================================
+  // 3. EVENT BOOKING
+  // ==========================================
+}
+ else if (data.purpose === PaymentPurpose.EVENT_BOOKING) {
     const result = await createEventBookingForPayment(userId, {
       purpose: PaymentPurpose.EVENT_BOOKING,
       currency: "INR",
