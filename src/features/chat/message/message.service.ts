@@ -18,14 +18,14 @@ import { createNotification } from "../../notification/notification.service";
 import { isUserViewingConversation } from "../chat.helper";
 import { prisma } from "../../../prisma/prismaClient";
 import { updateUserReplyStats } from "../user-reply-stats.service";
+import { sendSocketGiftMessage } from "./gift.handler";
+import { AppError } from "../../rose/AppError";
 
 export const messageService = {
   /**
    * Create/send message.
    */
-  async createMessage(
-    data: CreateMessageInput
-  ) {
+  async createMessage(data: CreateMessageInput) {
     /**
      * 1. Check whether sender belongs
      *    to the conversation.
@@ -34,25 +34,143 @@ export const messageService = {
     console.log("data in message service : ", data);
     const participant = await messageRepository.findConversationParticipant(
       data.conversationId,
-      data.userId
+      data.userId,
     );
 
     if (!participant) {
-      throw new Error(
-        "You are not a participant of this conversation"
-      );
+      throw new Error("You are not a participant of this conversation");
     }
+
+// ==========================================
+// GIFT MESSAGE HANDLER
+// ==========================================
+
+if (data.messageType === MessageType.GIFT) {
+  const metadata = data.metadata;
+
+  console.log("metadata : ", metadata)
+  // 1. Validate metadata is a plain JSON object
+  if (
+    !metadata ||
+    typeof metadata !== "object" ||
+    Array.isArray(metadata) ||
+    "toJSON" in metadata
+  ) {
+    throw new AppError(
+      400,
+      "GIFT_METADATA_REQUIRED"
+    );
+  }
+
+  // 2. Convert to a safely accessible object
+  const giftMetadata = metadata as Record<string, unknown>;
+
+  // 3. Extract giftId
+  const giftId = giftMetadata.giftId;
+
+const parsedGiftId =
+  typeof giftId === "number"
+    ? giftId
+    : typeof giftId === "string" && giftId.trim()
+      ? Number(giftId)
+      : NaN;
+
+if (
+  !Number.isSafeInteger(parsedGiftId) ||
+  parsedGiftId <= 0
+) {
+  throw new AppError(
+    400,
+    "INVALID_GIFT_ID: Expected numeric catalog Gift.id"
+  );
+}
+
+  // 4. Extract optional target information
+  const targetType = giftMetadata.targetType ?? null;
+  const targetId = giftMetadata.targetId ?? null;
+
+  // 5. Validate targetType
+  if (
+    targetType !== null &&
+    targetType !== "PHOTO" &&
+    targetType !== "PROMPT"
+  ) {
+    throw new AppError(
+      400,
+      "INVALID_TARGET_TYPE"
+    );
+  }
+
+  // 6. Validate targetId
+  if (
+    targetId !== null &&
+    (
+      typeof targetId !== "string" ||
+      !targetId.trim()
+    )
+  ) {
+    throw new AppError(
+      400,
+      "INVALID_TARGET_ID"
+    );
+  }
+
+  // 7. Validate target combination
+  if (
+    (targetType === "PHOTO" ||
+      targetType === "PROMPT") &&
+    !targetId
+  ) {
+    throw new AppError(
+      400,
+      "TARGET_ID_REQUIRED"
+    );
+  }
+
+  if (targetId && !targetType) {
+    throw new AppError(
+      400,
+      "TARGET_ID_NOT_ALLOWED"
+    );
+  }
+
+  // 8. Find receiver
+  const receiver =
+    await messageRepository.findOtherParticipant(
+      data.conversationId,
+      data.userId
+    );
+
+  if (!receiver) {
+    throw new AppError(
+      404,
+      "RECEIVER_NOT_FOUND"
+    );
+  }
+
+  // 9. Send gift
+  const result = await sendSocketGiftMessage({
+    conversationId: data.conversationId,
+    senderId: data.userId,
+    receiverId: receiver.userId,
+
+    giftId: String(parsedGiftId),
+
+    content: data.content?.trim() || null,
+
+    targetType,
+    targetId: targetId?.trim() ?? null,
+  });
+
+  return result.data.message;
+}
+
 
     /**
      * 2. Validate message content.
      */
-    if (
-      data.messageType === MessageType.TEXT &&
-      !data.content?.trim()
-    ) {
-      throw new Error(
-        "Text message content is required"
-      );
+    if (data.messageType === MessageType.TEXT && !data.content?.trim()) {
+      throw new Error("Text message content is required");
     }
 
     /**
@@ -67,72 +185,56 @@ export const messageService = {
 
     if (mediaMessageTypes.includes(data.messageType)) {
       if (!data.mediaUrl) {
-        throw new Error(
-          "Media URL is required"
-        );
+        throw new Error("Media URL is required");
       }
     }
 
     /**
-  * 4. Validate compliment
-  */
-    if (
-      data.messageType ===
-      MessageType.COMPLIMENT &&
-      !data.content?.trim()
-    ) {
-      throw new Error(
-        "Compliment content is required"
-      );
+     * 4. Validate compliment
+     */
+    if (data.messageType === MessageType.COMPLIMENT && !data.content?.trim()) {
+      throw new Error("Compliment content is required");
     }
 
     /**
- * 5. Get previous message BEFORE saving
- *    the new message.
- *
- * Used only to determine whether this
- * new message is a reply.
- */
-    const previousMessage =
-      await prisma.chatMessage.findFirst({
-        where: {
-          conversationId:
-            data.conversationId,
-          deletedAt: null,
-        },
+     * 5. Get previous message BEFORE saving
+     *    the new message.
+     *
+     * Used only to determine whether this
+     * new message is a reply.
+     */
+    const previousMessage = await prisma.chatMessage.findFirst({
+      where: {
+        conversationId: data.conversationId,
+        deletedAt: null,
+      },
 
-        orderBy: {
-          createdAt: "desc",
-        },
+      orderBy: {
+        createdAt: "desc",
+      },
 
-        select: {
-          id: true,
-          senderId: true,
-          createdAt: true,
-        },
-      });
+      select: {
+        id: true,
+        senderId: true,
+        createdAt: true,
+      },
+    });
 
     /**
      * 6. Save message.
      */
     const message = await messageRepository.create({
-      conversationId:
-        data.conversationId,
+      conversationId: data.conversationId,
 
-      senderId:
-        data.userId,
+      senderId: data.userId,
 
-      content:
-        data.content,
+      content: data.content,
 
-      messageType:
-        data.messageType,
+      messageType: data.messageType,
 
-      mediaUrl:
-        data.mediaUrl,
+      mediaUrl: data.mediaUrl,
 
-      metadata:
-        data.metadata,
+      metadata: data.metadata,
     });
 
     /**
@@ -171,13 +273,8 @@ export const messageService = {
 
     const isReply =
       previousMessage !== null &&
-      previousMessage.senderId !==
-      data.userId &&
-      replyStatsMessageTypes.includes(
-        data.messageType,
-      );
-
-      
+      previousMessage.senderId !== data.userId &&
+      replyStatsMessageTypes.includes(data.messageType);
 
     if (isReply) {
       void updateUserReplyStats(
@@ -187,15 +284,14 @@ export const messageService = {
       );
     }
 
-
     /**
-* Check whether this message is
-* a reply that should create match.
-*
-* IMPORTANT:
-* Don't run this for Rose/Gift/Compliment
-* themselves.
-*/
+     * Check whether this message is
+     * a reply that should create match.
+     *
+     * IMPORTANT:
+     * Don't run this for Rose/Gift/Compliment
+     * themselves.
+     */
     const replyTypes: MessageType[] = [
       MessageType.TEXT,
       MessageType.IMAGE,
@@ -205,27 +301,16 @@ export const messageService = {
       MessageType.LINK,
     ];
 
-    if (
-      replyTypes.includes(
-        data.messageType,
-      )
-    ) {
+    if (replyTypes.includes(data.messageType)) {
       try {
-        const matchResult =
-          await createMatchFromReplyService(
-            data.conversationId,
-            data.userId,
-          );
+        const matchResult = await createMatchFromReplyService(
+          data.conversationId,
+          data.userId,
+        );
 
-        console.log(
-          "MATCH FROM REPLY RESULT:",
-          matchResult,
-        );
+        console.log("MATCH FROM REPLY RESULT:", matchResult);
       } catch (error) {
-        console.error(
-          "MATCH FROM REPLY ERROR:",
-          error,
-        );
+        console.error("MATCH FROM REPLY ERROR:", error);
       }
     }
 
@@ -246,11 +331,7 @@ export const messageService = {
       MessageType.LINK,
     ];
 
-    if (
-      chatNotificationTypes.includes(
-        data.messageType
-      )
-    ) {
+    if (chatNotificationTypes.includes(data.messageType)) {
       try {
         /**
          * Returns:
@@ -261,78 +342,59 @@ export const messageService = {
          *
          * OR null
          */
-        const receiver =
-          await messageRepository.findOtherParticipant(
-            data.conversationId,
-            data.userId,
-          );
-
-        console.log(
-          "MESSAGE RECEIVER:",
-          receiver,
+        const receiver = await messageRepository.findOtherParticipant(
+          data.conversationId,
+          data.userId,
         );
+
+        console.log("MESSAGE RECEIVER:", receiver);
 
         if (receiver) {
           /**
            * Extract actual string user ID.
            */
-          const receiverId =
-            receiver.userId;
+          const receiverId = receiver.userId;
 
-          console.log(
-            "MESSAGE RECEIVER ID:",
-            receiverId,
-          );
+          console.log("MESSAGE RECEIVER ID:", receiverId);
 
           /**
            * Check whether receiver currently
            * has this exact conversation open.
            */
-          const receiverViewingChat =
-            await isUserViewingConversation(
-              receiverId,
-              data.conversationId,
-            );
-
-       
+          const receiverViewingChat = await isUserViewingConversation(
+            receiverId,
+            data.conversationId,
+          );
 
           /**
            * Build notification message.
            */
-          let notificationMessage =
-            "Sent you a message";
+          let notificationMessage = "Sent you a message";
 
           switch (data.messageType) {
             case MessageType.TEXT:
               notificationMessage =
-                data.content?.trim() ||
-                "Sent you a message";
+                data.content?.trim() || "Sent you a message";
               break;
 
             case MessageType.IMAGE:
-              notificationMessage =
-                "Sent you a photo";
+              notificationMessage = "Sent you a photo";
               break;
 
             case MessageType.VIDEO:
-              notificationMessage =
-                "Sent you a video";
+              notificationMessage = "Sent you a video";
               break;
 
             case MessageType.AUDIO:
-              notificationMessage =
-                "Sent you an audio message";
+              notificationMessage = "Sent you an audio message";
               break;
 
             case MessageType.FILE:
-              notificationMessage =
-                "Sent you a file";
+              notificationMessage = "Sent you a file";
               break;
 
             case MessageType.LINK:
-              notificationMessage =
-                data.content?.trim() ||
-                "Sent you a link";
+              notificationMessage = data.content?.trim() || "Sent you a link";
               break;
           }
 
@@ -342,22 +404,20 @@ export const messageService = {
            * Needed because your current
            * participant query does not include User.
            */
-          const sender =
-            await prisma.user.findUnique({
-              where: {
-                id: data.userId,
-              },
-              select: {
-                full_name: true,
-              },
-            });
+          const sender = await prisma.user.findUnique({
+            where: {
+              id: data.userId,
+            },
+            select: {
+              full_name: true,
+            },
+          });
 
           /**
            * Create notification.
            */
           await createNotification({
-            senderId:
-              data.userId,
+            senderId: data.userId,
 
             /**
              * This is now string,
@@ -365,38 +425,28 @@ export const messageService = {
              */
             receiverId,
 
-            type:
-              "NEW_MESSAGE",
+            type: "NEW_MESSAGE",
 
-            title:
-              sender?.full_name ??
-              "New message",
+            title: sender?.full_name ?? "New message",
 
-            message:
-              notificationMessage,
+            message: notificationMessage,
 
             /**
              * Flutter can use this data
              * to navigate to the chat.
              */
             data: {
-              type:
-                "MESSAGE",
+              type: "MESSAGE",
 
-              targetType:
-                "CHAT",
+              targetType: "CHAT",
 
-              targetId:
-                data.conversationId,
+              targetId: data.conversationId,
 
-              conversationId:
-                data.conversationId,
+              conversationId: data.conversationId,
 
-              messageId:
-                message.id,
+              messageId: message.id,
 
-              senderId:
-                data.userId,
+              senderId: data.userId,
 
               receiverId,
             },
@@ -405,21 +455,15 @@ export const messageService = {
              * Same chat currently open:
              * skip FCM push.
              */
-            skipPush:
-              receiverViewingChat,
+            skipPush: receiverViewingChat,
           });
-
-          
         }
       } catch (error) {
         /**
          * Don't fail message sending just
          * because notification failed.
          */
-        console.error(
-          "CHAT NOTIFICATION ERROR:",
-          error,
-        );
+        console.error("CHAT NOTIFICATION ERROR:", error);
       }
     }
 
@@ -429,48 +473,37 @@ export const messageService = {
   /**
    * Get messages.
    */
-  async getMessages(
-    data: GetMessagesInput
-  ) {
+  async getMessages(data: GetMessagesInput) {
     /**
      * Check conversation access.
      */
-    const participant =
-      await messageRepository.findConversationParticipant(
-        data.conversationId,
-        data.userId
-      );
+    const participant = await messageRepository.findConversationParticipant(
+      data.conversationId,
+      data.userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "You are not a participant of this conversation"
-      );
+      throw new Error("You are not a participant of this conversation");
     }
 
     /**
      * Fetch messages.
      */
-    const messages =
-      await messageRepository.findMany(
-        data.conversationId,
-        data.cursor,
-        data.limit
-      );
+    const messages = await messageRepository.findMany(
+      data.conversationId,
+      data.cursor,
+      data.limit,
+    );
 
     /**
      * limit + 1 tells us whether
      * another page exists.
      */
-    const hasMore =
-      messages.length > data.limit;
+    const hasMore = messages.length > data.limit;
 
-    const items = hasMore
-      ? messages.slice(0, data.limit)
-      : messages;
+    const items = hasMore ? messages.slice(0, data.limit) : messages;
 
-    const nextCursor = hasMore
-      ? items[items.length - 1]?.id ?? null
-      : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return {
       items,
@@ -484,13 +517,8 @@ export const messageService = {
   /**
    * Get a single message.
    */
-  async getMessage(
-    data: GetMessageInput
-  ) {
-    const message =
-      await messageRepository.findById(
-        data.messageId
-      );
+  async getMessage(data: GetMessageInput) {
+    const message = await messageRepository.findById(data.messageId);
 
     if (!message) {
       throw new Error("Message not found");
@@ -499,16 +527,13 @@ export const messageService = {
     /**
      * Check access through conversation.
      */
-    const participant =
-      await messageRepository.findConversationParticipant(
-        message.conversationId,
-        data.userId
-      );
+    const participant = await messageRepository.findConversationParticipant(
+      message.conversationId,
+      data.userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "You are not allowed to access this message"
-      );
+      throw new Error("You are not allowed to access this message");
     }
 
     return message;
@@ -517,13 +542,8 @@ export const messageService = {
   /**
    * Mark one message as delivered.
    */
-  async markDelivered(
-    data: MarkMessageDeliveredInput
-  ) {
-    const message =
-      await messageRepository.findById(
-        data.messageId
-      );
+  async markDelivered(data: MarkMessageDeliveredInput) {
+    const message = await messageRepository.findById(data.messageId);
 
     if (!message) {
       throw new Error("Message not found");
@@ -532,16 +552,13 @@ export const messageService = {
     /**
      * User must belong to the conversation.
      */
-    const participant =
-      await messageRepository.findConversationParticipant(
-        message.conversationId,
-        data.userId
-      );
+    const participant = await messageRepository.findConversationParticipant(
+      message.conversationId,
+      data.userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "You are not a participant of this conversation"
-      );
+      throw new Error("You are not a participant of this conversation");
     }
 
     /**
@@ -558,21 +575,14 @@ export const messageService = {
       return message;
     }
 
-    return messageRepository.markDelivered(
-      data.messageId
-    );
+    return messageRepository.markDelivered(data.messageId);
   },
 
   /**
    * Mark one message as read.
    */
-  async markRead(
-    data: MarkMessageReadInput
-  ) {
-    const message =
-      await messageRepository.findById(
-        data.messageId
-      );
+  async markRead(data: MarkMessageReadInput) {
+    const message = await messageRepository.findById(data.messageId);
 
     if (!message) {
       throw new Error("Message not found");
@@ -581,16 +591,13 @@ export const messageService = {
     /**
      * Verify receiver belongs to conversation.
      */
-    const participant =
-      await messageRepository.findConversationParticipant(
-        message.conversationId,
-        data.userId
-      );
+    const participant = await messageRepository.findConversationParticipant(
+      message.conversationId,
+      data.userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "You are not a participant of this conversation"
-      );
+      throw new Error("You are not a participant of this conversation");
     }
 
     /**
@@ -608,45 +615,33 @@ export const messageService = {
       return message;
     }
 
-    return messageRepository.markRead(
-      data.messageId
-    );
+    return messageRepository.markRead(data.messageId);
   },
 
   /**
    * Mark all messages in conversation as read.
    */
-  async markConversationRead(
-    data: MarkMessagesReadInput
-  ) {
-    const participant =
-      await messageRepository.findConversationParticipant(
-        data.conversationId,
-        data.userId
-      );
+  async markConversationRead(data: MarkMessagesReadInput) {
+    const participant = await messageRepository.findConversationParticipant(
+      data.conversationId,
+      data.userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "You are not a participant of this conversation"
-      );
+      throw new Error("You are not a participant of this conversation");
     }
 
     return messageRepository.markConversationMessagesRead(
       data.conversationId,
-      data.userId
+      data.userId,
     );
   },
 
   /**
    * Delete message.
    */
-  async deleteMessage(
-    data: DeleteMessageInput
-  ) {
-    const message =
-      await messageRepository.findById(
-        data.messageId
-      );
+  async deleteMessage(data: DeleteMessageInput) {
+    const message = await messageRepository.findById(data.messageId);
 
     if (!message) {
       throw new Error("Message not found");
@@ -656,22 +651,16 @@ export const messageService = {
      * Only sender can delete own message.
      */
     if (message.senderId !== data.userId) {
-      throw new Error(
-        "You can only delete your own message"
-      );
+      throw new Error("You can only delete your own message");
     }
 
     /**
      * Already deleted.
      */
     if (message.deletedAt) {
-      throw new Error(
-        "Message is already deleted"
-      );
+      throw new Error("Message is already deleted");
     }
 
-    return messageRepository.softDelete(
-      data.messageId
-    );
+    return messageRepository.softDelete(data.messageId);
   },
 };
