@@ -111,6 +111,22 @@ export const walletRepository = {
       total,
     };
   },
+  
+  getTotalWalletCredit: async (walletId: string) => {
+  const result = await prisma.walletTransaction.aggregate({
+    where: {
+      walletId,
+      type: TransactionType.DEPOSIT,
+      source: TransactionSource.WALLET_TOPUP,
+      status: TransactionStatus.SUCCESS,
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  return Number(result._sum.amount ?? 0);
+},
 };
 
 // ==========================================

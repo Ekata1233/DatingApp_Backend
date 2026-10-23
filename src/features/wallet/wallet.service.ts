@@ -13,9 +13,11 @@ import {
   WalletTransactionFilter,
 } from "./wallet.types";
 import { prisma } from "../../prisma/prismaClient";
-import { consumeWalletGooglePurchase, verifyWalletGooglePurchase } from "./walletGooglePlay.provider";
+import {
+  consumeWalletGooglePurchase,
+  verifyWalletGooglePurchase,
+} from "./walletGooglePlay.provider";
 import { createHash } from "node:crypto";
-
 
 export const getMyWalletService = async (
   userId: string,
@@ -25,18 +27,9 @@ export const getMyWalletService = async (
   // PAGINATION
   // ==========================================
 
-  const page = Math.max(
-    Number(query.page) || 1,
-    1,
-  );
+  const page = Math.max(Number(query.page) || 1, 1);
 
-  const limit = Math.min(
-    Math.max(
-      Number(query.limit) || 20,
-      1,
-    ),
-    50,
-  );
+  const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 50);
 
   const skip = (page - 1) * limit;
 
@@ -44,24 +37,18 @@ export const getMyWalletService = async (
   // FILTER
   // ==========================================
 
-  const filter: WalletTransactionFilter =
-    ["ALL", "IN", "OUT"].includes(
-      String(query.filter).toUpperCase(),
-    )
-      ? (String(
-          query.filter,
-        ).toUpperCase() as WalletTransactionFilter)
-      : "ALL";
+  const filter: WalletTransactionFilter = ["ALL", "IN", "OUT"].includes(
+    String(query.filter).toUpperCase(),
+  )
+    ? (String(query.filter).toUpperCase() as WalletTransactionFilter)
+    : "ALL";
 
   // ==========================================
   // TRANSACTION SOURCE FILTER
   // ==========================================
 
   const source: TransactionSource | undefined =
-    query.source &&
-    Object.values(TransactionSource).includes(
-      query.source,
-    )
+    query.source && Object.values(TransactionSource).includes(query.source)
       ? query.source
       : undefined;
 
@@ -69,10 +56,7 @@ export const getMyWalletService = async (
   // WALLET
   // ==========================================
 
-  const wallet =
-    await walletRepository.getWalletByUserId(
-      userId,
-    );
+  const wallet = await walletRepository.getWalletByUserId(userId);
 
   /*
    * User may not have wallet record yet.
@@ -80,25 +64,21 @@ export const getMyWalletService = async (
    */
 
   if (!wallet) {
-    const datePlan =
-      await walletRepository.getDatePlanBalance(
-        userId,
-      );
+    const datePlan = await walletRepository.getDatePlanBalance(userId);
 
     return {
       wallet: {
         balance: 0,
+        totalCredit: 0,
         currency: "INR",
         formattedBalance: "₹0",
+        formattedTotalCredit: "₹0",
       },
 
       datePlans: {
-        balance:
-          datePlan?.balance ?? 0,
+        balance: datePlan?.balance ?? 0,
 
-        label: `${
-          datePlan?.balance ?? 0
-        } left`,
+        label: `${datePlan?.balance ?? 0} left`,
       },
 
       filter,
@@ -122,10 +102,7 @@ export const getMyWalletService = async (
   // FETCH TRANSACTIONS + DATE PLAN
   // ==========================================
 
-  const [
-    transactionResult,
-    datePlanStats,
-  ] = await Promise.all([
+  const [transactionResult, datePlanStats, totalCredit] = await Promise.all([
     walletRepository.getTransactions({
       walletId: wallet.id,
       filter,
@@ -134,107 +111,75 @@ export const getMyWalletService = async (
       take: limit,
     }),
 
-    walletRepository.getDatePlanBalance(
-      userId,
-    ),
+    walletRepository.getDatePlanBalance(userId),
+    walletRepository.getTotalWalletCredit(wallet.id),
   ]);
 
   // ==========================================
   // FORMAT TRANSACTIONS
   // ==========================================
 
-  const transactions =
-    transactionResult.transactions.map(
-      (transaction) => {
-        const direction =
-          getTransactionDirection(
-            transaction.type,
-          );
+  const transactions = transactionResult.transactions.map((transaction) => {
+    const direction = getTransactionDirection(transaction.type);
 
-        const amount = Number(
-          transaction.amount,
-        );
+    const amount = Number(transaction.amount);
 
-        return {
-          id: transaction.id,
+    return {
+      id: transaction.id,
 
-          type: transaction.type,
+      type: transaction.type,
 
-          source: transaction.source,
+      source: transaction.source,
 
-          status: transaction.status,
+      status: transaction.status,
 
-          direction,
+      direction,
 
-          title:
-            getTransactionTitle(
-              transaction.type,
-              transaction.source,
-              transaction.description,
-            ),
+      title: getTransactionTitle(
+        transaction.type,
+        transaction.source,
+        transaction.description,
+      ),
 
-          description:
-            transaction.description,
+      description: transaction.description,
 
-          amount,
+      amount,
 
-          formattedAmount:
-            formatTransactionAmount(
-              amount,
-              direction,
-            ),
+      formattedAmount: formatTransactionAmount(amount, direction),
 
-          balanceBefore: Number(
-            transaction.balanceBefore,
-          ),
+      balanceBefore: Number(transaction.balanceBefore),
 
-          balanceAfter: Number(
-            transaction.balanceAfter,
-          ),
+      balanceAfter: Number(transaction.balanceAfter),
 
-          referenceId:
-            transaction.referenceId,
+      referenceId: transaction.referenceId,
 
-          createdAt:
-            transaction.createdAt,
-        };
-      },
-    );
+      createdAt: transaction.createdAt,
+    };
+  });
 
-  const walletBalance = Number(
-    wallet.balance,
-  );
+  const walletBalance = Number(wallet.balance);
 
-  const datePlanBalance =
-    datePlanStats?.balance ?? 0;
+  const datePlanBalance = datePlanStats?.balance ?? 0;
 
-  const total =
-    transactionResult.total;
+  const total = transactionResult.total;
 
-  const totalPages = Math.ceil(
-    total / limit,
-  );
+  const totalPages = Math.ceil(total / limit);
 
   return {
     wallet: {
       balance: walletBalance,
-
+      totalCredit,
       currency: "INR",
-
-      formattedBalance:
-        formatCurrency(walletBalance),
+      formattedBalance: formatCurrency(walletBalance),
+      formattedTotalCredit: formatCurrency(totalCredit),
     },
 
     datePlans: {
       balance: datePlanBalance,
 
-      totalDatePlan:
-        datePlanStats?.totalDatePlan ??
-        0,
+      totalDatePlan: datePlanStats?.totalDatePlan ?? 0,
 
-      purchasedDatePlan:
-        datePlanStats
-          ?.purchasedDataPlan ?? 0,
+      purchasedDatePlan: datePlanStats?.purchasedDataPlan ?? 0,
 
       label: `${datePlanBalance} left`,
     },
@@ -251,21 +196,14 @@ export const getMyWalletService = async (
       total,
       totalPages,
 
-      hasNextPage:
-        page < totalPages,
+      hasNextPage: page < totalPages,
 
-      hasPreviousPage:
-        page > 1,
+      hasPreviousPage: page > 1,
     },
   };
 };
 
-
-
-
-const getTransactionDirection = (
-  type: TransactionType,
-): "IN" | "OUT" => {
+const getTransactionDirection = (type: TransactionType): "IN" | "OUT" => {
   switch (type) {
     case TransactionType.DEPOSIT:
     case TransactionType.REFUND:
@@ -378,40 +316,27 @@ const getTransactionTitle = (
 // FORMAT MONEY
 // ==========================================
 
-const formatCurrency = (
-  amount: number,
-) => {
-  return `₹${amount.toLocaleString(
-    "en-IN",
-    {
-      maximumFractionDigits: 2,
-    },
-  )}`;
+const formatCurrency = (amount: number) => {
+  return `₹${amount.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 // ==========================================
 // FORMAT TRANSACTION MONEY
 // ==========================================
 
-const formatTransactionAmount = (
-  amount: number,
-  direction: "IN" | "OUT",
-) => {
-  const formatted =
-    amount.toLocaleString("en-IN", {
-      maximumFractionDigits: 2,
-    });
+const formatTransactionAmount = (amount: number, direction: "IN" | "OUT") => {
+  const formatted = amount.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
 
-  return direction === "IN"
-    ? `+₹${formatted}`
-    : `-₹${formatted}`;
+  return direction === "IN" ? `+₹${formatted}` : `-₹${formatted}`;
 };
 
 // ==========================================
 // TYPES
 // ==========================================
-
-
 
 // ==========================================
 // SERVER-CONTROLLED PRODUCT CATALOG
@@ -427,19 +352,10 @@ const WALLET_PRODUCTS: Record<string, number> = {
 // ADD MONEY USING GOOGLE PLAY
 // ==========================================
 
-export const addMoneyToWalletService = async (
-  data: AddMoneyData
-) => {
-  const {
-    userId,
-    amount,
-    productId,
-    orderId,
-    purchaseToken,
-  } = data;
+export const addMoneyToWalletService = async (data: AddMoneyData) => {
+  const { userId, amount, productId, orderId, purchaseToken } = data;
 
-
-  console.log("product id : ", productId)
+  console.log("product id : ", productId);
   // ------------------------------------------
   // 1. VALIDATE INPUT
   // ------------------------------------------
@@ -487,54 +403,37 @@ export const addMoneyToWalletService = async (
   const verified = await verifyWalletGooglePurchase(
     productId,
     purchaseToken,
-    orderId
+    orderId,
   );
 
-  if (
-    verified.productId !== productId ||
-    verified.orderId !== orderId
-  ) {
-    throw new Error(
-      "Google Play purchase verification failed"
-    );
+  if (verified.productId !== productId || verified.orderId !== orderId) {
+    throw new Error("Google Play purchase verification failed");
   }
 
   // ------------------------------------------
   // 5. PREVENT DUPLICATE PURCHASE CREDIT
   // ------------------------------------------
 
-  const existingPurchase =
-    await prisma.walletGooglePlayPurchase.findFirst({
-      where: {
-        OR: [
-          { purchaseTokenHash },
-          { orderId },
-        ],
-      },
-    });
+  const existingPurchase = await prisma.walletGooglePlayPurchase.findFirst({
+    where: {
+      OR: [{ purchaseTokenHash }, { orderId }],
+    },
+  });
 
   if (existingPurchase) {
     if (existingPurchase.userId !== userId) {
-      throw new Error(
-        "This purchase belongs to another user"
-      );
+      throw new Error("This purchase belongs to another user");
     }
 
     if (existingPurchase.status === "SUCCESS") {
-      throw new Error(
-        "This Google Play purchase has already been credited"
-      );
+      throw new Error("This Google Play purchase has already been credited");
     }
 
     if (existingPurchase.status === "PROCESSING") {
-      throw new Error(
-        "This Google Play purchase is already processing"
-      );
+      throw new Error("This Google Play purchase is already processing");
     }
 
-    throw new Error(
-      "This purchase requires reconciliation before retrying"
-    );
+    throw new Error("This purchase requires reconciliation before retrying");
   }
 
   // ------------------------------------------
@@ -545,17 +444,16 @@ export const addMoneyToWalletService = async (
     async (tx) => {
       // Reserve the unique purchase token and order ID.
       // Concurrent duplicate requests cannot both insert.
-      const purchase =
-        await tx.walletGooglePlayPurchase.create({
-          data: {
-            userId,
-            productId,
-            orderId,
-            purchaseTokenHash,
-            amount: new Prisma.Decimal(amount),
-            status: "PROCESSING",
-          },
-        });
+      const purchase = await tx.walletGooglePlayPurchase.create({
+        data: {
+          userId,
+          productId,
+          orderId,
+          purchaseTokenHash,
+          amount: new Prisma.Decimal(amount),
+          status: "PROCESSING",
+        },
+      });
 
       // Ensure wallet exists.
       const wallet = await tx.wallet.upsert({
@@ -578,24 +476,21 @@ export const addMoneyToWalletService = async (
       });
 
       // Correct balance before this increment.
-      const balanceBefore =
-        updatedWallet.balance.minus(amount);
+      const balanceBefore = updatedWallet.balance.minus(amount);
 
       // Wallet transaction history.
-      const transaction =
-        await tx.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
-            amount: new Prisma.Decimal(amount),
-            type: TransactionType.DEPOSIT,
-            status: TransactionStatus.SUCCESS,
-            source: TransactionSource.WALLET_TOPUP,
-            description:
-              `Google Play wallet top-up: ${productId}`,
-            balanceBefore,
-            balanceAfter: updatedWallet.balance,
-          },
-        });
+      const transaction = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: new Prisma.Decimal(amount),
+          type: TransactionType.DEPOSIT,
+          status: TransactionStatus.SUCCESS,
+          source: TransactionSource.WALLET_TOPUP,
+          description: `Google Play wallet top-up: ${productId}`,
+          balanceBefore,
+          balanceAfter: updatedWallet.balance,
+        },
+      });
 
       // Mark purchase successfully credited.
       await tx.walletGooglePlayPurchase.update({
@@ -614,11 +509,10 @@ export const addMoneyToWalletService = async (
       };
     },
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       maxWait: 5000,
       timeout: 10000,
-    }
+    },
   );
 
   // ------------------------------------------
@@ -631,17 +525,11 @@ export const addMoneyToWalletService = async (
   let consumptionPending = false;
 
   try {
-    await consumeWalletGooglePurchase(
-      productId,
-      purchaseToken
-    );
+    await consumeWalletGooglePurchase(productId, purchaseToken);
   } catch (error) {
     consumptionPending = true;
 
-    console.error(
-      "GOOGLE PLAY CONSUMPTION FAILED:",
-      error
-    );
+    console.error("GOOGLE PLAY CONSUMPTION FAILED:", error);
 
     // A production system needs a durable retry
     // mechanism for pending consumption.
@@ -654,26 +542,19 @@ export const addMoneyToWalletService = async (
   return {
     walletId: result.wallet.id,
 
-    addedAmount:
-      result.transaction.amount.toNumber(),
+    addedAmount: result.transaction.amount.toNumber(),
 
-    balanceBefore:
-      result.transaction.balanceBefore.toNumber(),
+    balanceBefore: result.transaction.balanceBefore.toNumber(),
 
-    balanceAfter:
-      result.transaction.balanceAfter.toNumber(),
+    balanceAfter: result.transaction.balanceAfter.toNumber(),
 
-    transactionId:
-      result.transaction.id,
+    transactionId: result.transaction.id,
 
-    transactionType:
-      result.transaction.type,
+    transactionType: result.transaction.type,
 
-    transactionStatus:
-      result.transaction.status,
+    transactionStatus: result.transaction.status,
 
-    source:
-      result.transaction.source,
+    source: result.transaction.source,
 
     paymentMethod: "GOOGLE_PLAY",
 
@@ -683,7 +564,6 @@ export const addMoneyToWalletService = async (
 
     consumptionPending,
 
-    createdAt:
-      result.transaction.createdAt,
+    createdAt: result.transaction.createdAt,
   };
 };

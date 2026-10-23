@@ -593,51 +593,48 @@ export const discoverDatePlan = async (
 
     include: {
       user: {
-  include: {
-    profile: true,
-    eduWork: true,
-    bio: true,
+        include: {
+          profile: true,
+          eduWork: true,
+          bio: true,
 
-    answer: {
-      include: {
-        question: true,
-        option: true,
-      },
-    },
+          answer: {
+            include: {
+              question: true,
+              option: true,
+            },
+          },
 
-    photos: {
-      where: {
-        order: 1,
-      },
-      take: 1,
-    },
+          photos: {
+            where: {
+              order: 1,
+            },
+            take: 1,
+          },
 
-    // GET DATE PLAN HOST ACTIVE PACKAGE
-    userPackages: {
-      where: {
-        status: PackageStatus.ACTIVE,
-        startDate: {
-          lte: now,
-        },
-        OR: [
-          { endDate: null },
-          { endDate: { gt: now } },
-        ],
-      },
-      orderBy: {
-        startDate: "desc",
-      },
-      take: 1,
-      select: {
-        package: {
-          select: {
-            name: true,
+          // GET DATE PLAN HOST ACTIVE PACKAGE
+          userPackages: {
+            where: {
+              status: PackageStatus.ACTIVE,
+              startDate: {
+                lte: now,
+              },
+              OR: [{ endDate: null }, { endDate: { gt: now } }],
+            },
+            orderBy: {
+              startDate: "desc",
+            },
+            take: 1,
+            select: {
+              package: {
+                select: {
+                  name: true,
+                },
+              },
+            },
           },
         },
       },
-    },
-  },
-},
 
       activity: true,
       quickTitle: true,
@@ -663,7 +660,7 @@ export const discoverDatePlan = async (
     const matchScore = 75;
     //  calculateMatchScore(me, plan.user);
 
-    console.log("////////////match score : ", matchScore)
+    console.log("////////////match score : ", matchScore);
 
     let distanceKm: number | null = null;
 
@@ -825,28 +822,25 @@ export const discoverDatePlan = async (
       duration: plan.duration,
 
       host: {
-  id: plan.user.id,
+        id: plan.user.id,
 
-  name: plan.user.full_name,
+        name: plan.user.full_name,
 
-  trustScore: plan.user.trust_score,
+        trustScore: plan.user.trust_score,
 
-  profilePhoto:
-    plan.user.photos.length > 0
-      ? plan.user.photos[0].media_url
-      : null,
+        profilePhoto:
+          plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
 
-  age: plan.user.birth_date
-    ? Math.floor(
-        (Date.now() - new Date(plan.user.birth_date).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000),
-      )
-    : null,
+        age: plan.user.birth_date
+          ? Math.floor(
+              (Date.now() - new Date(plan.user.birth_date).getTime()) /
+                (365.25 * 24 * 60 * 60 * 1000),
+            )
+          : null,
 
-  // HOST PURCHASED PACKAGE
-  package:
-    plan.user.userPackages[0]?.package.name ?? "FREE",
-},
+        // HOST PURCHASED PACKAGE
+        package: plan.user.userPackages[0]?.package.name ?? "FREE",
+      },
     };
   });
 
@@ -1661,7 +1655,11 @@ export const getMyDatePlanRequests = async (userId: string) => {
           },
 
           user: {
-            include: {
+            select: {
+              id: true,
+              full_name: true,
+              trust_score: true,
+
               photos: {
                 where: {
                   is_primary: true,
@@ -1734,6 +1732,8 @@ export const getMyDatePlanRequests = async (userId: string) => {
           request.plan.user.photos.length > 0
             ? request.plan.user.photos[0].media_url
             : null,
+        trustScore: request.plan.user.trust_score,
+        matchScore: 77,
       },
     },
   }));
@@ -2864,8 +2864,12 @@ export const updateDatePlanActivityService = async (
   return updatedPlan;
 };
 
-export const cancelDatePlanService = async (userId: string, planId: string) => {
-  // Check if the date plan exists
+
+export const cancelDatePlanService = async (
+  userId: string,
+  planId: string,
+) => {
+  // 1. Check if date plan exists
   const datePlan = await prisma.datePlan.findUnique({
     where: {
       id: planId,
@@ -2876,30 +2880,86 @@ export const cancelDatePlanService = async (userId: string, planId: string) => {
     throw new Error("Date plan not found");
   }
 
-  // Check ownership
+  // 2. Check ownership
   if (datePlan.userId !== userId) {
-    throw new Error("You are not authorized to cancel this date plan");
+    throw new Error(
+      "You are not authorized to cancel this date plan",
+    );
   }
 
-  // Check whether plan can be cancelled
-  if (datePlan.status !== "BOOKED" && datePlan.status !== "ACTIVE") {
+  // 3. Validate plan status
+  if (
+    datePlan.status !== "BOOKED" &&
+    datePlan.status !== "ACTIVE"
+  ) {
     throw new Error(
       `Date plan cannot be cancelled because its current status is ${datePlan.status}`,
     );
   }
 
-  // Cancel the date plan
-  const cancelledPlan = await prisma.datePlan.update({
-    where: {
-      id: planId,
-    },
-    data: {
-      status: "CANCELLED",
-    },
+  // 4. Cancel plan and get approved requests
+  const result = await prisma.$transaction(async (tx) => {
+    const cancelledPlan = await tx.datePlan.update({
+      where: {
+        id: planId,
+      },
+      data: {
+        status: "CANCELLED",
+      },
+    });
+
+    const approvedRequests =
+      await tx.datePlanRequest.findMany({
+        where: {
+          planId,
+          status: "APPROVED",
+        },
+        select: {
+          id: true,
+          requesterId: true,
+        },
+      });
+
+    return {
+      cancelledPlan,
+      approvedRequests,
+    };
   });
 
-  return cancelledPlan;
+  // 5. Send notification to approved users only
+  const notificationResults = await Promise.allSettled(
+    result.approvedRequests.map((request) =>
+      createNotification({
+        senderId: userId,
+        receiverId: request.requesterId,
+        type: "DATE_INVITE",
+        title: "Date Plan Cancelled",
+        message:
+          "The host has cancelled a date plan you were invited to.",
+        data: {
+          type: "DATE_PLAN_CANCELLED",
+          planId,
+          requestId: request.id,
+          senderId: userId,
+          receiverId: request.requesterId,
+        },
+      }),
+    ),
+  );
+
+  // Log failed notifications without failing cancellation
+  notificationResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error(
+        "Date plan cancellation notification failed:",
+        result.reason,
+      );
+    }
+  });
+
+  return result.cancelledPlan;
 };
+
 
 export const dateNowInviteMessage = {
   async inviteToDatePlan(
