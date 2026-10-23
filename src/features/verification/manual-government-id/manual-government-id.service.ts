@@ -26,7 +26,7 @@ import {
 // CONSTANTS
 // ======================================================
 
-const GOVERNMENT_ID_POINTS = 10;
+const GOVERNMENT_ID_POINTS = 20;
 
 const REVIEWED_BY = "Welvors Admin";
 

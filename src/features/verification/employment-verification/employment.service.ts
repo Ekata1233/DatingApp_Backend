@@ -32,7 +32,7 @@ interface UploadedDocument {
 
 const VERIFICATION_TYPE = VerificationType.PROFESSIONAL_VERIFICATION;
 const PROVIDER = "GRIDLINES_EPFO";
-const MAX_POINTS = 14;
+const MAX_POINTS = 10;
 const COMPANY_NAME_MAX_LENGTH = 100; // UserEduWork.companyName VarChar(100)
 const REVIEWED_BY = "Welvors Admin";
 

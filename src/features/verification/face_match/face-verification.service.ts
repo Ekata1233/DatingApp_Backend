@@ -14,7 +14,7 @@ import { getGovernmentIdPhoto } from "../government_id/government-id-photo.servi
 import { getUserProfilePhoto } from "./face-match.helper";
 import { recalculateTrustScore } from "../trust-score/trust-score.service";
 
-const FACE_POINTS = 12;
+const FACE_POINTS = 10;
 
 export const verifyUserFaceService = async (
   userId: string,

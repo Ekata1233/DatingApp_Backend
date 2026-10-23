@@ -199,13 +199,13 @@ export const getTrustVerificationStatusService = async (userId: string) => {
 
     title: "Identity Verification",
 
-    subtitle: "Real person, real face · +20 pts",
+    subtitle: "Real person, real face · +40 pts",
 
     status: getSectionStatus(identityCompleted, identityItems.length),
 
     earnedPoints: identityEarnedPoints,
 
-    maxPoints: 20,
+    maxPoints: 40,
 
     completed: identityCompleted,
 
@@ -236,31 +236,13 @@ export const getTrustVerificationStatusService = async (userId: string) => {
   const highTrustSection = {
     key: "HIGH_TRUST",
     number: "03",
-
     title: "High Trust Verification",
-
-    subtitle: "Stops catfishing & bots · +30 pts",
-
+    subtitle: "Stops catfishing & bots · +20 pts",
     status: getSectionStatus(highTrustCompleted, highTrustItems.length),
-
     earnedPoints: highTrustEarnedPoints,
-
-    /**
-     * Keeping 30 because this is the response
-     * format you requested.
-     *
-     * Current visible items only total 15.
-     */
-    maxPoints: 30,
-
+    maxPoints: 20,
     completed: highTrustCompleted,
-
-    /**
-     * You requested total: 4, although currently
-     * only two items exist.
-     */
-    total: 4,
-
+    total: highTrustItems.length,
     items: highTrustItems,
   };
 
@@ -314,25 +296,17 @@ export const getTrustVerificationStatusService = async (userId: string) => {
   const platinumSection = {
     key: "PLATINUM",
     number: "04",
-
     title: "Platinum Verification",
-
-    subtitle: "For serious long-term · +26 pts",
-
+    subtitle: "For serious long-term · +40 pts",
     status: getSectionStatus(
       platinumCompleted,
       platinumItems.length,
       !platinumUnlocked,
     ),
-
     earnedPoints: platinumEarnedPoints,
-
-    maxPoints: 26,
-
+    maxPoints: 40,
     completed: platinumCompleted,
-
     total: platinumItems.length,
-
     items: platinumItems,
   };
 
