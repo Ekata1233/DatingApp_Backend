@@ -144,14 +144,24 @@ export const chatService = {
       ? "This account has been deleted. You can view your previous messages, but you can no longer send new messages to this user."
       : null;
 
-    // 2. Fetch messages
-    const messages = await chatRepository.findMessages(
-      data.conversationId,
-      data.userId,
-      data.cursor,
-      data.limit,
-      data.type ?? "all",
-    );
+   // ============================================
+// 2. FETCH MESSAGES + COUNTS
+// ============================================
+
+const [messages, counts] = await Promise.all([
+  chatRepository.findMessages(
+    data.conversationId,
+    data.userId,
+    data.cursor,
+    data.limit,
+    data.type ?? "all",
+  ),
+
+  chatRepository.getMessageCounts(
+    data.conversationId,
+    data.userId,
+  ),
+]);
 
     // 3. Pagination
     const hasMore = messages.length > data.limit;
@@ -232,6 +242,7 @@ export const chatService = {
       items: itemsWithProgress,
       isDelete,
       deleteMessage,
+      counts,
       pagination: {
         hasMore,
         nextCursor,

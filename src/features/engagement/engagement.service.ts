@@ -303,9 +303,9 @@ export const sendEngagementService = async (
 
   const isMatched = await checkMatch(senderId, receiverId, prisma);
 
-  if (isMatched) {
-    throw new AppError(400, "ALREADY_MATCHED");
-  }
+  // if (isMatched) {
+  //   throw new AppError(400, "ALREADY_MATCHED");
+  // }
 
   if ((targetType === "PHOTO" || targetType === "PROMPT") && !targetId) {
     throw new AppError(400, "TARGET_ID_REQUIRED");

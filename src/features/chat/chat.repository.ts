@@ -2438,4 +2438,93 @@ const online = userConversations.filter(
        gifts,
     };
   },
+
+  async getMessageCounts(
+  conversationId: string,
+  userId: string,
+) {
+  // ============================================
+  // COMMON FILTER
+  // ============================================
+
+  const where = {
+    conversationId,
+
+    deletedAt: null,
+
+    deletions: {
+      none: {
+        userId,
+      },
+    },
+  };
+
+  // ============================================
+  // GET COUNTS
+  // ============================================
+
+  const [
+    all,
+    gifts,
+    compliments,
+    dateInvites,
+    events,
+  ] = await prisma.$transaction([
+    prisma.chatMessage.count({
+      where,
+    }),
+
+    prisma.chatMessage.count({
+      where: {
+        ...where,
+        messageType: MessageType.GIFT,
+      },
+    }),
+
+    prisma.chatMessage.count({
+      where: {
+        ...where,
+        messageType: MessageType.COMPLIMENT,
+      },
+    }),
+
+    prisma.chatMessage.count({
+      where: {
+        ...where,
+        messageType: {
+          in: [
+            MessageType.DATE_INVITE,
+            MessageType.DATE_CONFIRMED,
+            MessageType.DATE_CANCELLED,
+          ],
+        },
+      },
+    }),
+
+    prisma.chatMessage.count({
+      where: {
+        ...where,
+        messageType: {
+          in: [
+            MessageType.EVENT_INVITE,
+            MessageType.EVENT_CONFIRM,
+            MessageType.EVENT_CANCEL,
+          ],
+        },
+      },
+    }),
+  ]);
+
+  // ============================================
+  // RETURN COUNTS
+  // ============================================
+
+  return {
+    all,
+    gifts,
+    compliments,
+    dateInvites,
+    events,
+  };
+},
 };
