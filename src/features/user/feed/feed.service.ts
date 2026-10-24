@@ -2624,6 +2624,7 @@ const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
     community: user.profile?.community?.name || null,
     motherTongue: motherTongue,
     height: user.height,
+    heightInFeet: convertCmToFeet(user.height),
     city: user.profile?.city || null,
     state: user.profile?.state || null,
     country: user.profile?.country || null,

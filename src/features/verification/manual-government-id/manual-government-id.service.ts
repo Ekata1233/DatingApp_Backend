@@ -359,13 +359,9 @@ export const submitManualGovernmentIdService = async (
       backPhoto: backPhoto?.filePath || null,
 
       status: VerificationStatus.IN_PROGRESS,
-
       reviewedBy: null,
-
       reviewedAt: null,
-
       verifiedAt: null,
-
       rejectionReason: null,
     },
   });
