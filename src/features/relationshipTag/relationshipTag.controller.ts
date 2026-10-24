@@ -683,10 +683,10 @@ export const endRelationshipController = async (
       );
 
       // SEND TO CURRENT USER A
-      io.to(`user:${userId}`).emit(
-        "message:receive",
-        breakupSocketPayload,
-      );
+      // io.to(`user:${userId}`).emit(
+      //   "message:receive",
+      //   breakupSocketPayload,
+      // );
 
       console.log("Relationship ended socket sent:", {
         senderId: userId,

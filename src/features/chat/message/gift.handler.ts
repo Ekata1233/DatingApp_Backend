@@ -494,9 +494,9 @@ export const sendSocketGiftMessage = async (data: SendSocketGiftInput) => {
   // If matched users should be able to send
   // gifts in chat, remove this validation.
 
-  if (isMatched) {
-    throw new AppError(400, "ALREADY_MATCHED");
-  }
+  // if (isMatched) {
+  //   throw new AppError(400, "ALREADY_MATCHED");
+  // }
 
   // ==========================================
   // 5. RECEIVER VALIDATION
