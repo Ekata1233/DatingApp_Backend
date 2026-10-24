@@ -19,6 +19,7 @@ import { calculateAge } from "../chat.repository";
 import { prisma } from "../../../prisma/prismaClient";
 import { incrementRoseAndGiftMessages } from "../../unlockRoseGift/unlockRoseGift.service";
 import { AppError } from "../../rose/AppError";
+import { emitEngagementProgress } from "./engagement-progress.socket";
 
 export const chatSocketService = {
   /**
@@ -304,6 +305,23 @@ if (payload.messageType === MessageType.GIFT) {
         userId,
         receiverId,
       );
+
+      if (
+    interactionResult &&
+    (interactionResult.rose || interactionResult.gift)
+  ) {
+    try {
+      await emitEngagementProgress(
+        io,
+        payload.conversationId,
+        interactionResult,
+      );
+    } catch (error) {
+      console.error(
+        "ENGAGEMENT PROGRESS SOCKET ERROR:",
+        error,
+      );
+    }}
     }
 
     const unreadCount = await chatService.getUnreadCount(
