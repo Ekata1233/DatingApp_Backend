@@ -1,4 +1,8 @@
-import { MessageType, PrismaClient, UserRelationshipStatus } from "@prisma/client";
+import {
+  MessageType,
+  PrismaClient,
+  UserRelationshipStatus,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -947,56 +951,52 @@ export const endRelationshipRepository = async (
     // 1. UPDATE RELATIONSHIP
     // ============================================
 
-    const endedRelationship =
-      await tx.userRelationship.update({
-        where: {
-          id: relationshipId,
-          status: UserRelationshipStatus.ACTIVE,
-          OR: [
-            { user1Id: endedByUserId },
-            { user2Id: endedByUserId },
-          ],
-        },
-        data: {
-          status: UserRelationshipStatus.ENDED,
-          endedAt: new Date(),
-        },
-        include: {
-          user1: {
-            select: {
-              id: true,
-              full_name: true,
-              photos: {
-                orderBy: {
-                  created_at: "asc",
-                },
-                take: 1,
-                select: {
-                  id: true,
-                  media_url: true,
-                },
+    const endedRelationship = await tx.userRelationship.update({
+      where: {
+        id: relationshipId,
+        status: UserRelationshipStatus.ACTIVE,
+        OR: [{ user1Id: endedByUserId }, { user2Id: endedByUserId }],
+      },
+      data: {
+        status: UserRelationshipStatus.ENDED,
+        endedAt: new Date(),
+      },
+      include: {
+        user1: {
+          select: {
+            id: true,
+            full_name: true,
+            photos: {
+              orderBy: {
+                created_at: "asc",
+              },
+              take: 1,
+              select: {
+                id: true,
+                media_url: true,
               },
             },
           },
+        },
 
-          user2: {
-            select: {
-              id: true,
-              full_name: true,
-              photos: {
-                orderBy: {
-                  created_at: "asc",
-                },
-                take: 1,
-                select: {
-                  id: true,
-                  media_url: true,
-                },
+        user2: {
+          select: {
+            id: true,
+            full_name: true,
+            photos: {
+              orderBy: {
+                created_at: "asc",
+              },
+              take: 1,
+              select: {
+                id: true,
+                media_url: true,
               },
             },
           },
         },
-      });
+      },
+    });
 
     // ============================================
     // 2. IDENTIFY USERS
@@ -1016,30 +1016,29 @@ export const endRelationshipRepository = async (
     // 3. FIND EXISTING CONVERSATION
     // ============================================
 
-    const conversation =
-      await tx.conversation.findFirst({
-        where: {
-          AND: [
-            {
-              participants: {
-                some: {
-                  userId: self.id,
-                },
+    const conversation = await tx.conversation.findFirst({
+      where: {
+        AND: [
+          {
+            participants: {
+              some: {
+                userId: self.id,
               },
             },
-            {
-              participants: {
-                some: {
-                  userId: partner.id,
-                },
+          },
+          {
+            participants: {
+              some: {
+                userId: partner.id,
               },
             },
-          ],
-        },
-        orderBy: {
-          updatedAt: "desc",
-        },
-      });
+          },
+        ],
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
 
     // ============================================
     // 4. SAVE BREAKUP MESSAGE
@@ -1064,8 +1063,7 @@ export const endRelationshipRepository = async (
             relationshipTag: endedRelationship.tag,
             endedByUserId,
             partnerId: partner.id,
-            endedAt:
-              endedRelationship.endedAt?.toISOString(),
+            endedAt: endedRelationship.endedAt?.toISOString(),
           },
         },
       });

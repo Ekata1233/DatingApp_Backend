@@ -60,12 +60,22 @@ export const chatService = {
    * Get user's conversations.
    */
   async getConversations(data: GetConversationsInput) {
-    const conversations = await chatRepository.findUserConversations(
+   // ============================================
+  // 1. FETCH CONVERSATIONS AND COUNTS
+  // ============================================
+
+  const [conversations, counts] = await Promise.all([
+    chatRepository.findUserConversations(
       data.userId,
       data.cursor,
       data.limit,
       data.type,
-    );
+    ),
+
+    chatRepository.getConversationCounts(
+      data.userId,
+    ),
+  ]);
 
     const sortedConversations = conversations.sort((a, b) => {
       const timeA = a.lastMessage?.createdAt
@@ -91,6 +101,7 @@ export const chatService = {
 
     return {
       items,
+       counts,
       pagination: {
         hasMore,
         nextCursor,

@@ -1,6 +1,5 @@
 // import { prisma } from "../../prisma/prismaClient";
 
-
 // export const incrementRoseAndGiftMessages = async (
 //   senderId: string,
 //   receiverId: string,
@@ -93,7 +92,14 @@
 //   };
 // };
 
-import { MessageType, Prisma, TransactionSource, TransactionStatus, TransactionType } from "@prisma/client";
+import {
+  MessageType,
+  Prisma,
+  StoreFeatureType,
+  TransactionSource,
+  TransactionStatus,
+  TransactionType,
+} from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { AppError } from "../rose/AppError";
 
@@ -330,354 +336,270 @@ export const incrementRoseAndGiftMessages = async (
 ) => {
   const now = new Date();
 
+  return prisma.$transaction(async (tx) => {
+    // =====================================================
+    // IMPORTANT
+    //
+    // senderId   = person sending normal chat message
+    // receiverId = person receiving normal chat message
+    //
+    // If A gave reward to B:
+    //
+    // reward.senderId   = A
+    // reward.receiverId = B
+    //
+    // When B messages A:
+    //
+    // senderId   = B
+    // receiverId = A
+    //
+    // therefore:
+    //
+    // reward.senderId   = receiverId
+    // reward.receiverId = senderId
+    // =====================================================
 
-  return prisma.$transaction(
-    async (tx) => {
-      // =====================================================
-      // IMPORTANT
-      //
-      // senderId   = person sending normal chat message
-      // receiverId = person receiving normal chat message
-      //
-      // If A gave reward to B:
-      //
-      // reward.senderId   = A
-      // reward.receiverId = B
-      //
-      // When B messages A:
-      //
-      // senderId   = B
-      // receiverId = A
-      //
-      // therefore:
-      //
-      // reward.senderId   = receiverId
-      // reward.receiverId = senderId
-      // =====================================================
+    // =====================================================
+    // GET PENDING ROSE
+    // =====================================================
 
-      // =====================================================
-      // GET PENDING ROSE
-      // =====================================================
+    const pendingRose = await tx.userRose.findFirst({
+      where: {
+        senderId: receiverId,
+        receiverId: senderId,
 
-      const pendingRose =
-        await tx.userRose.findFirst({
-          where: {
-            senderId: receiverId,
-            receiverId: senderId,
+        isUnlocked: false,
 
-            isUnlocked: false,
-
-            OR: [
-              {
-                expiresAt: null,
-              },
-              {
-                expiresAt: {
-                  gt: now,
-                },
-              },
-            ],
+        OR: [
+          {
+            expiresAt: null,
           },
-
-          orderBy: {
-            createdAt: "asc",
-          },
-        });
-
-      // =====================================================
-      // GET PENDING GIFT
-      // =====================================================
-
-      const pendingGift =
-        await tx.userGift.findFirst({
-          where: {
-            senderId: receiverId,
-            receiverId: senderId,
-
-            isUnlocked: false,
-
+          {
             expiresAt: {
               gt: now,
             },
           },
+        ],
+      },
 
-          orderBy: {
-            createdAt: "asc",
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    // =====================================================
+    // GET PENDING GIFT
+    // =====================================================
+
+    const pendingGift = await tx.userGift.findFirst({
+      where: {
+        senderId: receiverId,
+        receiverId: senderId,
+
+        isUnlocked: false,
+
+        expiresAt: {
+          gt: now,
+        },
+      },
+
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    // =====================================================
+    // NOTHING PENDING
+    // =====================================================
+
+    if (!pendingRose && !pendingGift) {
+      return {
+        rose: null,
+        gift: null,
+        redeemed: [],
+      };
+    }
+
+    // =====================================================
+    // CHECK BUNDLE
+    // =====================================================
+
+    let isBundle = false;
+
+    if (pendingRose && pendingGift) {
+      const bundleMessage = await tx.chatMessage.findFirst({
+        where: {
+          messageType: MessageType.ENGAGEMENT,
+
+          roseId: pendingRose.id,
+
+          giftId: pendingGift.id,
+
+          metadata: {
+            path: ["isBundle"],
+
+            equals: true,
           },
-        });
+        },
 
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
 
-      // =====================================================
-      // NOTHING PENDING
-      // =====================================================
+      isBundle = !!bundleMessage;
+    }
 
-      if (
-        !pendingRose &&
-        !pendingGift
-      ) {
-        return {
-          rose: null,
-          gift: null,
-          redeemed: [],
-        };
+    // =====================================================
+    // BUNDLE
+    // =====================================================
+
+    if (isBundle && pendingRose && pendingGift) {
+      const newRoseMessages = pendingRose.messagesSent + 1;
+
+      const newGiftMessages = pendingGift.messagesSent + 1;
+
+      console.log("new gift messge sent count : ", newGiftMessages);
+
+      // -----------------------------------------
+      // Update progress first
+      // -----------------------------------------
+
+      let rose = await tx.userRose.update({
+        where: {
+          id: pendingRose.id,
+        },
+
+        data: {
+          messagesSent: newRoseMessages,
+        },
+      });
+
+      let gift = await tx.userGift.update({
+        where: {
+          id: pendingGift.id,
+        },
+
+        data: {
+          messagesSent: newGiftMessages,
+        },
+      });
+
+      const redeemed: string[] = [];
+
+      // -----------------------------------------
+      // Redeem rose automatically
+      // -----------------------------------------
+
+      if (newRoseMessages >= pendingRose.requiredMessages) {
+        rose = await redeemRoseReward(pendingRose.id, tx);
+
+        redeemed.push("ROSE");
       }
 
-      // =====================================================
-      // CHECK BUNDLE
-      // =====================================================
+      // -----------------------------------------
+      // Redeem gift automatically
+      // -----------------------------------------
 
-      let isBundle = false;
+      if (newGiftMessages >= pendingGift.requiredMessages) {
+        gift = await redeemGiftReward(pendingGift.id, tx);
 
-      if (
-        pendingRose &&
-        pendingGift
-      ) {
-        const bundleMessage =
-          await tx.chatMessage.findFirst({
-            where: {
-              messageType:
-                MessageType.ENGAGEMENT,
-
-              roseId:
-                pendingRose.id,
-
-              giftId:
-                pendingGift.id,
-
-              metadata: {
-                path: [
-                  "isBundle",
-                ],
-
-                equals: true,
-              },
-            },
-
-            orderBy: {
-              createdAt: "asc",
-            },
-          });
-
-        isBundle =
-          !!bundleMessage;
+        redeemed.push("GIFT");
       }
 
-      // =====================================================
-      // BUNDLE
-      // =====================================================
+      return {
+        rose,
+        gift,
+        redeemed,
+      };
+    }
 
-      if (
-        isBundle &&
-        pendingRose &&
-        pendingGift
-      ) {
-        const newRoseMessages =
-          pendingRose.messagesSent +
-          1;
+    // =====================================================
+    // DETERMINE OLDEST REWARD
+    // =====================================================
 
-        const newGiftMessages =
-          pendingGift.messagesSent +
-          1;
+    let rewardType: "rose" | "gift";
 
-          console.log("new gift messge sent count : ", newGiftMessages)
+    if (!pendingRose) {
+      rewardType = "gift";
+    } else if (!pendingGift) {
+      rewardType = "rose";
+    } else {
+      rewardType =
+        pendingGift.createdAt <= pendingRose.createdAt ? "gift" : "rose";
+    }
 
-        // -----------------------------------------
-        // Update progress first
-        // -----------------------------------------
+    // =====================================================
+    // GIFT
+    // =====================================================
 
-        let rose =
-          await tx.userRose.update({
-            where: {
-              id: pendingRose.id,
-            },
+    if (rewardType === "gift") {
+      const newMessagesSent = pendingGift!.messagesSent + 1;
 
-            data: {
-              messagesSent:
-                newRoseMessages,
-            },
-          });
+      let gift = await tx.userGift.update({
+        where: {
+          id: pendingGift!.id,
+        },
 
-        let gift =
-          await tx.userGift.update({
-            where: {
-              id: pendingGift.id,
-            },
-
-            data: {
-              messagesSent:
-                newGiftMessages,
-            },
-          });
-
-        const redeemed: string[] =
-          [];
-
-        // -----------------------------------------
-        // Redeem rose automatically
-        // -----------------------------------------
-
-        if (
-          newRoseMessages >=
-          pendingRose.requiredMessages
-        ) {
-          rose =
-            await redeemRoseReward(
-              pendingRose.id,
-              tx,
-            );
-
-          redeemed.push("ROSE");
-        }
-
-        // -----------------------------------------
-        // Redeem gift automatically
-        // -----------------------------------------
-
-        if (
-          newGiftMessages >=
-          pendingGift.requiredMessages
-        ) {
-          gift =
-            await redeemGiftReward(
-              pendingGift.id,
-              tx,
-            );
-
-          redeemed.push("GIFT");
-        }
-
-        return {
-          rose,
-          gift,
-          redeemed,
-        };
-      }
-
-      // =====================================================
-      // DETERMINE OLDEST REWARD
-      // =====================================================
-
-      let rewardType:
-        | "rose"
-        | "gift";
-
-      if (!pendingRose) {
-        rewardType = "gift";
-      } else if (!pendingGift) {
-        rewardType = "rose";
-      } else {
-        rewardType =
-          pendingGift.createdAt <=
-          pendingRose.createdAt
-            ? "gift"
-            : "rose";
-      }
-
-      // =====================================================
-      // GIFT
-      // =====================================================
-
-      if (
-        rewardType === "gift"
-      ) {
-        const newMessagesSent =
-          pendingGift!
-            .messagesSent + 1;
-
-        let gift =
-          await tx.userGift.update({
-            where: {
-              id: pendingGift!.id,
-            },
-
-            data: {
-              messagesSent:
-                newMessagesSent,
-            },
-          });
-
-        let redeemed = false;
-
-        // -----------------------------------------
-        // Auto redeem
-        // -----------------------------------------
-
-        if (
-          newMessagesSent >=
-          pendingGift!
-            .requiredMessages
-        ) {
-          gift =
-            await redeemGiftReward(
-              pendingGift!.id,
-              tx,
-            );
-
-          redeemed = true;
-        }
-
-        return {
-          rose: null,
-
-          gift,
-
-          redeemed:
-            redeemed
-              ? ["GIFT"]
-              : [],
-        };
-      }
-
-      // =====================================================
-      // ROSE
-      // =====================================================
-
-      const newMessagesSent =
-        pendingRose!.messagesSent +
-        1;
-
-      let rose =
-        await tx.userRose.update({
-          where: {
-            id: pendingRose!.id,
-          },
-
-          data: {
-            messagesSent:
-              newMessagesSent,
-          },
-        });
+        data: {
+          messagesSent: newMessagesSent,
+        },
+      });
 
       let redeemed = false;
 
-      if (
-        newMessagesSent >=
-        pendingRose!
-          .requiredMessages
-      ) {
-        rose =
-          await redeemRoseReward(
-            pendingRose!.id,
-            tx,
-          );
+      // -----------------------------------------
+      // Auto redeem
+      // -----------------------------------------
+
+      if (newMessagesSent >= pendingGift!.requiredMessages) {
+        gift = await redeemGiftReward(pendingGift!.id, tx);
 
         redeemed = true;
       }
 
       return {
-        rose,
+        rose: null,
 
-        gift: null,
+        gift,
 
-        redeemed:
-          redeemed
-            ? ["ROSE"]
-            : [],
+        redeemed: redeemed ? ["GIFT"] : [],
       };
-    },
-  );
-};
+    }
 
+    // =====================================================
+    // ROSE
+    // =====================================================
+
+    const newMessagesSent = pendingRose!.messagesSent + 1;
+
+    let rose = await tx.userRose.update({
+      where: {
+        id: pendingRose!.id,
+      },
+
+      data: {
+        messagesSent: newMessagesSent,
+      },
+    });
+
+    let redeemed = false;
+
+    if (newMessagesSent >= pendingRose!.requiredMessages) {
+      rose = await redeemRoseReward(pendingRose!.id, tx);
+
+      redeemed = true;
+    }
+
+    return {
+      rose,
+
+      gift: null,
+
+      redeemed: redeemed ? ["ROSE"] : [],
+    };
+  });
+};
 
 export const redeemGiftReward = async (
   userGiftId: string,
@@ -709,10 +631,7 @@ export const redeemGiftReward = async (
   // 3. Requirement not completed
   // -------------------------------------------
 
-  if (
-    userGift.messagesSent <
-    userGift.requiredMessages
-  ) {
+  if (userGift.messagesSent < userGift.requiredMessages) {
     return userGift;
   }
 
@@ -720,16 +639,13 @@ export const redeemGiftReward = async (
   // 4. Prevent duplicate wallet credit
   // -------------------------------------------
 
-  const existingRedeemTransaction =
-    await tx.walletTransaction.findFirst({
-      where: {
-        referenceId: userGift.id,
-        source:
-          TransactionSource.GIFT_REDEEM,
-        status:
-          TransactionStatus.SUCCESS,
-      },
-    });
+  const existingRedeemTransaction = await tx.walletTransaction.findFirst({
+    where: {
+      referenceId: userGift.id,
+      source: TransactionSource.GIFT_REDEEM,
+      status: TransactionStatus.SUCCESS,
+    },
+  });
 
   if (existingRedeemTransaction) {
     // Wallet already credited.
@@ -741,9 +657,7 @@ export const redeemGiftReward = async (
       },
       data: {
         isUnlocked: true,
-        unlockedAt:
-          userGift.unlockedAt ??
-          new Date(),
+        unlockedAt: userGift.unlockedAt ?? new Date(),
       },
     });
   }
@@ -768,17 +682,11 @@ export const redeemGiftReward = async (
     });
   }
 
-  const redeemAmount = new Prisma.Decimal(
-      userGift.pricePaid,
-    );
+  const redeemAmount = new Prisma.Decimal(userGift.pricePaid);
 
-  const balanceBefore =
-    wallet.balance;
+  const balanceBefore = wallet.balance;
 
-  const balanceAfter =
-    wallet.balance.plus(
-      redeemAmount,
-    );
+  const balanceAfter = wallet.balance.plus(redeemAmount);
 
   // -------------------------------------------
   // 6. Credit receiver wallet
@@ -807,11 +715,9 @@ export const redeemGiftReward = async (
 
       type: TransactionType.REWARD,
 
-      status:
-        TransactionStatus.SUCCESS,
+      status: TransactionStatus.SUCCESS,
 
-      source:
-        TransactionSource.GIFT_REDEEM,
+      source: TransactionSource.GIFT_REDEEM,
 
       referenceId: userGift.id,
 
@@ -827,16 +733,15 @@ export const redeemGiftReward = async (
   // 8. Unlock gift
   // -------------------------------------------
 
-  const unlockedGift =
-    await tx.userGift.update({
-      where: {
-        id: userGift.id,
-      },
-      data: {
-        isUnlocked: true,
-        unlockedAt: new Date(),
-      },
-    });
+  const unlockedGift = await tx.userGift.update({
+    where: {
+      id: userGift.id,
+    },
+    data: {
+      isUnlocked: true,
+      unlockedAt: new Date(),
+    },
+  });
 
   return unlockedGift;
 };
@@ -849,18 +754,14 @@ export const redeemRoseReward = async (
   // 1. Get rose
   // -------------------------------------------
 
-  const userRose =
-    await tx.userRose.findUnique({
-      where: {
-        id: userRoseId,
-      },
-    });
+  const userRose = await tx.userRose.findUnique({
+    where: {
+      id: userRoseId,
+    },
+  });
 
   if (!userRose) {
-    throw new AppError(
-      404,
-      "Rose not found.",
-    );
+    throw new AppError(404, "Rose not found.");
   }
 
   // -------------------------------------------
@@ -875,10 +776,7 @@ export const redeemRoseReward = async (
   // 3. Requirement not completed
   // -------------------------------------------
 
-  if (
-    userRose.messagesSent <
-    userRose.requiredMessages
-  ) {
+  if (userRose.messagesSent < userRose.requiredMessages) {
     return userRose;
   }
 
@@ -886,18 +784,15 @@ export const redeemRoseReward = async (
   // 4. Prevent duplicate credit
   // -------------------------------------------
 
-  const existingRedeemTransaction =
-    await tx.walletTransaction.findFirst({
-      where: {
-        referenceId: userRose.id,
+  const existingRedeemTransaction = await tx.walletTransaction.findFirst({
+    where: {
+      referenceId: userRose.id,
 
-        source:
-          TransactionSource.ROSE_REDEEM,
+      source: TransactionSource.ROSE_REDEEM,
 
-        status:
-          TransactionStatus.SUCCESS,
-      },
-    });
+      status: TransactionStatus.SUCCESS,
+    },
+  });
 
   if (existingRedeemTransaction) {
     return tx.userRose.update({
@@ -906,9 +801,7 @@ export const redeemRoseReward = async (
       },
       data: {
         isUnlocked: true,
-        unlockedAt:
-          userRose.unlockedAt ??
-          new Date(),
+        unlockedAt: userRose.unlockedAt ?? new Date(),
       },
     });
   }
@@ -932,15 +825,28 @@ export const redeemRoseReward = async (
     });
   }
 
-  const redeemAmount = 10; // Assuming each rose is worth 10 units of currency
+  const roseFeature = await tx.storeFeature.findUnique({
+    where: {
+      feature: StoreFeatureType.ROSE_SEND_COST,
+    },
+    select: {
+      intValue: true,
+      enabled: true,
+    },
+  });
 
-  const balanceBefore =
-    wallet.balance;
+  if (!roseFeature || !roseFeature.enabled) {
+    throw new AppError(400, "Rose sending is currently unavailable.");
+  }
 
-  const balanceAfter =
-    wallet.balance.plus(
-      redeemAmount,
-    );
+  if (roseFeature.intValue === null || roseFeature.intValue < 0) {
+    throw new AppError(500, "Invalid rose send cost configuration.");
+  }
+  const redeemAmount = roseFeature.intValue || 120;
+
+  const balanceBefore = wallet.balance;
+
+  const balanceAfter = wallet.balance.plus(redeemAmount);
 
   // -------------------------------------------
   // 6. Add balance
@@ -967,19 +873,15 @@ export const redeemRoseReward = async (
 
       amount: redeemAmount,
 
-      type:
-        TransactionType.REWARD,
+      type: TransactionType.REWARD,
 
-      status:
-        TransactionStatus.SUCCESS,
+      status: TransactionStatus.SUCCESS,
 
-      source:
-        TransactionSource.ROSE_REDEEM,
+      source: TransactionSource.ROSE_REDEEM,
 
       referenceId: userRose.id,
 
-      description:
-        "Rose redeemed",
+      description: "Rose redeemed",
 
       balanceBefore,
 
@@ -991,16 +893,15 @@ export const redeemRoseReward = async (
   // 8. Unlock
   // -------------------------------------------
 
-  const unlockedRose =
-    await tx.userRose.update({
-      where: {
-        id: userRose.id,
-      },
-      data: {
-        isUnlocked: true,
-        unlockedAt: new Date(),
-      },
-    });
+  const unlockedRose = await tx.userRose.update({
+    where: {
+      id: userRose.id,
+    },
+    data: {
+      isUnlocked: true,
+      unlockedAt: new Date(),
+    },
+  });
 
   return unlockedRose;
 };

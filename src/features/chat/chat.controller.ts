@@ -71,6 +71,7 @@ export const getConversations = async (
 
     return res.status(200).json({
       success: true,
+            counts: result.counts,
       data: result.items,
       pagination: result.pagination,
     });
