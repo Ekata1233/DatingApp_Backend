@@ -16,6 +16,7 @@ import {
   MIN_REPLY_SAMPLES,
 } from "../../chat/user-reply-stats.service";
 import { maskAge, maskName } from "./feed.helper";
+import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 
 // =========================
 // HELPERS
@@ -1959,38 +1960,48 @@ export const getFeedService = async ({
   // COMPATIBILITY SCORE
   // ========================================================
 
-  const compatibilityStart = performance.now();
+  // const compatibilityStart = performance.now();
 
-  const compatibilityScores = await prisma.userCompatibility.findMany({
-    where: {
-      userId,
+  // const compatibilityScores = await prisma.userCompatibility.findMany({
+  //   where: {
+  //     userId,
 
-      targetUserId: {
-        in: candidateIds,
-      },
-    },
+  //     targetUserId: {
+  //       in: candidateIds,
+  //     },
+  //   },
 
-    select: {
-      targetUserId: true,
+  //   select: {
+  //     targetUserId: true,
 
-      score: true,
+  //     score: true,
 
-      percentage: true,
-    },
-  });
+  //     percentage: true,
+  //   },
+  // });
 
-  console.log(
-    "compatibility scores:",
-    performance.now() - compatibilityStart,
-    "ms",
-  );
+  // const compatibilityMap = new Map(
+  //   compatibilityScores.map((compatibility) => [
+  //     compatibility.targetUserId,
+  //     compatibility,
+  //   ]),
+  // );
+  // ========================================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// ========================================================
 
-  const compatibilityMap = new Map(
-    compatibilityScores.map((compatibility) => [
-      compatibility.targetUserId,
-      compatibility,
-    ]),
-  );
+const matchScoreStart = performance.now();
+
+const compatibilityMap = await getMatchScoresForUsers(
+  userId,
+  candidateIds,
+);
+
+console.log(
+  "Dynamic match scores:",
+  performance.now() - matchScoreStart,
+  "ms",
+);
 
   // ========================================================
   // ENRICH USERS
@@ -2377,6 +2388,18 @@ export const getFeedDetailsService = async (
   const shouldTrackProfileView = userId !== currentUserId;
 
   // =====================================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// =====================================================
+
+const matchScoreMap = await getMatchScoresForUsers(
+  currentUserId,
+  [userId],
+);
+
+const dynamicMatchScore =
+  matchScoreMap.get(userId)?.percentage ?? 0;
+
+  // =====================================================
   // 2. CHECK REDIS
   // =====================================================
 
@@ -2394,8 +2417,10 @@ export const getFeedDetailsService = async (
       });
     }
 
-    return cachedFeedDetails;
-  }
+return {
+  ...cachedFeedDetails,
+  matchScore: dynamicMatchScore,
+};  }
 
   // =====================================================
   // 3. GET PROFILE FROM DATABASE
@@ -2519,6 +2544,7 @@ export const getFeedDetailsService = async (
 const transformedResponse = transformUserData(
   user,
   replyTime,
+  dynamicMatchScore
 );
 
 // Add heightInFeet immediately after height
@@ -2528,6 +2554,7 @@ const response: UserFeedResponse = {
   ...transformedResponse,
   height,
   heightInFeet: convertCmToFeet(height),
+  matchScore: dynamicMatchScore,
 };
 
 // Reorder fields to place heightInFeet after height
@@ -2574,7 +2601,7 @@ const orderedResponse = Object.fromEntries(
 };
 
 // Helper function to transform user data
-const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
+const transformUserData = (user: any, replyTime: string, matchScore: number,): UserFeedResponse => {
   // Extract lifestyle answers (screen = LIFESTYLE)
   const lifestyleAnswers = user.answer.filter(
     (a: any) => a.question.screen === "LIFESTYLE",
@@ -2613,7 +2640,7 @@ const transformUserData = (user: any, replyTime: string): UserFeedResponse => {
     phone_number: user.phone_number,
 
     // Static values
-    matchScore: STATIC_MATCH_SCORE,
+    matchScore,
     trust: user.trust_score ?? 0,
     replyTime: replyTime,
     // Basic Info
