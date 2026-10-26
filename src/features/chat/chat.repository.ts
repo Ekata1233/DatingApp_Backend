@@ -411,15 +411,31 @@ export const chatRepository = {
     // 3. Nearby filter
     // --------------------------------------------------
 
+    // ============================================
+    // NEARBY CONVERSATION FILTER
+    // ============================================
+
     if (type === "nearby") {
-      where.participants = {
-        some: {
-          userId: {
-            in: nearbyUserIds,
+      where.AND = [
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
           },
-          deletedAt: null,
         },
-      };
+        {
+          participants: {
+            some: {
+              userId: {
+                in: nearbyUserIds,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ];
     }
 
     // --------------------------------------------------
@@ -468,7 +484,72 @@ export const chatRepository = {
     // 7. Get conversations
     // --------------------------------------------------
 
-    const fetchLimit = type === "online" ? Math.max(limit * 3, 50) : limit + 1;
+    // ============================================
+    // GET ALL ONLINE USER IDS FOR ONLINE FILTER
+    // ============================================
+
+    if (type === "online") {
+      const eligibleConversations = await prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
+        },
+
+        select: {
+          participants: {
+            where: {
+              deletedAt: null,
+              userId: {
+                not: userId,
+              },
+            },
+            select: {
+              userId: true,
+            },
+          },
+        },
+      });
+
+      const otherUserIds = [
+        ...new Set(
+          eligibleConversations.flatMap((conversation) =>
+            conversation.participants.map((participant) => participant.userId),
+          ),
+        ),
+      ];
+
+      const presence =
+        otherUserIds.length > 0
+          ? await presenceService.getUsersPresence({
+              userIds: otherUserIds,
+            })
+          : [];
+
+      onlineUserIds = presence
+        .filter((item) => item.isOnline === true)
+        .map((item) => item.userId);
+
+      if (onlineUserIds.length === 0) {
+        return [];
+      }
+
+      where.AND = [
+        {
+          participants: {
+            some: {
+              userId: {
+                in: onlineUserIds,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ];
+    }
 
     const conversations = await prisma.conversation.findMany({
       where,
@@ -604,24 +685,25 @@ export const chatRepository = {
     // --------------------------------------------------
     // 8.3 ONLINE FILTER
     // --------------------------------------------------
+    const filteredConversations = conversations;
 
-    let filteredConversations = conversations;
+    // let filteredConversations = conversations;
 
-    if (type === "online") {
-      filteredConversations = conversations.filter((conversation) => {
-        const otherParticipant = conversation.participants.find(
-          (participant) => participant.userId !== userId,
-        );
+    // if (type === "online") {
+    //   filteredConversations = conversations.filter((conversation) => {
+    //     const otherParticipant = conversation.participants.find(
+    //       (participant) => participant.userId !== userId,
+    //     );
 
-        if (!otherParticipant) {
-          return false;
-        }
+    //     if (!otherParticipant) {
+    //       return false;
+    //     }
 
-        const presence = presenceMap.get(otherParticipant.userId);
+    //     const presence = presenceMap.get(otherParticipant.userId);
 
-        return presence?.isOnline === true;
-      });
-    }
+    //     return presence?.isOnline === true;
+    //   });
+    // }
     // --------------------------------------------------
     // 9. Get compatibility scores
     // --------------------------------------------------
@@ -2364,167 +2446,168 @@ export const chatRepository = {
     ]);
 
     // ============================================
-// 4. GET ONLINE CONVERSATION COUNT
-// ============================================
+    // 4. GET ONLINE CONVERSATION COUNT
+    // ============================================
 
-// Get all visible conversations of logged-in user
-const userConversations =
-  await prisma.conversation.findMany({
-    where: baseWhere,
+    // Get all visible conversations of logged-in user
+    const userConversations = await prisma.conversation.findMany({
+      where: baseWhere,
 
-    select: {
-      participants: {
-        where: {
-          deletedAt: null,
-          userId: {
-            not: userId,
+      select: {
+        participants: {
+          where: {
+            deletedAt: null,
+            userId: {
+              not: userId,
+            },
+          },
+
+          select: {
+            userId: true,
           },
         },
-
-        select: {
-          userId: true,
-        },
       },
-    },
-  });
-
-// Collect unique other participant IDs
-const otherUserIds = [
-  ...new Set(
-    userConversations.flatMap((conversation) =>
-      conversation.participants.map(
-        (participant) => participant.userId
-      )
-    )
-  ),
-];
-
-// ============================================
-// 5. GET ONLINE STATUS FROM REDIS
-// ============================================
-
-let onlineUserIds = new Set<string>();
-
-if (otherUserIds.length > 0) {
-  const userPresence =
-    await presenceService.getUsersPresence({
-      userIds: otherUserIds,
     });
 
-  onlineUserIds = new Set(
-    userPresence
-      .filter((user) => user.isOnline === true)
-      .map((user) => user.userId)
-  );
-}
+    // Collect unique other participant IDs
+    const otherUserIds = [
+      ...new Set(
+        userConversations.flatMap((conversation) =>
+          conversation.participants.map((participant) => participant.userId),
+        ),
+      ),
+    ];
 
-// ============================================
-// 6. COUNT ONLINE CONVERSATIONS
-// ============================================
+    // ============================================
+    // 5. GET ONLINE STATUS FROM REDIS
+    // ============================================
 
-const online = userConversations.filter(
-  (conversation) =>
-    conversation.participants.some(
-      (participant) =>
-        onlineUserIds.has(participant.userId)
-    )
-).length;
+    let onlineUserIds = new Set<string>();
+
+    if (otherUserIds.length > 0) {
+      const userPresence = await presenceService.getUsersPresence({
+        userIds: otherUserIds,
+      });
+
+      onlineUserIds = new Set(
+        userPresence
+          .filter((user) => user.isOnline === true)
+          .map((user) => user.userId),
+      );
+    }
+
+    // ============================================
+    // 6. COUNT ONLINE CONVERSATIONS
+    // ============================================
+
+    const online =
+      onlineUserIds.size > 0
+        ? await prisma.conversation.count({
+            where: {
+              AND: [
+                baseWhere,
+                {
+                  participants: {
+                    some: {
+                      userId: {
+                        in: [...onlineUserIds],
+                      },
+                      deletedAt: null,
+                    },
+                  },
+                },
+              ],
+            },
+          })
+        : 0;
     return {
       all,
       unread,
       online,
       nearby,
       dateInvites,
-       gifts,
+      gifts,
     };
   },
 
-  async getMessageCounts(
-  conversationId: string,
-  userId: string,
-) {
-  // ============================================
-  // COMMON FILTER
-  // ============================================
+  async getMessageCounts(conversationId: string, userId: string) {
+    // ============================================
+    // COMMON FILTER
+    // ============================================
 
-  const where = {
-    conversationId,
+    const where = {
+      conversationId,
 
-    deletedAt: null,
+      deletedAt: null,
 
-    deletions: {
-      none: {
-        userId,
-      },
-    },
-  };
-
-  // ============================================
-  // GET COUNTS
-  // ============================================
-
-  const [
-    all,
-    gifts,
-    compliments,
-    dateInvites,
-    events,
-  ] = await prisma.$transaction([
-    prisma.chatMessage.count({
-      where,
-    }),
-
-    prisma.chatMessage.count({
-      where: {
-        ...where,
-        messageType: MessageType.GIFT,
-      },
-    }),
-
-    prisma.chatMessage.count({
-      where: {
-        ...where,
-        messageType: MessageType.COMPLIMENT,
-      },
-    }),
-
-    prisma.chatMessage.count({
-      where: {
-        ...where,
-        messageType: {
-          in: [
-            MessageType.DATE_INVITE,
-            MessageType.DATE_CONFIRMED,
-            MessageType.DATE_CANCELLED,
-          ],
+      deletions: {
+        none: {
+          userId,
         },
       },
-    }),
+    };
 
-    prisma.chatMessage.count({
-      where: {
-        ...where,
-        messageType: {
-          in: [
-            MessageType.EVENT_INVITE,
-            MessageType.EVENT_CONFIRM,
-            MessageType.EVENT_CANCEL,
-          ],
-        },
-      },
-    }),
-  ]);
+    // ============================================
+    // GET COUNTS
+    // ============================================
 
-  // ============================================
-  // RETURN COUNTS
-  // ============================================
+    const [all, gifts, compliments, dateInvites, events] =
+      await prisma.$transaction([
+        prisma.chatMessage.count({
+          where,
+        }),
 
-  return {
-    all,
-    gifts,
-    compliments,
-    dateInvites,
-    events,
-  };
-},
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: MessageType.GIFT,
+          },
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: MessageType.COMPLIMENT,
+          },
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: {
+              in: [
+                MessageType.DATE_INVITE,
+                MessageType.DATE_CONFIRMED,
+                MessageType.DATE_CANCELLED,
+              ],
+            },
+          },
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: {
+              in: [
+                MessageType.EVENT_INVITE,
+                MessageType.EVENT_CONFIRM,
+                MessageType.EVENT_CANCEL,
+              ],
+            },
+          },
+        }),
+      ]);
+
+    // ============================================
+    // RETURN COUNTS
+    // ============================================
+
+    return {
+      all,
+      gifts,
+      compliments,
+      dateInvites,
+      events,
+    };
+  },
 };

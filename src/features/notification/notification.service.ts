@@ -4,7 +4,7 @@ import { NotificationType } from "@prisma/client";
 import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
 import { incrementBadgeCount } from "./badge.service";
-import { createNotificationSettingRepository, findNotificationByIdRepository, getNotificationCountRepository, getNotificationSettingRepository, getNotificationsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository, updateNotificationSettingRepository } from "./notification.repository";
+import { createNotificationSettingRepository, findNotificationByIdRepository, getNotificationCountRepository, getNotificationSettingRepository, getNotificationsRepository, getUnreadNotificationCategoryCountsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository, updateNotificationSettingRepository } from "./notification.repository";
 import { CreateNotificationParams, NotificationCategory, notificationCategoryMap, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
 import { canSendPushNotification } from "./notification.helper";
@@ -274,7 +274,7 @@ export const getUnreadCountService = async (
   }
 
   const unreadCount =
-    await getUnreadNotificationCountRepository(
+    await getUnreadNotificationCategoryCountsRepository(
       userId,
     );
 

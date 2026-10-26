@@ -15,261 +15,6 @@ import { createBundleGift } from "../gift/gift.helper";
 import { updateEngagementProgress } from "./engagement.helper";
 import { createNotification } from "../notification/notification.service";
 
-// export const sendEngagementService = async (
-//     senderId: string,
-//     data: SendEngagementDTO
-// ): Promise<SendEngagementResponse> => {
-//     const {
-//         receiverId,
-//         targetType,
-//         targetId,
-//         rose: roseData,
-//         compliment: complimentData,
-//         gift: giftData,
-//     } = data;
-
-//     // --------------------------------------------------
-//     // 1. BASIC VALIDATIONS
-//     // --------------------------------------------------
-
-//     if (senderId === receiverId) {
-//         throw new AppError(400, "CANNOT_SEND_TO_SELF");
-//     }
-
-//     // --------------------------------------------------
-//     // 2. BLOCK CHECK
-//     // --------------------------------------------------
-
-//     const isBlocked = await checkBlockedStatus(
-//         senderId,
-//         receiverId,
-//         prisma
-//     );
-
-//     if (isBlocked) {
-//         throw new AppError(403, "BLOCKED_USER");
-//     }
-
-//     // --------------------------------------------------
-//     // 3. MATCH CHECK
-//     // --------------------------------------------------
-
-//     const isMatched = await checkMatch(
-//         senderId,
-//         receiverId,
-//         prisma
-//     );
-
-//     if (isMatched) {
-//         throw new AppError(
-//             400,
-//             "ALREADY_MATCHED"
-//         );
-//     }
-
-//     // --------------------------------------------------
-//     // 4. ROSE-SPECIFIC VALIDATIONS
-//     // --------------------------------------------------
-
-//     if (roseData) {
-//         await validateRoseForBundle(
-//             senderId,
-//             receiverId
-//         );
-//     }
-
-//     // --------------------------------------------------
-//     // 5. TRANSACTION
-//     // --------------------------------------------------
-
-//     return prisma.$transaction(
-//         async (tx) => {
-
-//             let roseId: string | null = null;
-//             let complimentId: string | null = null;
-//             let giftId: string | null = null;
-
-//             // =================================================
-//             // ROSE
-//             // =================================================
-
-//             if (roseData) {
-
-//                 const roseResult =
-//                     await createBundleRose(
-//                         senderId,
-//                         receiverId,
-//                         roseData,
-//                         targetType,
-//                         targetId,
-//                         tx
-//                     );
-
-//                 console.log("rose result : ", roseResult)
-
-//                 roseId = roseResult.roseId;
-//             }
-
-//             // =================================================
-//             // COMPLIMENT
-//             // =================================================
-
-//             if (complimentData) {
-
-//                 const compliment =
-//                     await createBundleCompliment(
-//                         senderId,
-//                         receiverId,
-//                         complimentData,
-//                         targetType,
-//                         targetId,
-//                         tx
-//                     );
-
-//                 console.log("compliment result : ", compliment)
-
-//                 complimentId = compliment.compliment.id;
-//             }
-
-//             // =================================================
-//             // GIFT
-//             // =================================================
-
-//             if (giftData) {
-
-//                 const gift =
-//                     await createBundleGift(
-//                         senderId,
-//                         receiverId,
-//                         giftData,
-//                         targetType,
-//                         targetId,
-//                         tx
-//                     );
-
-//                 console.log("gift result : ", gift)
-
-//                 giftId = gift.userGift.id;
-//             }
-
-//             // =================================================
-//             // CONVERSATION
-//             // =================================================
-
-//             const conversation =
-//                 await getOrCreateConversation(
-//                     senderId,
-//                     receiverId,
-//                     tx
-//                 );
-
-//             // =================================================
-//             // MESSAGE TYPE
-//             // =================================================
-
-//             const engagementCount =
-//                 Number(!!roseId) +
-//                 Number(!!complimentId) +
-//                 Number(!!giftId);
-
-//             let messageType: MessageType;
-
-//             if (engagementCount > 1) {
-//                 messageType = MessageType.ENGAGEMENT;
-//             } else if (roseId) {
-//                 messageType = MessageType.ROSE;
-//             } else if (complimentId) {
-//                 messageType = MessageType.COMPLIMENT;
-//             } else {
-//                 messageType = MessageType.GIFT;
-//             }
-
-//             // =================================================
-//             // CREATE ONE CHAT MESSAGE
-//             // =================================================
-
-//             const chatMessage =
-//                 await tx.chatMessage.create({
-//                     data: {
-//                         conversationId: conversation.id,
-//                         senderId,
-
-//                         messageType,
-
-//                         roseId,
-//                         complimentId,
-//                         giftId,
-
-//                         metadata: {
-//                             isBundle: true,
-//                         },
-//                     },
-
-//                     include: {
-//                         rose: true,
-//                         compliment: true,
-//                         gift: true,
-//                     },
-//                 });
-
-//             // =================================================
-//             // PROGRESS +1 ONLY ONCE
-//             // =================================================
-
-//             // await updateEngagementProgress(
-//             //     tx,
-//             //     senderId,
-//             //     receiverId
-//             // );
-
-//             // =================================================
-//             // UPDATE CONVERSATION
-//             // =================================================
-
-//             await tx.conversation.update({
-//                 where: {
-//                     id: conversation.id,
-//                 },
-//                 data: {
-//                     updatedAt: new Date(),
-//                 },
-//             });
-
-//             // =================================================
-//             // BALANCE
-//             // =================================================
-
-//             const updatedBalance =
-//                 await getOrCreateBalance(
-//                     senderId,
-//                     tx as any
-//                 );
-
-//             // =================================================
-//             // RETURN
-//             // =================================================
-
-//             return {
-//                 success: true,
-
-//                 message:
-//                     "Engagement sent successfully",
-
-//                 data: {
-//                     message: chatMessage,
-
-//                     remainingBalance: {
-//                         totalRoses:
-//                             updatedBalance.totalRoses,
-//                         lastResetAt:
-//                             updatedBalance.lastResetAt,
-//                     },
-//                 },
-//             };
-//         }
-//     );
-// };
-
 export const sendEngagementService = async (
   senderId: string,
   data: SendEngagementDTO,
@@ -471,9 +216,9 @@ export const sendEngagementService = async (
         },
       });
 
-      if (existingSenderSwipe?.action === "PASS") {
-        throw new AppError(400, "ROSE_MATCH_REQUIRES_SWIPE_RESET");
-      }
+      // if (existingSenderSwipe?.action === "PASS") {
+      //   throw new AppError(400, "ROSE_MATCH_REQUIRES_SWIPE_RESET");
+      // }
 
       if (!existingSenderSwipe) {
         await tx.userSwipe.create({
@@ -627,13 +372,10 @@ export const sendEngagementService = async (
       data: {
         matched,
         matchId,
-
+        conversationId: conversation.id,
         message: chatMessage,
-
         rose: roseId ? { id: roseId } : null,
-
         compliment: complimentId ? { id: complimentId } : null,
-
         gift: giftId
           ? {
               id: giftId,
@@ -688,6 +430,8 @@ export const sendEngagementService = async (
   // ============================================
 
   const notifications: Promise<unknown>[] = [];
+  const conversationId = result.data.conversationId;
+
 
   if (result.data.rose) {
     notifications.push(
@@ -699,6 +443,7 @@ export const sendEngagementService = async (
         message: `${senderName} sent you a rose 🌹`,
         data: {
           type: "ROSE",
+          conversationId,
           roseId: result.data.rose.id,
           senderId,
           receiverId,
@@ -719,6 +464,7 @@ export const sendEngagementService = async (
         message: `${senderName} sent you a compliment 💬`,
         data: {
           type: "COMPLIMENT",
+          conversationId,
           complimentId: result.data.compliment.id,
           senderId,
           receiverId,
@@ -739,6 +485,7 @@ export const sendEngagementService = async (
         message: `${senderName} sent you ${result.data.gift.name} 🎁`,
         data: {
           type: "GIFT",
+          conversationId,
           giftId: result.data.gift.id,
           giftName: result.data.gift.name,
           senderId,
@@ -762,6 +509,7 @@ export const sendEngagementService = async (
         message: "You both liked each other ❤️",
         data: {
           type: "MATCH",
+          conversationId,
           matchId,
           userId: senderId,
         },
@@ -777,6 +525,7 @@ export const sendEngagementService = async (
         message: "You both liked each other ❤️",
         data: {
           type: "MATCH",
+          conversationId,
           matchId,
           userId: receiverId,
         },
