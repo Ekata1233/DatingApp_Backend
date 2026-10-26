@@ -384,7 +384,7 @@ export const createBundleRose = async (
     throw new AppError(500, "Invalid rose send cost configuration.");
   }
 
-  const ROSE_PRICE = roseFeature.intValue || 50;
+  const ROSE_PRICE = roseFeature.intValue || 120;
   // Validate limits inside transaction.
   const todayRoses = await countTodayRoses(
     senderId,

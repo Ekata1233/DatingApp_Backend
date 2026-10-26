@@ -43,17 +43,10 @@ export const getTimeAgo = (date: Date | string): string => {
   const now = new Date();
   const createdAt = new Date(date);
 
-  const diffMs = Math.max(
-    0,
-    now.getTime() - createdAt.getTime()
-  );
- console.log("-------------------Now",now);
- console.log("create at",createdAt);
- console.log("---------------diffms",diffMs);
- 
- 
- 
-
+  const diffMs = Math.max(0, now.getTime() - createdAt.getTime());
+  console.log("-------------------Now", now);
+  console.log("create at", createdAt);
+  console.log("---------------diffms", diffMs);
 
   const totalMinutes = Math.floor(diffMs / (1000 * 60));
 
@@ -225,6 +218,56 @@ export const getAdmirers = async ({
   const matchedUserIds = activeMatches.map((match) =>
     match.user1Id === userId ? match.user2Id : match.user1Id,
   );
+
+  // ==========================================
+  // GET EXISTING CONVERSATION USER IDS
+  // ==========================================
+
+  const existingConversations = await prisma.conversation.findMany({
+    where: {
+      participants: {
+        some: {
+          userId,
+          deletedAt: null,
+        },
+      },
+    },
+
+    select: {
+      participants: {
+        where: {
+          userId: {
+            not: userId,
+          },
+          deletedAt: null,
+        },
+
+        select: {
+          userId: true,
+        },
+      },
+    },
+  });
+
+  // ==========================================
+  // EXTRACT CONVERSATION USER IDS
+  // ==========================================
+
+  const conversationUserIds = [
+    ...new Set(
+      existingConversations.flatMap((conversation) =>
+        conversation.participants.map((participant) => participant.userId),
+      ),
+    ),
+  ];
+
+  // ==========================================
+  // COMBINE MATCHED + CONVERSATION USERS
+  // ==========================================
+
+  const excludedSentUserIds = [
+    ...new Set([...matchedUserIds, ...conversationUserIds]),
+  ];
   // ==========================================
   // RECEIVED LIKES COUNT
   // ==========================================
@@ -264,7 +307,7 @@ export const getAdmirers = async ({
       : {
           swiperId: userId,
           targetUserId: {
-            notIn: matchedUserIds,
+            notIn: excludedSentUserIds,
           },
           targetUser: {
             deleted_at: null,

@@ -494,9 +494,9 @@ export const sendSocketGiftMessage = async (data: SendSocketGiftInput) => {
   // If matched users should be able to send
   // gifts in chat, remove this validation.
 
-  if (isMatched) {
-    throw new AppError(400, "ALREADY_MATCHED");
-  }
+  // if (isMatched) {
+  //   throw new AppError(400, "ALREADY_MATCHED");
+  // }
 
   // ==========================================
   // 5. RECEIVER VALIDATION
@@ -775,27 +775,17 @@ export const sendSocketGiftMessage = async (data: SendSocketGiftInput) => {
     await createNotification({
       senderId,
       receiverId,
-
       type: "NEW_GIFT",
-
       title: "You received a gift 🎁",
-
       message: `${senderName} sent you ` + `${result.gift.name} 🎁`,
-
       data: {
         type: "GIFT",
-
         giftId: result.gift.id,
-
         giftName: result.gift.name,
-
         conversationId,
-
         messageId: result.message.id,
-
         senderId,
         receiverId,
-
         targetType,
         targetId,
       },
