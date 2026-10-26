@@ -126,43 +126,28 @@ export const getMyWalletService = async (
 
     return {
       id: transaction.id,
-
       type: transaction.type,
-
       source: transaction.source,
-
       status: transaction.status,
-
       direction,
-
       title: getTransactionTitle(
         transaction.type,
         transaction.source,
         transaction.description,
       ),
-
       description: transaction.description,
-
       amount,
-
       formattedAmount: formatTransactionAmount(amount, direction),
-
       balanceBefore: Number(transaction.balanceBefore),
-
       balanceAfter: Number(transaction.balanceAfter),
-
       referenceId: transaction.referenceId,
-
       createdAt: transaction.createdAt,
     };
   });
 
   const walletBalance = Number(wallet.balance);
-
   const datePlanBalance = datePlanStats?.balance ?? 0;
-
   const total = transactionResult.total;
-
   const totalPages = Math.ceil(total / limit);
 
   return {
