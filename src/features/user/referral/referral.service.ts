@@ -573,7 +573,7 @@ export const getReferralDashboard = async (
     referralCode: user.referralCode || "",
 
     shareLink:
-      "https://play.google.com/store/apps/details?id=com.fetchtrue.bizbooster2x&pcampaignid=web_share",
+      "https://play.google.com/store/apps/details?id=com.infynod.welvors",
 
     selfSignupReward: 50,
 
