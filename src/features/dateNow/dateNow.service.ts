@@ -75,10 +75,25 @@ export const updateDraftDatePlan = async (
 
   const { vibeIds, eventDate, eventTime, activityId, ...planData } = payload;
   let eventDateTime: Date | undefined;
+// ============================================
+// VALIDATE EVENT DATE AND TIME
+// ============================================
 
-  if (eventDate && eventTime) {
-    eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
+if (eventDate && eventTime) {
+  eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
+
+  // Check invalid date
+  if (isNaN(eventDateTime.getTime())) {
+    throw new Error("Invalid event date or time.");
   }
+
+  // Prevent past date and time
+  if (eventDateTime.getTime() <= Date.now()) {
+    throw new Error(
+      "You cannot select a past date or time. Please select a future date and time.",
+    );
+  }
+}
 
   const updatedPlan = await prisma.$transaction(async (tx) => {
     await tx.datePlan.update({
@@ -189,7 +204,21 @@ export const publishDatePlan = async (planId: string, userId: string) => {
     if (plan.status === PlanStatus.ACTIVE) {
       throw new Error("Plan is already published");
     }
+// ============================================
+// VALIDATE EVENT DATE AND TIME
+// ============================================
 
+if (!plan.eventDateTime) {
+  throw new Error(
+    "Please select a date and time before publishing the date plan.",
+  );
+}
+
+if (plan.eventDateTime.getTime() <= Date.now()) {
+  throw new Error(
+    "You cannot publish a date plan with a past date or time. Please select a future date and time.",
+  );
+}
     // ============================================
     // 2. GET USER DATE PLAN STATS
     // ============================================
@@ -1901,6 +1930,32 @@ export const getDatePlanHistory = async (
   query: HistoryQuery,
 ) => {
   const page = Math.max(Number(query.page) || 1, 1);
+
+// ============================================
+// AUTO EXPIRE DATE PLAN
+// ============================================
+
+await prisma.datePlan.updateMany({
+  where: {
+    userId,
+
+    status: PlanStatus.ACTIVE,
+
+    expiresAt: {
+      not: null,
+      lte: new Date(),
+    },
+
+    // Do not expire confirmed dates
+    DateConfirmed: {
+      none: {},
+    },
+  },
+
+  data: {
+    status: PlanStatus.EXPIRED,
+  },
+});
 
   const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
