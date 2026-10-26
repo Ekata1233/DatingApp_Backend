@@ -1941,10 +1941,10 @@ await prisma.datePlan.updateMany({
 
     status: PlanStatus.ACTIVE,
 
-    expiresAt: {
-      not: null,
-      lte: new Date(),
-    },
+  eventDateTime: {
+  not: null,
+  lte: new Date(),
+},
 
     // Do not expire confirmed dates
     DateConfirmed: {
@@ -1954,6 +1954,7 @@ await prisma.datePlan.updateMany({
 
   data: {
     status: PlanStatus.EXPIRED,
+    expiresAt: new Date(),
   },
 });
 
