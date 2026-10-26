@@ -306,10 +306,7 @@ export const deductRoseAmountFromWallet = async (
       amount: amountDecimal,
       type: TransactionType.PURCHASE,
       status: TransactionStatus.SUCCESS,
-
-      // See schema change below
-      source: TransactionSource.WALLET_TOPUP,
-
+      source: TransactionSource.WALLET_ROSE,
       description: "Rose purchase",
       balanceBefore,
       balanceAfter,

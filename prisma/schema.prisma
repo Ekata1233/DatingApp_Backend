@@ -2780,6 +2780,9 @@ enum TransactionSource {
   GIFT_PURCHASE
   GIFT_REDEEM
   ROSE_REDEEM
+  WALLET_COMPLIMENT
+  WALLET_ROSE
+  WALLET_DATE_PLAN
 }
 
 enum MessageType {

@@ -241,7 +241,7 @@ export const deductComplimentAmountFromWallet = async (
         amount: amountDecimal,
         type: TransactionType.PURCHASE,
         status: TransactionStatus.SUCCESS,
-        source: TransactionSource.WALLET_TOPUP,
+        source: TransactionSource.WALLET_COMPLIMENT,
         description: "Compliment purchase",
         balanceBefore,
         balanceAfter,

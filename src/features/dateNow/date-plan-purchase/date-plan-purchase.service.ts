@@ -148,26 +148,13 @@ export const purchaseDatePlanWithWalletService =
                     await tx.walletTransaction.create({
                         data: {
                             walletId: wallet.id,
-
                             amount: purchaseAmount,
-
-                            type:
-                                TransactionType.PURCHASE,
-
-                            status:
-                                TransactionStatus.SUCCESS,
-
-                            source:
-                                TransactionSource.WALLET_TOPUP,
-
-                            description:
-                                `Purchased ${planQuantity} Date Plans using wallet`,
-
-                            balanceBefore:
-                                wallet.balance,
-
-                            balanceAfter:
-                                updatedWallet.balance,
+                            type:TransactionType.PURCHASE,
+                            status: TransactionStatus.SUCCESS,
+                            source: TransactionSource.WALLET_DATE_PLAN,
+                            description: `Purchased ${planQuantity} Date Plans using wallet`,
+                            balanceBefore: wallet.balance,
+                            balanceAfter:updatedWallet.balance,
                         },
                     });
 
