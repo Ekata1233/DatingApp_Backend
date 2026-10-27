@@ -126,14 +126,26 @@ export const verifyUserFaceService = async (
     );
   }
 
-// 7. Get only user's second photo (order = 2)
-const userPhoto = await prisma.userPhoto.findFirst({
-  where: {
-    user_id: userId,
-    media_type: MediaType.IMAGE,
-    order: 2,
-  },
-});
+  // 7. Get user's first/profile photo
+  const userPhoto =
+    await prisma.userPhoto.findFirst({
+      where: {
+        user_id: userId,
+        media_type: MediaType.IMAGE,
+      },
+
+      orderBy: [
+        {
+          is_primary: "desc",
+        },
+        {
+          order: "asc",
+        },
+        {
+          created_at: "asc",
+        },
+      ],
+    });
 
   if (!userPhoto) {
     throw new Error(
