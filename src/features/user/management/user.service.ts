@@ -5,6 +5,7 @@ import {
   MIN_REPLY_SAMPLES,
 } from "../../chat/user-reply-stats.service";
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
+import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 import { calculateAge } from "../feed/feed.service";
 
 //SERVICE LAYER FOR ALL USER MANAGEMENT
@@ -207,28 +208,21 @@ export const getSingleUser = async (id: string, currentUserId?: string) => {
   isBoosted = !!activeBoost;
 
   // ==========================================================
-  // COMPATIBILITY
-  // ==========================================================
+// DYNAMIC MATCH SCORE - REDIS + PRISMA
+// ==========================================================
 
-  if (currentUserId) {
-    const compatibility = await prisma.userCompatibility.findFirst({
-      where: {
-        userId: currentUserId,
-        targetUserId: user.id,
-      },
+if (currentUserId && currentUserId !== user.id) {
+  const matchScoreMap = await getMatchScoresForUsers(
+    currentUserId,
+    [user.id],
+  );
 
-      select: {
-        score: true,
-        percentage: true,
-      },
-    });
+  const compatibility = matchScoreMap.get(user.id);
 
-    if (compatibility) {
-      matchScore = compatibility.percentage || 0;
+  matchScore = compatibility?.percentage ?? 0;
 
-      compatibilityScore = compatibility.score || 0;
-    }
-  }
+  compatibilityScore = compatibility?.score ?? 0;
+}
 
   // ==========================================================
   // DISTANCE

@@ -14,6 +14,7 @@ import {
   SubmitNoShowFeedbackInput,
   UpdateMetUserInput,
 } from "./datePlanMyPlans.types";
+import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 
 /**
  * Calculate user's age
@@ -300,6 +301,23 @@ export const getMyPlansService = async ({
     }),
   ]);
 
+  // ============================================
+  // DYNAMIC REQUESTER MATCH SCORE - REDIS + PRISMA
+  // ============================================
+
+  // Collect unique requester IDs across all plans
+  const requesterIds = [
+    ...new Set(
+      plans.flatMap((plan) =>
+        plan.requests.map((request) => request.requester.id),
+      ),
+    ),
+  ];
+
+  // Calculate compatibility between the logged-in host
+  // and each requester in one batch
+  const matchScoreMap = await getMatchScoresForUsers(userId, requesterIds);
+
   const now = new Date();
 
   /**
@@ -493,7 +511,7 @@ export const getMyPlansService = async ({
           age: calculateAge(request.requester.birth_date),
           photo: request.requester.photos[0]?.media_url ?? null,
           trustScore: request.requester.trust_score ?? 0,
-          matchScore: 77,
+          matchScore: matchScoreMap.get(request.requester.id)?.percentage ?? 0,
           matchPercentage: null,
           location: request.requester.profile
             ? {

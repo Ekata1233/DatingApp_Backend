@@ -92,6 +92,65 @@ export const getUnreadNotificationCountRepository = async (
   });
 };
 
+// =============================================
+// CATEGORY-WISE UNREAD NOTIFICATION COUNTS
+// =============================================
+
+export const getUnreadNotificationCategoryCountsRepository = async (
+  userId: string,
+) => {
+  const [
+    all,
+    likesAndRoses,
+    matches,
+    gifts,
+    dates,
+    events,
+  ] = await Promise.all([
+    // All unread notifications
+    getUnreadNotificationCountRepository(userId),
+
+    // Likes + Roses + Super Likes
+    getUnreadNotificationCountRepository(userId, [
+      NotificationType.NEW_LIKE,
+      NotificationType.NEW_ROSE,
+      NotificationType.SUPER_LIKE,
+    ]),
+
+    // Matches
+    getUnreadNotificationCountRepository(userId, [
+      NotificationType.NEW_MATCH,
+    ]),
+
+    // Gifts
+    getUnreadNotificationCountRepository(userId, [
+      NotificationType.NEW_GIFT,
+    ]),
+
+    // Dates
+    getUnreadNotificationCountRepository(userId, [
+      NotificationType.DATE_INVITE,
+      NotificationType.DATE_CONFIRMED,
+    ]),
+
+    // Events
+    getUnreadNotificationCountRepository(userId, [
+      NotificationType.EVENT_INVITE,
+      NotificationType.EVENT_RESPONSE,
+    ]),
+  ]);
+
+  return {
+    unreadCount: all,
+    all,
+    likesAndRoses,
+    matches,
+    gifts,
+    dates,
+    events,
+  };
+};
+
 export const findNotificationByIdRepository = async (
   notificationId: string,
   userId: string,

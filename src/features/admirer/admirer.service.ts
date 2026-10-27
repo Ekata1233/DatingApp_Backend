@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
+import { getMatchScoresForUsers } from "../match-score/match-score.service";
 
 type AdmirerDirection = "RECEIVED" | "SENT";
 
@@ -498,49 +499,21 @@ export const getAdmirers = async ({
   );
 
   // ==========================================
-  // FETCH COMPATIBILITY SCORES
-  // ==========================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// ==========================================
 
-  let compatibilityMap = new Map<
-    string,
-    {
-      score: number;
-      percentage: number;
-    }
-  >();
+const matchScoreStart = performance.now();
 
-  if (userIds.length > 0) {
-    const compatibilityScores = await prisma.userCompatibility.findMany({
-      where: {
-        userId,
+const compatibilityMap = await getMatchScoresForUsers(
+  userId,
+  userIds,
+);
 
-        targetUserId: {
-          in: userIds,
-        },
-      },
-
-      select: {
-        targetUserId: true,
-        score: true,
-        percentage: true,
-      },
-    });
-
-    compatibilityMap = new Map(
-      compatibilityScores.map((compatibility) => [
-        compatibility.targetUserId,
-        {
-          score: compatibility.score,
-
-          percentage: compatibility.percentage,
-        },
-      ]),
-    );
-  }
-
-  // ==========================================
-  // FETCH MATCHES
-  // ==========================================
+console.log(
+  "Admirers dynamic match scores:",
+  performance.now() - matchScoreStart,
+  "ms",
+);
 
   const matches =
     userIds.length > 0
@@ -987,6 +960,18 @@ export const getAdmirerDetailsService = async (
   }
 
   // ==========================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// ==========================================
+
+const matchScoreMap = await getMatchScoresForUsers(
+  userId,
+  [admirerId],
+);
+
+const matchScore =
+  matchScoreMap.get(admirerId)?.percentage ?? 0;
+
+  // ==========================================
   // 3. WHY THEY LIKED YOU
   // ==========================================
   //
@@ -1214,7 +1199,7 @@ export const getAdmirerDetailsService = async (
     // 5. MATCH - STATIC
     // ========================================
 
-    matchScore: 75,
+    matchScore,
 
     // ========================================
     // 6. DISTANCE

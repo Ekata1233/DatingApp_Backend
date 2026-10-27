@@ -86,11 +86,9 @@ export function calculateMatchScore(me: any, user: any) {
 
     // score += distanceScore(distanceKm);
 
-    const myAnswers = buildAnswerMap(me.answer);
-    const otherAnswers = buildAnswerMap(user.answer);
+const myAnswers = buildAnswerMap(me.answer ?? []);
+const otherAnswers = buildAnswerMap(user.answer ?? []);
 
-    console.log("myAnswers", myAnswers);
-    console.log("otherAnswers", otherAnswers);
 
     score += drinkScore(
         myAnswers["drinking"],
@@ -211,8 +209,8 @@ export function calculateMatchScore(me: any, user: any) {
 
     // Bio
     score += bioScore(
-        me.profile.bio,
-        user.profile.bio
+        me.bio?.bio ?? undefined,
+    user.bio?.bio ?? undefined
     );
 
     // Photos
@@ -230,7 +228,13 @@ export function calculateMatchScore(me: any, user: any) {
     const MAX_SCORE = 186;
 
     return {
-        score,
-        percentage: Math.round((score / MAX_SCORE) * 100),
+       score: Math.round(score * 100) / 100,
+  percentage: Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round((score / MAX_SCORE) * 100),
+    ),
+  ),
     };
 }
