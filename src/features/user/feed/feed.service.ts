@@ -414,6 +414,22 @@ export const getFeedService = async ({
 
   const activePackageName = activeFeedPackage?.package?.name ?? "FREE";
 
+  // ========================================================
+// PACKAGE BASED FEED VISIBILITY
+// ========================================================
+
+const isVipDiscoveryPool =
+  activePackageName === "VIP" ||
+  activePackageName === "VIP_ELITE";
+
+console.log("FEED PACKAGE VISIBILITY:", {
+  userId,
+  activePackageName,
+  discoveryPool: isVipDiscoveryPool
+    ? "VIP_AND_VIP_ELITE"
+    : "FREE_AND_PREMIUM",
+});
+
   // ==========================================
   // PACKAGE BASED DAILY LIMIT
   // ==========================================
@@ -886,6 +902,53 @@ export const getFeedService = async ({
         u.deleted_at IS NULL
         AND u.account_status = 'ACTIVE'::"AccountStatus"
         AND u.id <> ${userId}::uuid
+      
+AND (
+  CASE
+    WHEN ${isVipDiscoveryPool}::boolean THEN
+
+      EXISTS (
+        SELECT 1
+        FROM user_packages up
+        INNER JOIN package pkg
+          ON pkg.id = up."packageId"
+
+        WHERE up.user_id = u.id
+          AND up.status = 'ACTIVE'::"PackageStatus"
+          AND up."startDate" <= ${now}
+          AND (
+            up."endDate" IS NULL
+            OR up."endDate" > ${now}
+          )
+          AND pkg.name IN (
+            'VIP'::"PackageType",
+            'VIP_ELITE'::"PackageType"
+          )
+      )
+
+    ELSE
+
+      NOT EXISTS (
+        SELECT 1
+        FROM user_packages up
+        INNER JOIN package pkg
+          ON pkg.id = up."packageId"
+
+        WHERE up.user_id = u.id
+          AND up.status = 'ACTIVE'::"PackageStatus"
+          AND up."startDate" <= ${now}
+          AND (
+            up."endDate" IS NULL
+            OR up."endDate" > ${now}
+          )
+          AND pkg.name IN (
+            'VIP'::"PackageType",
+            'VIP_ELITE'::"PackageType"
+          )
+      )
+
+  END
+)
         AND NOT EXISTS (
           SELECT 1
           FROM swipes s
