@@ -45,7 +45,8 @@ export interface UserFeedResponse {
   religion: string | null;
   community: string | null;
   motherTongue: string | null;
-  height: number | null;
+height: number | null;
+heightInFeet: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -130,4 +131,9 @@ export interface SiblingInfo {
   relation: string | null;
   occupation: string | null;
   marital: string | null;
+}
+
+export interface DeletedUserResponse {
+  isDeleted: true;
+  message: string;
 }

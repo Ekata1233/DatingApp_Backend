@@ -3,11 +3,9 @@ import { ZodError } from "zod";
 
 import { sendEngagementService } from "./engagement.service";
 import { sendEngagementSchema } from "./engagement.validation";
+import { getIO } from "../../config/socket";
 
-export const sendEngagement = async (
-  req: Request,
-  res: Response
-) => {
+export const sendEngagement = async (req: Request, res: Response) => {
   try {
     /* ------------------------------------------------------------------------ */
     /*                              Auth User                                   */
@@ -19,28 +17,58 @@ export const sendEngagement = async (
     /*                              Validation                                  */
     /* ------------------------------------------------------------------------ */
 
-    const data = sendEngagementSchema.parse(
-      req.body
-    );
+    const data = sendEngagementSchema.parse(req.body);
 
     /* ------------------------------------------------------------------------ */
     /*                              Service                                     */
     /* ------------------------------------------------------------------------ */
 
-    const result =
-      await sendEngagementService(
-        senderId,
-        data
-      );
+    const result = await sendEngagementService(senderId, data);
+
+    /* ------------------------------------------------------------------------ */
+    /*                    SOCKET.IO REAL-TIME MESSAGE                           */
+    /* ------------------------------------------------------------------------ */
+
+    try {
+      const io = getIO();
+
+      const receiverId = data.receiverId;
+
+      // The service must return the saved chat message
+      const message = result.data?.message;
+
+      if (message) {
+        // ========================================
+        // SEND MESSAGE TO RECEIVER
+        // ========================================
+
+        io.to(`user:${receiverId}`).emit("message:receive", message);
+
+        // ========================================
+        // SEND MESSAGE TO SENDER
+        // ========================================
+
+        io.to(`user:${senderId}`).emit("message:receive", message);
+
+        console.log("Engagement message socket sent:", {
+          senderId,
+          receiverId,
+          messageId: message.id,
+        });
+      }
+    } catch (socketError) {
+      // Socket failure should not affect
+      // successful engagement transaction
+
+      console.error("Engagement socket emission error:", socketError);
+    }
 
     /* ------------------------------------------------------------------------ */
     /*                              Response                                    */
     /* ------------------------------------------------------------------------ */
 
     return res.status(201).json(result);
-
   } catch (error) {
-
     /* ------------------------------------------------------------------------ */
     /*                              Zod Error                                   */
     /* ------------------------------------------------------------------------ */
@@ -66,9 +94,9 @@ export const sendEngagement = async (
           message: error.message,
           errors: {
             fieldErrors: {
-              rose: [error.message]
-            }
-          }
+              rose: [error.message],
+            },
+          },
         });
       }
 
@@ -77,8 +105,8 @@ export const sendEngagement = async (
         success: false,
         message: error.message,
         errors: {
-          fieldErrors: {}
-        }
+          fieldErrors: {},
+        },
       });
     }
 
@@ -88,14 +116,14 @@ export const sendEngagement = async (
 
     // Log the error for debugging
     console.error("Unexpected error in sendEngagement:", error);
-    
+
     // Return a generic error response instead of throwing
     return res.status(500).json({
       success: false,
       message: "Internal server error",
       errors: {
-        fieldErrors: {}
-      }
+        fieldErrors: {},
+      },
     });
   }
 };

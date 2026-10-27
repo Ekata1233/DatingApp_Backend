@@ -26,7 +26,7 @@ export const ROSE_CONSTANTS = {
     BLOCKED_USER: 'You cannot send a rose to this user',
     ALREADY_MATCHED: 'You are already matched with this user',
     RATE_LIMIT_EXCEEDED: 'You have exceeded the daily rose limit',
-    COOLDOWN_ACTIVE: 'Please wait before sending another rose to this user',
+    COOLDOWN_ACTIVE: 'Please wait before sending another rose to this user (1 min)',
     SAME_USER_LIMIT: 'You can only send 3 roses per day to the same user',
     INVALID_ROSE_TYPE: 'Invalid rose type',
     PURCHASED_ROSES_UNAVAILABLE: 'You don\'t have purchased roses available',

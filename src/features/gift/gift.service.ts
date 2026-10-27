@@ -203,23 +203,69 @@ export const sendGiftService = async (
   });
 
   // 🔔 Send notification AFTER transaction successfully commits
-  createNotification({
+  // createNotification({
+  //   senderId,
+  //   receiverId,
+  //   type: "NEW_GIFT",
+  //   title: "You received a gift 🎁",
+  //   message: "Someone sent you a gift 🎁",
+  //   data: {
+  //     giftId: result.gift.id,
+  //     senderId,
+  //     receiverId,
+  //     targetType,
+  //     targetId,
+  //     type: "GIFT",
+  //   },
+  // }).catch((error) => {
+  //   console.error("Failed to send rose notification:", error);
+  // });
+
+  // ============================================
+// CREATE GIFT NOTIFICATION
+// AFTER SUCCESSFUL TRANSACTION
+// ============================================
+
+try {
+  console.log("🎁 Creating gift notification...", {
     senderId,
     receiverId,
+    giftId: result.gift.id,
+  });
+
+  const notification = await createNotification({
+    senderId,
+    receiverId,
+
     type: "NEW_GIFT",
+
     title: "You received a gift 🎁",
-    message: "Someone sent you a gift 🎁",
+
+    message: `Someone sent you ${result.gift.giftName} 🎁`,
+
     data: {
+      type: "GIFT",
       giftId: result.gift.id,
+      giftName: result.gift.giftName,
       senderId,
       receiverId,
       targetType,
       targetId,
-      type: "GIFT",
     },
-  }).catch((error) => {
-    console.error("Failed to send rose notification:", error);
   });
+
+  console.log(
+    "✅ Gift notification result:",
+    notification,
+  );
+} catch (error) {
+  console.error(
+    "❌ Gift notification creation failed:",
+    error,
+  );
+}
+
+return result;
 
   return result;
 };

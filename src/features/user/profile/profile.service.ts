@@ -21,6 +21,9 @@ import { queueMatchScoreCalculation } from "../../../queues/match-score.queue";
 import { QUESTION_SCREEN_TO_ONBOARDING_STEP } from "../../../config/onboardingFlows";
 import { clearFeedUserCache, clearUserFeedDetailsCache } from "../user.helper";
 
+const MAX_PHOTOS = 6;
+const MAX_VIDEOS = 1;
+
 //profile update service
 export const updateProfileService = async (
   userId: string,
@@ -64,7 +67,9 @@ export const updateProfileService = async (
       birth_date: new Date(birth_date),
       height,
       gender,
-      gender_option,
+      ...(gender_option !== undefined && {
+        gender_option,
+      }),
       onboarding_step: currentStep,
       next_step: nextStep,
     },
@@ -151,28 +156,88 @@ export const updateInterestedInService = async (
 };
 
 //Religion
+
 export const updateReligionService = async (
   userId: string,
-  religionId: number,
-  communityId: number,
+  religionId?: number,
+  communityId?: number,
 ) => {
   if (!userId) {
     throw new Error("User ID is missing");
   }
 
-  // Validate community belongs to religion
-  const community = await prisma.community.findUnique({
+  if (religionId === undefined && communityId === undefined) {
+    throw new Error("At least religionId or communityId is required");
+  }
+
+  if (
+    religionId !== undefined &&
+    (!Number.isInteger(religionId) || religionId <= 0)
+  ) {
+    throw new Error("Invalid religionId");
+  }
+
+  if (
+    communityId !== undefined &&
+    (!Number.isInteger(communityId) || communityId <= 0)
+  ) {
+    throw new Error("Invalid communityId");
+  }
+
+  const existingProfile = await prisma.userProfile.findUnique({
     where: {
-      id: communityId,
+      user_id: userId,
     },
   });
 
-  if (!community) {
-    throw new Error("Community not found");
+  let finalReligionId = religionId ?? existingProfile?.religionId ?? null;
+
+  let finalCommunityId: number | null =
+    communityId ?? existingProfile?.communityId ?? null;
+
+  if (religionId !== undefined) {
+    const religion = await prisma.religion.findUnique({
+      where: {
+        id: religionId,
+      },
+    });
+
+    if (!religion) {
+      throw new Error("Religion not found");
+    }
   }
 
-  if (community.religionId !== religionId) {
-    throw new Error("Selected community does not belong to selected religion");
+  if (communityId !== undefined) {
+    const community = await prisma.community.findUnique({
+      where: {
+        id: communityId,
+      },
+    });
+
+    if (!community) {
+      throw new Error("Community not found");
+    }
+
+    if (community.religionId !== finalReligionId) {
+      throw new Error(
+        "Selected community does not belong to selected religion",
+      );
+    }
+  } else if (religionId !== undefined && finalCommunityId !== null) {
+    // Religion changed without community:
+    // clear existing community if incompatible.
+    const existingCommunity = await prisma.community.findUnique({
+      where: {
+        id: finalCommunityId,
+      },
+    });
+
+    if (
+      !existingCommunity ||
+      existingCommunity.religionId !== finalReligionId
+    ) {
+      finalCommunityId = null;
+    }
   }
 
   const currentStep = "RELIGION";
@@ -183,13 +248,13 @@ export const updateReligionService = async (
       user_id: userId,
     },
     update: {
-      religionId,
-      communityId,
+      religionId: finalReligionId,
+      communityId: finalCommunityId,
     },
     create: {
       user_id: userId,
-      religionId,
-      communityId,
+      religionId: finalReligionId,
+      communityId: finalCommunityId,
     },
     include: {
       religion: true,
@@ -210,14 +275,13 @@ export const updateReligionService = async (
     },
   });
 
-  // await queueMatchScoreCalculation(
-  //   userId,
-  // );
+  // await queueMatchScoreCalculation(userId);
 
   await redis.del(`profile:edit:${userId}`);
-  // await redis.del(`feed:details:${userId}`);
+
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
+
   return updatedProfile;
 };
 
@@ -246,7 +310,6 @@ export const updateReligionService = async (
 //   return updatedUser;
 // };
 
-
 //LOOKING FOR API BUT IN DATABASE MODEL NAME IS INTENTION
 export const updateLookingForService = async (
   userId: string,
@@ -264,19 +327,16 @@ export const updateLookingForService = async (
     throw new Error("Invalid option selected");
   }
 
-  const score = await calculateProfileScore(userId);
-
   const currentStep = "LOOKING_FOR";
   const nextStep = getNextStep(currentStep);
 
-
+  // 1. Update intention first
   const result = await prisma.user.update({
     where: { id: userId },
     data: {
-      intentionId: selectedOption.id, // ✅ Save the option ID
+      intentionId: selectedOption.id,
       onboarding_step: currentStep,
       next_step: nextStep,
-      profile_completion: score,
     },
     include: {
       intention: {
@@ -287,15 +347,27 @@ export const updateLookingForService = async (
     },
   });
 
-  // await queueMatchScoreCalculation(
-  //   userId,
-  // );
+  // 2. Calculate score after updating intention
+  const score = await calculateProfileScore(userId);
 
+  // 3. Update profile completion
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      profile_completion: score,
+    },
+  });
+
+  // 4. Clear cache
   await redis.del(`profile:edit:${userId}`);
-  // await redis.del(`feed:details:${userId}`);
+
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
-  return result;
+
+  return {
+    ...result,
+    profile_completion: score,
+  };
 };
 
 //Address
@@ -322,14 +394,14 @@ export const updateAddressService = async (
         country,
         state,
         city,
-        area
+        area,
       },
       create: {
         user_id: userId,
         country,
         state,
         city,
-        area
+        area,
       },
     });
 
@@ -477,15 +549,16 @@ export const updateLocationService = async (
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
-      next_step: nextStep, profile_completion: score
+      next_step: nextStep,
+      profile_completion: score,
     },
   });
 
-  console.log("before bull mq")
+  console.log("before bull mq");
   // await queueMatchScoreCalculation(
   //   userId,
   // );
-  console.log("after bullmq")
+  console.log("after bullmq");
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
@@ -547,8 +620,7 @@ export const updateUserAnswerService = async (
   // GET ONBOARDING STEP FROM QUESTION SCREEN
   // =====================================================
 
-  const currentStep =
-    QUESTION_SCREEN_TO_ONBOARDING_STEP[question.screen];
+  const currentStep = QUESTION_SCREEN_TO_ONBOARDING_STEP[question.screen];
 
   if (!currentStep) {
     throw new Error(
@@ -565,7 +637,8 @@ export const updateUserAnswerService = async (
     where: { id: userId },
     data: {
       onboarding_step: currentStep,
-      next_step: nextStep, profile_completion: score
+      next_step: nextStep,
+      profile_completion: score,
     },
   });
 
@@ -942,9 +1015,7 @@ export const uploadUserMediaService = async (
 
   if (!files || files.length === 0) {
     throw new Error(
-      mediaType === "IMAGE"
-        ? "No images provided"
-        : "No videos provided",
+      mediaType === "IMAGE" ? "No images provided" : "No videos provided",
     );
   }
 
@@ -968,69 +1039,74 @@ export const uploadUserMediaService = async (
   });
 
   // ==================================================
+  // VALIDATE MEDIA UPLOAD LIMIT
+  // ==================================================
+
+  const maxAllowed = mediaType === "IMAGE" ? MAX_PHOTOS : MAX_VIDEOS;
+
+  const existingCount = existingMedia.length;
+
+  const incomingCount = files.length;
+
+  if (existingCount >= maxAllowed) {
+    throw new Error(
+      mediaType === "IMAGE"
+        ? "You can upload a maximum of 6 photos."
+        : "You can upload a maximum of 1 video.",
+    );
+  }
+
+  if (existingCount + incomingCount > maxAllowed) {
+    const remainingSlots = maxAllowed - existingCount;
+
+    throw new Error(
+      mediaType === "IMAGE"
+        ? `You can upload only ${remainingSlots} more photo(s). Maximum 6 photos allowed.`
+        : "You can upload a maximum of 1 video.",
+    );
+  }
+  // ==================================================
   // 2. FIND CURRENT HIGHEST ORDER
   // ==================================================
 
   const highestOrder =
-    existingMedia.length > 0
-      ? existingMedia[0].order ?? 0
-      : 0;
+    existingMedia.length > 0 ? (existingMedia[0].order ?? 0) : 0;
 
   // ==================================================
   // 3. CHECK IF PRIMARY PHOTO ALREADY EXISTS
   // ==================================================
 
   const hasPrimaryPhoto =
-    mediaType === "IMAGE" &&
-    existingMedia.some(
-      (media) => media.is_primary,
-    );
+    mediaType === "IMAGE" && existingMedia.some((media) => media.is_primary);
 
   // ==================================================
   // 4. UPLOAD MEDIA
   // ==================================================
 
   const uploadedMedia = await Promise.all(
-    files.map(
-      async (
-        file: any,
-        index: number,
-      ) => {
-        const base64File =
-          file.data.toString("base64");
+    files.map(async (file: any, index: number) => {
+      const base64File = file.data.toString("base64");
 
-        const uploadResponse =
-          await imagekit.upload({
-            file: base64File,
-            fileName: file.name,
-            folder:
-              mediaType === "IMAGE"
-                ? "/user-photos"
-                : "/user-videos",
-          });
+      const uploadResponse = await imagekit.upload({
+        file: base64File,
+        fileName: file.name,
+        folder: mediaType === "IMAGE" ? "/user-photos" : "/user-videos",
+      });
 
-        return {
-          user_id: userId,
+      return {
+        user_id: userId,
 
-          media_url:
-            uploadResponse.url,
+        media_url: uploadResponse.url,
 
-          // Continue after existing photos
-          order:
-            highestOrder +
-            index +
-            1,
+        // Continue after existing photos
+        order: highestOrder + index + 1,
 
-          // Only first-ever image becomes primary
-          is_primary:
-            mediaType === "IMAGE" &&
-            !hasPrimaryPhoto &&
-            index === 0,
+        // Only first-ever image becomes primary
+        is_primary: mediaType === "IMAGE" && !hasPrimaryPhoto && index === 0,
 
-          media_type: mediaType,
-        };
-      },
-    ),
+        media_type: mediaType,
+      };
+    }),
   );
 
   // ==================================================
@@ -1045,17 +1121,16 @@ export const uploadUserMediaService = async (
   // 6. GET ALL MEDIA IN CORRECT ORDER
   // ==================================================
 
-  const savedMedia =
-    await prisma.userPhoto.findMany({
-      where: {
-        user_id: userId,
-        media_type: mediaType,
-      },
+  const savedMedia = await prisma.userPhoto.findMany({
+    where: {
+      user_id: userId,
+      media_type: mediaType,
+    },
 
-      orderBy: {
-        order: "asc",
-      },
-    });
+    orderBy: {
+      order: "asc",
+    },
+  });
 
   // ==================================================
   // 7. ONBOARDING
@@ -1063,37 +1138,30 @@ export const uploadUserMediaService = async (
 
   const currentStep = "PHOTOS";
 
-  const nextStep =
-    getNextStep(currentStep);
+  const nextStep = getNextStep(currentStep);
 
-  const updatedUser =
-    await prisma.user.update({
-      where: {
-        id: userId,
-      },
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
 
-      data: {
-        onboarding_step:
-          currentStep,
+    data: {
+      onboarding_step: currentStep,
 
-        next_step:
-          nextStep,
-      },
+      next_step: nextStep,
+    },
 
-      select: {
-        onboarding_step: true,
-        next_step: true,
-      },
-    });
+    select: {
+      onboarding_step: true,
+      next_step: true,
+    },
+  });
 
   // ==================================================
   // 8. PROFILE SCORE
   // ==================================================
 
-  const score =
-    await calculateProfileScore(
-      userId,
-    );
+  const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
     where: {
@@ -1101,8 +1169,7 @@ export const uploadUserMediaService = async (
     },
 
     data: {
-      profile_completion:
-        score,
+      profile_completion: score,
     },
   });
 
@@ -1114,17 +1181,12 @@ export const uploadUserMediaService = async (
   //   userId,
   // );
 
-  await redis.del(
-    `profile:edit:${userId}`,
-  );
+  await redis.del(`profile:edit:${userId}`);
 
-  await redis.del(
-    `feed:details:${userId}`,
-  );
+  await redis.del(`feed:details:${userId}`);
 
-  await clearFeedUserCache(userId,);
+  await clearFeedUserCache(userId);
   await clearUserFeedDetailsCache(userId);
-
 
   return {
     media: savedMedia,
@@ -1152,15 +1214,22 @@ export const updateUserMediaService = async (
     throw new Error("Media not found");
   }
 
+  // ==================================================
+  // 2. PREVENT MEDIA TYPE CHANGE
+  // ==================================================
+
+  if (existingMedia.media_type !== mediaType) {
+    throw new Error(
+      "Media type cannot be changed. Please upload the correct media type.",
+    );
+  }
+
   const base64File = file.data.toString("base64");
 
   const uploadResponse = await imagekit.upload({
     file: base64File,
     fileName: file.name,
-    folder:
-      mediaType === "IMAGE"
-        ? "/user-photos"
-        : "/user-videos",
+    folder: mediaType === "IMAGE" ? "/user-photos" : "/user-videos",
   });
 
   const updatedMedia = await prisma.userPhoto.update({
@@ -1242,107 +1311,89 @@ export const deleteUserMediaService = async (
   mediaId: string,
   mediaType: "IMAGE" | "VIDEO",
 ) => {
-  const media =
-    await prisma.userPhoto.findFirst({
+  const media = await prisma.userPhoto.findFirst({
+    where: {
+      id: mediaId,
+      user_id: userId,
+      media_type: mediaType,
+    },
+  });
+
+  if (!media) {
+    throw new Error("Media not found");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Delete media
+    await tx.userPhoto.delete({
       where: {
         id: mediaId,
-        user_id: userId,
-        media_type: mediaType,
       },
     });
 
-  if (!media) {
-    throw new Error(
-      "Media not found",
-    );
-  }
+    // ==============================================
+    // IMAGE LOGIC
+    // ==============================================
 
-  await prisma.$transaction(
-    async (tx) => {
-      // Delete media
-      await tx.userPhoto.delete({
+    if (mediaType === "IMAGE") {
+      const remainingPhotos = await tx.userPhoto.findMany({
         where: {
-          id: mediaId,
+          user_id: userId,
+          media_type: "IMAGE",
+        },
+
+        orderBy: {
+          order: "asc",
         },
       });
 
-      // ==============================================
-      // IMAGE LOGIC
-      // ==============================================
+      // ------------------------------------------
+      // Reassign order
+      // ------------------------------------------
 
-      if (mediaType === "IMAGE") {
-        const remainingPhotos =
-          await tx.userPhoto.findMany({
-            where: {
-              user_id: userId,
-              media_type: "IMAGE",
-            },
+      for (let i = 0; i < remainingPhotos.length; i++) {
+        await tx.userPhoto.update({
+          where: {
+            id: remainingPhotos[i].id,
+          },
 
-            orderBy: {
-              order: "asc",
-            },
-          });
-
-        // ------------------------------------------
-        // Reassign order
-        // ------------------------------------------
-
-        for (
-          let i = 0;
-          i < remainingPhotos.length;
-          i++
-        ) {
-          await tx.userPhoto.update({
-            where: {
-              id: remainingPhotos[i].id,
-            },
-
-            data: {
-              order: i + 1,
-            },
-          });
-        }
-
-        // ------------------------------------------
-        // If deleted photo was primary,
-        // make first remaining photo primary
-        // ------------------------------------------
-
-        if (
-          media.is_primary &&
-          remainingPhotos.length > 0
-        ) {
-          await tx.userPhoto.update({
-            where: {
-              id: remainingPhotos[0].id,
-            },
-
-            data: {
-              is_primary: true,
-            },
-          });
-        }
+          data: {
+            order: i + 1,
+          },
+        });
       }
-    },
-  );
+
+      // ------------------------------------------
+      // If deleted photo was primary,
+      // make first remaining photo primary
+      // ------------------------------------------
+
+      if (media.is_primary && remainingPhotos.length > 0) {
+        await tx.userPhoto.update({
+          where: {
+            id: remainingPhotos[0].id,
+          },
+
+          data: {
+            is_primary: true,
+          },
+        });
+      }
+    }
+  });
 
   // await queueMatchScoreCalculation(
   //   userId,
   // );
 
-  await redis.del(
-    `profile:edit:${userId}`,
-  );
+  await redis.del(`profile:edit:${userId}`);
 
-  await redis.del(
-    `feed:details:${userId}`,
-  );
+  await redis.del(`feed:details:${userId}`);
 
-  await clearFeedUserCache(userId,);
+  await clearFeedUserCache(userId);
   await clearUserFeedDetailsCache(userId);
 
-
-  const score = await calculateProfileScore(userId,);
+  const score = await calculateProfileScore(userId);
 
   await prisma.user.update({
     where: {
@@ -1350,23 +1401,16 @@ export const deleteUserMediaService = async (
     },
 
     data: {
-      profile_completion:
-        score,
+      profile_completion: score,
     },
   });
 
   return {
-    message:
-      mediaType === "IMAGE"
-        ? "Photo deleted"
-        : "Video deleted",
+    message: mediaType === "IMAGE" ? "Photo deleted" : "Video deleted",
   };
 };
 
-export const updateUserVideoService = async (
-  userId: string,
-  file: any,
-) => {
+export const updateUserVideoService = async (userId: string, file: any) => {
   if (!userId) throw new Error("User ID is required");
 
   // Check existing video

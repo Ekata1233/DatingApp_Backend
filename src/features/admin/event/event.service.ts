@@ -1410,9 +1410,40 @@ export const getEventList = async (
       },
     },
   });
+// ============================================
+// FILTER OUT EVENTS WHOSE END TIME HAS PASSED
+// ============================================
 
+const currentDateTime = new Date();
+
+const activeEvents = events.filter((event) => {
+  if (!event.eventDate || !event.endTime) {
+    return false;
+  }
+
+  const eventDate = event.eventDate
+    .toISOString()
+    .split("T")[0];
+
+  const endTime = event.endTime.trim();
+
+  // Supports HH:mm and HH:mm:ss
+  if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(endTime)) {
+    return false;
+  }
+
+  const normalizedEndTime =
+    endTime.length === 5 ? `${endTime}:00` : endTime;
+
+  // Event timezone: IST (+05:30)
+  const eventEndDateTime = new Date(
+    `${eventDate}T${normalizedEndTime}+05:30`,
+  );
+
+  return currentDateTime < eventEndDateTime;
+});
   const eventsWithBookingStats = await Promise.all(
-    events.map(async (event) => {
+    activeEvents.map(async (event) => {
       const bookingStats = await getEventBookingStats(
         event.id,
         event.totalCapacity,

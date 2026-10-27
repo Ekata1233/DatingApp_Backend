@@ -48,6 +48,7 @@ export const PROFILE_WEIGHTS = {
     MARITAL_STATUS: 1,
     ZODIAC: 1,
     LANGUAGES: 1,
+    COMMUNICATION_STYLE:1,
   },
 
   INTERESTED_IN: {

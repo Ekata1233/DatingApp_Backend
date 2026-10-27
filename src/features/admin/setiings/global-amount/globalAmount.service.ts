@@ -3,6 +3,10 @@ import { prisma } from "../../../../prisma/prismaClient";
 interface GlobalAmountInput {
   gst: number;
   eventPlatformFee: number;
+  freeProfileLimit: number;
+  premiumProfileLimit: number;
+  vipProfileLimit: number;
+  vipEliteProfileLimit: number;
 }
 
 export const createGlobalAmountService = async (
@@ -43,6 +47,10 @@ export const createGlobalAmountService = async (
         gst: data.gst,
         eventPlatformFee:
           data.eventPlatformFee,
+          freeProfileLimit: data.freeProfileLimit,
+premiumProfileLimit: data.premiumProfileLimit,
+vipProfileLimit: data.vipProfileLimit,
+vipEliteProfileLimit: data.vipEliteProfileLimit,
       },
     });
 

@@ -46,6 +46,8 @@ export const getSingleUserController = async (
   res: Response,
 ) => {
   try {
+
+    console.log("GET USER DETAILS CONTROLLER CALLED");
     const { id } = req.params;
 
     if (Array.isArray(id) || !id) {

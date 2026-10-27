@@ -103,14 +103,14 @@ export const chatRepository = {
           userId,
         },
       },
-       include: {
-      user: {
-        select: {
-          id: true,
-          full_name: true,
+      include: {
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+          },
         },
       },
-    },
     });
   },
 
@@ -336,7 +336,6 @@ export const chatRepository = {
   //   return result.filter(Boolean);
   // },
 
-
   async findUserConversations(
     userId: string,
     cursor?: string,
@@ -351,16 +350,15 @@ export const chatRepository = {
     let onlineUserIds: string[] = [];
 
     if (type === "nearby") {
-      const currentUserProfile =
-        await prisma.userProfile.findUnique({
-          where: {
-            user_id: userId,
-          },
-          select: {
-            latitude: true,
-            longitude: true,
-          },
-        });
+      const currentUserProfile = await prisma.userProfile.findUnique({
+        where: {
+          user_id: userId,
+        },
+        select: {
+          latitude: true,
+          longitude: true,
+        },
+      });
 
       if (
         currentUserProfile?.latitude == null ||
@@ -370,30 +368,26 @@ export const chatRepository = {
       }
 
       // 10 KM radius
-      const nearbyUsers = await prisma.$queryRaw<
-        { user_id: string }[]
-      >`
-      SELECT up.user_id
-      FROM user_profiles up
-      WHERE
-        up.user_id <> ${userId}::uuid
-        AND up.location IS NOT NULL
-        AND ST_DWithin(
-          up.location,
-          ST_SetSRID(
-            ST_MakePoint(
-              ${Number(currentUserProfile.longitude)},
-              ${Number(currentUserProfile.latitude)}
-            ),
-            4326
-          )::geography,
-          25000
-        )
-    `;
+      const nearbyUsers = await prisma.$queryRaw<{ user_id: string }[]>`
+        SELECT up.user_id
+        FROM user_profiles up
+        WHERE
+          up.user_id <> ${userId}::uuid
+          AND up.location IS NOT NULL
+          AND ST_DWithin(
+            up.location,
+            ST_SetSRID(
+              ST_MakePoint(
+                ${Number(currentUserProfile.longitude)},
+                ${Number(currentUserProfile.latitude)}
+              ),
+              4326
+            )::geography,
+            25000
+          )
+      `;
 
-      nearbyUserIds = nearbyUsers.map(
-        (user) => user.user_id,
-      );
+      nearbyUserIds = nearbyUsers.map((user) => user.user_id);
 
       if (nearbyUserIds.length === 0) {
         return [];
@@ -405,27 +399,57 @@ export const chatRepository = {
     // --------------------------------------------------
 
     const where: Prisma.ConversationWhereInput = {
-      participants: {
-        some: {
-          userId,
-          deletedAt: null,
+      AND: [
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
         },
-      },
+        {
+          participants: {
+            some: {
+              userId: {
+                not: userId,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ],
     };
 
     // --------------------------------------------------
     // 3. Nearby filter
     // --------------------------------------------------
 
+    // ============================================
+    // NEARBY CONVERSATION FILTER
+    // ============================================
+
     if (type === "nearby") {
-      where.participants = {
-        some: {
-          userId: {
-            in: nearbyUserIds,
+      where.AND = [
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
           },
-          deletedAt: null,
         },
-      };
+        {
+          participants: {
+            some: {
+              userId: {
+                in: nearbyUserIds,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ];
     }
 
     // --------------------------------------------------
@@ -450,6 +474,11 @@ export const chatRepository = {
         some: {
           messageType: MessageType.GIFT,
           deletedAt: null,
+          deletions: {
+            none: {
+              userId,
+            },
+          },
         },
       };
     }
@@ -470,101 +499,166 @@ export const chatRepository = {
       };
     }
 
-
     // --------------------------------------------------
     // 7. Get conversations
     // --------------------------------------------------
 
-    const fetchLimit =
-      type === "online"
-        ? Math.max(limit * 3, 50)
-        : limit + 1;
+    // ============================================
+    // GET ALL ONLINE USER IDS FOR ONLINE FILTER
+    // ============================================
 
-    const conversations =
-      await prisma.conversation.findMany({
-        where,
-
-        orderBy: {
-          updatedAt: "desc",
+    if (type === "online") {
+      const eligibleConversations = await prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
         },
 
-        // IMPORTANT:
-        // Service will handle pagination.
-        // Repository returns limit + 1.
-        take: limit + 1,
+        select: {
+          participants: {
+            where: {
+              deletedAt: null,
+              userId: {
+                not: userId,
+              },
+            },
+            select: {
+              userId: true,
+            },
+          },
+        },
+      });
 
-        ...(cursor
-          ? {
+      const otherUserIds = [
+        ...new Set(
+          eligibleConversations.flatMap((conversation) =>
+            conversation.participants.map((participant) => participant.userId),
+          ),
+        ),
+      ];
+
+      const presence =
+        otherUserIds.length > 0
+          ? await presenceService.getUsersPresence({
+              userIds: otherUserIds,
+            })
+          : [];
+
+      onlineUserIds = presence
+        .filter((item) => item.isOnline === true)
+        .map((item) => item.userId);
+
+      if (onlineUserIds.length === 0) {
+        return [];
+      }
+
+      where.AND = [
+        {
+          participants: {
+            some: {
+              userId: {
+                in: onlineUserIds,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ];
+    }
+
+    const conversations = await prisma.conversation.findMany({
+      where,
+
+      orderBy: {
+        updatedAt: "desc",
+      },
+
+      // IMPORTANT:
+      // Service will handle pagination.
+      // Repository returns limit + 1.
+      take: limit + 1,
+
+      ...(cursor
+        ? {
             skip: 1,
             cursor: {
               id: cursor,
             },
           }
-          : {}),
+        : {}),
 
-        include: {
-          // --------------------------------------------------
-          // Participants
-          // --------------------------------------------------
+      include: {
+        // --------------------------------------------------
+        // Participants
+        // --------------------------------------------------
 
-          participants: {
-            where: {
-              deletedAt: null,
-            },
+        participants: {
+          where: {
+            deletedAt: null,
+          },
 
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  full_name: true,
-                  birth_date: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                full_name: true,
+                birth_date: true,
 
-                  photos: {
-                    where: {
-                      is_primary: true,
-                    },
+                photos: {
+                  where: {
+                    is_primary: true,
+                  },
 
-                    take: 1,
+                  take: 1,
 
-                    select: {
-                      id: true,
-                      media_url: true,
-                      media_type: true,
-                    },
+                  select: {
+                    id: true,
+                    media_url: true,
+                    media_type: true,
                   },
                 },
               },
             },
           },
+        },
 
-          // --------------------------------------------------
-          // Latest message
-          // --------------------------------------------------
+        // --------------------------------------------------
+        // Latest message
+        // --------------------------------------------------
 
-          messages: {
-            where: {
-              deletedAt: null,
-            },
-
-            orderBy: {
-              createdAt: "desc",
-            },
-
-            take: 1,
-
-            select: {
-              id: true,
-              senderId: true,
-              content: true,
-              messageType: true,
-              mediaUrl: true,
-              createdAt: true,
-              deliveredAt: true,
-              readAt: true,
+        messages: {
+          where: {
+            deletedAt: null,
+            deletions: {
+              none: {
+                userId,
+              },
             },
           },
+
+          orderBy: {
+            createdAt: "desc",
+          },
+
+          take: 1,
+
+          select: {
+            id: true,
+            senderId: true,
+            content: true,
+            messageType: true,
+            mediaUrl: true,
+            createdAt: true,
+            deliveredAt: true,
+            readAt: true,
+          },
         },
-      });
+      },
+    });
 
     // --------------------------------------------------
     // 8. Get other participant IDs
@@ -572,17 +666,13 @@ export const chatRepository = {
 
     const candidateIds = conversations
       .map((conversation) => {
-        const otherParticipant =
-          conversation.participants.find(
-            (participant) =>
-              participant.userId !== userId,
-          );
+        const otherParticipant = conversation.participants.find(
+          (participant) => participant.userId !== userId,
+        );
 
         return otherParticipant?.userId;
       })
-      .filter(
-        (id): id is string => Boolean(id),
-      );
+      .filter((id): id is string => Boolean(id));
 
     // --------------------------------------------------
     // 8.1 Get presence from Redis
@@ -591,11 +681,11 @@ export const chatRepository = {
     const userPresence =
       candidateIds.length > 0
         ? await presenceService.getUsersPresence({
-          userIds: candidateIds,
-        })
+            userIds: candidateIds,
+          })
         : [];
 
-    console.log("user presence : ", userPresence)
+    console.log("user presence : ", userPresence);
 
     // --------------------------------------------------
     // 8.2 Convert presence into Map
@@ -611,34 +701,28 @@ export const chatRepository = {
       ]),
     );
 
-
     // --------------------------------------------------
     // 8.3 ONLINE FILTER
     // --------------------------------------------------
+    const filteredConversations = conversations;
 
-    let filteredConversations = conversations;
+    // let filteredConversations = conversations;
 
-    if (type === "online") {
-      filteredConversations =
-        conversations.filter((conversation) => {
-          const otherParticipant =
-            conversation.participants.find(
-              (participant) =>
-                participant.userId !== userId,
-            );
+    // if (type === "online") {
+    //   filteredConversations = conversations.filter((conversation) => {
+    //     const otherParticipant = conversation.participants.find(
+    //       (participant) => participant.userId !== userId,
+    //     );
 
-          if (!otherParticipant) {
-            return false;
-          }
+    //     if (!otherParticipant) {
+    //       return false;
+    //     }
 
-          const presence =
-            presenceMap.get(
-              otherParticipant.userId,
-            );
+    //     const presence = presenceMap.get(otherParticipant.userId);
 
-          return presence?.isOnline === true;
-        });
-    }
+    //     return presence?.isOnline === true;
+    //   });
+    // }
     // --------------------------------------------------
     // 9. Get compatibility scores
     // --------------------------------------------------
@@ -646,20 +730,20 @@ export const chatRepository = {
     const matchScores =
       candidateIds.length > 0
         ? await prisma.userCompatibility.findMany({
-          where: {
-            userId,
+            where: {
+              userId,
 
-            targetUserId: {
-              in: candidateIds,
+              targetUserId: {
+                in: candidateIds,
+              },
             },
-          },
 
-          select: {
-            targetUserId: true,
-            score: true,
-            percentage: true,
-          },
-        })
+            select: {
+              targetUserId: true,
+              score: true,
+              percentage: true,
+            },
+          })
         : [];
 
     // --------------------------------------------------
@@ -680,10 +764,9 @@ export const chatRepository = {
     // 13. GET GIFT / ROSE PROGRESS
     // ==================================================
 
-    const conversationIds =
-      conversations.map(
-        (conversation) => conversation.id,
-      );
+    const conversationIds = conversations.map(
+      (conversation) => conversation.id,
+    );
 
     // --------------------------------------------------
     // 13.1 Get all active gifts
@@ -692,60 +775,60 @@ export const chatRepository = {
     const giftProgress =
       candidateIds.length > 0
         ? await prisma.userGift.findMany({
-          where: {
-            // Gift sent by current user OR
-            // received by current user
-            OR: [
-              {
-                senderId: userId,
-                receiverId: {
-                  in: candidateIds,
+            where: {
+              // Gift sent by current user OR
+              // received by current user
+              OR: [
+                {
+                  senderId: userId,
+                  receiverId: {
+                    in: candidateIds,
+                  },
                 },
-              },
-              {
-                receiverId: userId,
-                senderId: {
-                  in: candidateIds,
+                {
+                  receiverId: userId,
+                  senderId: {
+                    in: candidateIds,
+                  },
                 },
-              },
-            ],
+              ],
 
-            // Only pending gifts
-            isUnlocked: false,
+              // Only pending gifts
+              isUnlocked: false,
 
-            // Only non-expired gifts
-            expiresAt: {
-              gt: new Date(),
-            },
-          },
-
-          // VERY IMPORTANT
-          // Oldest gift first
-          orderBy: {
-            createdAt: "asc",
-          },
-
-          select: {
-            id: true,
-            senderId: true,
-            receiverId: true,
-            giftName: true,
-            requiredMessages: true,
-            messagesSent: true,
-            isUnlocked: true,
-            expiresAt: true,
-            createdAt: true,
-
-            chatMessage: {
-              select: {
-                conversationId: true,
+              // Only non-expired gifts
+              expiresAt: {
+                gt: new Date(),
               },
             },
-          },
-        })
+
+            // VERY IMPORTANT
+            // Oldest gift first
+            orderBy: {
+              createdAt: "asc",
+            },
+
+            select: {
+              id: true,
+              senderId: true,
+              receiverId: true,
+              giftName: true,
+              requiredMessages: true,
+              messagesSent: true,
+              isUnlocked: true,
+              expiresAt: true,
+              createdAt: true,
+
+              chatMessage: {
+                select: {
+                  conversationId: true,
+                },
+              },
+            },
+          })
         : [];
 
-    console.log("gift progress : ", giftProgress)
+    console.log("gift progress : ", giftProgress);
     // --------------------------------------------------
     // 13.2 Get active locked roses
     // --------------------------------------------------
@@ -753,65 +836,65 @@ export const chatRepository = {
     const roseProgress =
       candidateIds.length > 0
         ? await prisma.userRose.findMany({
-          where: {
-            // Rose sent by current user OR received by current user
-            OR: [
-              {
-                senderId: userId,
-                receiverId: {
-                  in: candidateIds,
-                },
-              },
-              {
-                receiverId: userId,
-                senderId: {
-                  in: candidateIds,
-                },
-              },
-            ],
-
-            // Only pending roses
-            isUnlocked: false,
-
-            // Only non-expired roses (combine with the first OR using AND)
-            AND: [
-              {
-                OR: [
-                  {
-                    expiresAt: null,
+            where: {
+              // Rose sent by current user OR received by current user
+              OR: [
+                {
+                  senderId: userId,
+                  receiverId: {
+                    in: candidateIds,
                   },
-                  {
-                    expiresAt: {
-                      gt: new Date(),
+                },
+                {
+                  receiverId: userId,
+                  senderId: {
+                    in: candidateIds,
+                  },
+                },
+              ],
+
+              // Only pending roses
+              isUnlocked: false,
+
+              // Only non-expired roses (combine with the first OR using AND)
+              AND: [
+                {
+                  OR: [
+                    {
+                      expiresAt: null,
                     },
-                  },
-                ],
-              },
-            ],
-          },
+                    {
+                      expiresAt: {
+                        gt: new Date(),
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
 
-          // Oldest Rose first
-          orderBy: {
-            createdAt: "asc",
-          },
+            // Oldest Rose first
+            orderBy: {
+              createdAt: "asc",
+            },
 
-          select: {
-            id: true,
-            senderId: true,
-            receiverId: true,
-            requiredMessages: true,
-            messagesSent: true,
-            isUnlocked: true,
-            expiresAt: true,
-            createdAt: true,
+            select: {
+              id: true,
+              senderId: true,
+              receiverId: true,
+              requiredMessages: true,
+              messagesSent: true,
+              isUnlocked: true,
+              expiresAt: true,
+              createdAt: true,
 
-            chatMessage: {
-              select: {
-                conversationId: true,
+              chatMessage: {
+                select: {
+                  conversationId: true,
+                },
               },
             },
-          },
-        })
+          })
         : [];
 
     console.log("rose progress : ", roseProgress);
@@ -841,8 +924,7 @@ export const chatRepository = {
       // Gift must have a ChatMessage / conversation
       // ------------------------------------------------
 
-      const conversationId =
-        gift.chatMessage?.conversationId;
+      const conversationId = gift.chatMessage?.conversationId;
 
       if (!conversationId) {
         continue;
@@ -877,10 +959,7 @@ export const chatRepository = {
       // sending logic.
       // ------------------------------------------------
 
-      if (
-        gift.messagesSent >=
-        gift.requiredMessages
-      ) {
+      if (gift.messagesSent >= gift.requiredMessages) {
         continue;
       }
 
@@ -888,40 +967,26 @@ export const chatRepository = {
       // Calculate progress
       // ------------------------------------------------
 
-      const current = Math.min(
-        gift.messagesSent,
-        gift.requiredMessages,
-      );
+      const current = Math.min(gift.messagesSent, gift.requiredMessages);
 
-      const target =
-        gift.requiredMessages;
+      const target = gift.requiredMessages;
 
       const percentage =
-        target > 0
-          ? Math.min(
-            100,
-            Math.round(
-              (current / target) * 100,
-            ),
-          )
-          : 0;
+        target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
 
       // ------------------------------------------------
       // Set active progress
       // ------------------------------------------------
 
-      progressMap.set(
-        conversationId,
-        {
-          current,
-          target,
-          percentage,
-          label: `${current}/${target} for ${gift.giftName}`,
-          type: "GIFT",
-          giftName: gift.giftName,
-          expiresAt: gift.expiresAt,
-        },
-      );
+      progressMap.set(conversationId, {
+        current,
+        target,
+        percentage,
+        label: `${current}/${target} for ${gift.giftName}`,
+        type: "GIFT",
+        giftName: gift.giftName,
+        expiresAt: gift.expiresAt,
+      });
     }
 
     // --------------------------------------------------
@@ -933,8 +998,7 @@ export const chatRepository = {
       // Rose must have a ChatMessage / conversation
       // ------------------------------------------------
 
-      const conversationId =
-        rose.chatMessage?.conversationId;
+      const conversationId = rose.chatMessage?.conversationId;
 
       if (!conversationId) {
         continue;
@@ -962,10 +1026,7 @@ export const chatRepository = {
       // by message sending logic.
       // ------------------------------------------------
 
-      if (
-        rose.messagesSent >=
-        rose.requiredMessages
-      ) {
+      if (rose.messagesSent >= rose.requiredMessages) {
         continue;
       }
 
@@ -973,40 +1034,26 @@ export const chatRepository = {
       // Calculate progress
       // ------------------------------------------------
 
-      const current = Math.min(
-        rose.messagesSent,
-        rose.requiredMessages,
-      );
+      const current = Math.min(rose.messagesSent, rose.requiredMessages);
 
-      const target =
-        rose.requiredMessages;
+      const target = rose.requiredMessages;
 
       const percentage =
-        target > 0
-          ? Math.min(
-            100,
-            Math.round(
-              (current / target) * 100,
-            ),
-          )
-          : 0;
+        target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
 
       // ------------------------------------------------
       // Set Rose progress
       // ------------------------------------------------
 
-      progressMap.set(
-        conversationId,
-        {
-          current,
-          target,
-          percentage,
-          label: `${current}/${target} for Rose`,
-          type: "ROSE",
-          giftName: null,
-          expiresAt: rose.expiresAt,
-        },
-      );
+      progressMap.set(conversationId, {
+        current,
+        target,
+        percentage,
+        label: `${current}/${target} for Rose`,
+        type: "ROSE",
+        giftName: null,
+        expiresAt: rose.expiresAt,
+      });
     }
 
     // --------------------------------------------------
@@ -1014,232 +1061,213 @@ export const chatRepository = {
     // --------------------------------------------------
 
     const result = await Promise.all(
-      filteredConversations.map(
-        async (conversation) => {
-          const currentParticipant =
-            conversation.participants.find(
-              (participant) =>
-                participant.userId === userId,
-            );
+      filteredConversations.map(async (conversation) => {
+        const currentParticipant = conversation.participants.find(
+          (participant) => participant.userId === userId,
+        );
 
-          const otherParticipant =
-            conversation.participants.find(
-              (participant) =>
-                participant.userId !== userId,
-            );
+        const otherParticipant = conversation.participants.find(
+          (participant) => participant.userId !== userId,
+        );
 
-          if (
-            !currentParticipant ||
-            !otherParticipant
-          ) {
+        if (!currentParticipant || !otherParticipant) {
+          return null;
+        }
+
+        // --------------------------------------------------
+        // 12. Unread count
+        // --------------------------------------------------
+
+        const unreadCount = await prisma.chatMessage.count({
+          where: {
+            conversationId: conversation.id,
+            senderId: { not: userId },
+            readAt: null,
+            deletedAt: null,
+            deletions: {
+              none: {
+                userId,
+              },
+            },
+            ...(currentParticipant.lastReadAt
+              ? {
+                  createdAt: {
+                    gt: currentParticipant.lastReadAt,
+                  },
+                }
+              : {}),
+          },
+        });
+
+        // --------------------------------------------------
+        // 16. Other user
+        // --------------------------------------------------
+
+        const otherUser = otherParticipant.user;
+
+        const compatibility = matchScoreMap.get(otherUser.id);
+
+        // --------------------------------------------------
+        // 17. Final response
+        // --------------------------------------------------
+
+        const presence = presenceMap.get(otherUser.id);
+
+        // --------------------------------------------------
+        // Progress
+        // --------------------------------------------------
+
+        const progress = progressMap.get(conversation.id) ?? null;
+
+        // --------------------------------------------------
+        // 18. Latest message - Chat list display content
+        // --------------------------------------------------
+
+        const lastMessage = (() => {
+          const message = conversation.messages[0];
+
+          if (!message) {
             return null;
           }
 
-          // --------------------------------------------------
-          // 12. Unread count
-          // --------------------------------------------------
+          let displayContent = message.content;
 
-          const unreadCount =
-            await prisma.chatMessage.count({
-              where: {
-                conversationId:
-                  conversation.id,
+          switch (message.messageType) {
+            case MessageType.IMAGE:
+              displayContent = message.content
+                ? `📷 ${message.content}`
+                : "📷 Photo";
+              break;
 
-                senderId: {
-                  not: userId,
-                },
+            case MessageType.VIDEO:
+              displayContent = message.content
+                ? `🎥 ${message.content}`
+                : "🎥 Video";
+              break;
 
-                readAt: null,
+            case MessageType.TEXT:
+              displayContent = message.content ?? "";
+              break;
 
-                deletedAt: null,
+            case MessageType.AUDIO:
+              displayContent = message.content
+                ? `🎵 ${message.content}`
+                : "🎵 Audio";
+              break;
 
-                ...(currentParticipant.lastReadAt
-                  ? {
-                    createdAt: {
-                      gt: currentParticipant.lastReadAt,
-                    },
-                  }
-                  : {}),
-              },
-            });
+            case MessageType.FILE:
+              displayContent = message.content
+                ? `📎 ${message.content}`
+                : "📎 File";
+              break;
 
-          // --------------------------------------------------
-          // 16. Other user
-          // --------------------------------------------------
+            case MessageType.CONTACT:
+              displayContent = message.content
+                ? `👤 ${message.content}`
+                : "👤 Contact";
+              break;
 
-          const otherUser = otherParticipant.user;
+            case MessageType.LOCATION:
+              displayContent = message.content
+                ? `📍 ${message.content}`
+                : "📍 Location";
+              break;
 
-          const compatibility =
-            matchScoreMap.get(
-              otherUser.id,
-            );
+            case MessageType.GIFT:
+              displayContent =
+                message.senderId === userId
+                  ? "🎁 You sent a gift"
+                  : "🎁 You received a gift";
+              break;
 
-          // --------------------------------------------------
-          // 17. Final response
-          // --------------------------------------------------
+            case MessageType.ROSE:
+              displayContent =
+                message.senderId === userId
+                  ? "🌹 You sent a Rose"
+                  : "🌹 You received a Rose";
+              break;
 
-          const presence =
-            presenceMap.get(otherUser.id);
+            case MessageType.COMPLIMENT:
+              displayContent =
+                message.senderId === userId
+                  ? "💬 You sent a compliment"
+                  : "💬 You received a compliment";
+              break;
 
-          // --------------------------------------------------
-          // Progress
-          // --------------------------------------------------
+            case MessageType.ENGAGEMENT:
+              displayContent =
+                message.senderId === userId
+                  ? "✨ You sent a special interaction"
+                  : "✨ You received a special interaction";
+              break;
 
-          const progress =
-            progressMap.get(
-              conversation.id,
-            ) ?? null;
+            case MessageType.DATE_INVITE:
+              displayContent =
+                message.senderId === userId
+                  ? "📅 You sent a date invite"
+                  : "📅 You received a date invite";
+              break;
 
-          // --------------------------------------------------
-          // 18. Latest message - Chat list display content
-          // --------------------------------------------------
+            case MessageType.DATE_CONFIRMED:
+              displayContent = "✅ Date confirmed";
+              break;
 
-          const lastMessage = (() => {
-            const message = conversation.messages[0];
+            case MessageType.DATE_CANCELLED:
+              displayContent = "❌ Date cancelled";
+              break;
 
-            if (!message) {
-              return null;
-            }
+            case MessageType.EVENT_INVITE:
+              displayContent =
+                message.senderId === userId
+                  ? "📅 You sent an event invite"
+                  : "📅 You received an event invite";
+              break;
 
-            let displayContent = message.content;
+            case MessageType.EVENT_CONFIRM:
+              displayContent = "✅ Event confirmed";
+              break;
 
-            switch (message.messageType) {
-              case MessageType.IMAGE:
-                displayContent = message.content
-                  ? `📷 ${message.content}`
-                  : "📷 Photo";
-                break;
+            case MessageType.EVENT_CANCEL:
+              displayContent = "❌ Event cancelled";
+              break;
 
-              case MessageType.VIDEO:
-                displayContent = message.content
-                  ? `🎥 ${message.content}`
-                  : "🎥 Video";
-                break;
+            case MessageType.SYSTEM:
+              displayContent = "ℹ️ System message";
+              break;
 
-              case MessageType.TEXT:
-                displayContent = message.content ?? "";
-                break;
-
-              case MessageType.AUDIO:
-                displayContent = message.content
-                  ? `🎵 ${message.content}`
-                  : "🎵 Audio";
-                break;
-
-              case MessageType.FILE:
-                displayContent = message.content
-                  ? `📎 ${message.content}`
-                  : "📎 File";
-                break;
-
-              case MessageType.CONTACT:
-                displayContent = message.content
-                  ? `👤 ${message.content}`
-                  : "👤 Contact";
-                break;
-
-              case MessageType.LOCATION:
-                displayContent = message.content
-                  ? `📍 ${message.content}`
-                  : "📍 Location";
-                break;
-
-              case MessageType.GIFT:
-                displayContent =
-                  message.senderId === userId
-                    ? "🎁 You sent a gift"
-                    : "🎁 You received a gift";
-                break;
-
-              case MessageType.ROSE:
-                displayContent =
-                  message.senderId === userId
-                    ? "🌹 You sent a Rose"
-                    : "🌹 You received a Rose";
-                break;
-
-              case MessageType.COMPLIMENT:
-                displayContent =
-                  message.senderId === userId
-                    ? "💬 You sent a compliment"
-                    : "💬 You received a compliment";
-                break;
-
-              case MessageType.ENGAGEMENT:
-                displayContent =
-                  message.senderId === userId
-                    ? "✨ You sent a special interaction"
-                    : "✨ You received a special interaction";
-                break;
-
-              case MessageType.DATE_INVITE:
-                displayContent =
-                  message.senderId === userId
-                    ? "📅 You sent a date invite"
-                    : "📅 You received a date invite";
-                break;
-
-              case MessageType.DATE_CONFIRMED:
-                displayContent = "✅ Date confirmed";
-                break;
-
-              case MessageType.DATE_CANCELLED:
-                displayContent = "❌ Date cancelled";
-                break;
-
-              case MessageType.EVENT_INVITE:
-                displayContent =
-                  message.senderId === userId
-                    ? "📅 You sent an event invite"
-                    : "📅 You received an event invite";
-                break;
-
-              case MessageType.EVENT_CONFIRM:
-                displayContent = "✅ Event confirmed";
-                break;
-
-              case MessageType.EVENT_CANCEL:
-                displayContent = "❌ Event cancelled";
-                break;
-
-              case MessageType.SYSTEM:
-                displayContent = "ℹ️ System message";
-                break;
-
-              default:
-                displayContent = message.content ?? "New message";
-                break;
-            }
-
-            return {
-              ...message,
-              content: displayContent,
-            };
-          })();
-
-          // --------------------------------------------------
-          // Final response
-          // --------------------------------------------------
+            default:
+              displayContent = message.content ?? "New message";
+              break;
+          }
 
           return {
-            conversationId: conversation.id,
-            user: {
-              id: otherUser.id,
-              fullName: otherUser.full_name,
-              age: calculateAge(otherUser.birth_date,),
-              profilePhoto: otherUser.photos[0]?.media_url ?? null,
-              matchPercentage: compatibility?.percentage ?? 0,
-              trustPercentage: 85,
-              isOnline: presence?.isOnline ?? false,
-              lastSeenAt: presence?.lastSeenAt ?? null,
-            },
-            lastMessage,
-            unreadCount,
-            progress,
-            updatedAt: conversation.updatedAt,
+            ...message,
+            content: displayContent,
           };
-        },
-      ),
+        })();
+
+        // --------------------------------------------------
+        // Final response
+        // --------------------------------------------------
+
+        return {
+          conversationId: conversation.id,
+          user: {
+            id: otherUser.id,
+            fullName: otherUser.full_name,
+            age: calculateAge(otherUser.birth_date),
+            profilePhoto: otherUser.photos[0]?.media_url ?? null,
+            matchPercentage: compatibility?.percentage ?? 0,
+            trustPercentage: 85,
+            isOnline: presence?.isOnline ?? false,
+            lastSeenAt: presence?.lastSeenAt ?? null,
+          },
+          lastMessage,
+          unreadCount,
+          progress,
+          updatedAt: conversation.updatedAt,
+        };
+      }),
     );
 
     // --------------------------------------------------
@@ -1247,8 +1275,7 @@ export const chatRepository = {
     // --------------------------------------------------
 
     return result.filter(
-      (item): item is NonNullable<typeof item> =>
-        item !== null,
+      (item): item is NonNullable<typeof item> => item !== null,
     );
   },
   /**
@@ -1270,430 +1297,419 @@ export const chatRepository = {
         ? {}
         : type === "date"
           ? {
-            messageType: {
-              in: [
-                MessageType.DATE_CONFIRMED,
-                MessageType.DATE_CANCELLED,
-                MessageType.DATE_INVITE,
-              ],
-            },
-          }
-          : type === "event"
-            ? {
               messageType: {
                 in: [
-                  MessageType.EVENT_INVITE,
-                  MessageType.EVENT_CONFIRM,
-                  MessageType.EVENT_CANCEL,
+                  MessageType.DATE_CONFIRMED,
+                  MessageType.DATE_CANCELLED,
+                  MessageType.DATE_INVITE,
                 ],
               },
             }
+          : type === "event"
+            ? {
+                messageType: {
+                  in: [
+                    MessageType.EVENT_INVITE,
+                    MessageType.EVENT_CONFIRM,
+                    MessageType.EVENT_CANCEL,
+                  ],
+                },
+              }
             : {
-              messageType:
-                type.toUpperCase() as MessageType,
-            };
+                messageType: type.toUpperCase() as MessageType,
+              };
 
     // =========================================================
     // GET MESSAGES
     // =========================================================
 
-    const messages =
-      await prisma.chatMessage.findMany({
-        where: {
-          conversationId,
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId,
 
-          deletedAt: null,
+        deletedAt: null,
 
-          // Clear chat deletion for this user
-          deletions: {
-            none: {
-              userId,
-            },
+        // Clear chat deletion for this user
+        deletions: {
+          none: {
+            userId,
           },
-
-          ...messageTypeFilter,
         },
 
-        orderBy: {
-          createdAt: "desc",
-        },
+        ...messageTypeFilter,
+      },
 
-        take: limit + 1,
+      orderBy: {
+        createdAt: "desc",
+      },
 
-        ...(cursor
-          ? {
+      take: limit + 1,
+
+      ...(cursor
+        ? {
             skip: 1,
             cursor: {
               id: cursor,
             },
           }
-          : {}),
+        : {}),
 
-        select: {
-          // =====================================================
-          // BASIC MESSAGE DATA
-          // =====================================================
+      select: {
+        // =====================================================
+        // BASIC MESSAGE DATA
+        // =====================================================
 
-          id: true,
-          conversationId: true,
-          senderId: true,
+        id: true,
+        conversationId: true,
+        senderId: true,
 
-          content: true,
-          messageType: true,
-          mediaUrl: true,
-          metadata: true,
+        content: true,
+        messageType: true,
+        mediaUrl: true,
+        metadata: true,
 
-          createdAt: true,
-          deliveredAt: true,
-          readAt: true,
+        createdAt: true,
+        deliveredAt: true,
+        readAt: true,
 
-          // =====================================================
-          // SPECIAL IDS
-          // =====================================================
+        // =====================================================
+        // SPECIAL IDS
+        // =====================================================
 
-          roseId: true,
-          complimentId: true,
-          giftId: true,
-          eventId: true,
-          datePlanId: true,
+        roseId: true,
+        complimentId: true,
+        giftId: true,
+        eventId: true,
+        datePlanId: true,
 
-          // =====================================================
-          // ROSE
-          // =====================================================
+        // =====================================================
+        // ROSE
+        // =====================================================
 
-          rose: {
-            select: {
-              id: true,
-              senderId: true,
-              receiverId: true,
-              targetType: true,
-              targetId: true,
-              requiredMessages: true,
-              messagesSent: true,
-              isUnlocked: true,
-              unlockedAt: true,
-              expiresAt: true,
-            },
+        rose: {
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            targetType: true,
+            targetId: true,
+            requiredMessages: true,
+            messagesSent: true,
+            isUnlocked: true,
+            unlockedAt: true,
+            expiresAt: true,
           },
+        },
 
-          // =====================================================
-          // GIFT
-          // =====================================================
+        // =====================================================
+        // GIFT
+        // =====================================================
 
-          gift: {
-            select: {
-              id: true,
-              senderId: true,
-              receiverId: true,
+        gift: {
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
 
-              giftId: true,
-              giftName: true,
-              pricePaid: true,
-              message: true,
+            giftId: true,
+            giftName: true,
+            pricePaid: true,
+            message: true,
 
-              targetType: true,
-              targetId: true,
+            targetType: true,
+            targetId: true,
 
-              requiredMessages: true,
-              messagesSent: true,
+            requiredMessages: true,
+            messagesSent: true,
 
-              isUnlocked: true,
-              unlockedAt: true,
-              expiresAt: true,
+            isUnlocked: true,
+            unlockedAt: true,
+            expiresAt: true,
 
-              gift: {
-                select: {
-                  id: true,
-                  categoryId: true,
-                  image: true,
-                  name: true,
-                  coinCost: true,
-                  triggerLine: true,
-                  receiverLine: true,
-                  isLive: true,
+            gift: {
+              select: {
+                id: true,
+                categoryId: true,
+                image: true,
+                name: true,
+                coinCost: true,
+                triggerLine: true,
+                receiverLine: true,
+                isLive: true,
 
-                  category: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
                   },
                 },
               },
             },
           },
+        },
 
-          // =====================================================
-          // COMPLIMENT
-          // =====================================================
+        // =====================================================
+        // COMPLIMENT
+        // =====================================================
 
-          compliment: {
-            select: {
-              id: true,
-              senderId: true,
-              receiverId: true,
+        compliment: {
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
 
-              targetType: true,
-              targetId: true,
+            targetType: true,
+            targetId: true,
 
-              ideaId: true,
-              message: true,
-              status: true,
+            ideaId: true,
+            message: true,
+            status: true,
 
-              createdAt: true,
-              updatedAt: true,
-            },
+            createdAt: true,
+            updatedAt: true,
           },
+        },
 
-          // =====================================================
-          // EVENT
-          // =====================================================
+        // =====================================================
+        // EVENT
+        // =====================================================
 
-          event: {
-            select: {
-              id: true,
+        event: {
+          select: {
+            id: true,
 
-              eventType: true,
-              title: true,
-              city: true,
-              eventTag: true,
+            eventType: true,
+            title: true,
+            city: true,
+            eventTag: true,
 
-              eventDate: true,
-              startTime: true,
-              endTime: true,
+            eventDate: true,
+            startTime: true,
+            endTime: true,
 
-              venueName: true,
-              fullAddress: true,
+            venueName: true,
+            fullAddress: true,
 
-              menEntryPrice: true,
-              womenEntryPrice: true,
-              otherCapacity: true,
+            menEntryPrice: true,
+            womenEntryPrice: true,
+            otherCapacity: true,
 
-              menDiscountedPrice: true,
-              womenDiscountedPrice: true,
-              otherDiscountedPrice: true,
+            menDiscountedPrice: true,
+            womenDiscountedPrice: true,
+            otherDiscountedPrice: true,
 
-              heroImage: true,
+            heroImage: true,
 
-              featureTags: true,
-              // =========================================
-              // CURRENT USER EVENT BOOKING
-              // =========================================
-              EventBooking: {
-                where: {
-                  userId: userId,
+            featureTags: true,
+            // =========================================
+            // CURRENT USER EVENT BOOKING
+            // =========================================
+            EventBooking: {
+              where: {
+                userId: userId,
 
-                  // Consider event booked only after confirmation
-                  status: "CONFIRMED",
-                },
-
-                select: {
-                  id: true,
-                },
-
-                take: 1,
-              },
-            },
-          },
-
-          // =====================================================
-          // DATE PLAN
-          // =====================================================
-
-          datePlan: {
-            select: {
-              id: true,
-
-              userId: true,
-
-              // =================================================
-              // STEP 1
-              // =================================================
-
-              activityId: true,
-              title: true,
-              quickTitleId: true,
-              note: true,
-              photoUrl: true,
-
-              // =================================================
-              // STEP 2
-              // =================================================
-
-              venueName: true,
-              venueAddress: true,
-              venueLat: true,
-              venueLng: true,
-
-              // =================================================
-              // STEP 3
-              // =================================================
-
-              duration: true,
-              whoPaysId: true,
-              participantLimit: true,
-              joinRequestGenderId: true,
-              visibilityId: true,
-
-              status: true,
-              eventDateTime: true,
-              expiresAt: true,
-
-              createdAt: true,
-              updatedAt: true,
-
-              // =================================================
-              // ACTIVITY
-              // =================================================
-
-              activity: {
-                select: {
-                  id: true,
-                  type: true,
-                  label: true,
-                  value: true,
-                  icon: true,
-                },
+                // Consider event booked only after confirmation
+                status: "CONFIRMED",
               },
 
-              // =================================================
-              // QUICK TITLE
-              // =================================================
-
-              quickTitle: {
-                select: {
-                  id: true,
-                  type: true,
-                  label: true,
-                  value: true,
-                  icon: true,
-                },
+              select: {
+                id: true,
               },
 
-              // =================================================
-              // WHO PAYS
-              // =================================================
-
-              whoPays: {
-                select: {
-                  id: true,
-                  type: true,
-                  label: true,
-                  value: true,
-                  icon: true,
-                },
-              },
-
-              // =================================================
-              // JOIN REQUEST GENDER
-              // =================================================
-
-              joinRequestGender: {
-                select: {
-                  id: true,
-                  type: true,
-                  label: true,
-                  value: true,
-                  icon: true,
-                },
-              },
-
-              // =================================================
-              // VISIBILITY
-              // =================================================
-
-              visibility: {
-                select: {
-                  id: true,
-                  type: true,
-                  label: true,
-                  value: true,
-                  icon: true,
-                },
-              },
-
-              // =================================================
-              // ONLY CURRENT LOGGED-IN USER'S REQUEST
-              // =================================================
-
-              requests: {
-                where: {
-                  requesterId: userId,
-                },
-
-                select: {
-                  id: true,
-                },
-
-                take: 1,
-              },
+              take: 1,
             },
           },
         },
-      });
+
+        // =====================================================
+        // DATE PLAN
+        // =====================================================
+
+        datePlan: {
+          select: {
+            id: true,
+
+            userId: true,
+
+            // =================================================
+            // STEP 1
+            // =================================================
+
+            activityId: true,
+            title: true,
+            quickTitleId: true,
+            note: true,
+            photoUrl: true,
+
+            // =================================================
+            // STEP 2
+            // =================================================
+
+            venueName: true,
+            venueAddress: true,
+            venueLat: true,
+            venueLng: true,
+
+            // =================================================
+            // STEP 3
+            // =================================================
+
+            duration: true,
+            whoPaysId: true,
+            participantLimit: true,
+            joinRequestGenderId: true,
+            visibilityId: true,
+
+            status: true,
+            eventDateTime: true,
+            expiresAt: true,
+
+            createdAt: true,
+            updatedAt: true,
+
+            // =================================================
+            // ACTIVITY
+            // =================================================
+
+            activity: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // =================================================
+            // QUICK TITLE
+            // =================================================
+
+            quickTitle: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // =================================================
+            // WHO PAYS
+            // =================================================
+
+            whoPays: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // =================================================
+            // JOIN REQUEST GENDER
+            // =================================================
+
+            joinRequestGender: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // =================================================
+            // VISIBILITY
+            // =================================================
+
+            visibility: {
+              select: {
+                id: true,
+                type: true,
+                label: true,
+                value: true,
+                icon: true,
+              },
+            },
+
+            // =================================================
+            // ONLY CURRENT LOGGED-IN USER'S REQUEST
+            // =================================================
+
+            requests: {
+              where: {
+                requesterId: userId,
+              },
+
+              select: {
+                id: true,
+              },
+
+              take: 1,
+            },
+          },
+        },
+      },
+    });
 
     // =========================================================
     // FORMAT RESPONSE
     // =========================================================
 
-    const formattedMessages =
-      messages.map((message) => {
-        // =======================================================
-        // DATE PLAN
-        // =======================================================
+    const formattedMessages = messages.map((message) => {
+      // =======================================================
+      // DATE PLAN
+      // =======================================================
 
-        let formattedDatePlan = null;
+      let formattedDatePlan = null;
 
-        if (message.datePlan) {
-          const {
-            requests,
-            ...datePlanData
-          } = message.datePlan;
+      if (message.datePlan) {
+        const { requests, ...datePlanData } = message.datePlan;
 
-          // If current user has at least one request,
-          // then user has already requested this plan.
-          const is_already_requested =
-            requests.length > 0;
+        // If current user has at least one request,
+        // then user has already requested this plan.
+        const is_already_requested = requests.length > 0;
 
-          formattedDatePlan = {
-            ...datePlanData,
+        formattedDatePlan = {
+          ...datePlanData,
 
-            is_already_requested,
-          };
-        }
-
-        // =======================================================
-        // EVENT
-        // =======================================================
-
-        let formattedEvent = null;
-
-        if (message.event) {
-          const {
-            EventBooking,
-            ...eventData
-          } = message.event;
-
-          const is_event_book =
-            EventBooking.length > 0;
-
-          formattedEvent = {
-            ...eventData,
-            is_event_book,
-          };
-        }
-
-        // =======================================================
-        // FINAL MESSAGE
-        // =======================================================
-
-        return {
-          ...message,
-
-          datePlan: formattedDatePlan,
-          event: formattedEvent,
+          is_already_requested,
         };
-      });
+      }
+
+      // =======================================================
+      // EVENT
+      // =======================================================
+
+      let formattedEvent = null;
+
+      if (message.event) {
+        const { EventBooking, ...eventData } = message.event;
+
+        const is_event_book = EventBooking.length > 0;
+
+        formattedEvent = {
+          ...eventData,
+          is_event_book,
+        };
+      }
+
+      // =======================================================
+      // FINAL MESSAGE
+      // =======================================================
+
+      return {
+        ...message,
+
+        datePlan: formattedDatePlan,
+        event: formattedEvent,
+      };
+    });
 
     return formattedMessages;
   },
@@ -1712,9 +1728,9 @@ export const chatRepository = {
     return prisma.$transaction(async (tx) => {
       const metadata =
         data.metadata && typeof data.metadata === "object"
-          ? data.metadata as Record<string, any>
+          ? (data.metadata as Record<string, any>)
           : {};
-      console.log("metadata in repository : ", metadata)
+      console.log("metadata in repository : ", metadata);
       const message = await tx.chatMessage.create({
         data: {
           conversationId: data.conversationId,
@@ -1725,27 +1741,23 @@ export const chatRepository = {
           metadata: data.metadata ?? undefined,
           // Optional Rose
           roseId:
-            data.messageType === MessageType.ROSE &&
-              metadata.roseId
+            data.messageType === MessageType.ROSE && metadata.roseId
               ? metadata.roseId
               : null,
 
           // Optional Gift
           giftId:
-            data.messageType === MessageType.GIFT &&
-              metadata.giftId
+            data.messageType === MessageType.GIFT && metadata.giftId
               ? metadata.giftId
               : null,
 
           // Optional Compliment
           complimentId:
-            data.messageType === MessageType.COMPLIMENT &&
-              metadata.complimentId
+            data.messageType === MessageType.COMPLIMENT && metadata.complimentId
               ? metadata.complimentId
               : null,
         },
       });
-
 
       /**
        * Update conversation's updatedAt.
@@ -1861,11 +1873,11 @@ export const chatRepository = {
       select: {
         userId: true,
         user: {
-        select: {
-          id: true,
-          full_name: true,
+          select: {
+            id: true,
+            full_name: true,
+          },
         },
-      },
       },
     });
 
@@ -1874,6 +1886,29 @@ export const chatRepository = {
     }
 
     return participant.userId;
+  },
+
+  async findOtherParticipantAccountStatus(
+    conversationId: string,
+    userId: string,
+  ) {
+    return prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId,
+        userId: {
+          not: userId,
+        },
+      },
+      select: {
+        user: {
+          select: {
+            id: true,
+            account_status: true,
+            deleted_at: true,
+          },
+        },
+      },
+    });
   },
 
   async hasPreviousMessages(conversationId: string) {
@@ -1957,10 +1992,10 @@ export const chatRepository = {
         // Messages after the user's last read time
         ...(participant.lastReadAt
           ? {
-            createdAt: {
-              gt: participant.lastReadAt,
-            },
-          }
+              createdAt: {
+                gt: participant.lastReadAt,
+              },
+            }
           : {}),
       },
     });
@@ -2021,11 +2056,8 @@ export const chatRepository = {
     });
   },
 
-  //DELETE CONVERSATION 
-  async deleteConversationForUser(
-    conversationId: string,
-    userId: string
-  ) {
+  //DELETE CONVERSATION
+  async deleteConversationForUser(conversationId: string, userId: string) {
     return prisma.conversationParticipant.update({
       where: {
         conversationId_userId: {
@@ -2040,10 +2072,7 @@ export const chatRepository = {
   },
 
   //CLEAR ALL CHAT
-  async clearChat(
-    conversationId: string,
-    userId: string
-  ) {
+  async clearChat(conversationId: string, userId: string) {
     const messages = await prisma.chatMessage.findMany({
       where: {
         conversationId,
@@ -2105,7 +2134,6 @@ export const chatRepository = {
     conversationId: string,
     currentUserId: string,
   ) {
-
     console.log("=== PROFILE REPOSITORY START ===");
     console.log("conversationId:", conversationId);
     console.log("currentUserId:", currentUserId);
@@ -2132,25 +2160,18 @@ export const chatRepository = {
     }
 
     /**
-   * 2. Make sure current user belongs
-   *    to this conversation.
-   */
+     * 2. Make sure current user belongs
+     *    to this conversation.
+     */
     const currentParticipant = conversation.participants.find(
-      (participant) =>
-        participant.userId === currentUserId,
+      (participant) => participant.userId === currentUserId,
     );
 
-    console.log(
-      "currentParticipant:",
-      currentParticipant,
-    );
+    console.log("currentParticipant:", currentParticipant);
 
     if (!currentParticipant) {
-      throw new Error(
-        "You are not a participant of this conversation",
-      );
+      throw new Error("You are not a participant of this conversation");
     }
-
 
     /**
      * 2. Find the other participant
@@ -2159,10 +2180,7 @@ export const chatRepository = {
       (participant) => participant.userId !== currentUserId,
     );
 
-    console.log(
-      "otherParticipant:",
-      otherParticipant,
-    );
+    console.log("otherParticipant:", otherParticipant);
 
     if (!otherParticipant) {
       throw new Error("Other user not found in conversation");
@@ -2171,7 +2189,6 @@ export const chatRepository = {
     const targetUserId = otherParticipant.userId;
 
     console.log("targetUserId:", targetUserId);
-
 
     /**
      * 3. Fetch user details
@@ -2186,6 +2203,9 @@ export const chatRepository = {
         birth_date: true,
 
         photos: {
+          where: {
+            media_type: "IMAGE",
+          },
           orderBy: {
             order: "asc",
           },
@@ -2232,24 +2252,24 @@ export const chatRepository = {
      * Check both directions because your UserCompatibility
      * has userId and targetUserId.
      */
-    const compatibility = await prisma.userCompatibility.findFirst({
-      where: {
-        OR: [
-          {
-            userId: currentUserId,
-            targetUserId: targetUserId,
-          },
-          {
-            userId: targetUserId,
-            targetUserId: currentUserId,
-          },
-        ],
-      },
-      select: {
-        score: true,
-        percentage: true,
-      },
-    });
+    // const compatibility = await prisma.userCompatibility.findFirst({
+    //   where: {
+    //     OR: [
+    //       {
+    //         userId: currentUserId,
+    //         targetUserId: targetUserId,
+    //       },
+    //       {
+    //         userId: targetUserId,
+    //         targetUserId: currentUserId,
+    //       },
+    //     ],
+    //   },
+    //   select: {
+    //     score: true,
+    //     percentage: true,
+    //   },
+    // });
 
     /**
      * 5. Check block status
@@ -2274,18 +2294,355 @@ export const chatRepository = {
       },
     });
 
-
     return {
       conversationId,
       targetUserId,
-
       user,
-
-      matchScore: compatibility?.percentage ?? compatibility?.score ?? null,
-
       isBlocked: !!block,
     };
-
   },
 
+  async getConversationCounts(userId: string) {
+    // ============================================
+    // 1. BASE CONVERSATION FILTER
+    // ============================================
+
+    const baseWhere: Prisma.ConversationWhereInput = {
+      AND: [
+        // Logged-in user must be active participant
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
+        },
+
+        // Other user must also be active participant
+        {
+          participants: {
+            some: {
+              userId: {
+                not: userId,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ],
+    };
+
+    // ============================================
+    // 2. GET CURRENT USER LOCATION
+    // ============================================
+
+    const currentUserProfile = await prisma.userProfile.findUnique({
+      where: {
+        user_id: userId,
+      },
+      select: {
+        latitude: true,
+        longitude: true,
+      },
+    });
+
+    let nearbyUserIds: string[] = [];
+
+    if (
+      currentUserProfile?.latitude != null &&
+      currentUserProfile?.longitude != null &&
+      !(
+        Number(currentUserProfile.latitude) === 0 &&
+        Number(currentUserProfile.longitude) === 0
+      )
+    ) {
+      const nearbyUsers = await prisma.$queryRaw<{ user_id: string }[]>`
+      SELECT up.user_id
+      FROM user_profiles up
+      WHERE
+        up.user_id <> ${userId}::uuid
+        AND up.location IS NOT NULL
+        AND ST_DWithin(
+          up.location,
+          ST_SetSRID(
+            ST_MakePoint(
+              ${Number(currentUserProfile.longitude)},
+              ${Number(currentUserProfile.latitude)}
+            ),
+            4326
+          )::geography,
+          25000
+        )
+    `;
+
+      nearbyUserIds = nearbyUsers.map((user) => user.user_id);
+    }
+
+    // ============================================
+    // 3. CALCULATE ALL COUNTS
+    // ============================================
+
+    const [all, nearby, dateInvites, gifts, unread] = await Promise.all([
+      // All conversations
+      prisma.conversation.count({
+        where: baseWhere,
+      }),
+
+      // Nearby conversations
+      nearbyUserIds.length > 0
+        ? prisma.conversation.count({
+            where: {
+              AND: [
+                baseWhere,
+                {
+                  participants: {
+                    some: {
+                      userId: {
+                        in: nearbyUserIds,
+                      },
+                      deletedAt: null,
+                    },
+                  },
+                },
+              ],
+            },
+          })
+        : Promise.resolve(0),
+
+      // Date invite conversations
+      prisma.conversation.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              messages: {
+                some: {
+                  messageType: MessageType.DATE_CONFIRMED,
+                  deletedAt: null,
+                  deletions: {
+                    none: {
+                      userId,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+
+      // Gift conversations
+      prisma.conversation.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              messages: {
+                some: {
+                  messageType: MessageType.GIFT,
+                  deletedAt: null,
+                  deletions: {
+                    none: {
+                      userId,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+
+      // Unread conversations
+      prisma.conversation.count({
+        where: {
+          AND: [
+            baseWhere,
+            {
+              messages: {
+                some: {
+                  senderId: {
+                    not: userId,
+                  },
+                  readAt: null,
+                  deletedAt: null,
+                  deletions: {
+                    none: {
+                      userId,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    // ============================================
+    // 4. GET ONLINE CONVERSATION COUNT
+    // ============================================
+
+    // Get all visible conversations of logged-in user
+    const userConversations = await prisma.conversation.findMany({
+      where: baseWhere,
+
+      select: {
+        participants: {
+          where: {
+            deletedAt: null,
+            userId: {
+              not: userId,
+            },
+          },
+
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    // Collect unique other participant IDs
+    const otherUserIds = [
+      ...new Set(
+        userConversations.flatMap((conversation) =>
+          conversation.participants.map((participant) => participant.userId),
+        ),
+      ),
+    ];
+
+    // ============================================
+    // 5. GET ONLINE STATUS FROM REDIS
+    // ============================================
+
+    let onlineUserIds = new Set<string>();
+
+    if (otherUserIds.length > 0) {
+      const userPresence = await presenceService.getUsersPresence({
+        userIds: otherUserIds,
+      });
+
+      onlineUserIds = new Set(
+        userPresence
+          .filter((user) => user.isOnline === true)
+          .map((user) => user.userId),
+      );
+    }
+
+    // ============================================
+    // 6. COUNT ONLINE CONVERSATIONS
+    // ============================================
+
+    const online =
+      onlineUserIds.size > 0
+        ? await prisma.conversation.count({
+            where: {
+              AND: [
+                baseWhere,
+                {
+                  participants: {
+                    some: {
+                      userId: {
+                        in: [...onlineUserIds],
+                      },
+                      deletedAt: null,
+                    },
+                  },
+                },
+              ],
+            },
+          })
+        : 0;
+    return {
+      all,
+      unread,
+      online,
+      nearby,
+      dateInvites,
+      gifts,
+    };
+  },
+
+  async getMessageCounts(conversationId: string, userId: string) {
+    // ============================================
+    // COMMON FILTER
+    // ============================================
+
+    const where = {
+      conversationId,
+
+      deletedAt: null,
+
+      deletions: {
+        none: {
+          userId,
+        },
+      },
+    };
+
+    // ============================================
+    // GET COUNTS
+    // ============================================
+
+    const [all, gifts, compliments, dateInvites, events] =
+      await prisma.$transaction([
+        prisma.chatMessage.count({
+          where,
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: MessageType.GIFT,
+          },
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: MessageType.COMPLIMENT,
+          },
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: {
+              in: [
+                MessageType.DATE_INVITE,
+                MessageType.DATE_CONFIRMED,
+                MessageType.DATE_CANCELLED,
+              ],
+            },
+          },
+        }),
+
+        prisma.chatMessage.count({
+          where: {
+            ...where,
+            messageType: {
+              in: [
+                MessageType.EVENT_INVITE,
+                MessageType.EVENT_CONFIRM,
+                MessageType.EVENT_CANCEL,
+              ],
+            },
+          },
+        }),
+      ]);
+
+    // ============================================
+    // RETURN COUNTS
+    // ============================================
+
+    return {
+      all,
+      gifts,
+      compliments,
+      dateInvites,
+      events,
+    };
+  },
 };

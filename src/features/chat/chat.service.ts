@@ -11,13 +11,21 @@ import {
 } from "./chat.types";
 
 import { chatRepository } from "./chat.repository";
-import { buildMessageProgress, isUserViewingConversation } from "./chat.helper";
+import {
+  buildMessageProgress,
+  isUserViewingConversation,
+  resolveMessageTargets,
+} from "./chat.helper";
 import { createNotification } from "../notification/notification.service";
 import { presenceService } from "./presence/presence.service";
-import { findConversationMatchState, markConversationMatched } from "../match/match.repository";
+import {
+  findConversationMatchState,
+  markConversationMatched,
+} from "../match/match.repository";
 import { createMatchFromReplyService } from "../match/match.service";
 import console from "console";
 import { MessageType } from "@prisma/client";
+import { getMatchScoresForUsers } from "../match-score/match-score.service";
 
 export const chatService = {
   /**
@@ -53,16 +61,38 @@ export const chatService = {
    * Get user's conversations.
    */
   async getConversations(data: GetConversationsInput) {
-    const conversations = await chatRepository.findUserConversations(
-      data.userId,
-      data.cursor,
-      data.limit,
-      data.type,
-    );
+    // ============================================
+    // 1. FETCH CONVERSATIONS AND COUNTS
+    // ============================================
 
-    const hasMore = conversations.length > data.limit;
+    const [conversations, counts] = await Promise.all([
+      chatRepository.findUserConversations(
+        data.userId,
+        data.cursor,
+        data.limit,
+        data.type,
+      ),
 
-    const items = hasMore ? conversations.slice(0, data.limit) : conversations;
+      chatRepository.getConversationCounts(data.userId),
+    ]);
+
+    const sortedConversations = conversations.sort((a, b) => {
+      const timeA = a.lastMessage?.createdAt
+        ? new Date(a.lastMessage.createdAt).getTime()
+        : 0;
+
+      const timeB = b.lastMessage?.createdAt
+        ? new Date(b.lastMessage.createdAt).getTime()
+        : 0;
+
+      return timeB - timeA;
+    });
+
+    const hasMore = sortedConversations.length > data.limit;
+
+    const items = hasMore
+      ? sortedConversations.slice(0, data.limit)
+      : sortedConversations;
 
     const nextCursor = hasMore
       ? (items[items.length - 1]?.conversationId ?? null)
@@ -70,6 +100,7 @@ export const chatService = {
 
     return {
       items,
+      counts,
       pagination: {
         hasMore,
         nextCursor,
@@ -80,10 +111,9 @@ export const chatService = {
   /**
    * Get messages from conversation.
    */
+
   async getMessages(data: GetMessagesInput) {
-    /**
-     * Verify user is participant.
-     */
+    // 1. Verify participant
     const participant = await chatRepository.findParticipant(
       data.conversationId,
       data.userId,
@@ -93,24 +123,122 @@ export const chatService = {
       throw new Error("You are not a participant of this conversation");
     }
 
-    const messages = await chatRepository.findMessages(
-      data.conversationId,
-      data.userId,
-      data.cursor,
-      data.limit,
-      data.type ?? "all",
-    );
+    // =====================================================
+    // CHECK OTHER USER ACCOUNT STATUS
+    // =====================================================
 
+    const otherParticipant =
+      await chatRepository.findOtherParticipantAccountStatus(
+        data.conversationId,
+        data.userId,
+      );
+
+    const otherUser = otherParticipant?.user;
+
+    const isDelete = otherUser
+      ? otherUser.account_status === "DELETED" || otherUser.deleted_at !== null
+      : false;
+
+    const deleteMessage = isDelete
+      ? "This account has been deleted. You can view your previous messages, but you can no longer send new messages to this user."
+      : null;
+
+    // ============================================
+    // 2. FETCH MESSAGES + COUNTS
+    // ============================================
+
+    const [messages, counts] = await Promise.all([
+      chatRepository.findMessages(
+        data.conversationId,
+        data.userId,
+        data.cursor,
+        data.limit,
+        data.type ?? "all",
+      ),
+
+      chatRepository.getMessageCounts(data.conversationId, data.userId),
+    ]);
+
+    // 3. Pagination
     const hasMore = messages.length > data.limit;
 
     const items = hasMore ? messages.slice(0, data.limit) : messages;
 
-    /** * Add progress information for Gift/Rose/Engagement messages. */ const itemsWithProgress = items.map((message) => { const progress = buildMessageProgress(message); return { ...message, progress, }; });
+    // 4. Collect targets from Rose, Gift, Compliment
+    const targets = items.flatMap((message) => {
+      const entries: {
+        targetType: string | null;
+        targetId: string | null;
+      }[] = [];
 
+      for (const record of [message.rose, message.gift, message.compliment]) {
+        if (record?.targetType && record?.targetId) {
+          entries.push({
+            targetType: record.targetType,
+            targetId: record.targetId,
+          });
+        }
+      }
+
+      return entries;
+    });
+
+    // 5. Resolve target details
+    const targetMap = await resolveMessageTargets(targets);
+
+    const getTargetDetails = (
+      record: {
+        targetType: string | null;
+        targetId: string | null;
+      } | null,
+    ) => {
+      if (!record?.targetType || !record?.targetId) {
+        return null;
+      }
+
+      return targetMap.get(`${record.targetType}:${record.targetId}`) ?? null;
+    };
+
+    // 6. Attach details and progress
+    const itemsWithProgress = items.map((message) => {
+      const progress = buildMessageProgress(message);
+
+      return {
+        ...message,
+
+        rose: message.rose
+          ? {
+              ...message.rose,
+              targetDetails: getTargetDetails(message.rose),
+            }
+          : null,
+
+        gift: message.gift
+          ? {
+              ...message.gift,
+              targetDetails: getTargetDetails(message.gift),
+            }
+          : null,
+
+        compliment: message.compliment
+          ? {
+              ...message.compliment,
+              targetDetails: getTargetDetails(message.compliment),
+            }
+          : null,
+
+        progress,
+      };
+    });
+
+    // 7. Next cursor
     const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return {
       items: itemsWithProgress,
+      isDelete,
+      deleteMessage,
+      counts,
       pagination: {
         hasMore,
         nextCursor,
@@ -142,7 +270,7 @@ export const chatService = {
       data.userId,
     );
 
-    console.log("participant : ", participant)
+    console.log("participant : ", participant);
 
     if (!participant) {
       throw new Error(
@@ -168,17 +296,13 @@ export const chatService = {
     }
 
     /**
-  * 4. Get conversation match state.
-  */
-    const conversation =
-      await findConversationMatchState(
-        data.conversationId,
-      );
+     * 4. Get conversation match state.
+     */
+    const conversation = await findConversationMatchState(data.conversationId);
 
     if (!conversation) {
       throw new Error("Conversation not found");
     }
-
 
     /**
      * Create message.
@@ -191,18 +315,15 @@ export const chatService = {
       mediaUrl: data.mediaUrl,
     });
 
-    console.log("message : ", message)
+    console.log("message : ", message);
 
     /**
- * Default match response.
- */
+     * Default match response.
+     */
     let matchCreated = false;
     let match = null;
-    let matchedBy:
-      | "ROSE_REPLY"
-      | "GIFT_REPLY"
-      | "COMPLIMENT_REPLY"
-      | null = null;
+    let matchedBy: "ROSE_REPLY" | "GIFT_REPLY" | "COMPLIMENT_REPLY" | null =
+      null;
 
     /**
      * These message types are considered
@@ -217,7 +338,7 @@ export const chatService = {
       "VIDEO",
       "AUDIO",
       "FILE",
-      "LINK"
+      "LINK",
     ];
 
     /**
@@ -230,17 +351,15 @@ export const chatService = {
      */
     if (
       !conversation.match &&
-      conversation.matchPendingForUserId ===
-      data.userId &&
+      conversation.matchPendingForUserId === data.userId &&
       replyMessageTypes.includes(data.messageType)
     ) {
-      const matchResult =
-        await createMatchFromReplyService(
-          data.conversationId,
-          data.userId,
-        );
+      const matchResult = await createMatchFromReplyService(
+        data.conversationId,
+        data.userId,
+      );
 
-      console.log("matchResult : ", matchResult)
+      console.log("matchResult : ", matchResult);
 
       /**
        * First valid reply created the match.
@@ -257,22 +376,17 @@ export const chatService = {
         // await markConversationMatched(
         //   data.conversationId,
         // );
-      }
+      } else if (matchResult.alreadyMatched) {
+        /**
+         * Safety case:
+         * UserMatch already exists but
+         * conversation.match was false.
+         *
+         * Sync conversation state.
+         */
+        match = "match" in matchResult ? matchResult.match : null;
 
-      /**
-       * Safety case:
-       * UserMatch already exists but
-       * conversation.match was false.
-       *
-       * Sync conversation state.
-       */
-      else if (matchResult.alreadyMatched) {
-        match =
-          "match" in matchResult
-            ? matchResult.match
-            : null;
-
-        console.log("match : ", match)
+        console.log("match : ", match);
 
         // await markConversationMatched(
         //   data.conversationId,
@@ -289,14 +403,14 @@ export const chatService = {
      * in a larger implementation.
      */
     /**
-  * =========================================================
-  * CHAT PUSH NOTIFICATION
-  * =========================================================
-  *
-  * ROSE / GIFT / COMPLIMENT already have their own
-  * notification logic, so don't create MESSAGE notification
-  * for those types.
-  */const chatNotificationTypes: MessageType[] = [
+     * =========================================================
+     * CHAT PUSH NOTIFICATION
+     * =========================================================
+     *
+     * ROSE / GIFT / COMPLIMENT already have their own
+     * notification logic, so don't create MESSAGE notification
+     * for those types.
+     */ const chatNotificationTypes: MessageType[] = [
       MessageType.TEXT,
       MessageType.IMAGE,
       MessageType.VIDEO,
@@ -305,76 +419,56 @@ export const chatService = {
       MessageType.LINK,
     ];
 
-    if (
-      chatNotificationTypes.includes(
-        data.messageType,
-      )
-    ) {
+    if (chatNotificationTypes.includes(data.messageType)) {
       /**
        * findOtherParticipant returns userId
        * directly as string.
        */
-      const receiverId =
-        await chatRepository.findOtherParticipant(
-          data.conversationId,
-          data.userId,
-        );
-
-      console.log(
-        "Chat notification receiverId:",
-        receiverId,
+      const receiverId = await chatRepository.findOtherParticipant(
+        data.conversationId,
+        data.userId,
       );
+
+      console.log("Chat notification receiverId:", receiverId);
 
       if (receiverId) {
         /**
          * Check whether receiver currently
          * has this conversation open.
          */
-        const receiverViewingChat =
-          await isUserViewingConversation(
-            receiverId,
-            data.conversationId,
-          );
-
-      
+        const receiverViewingChat = await isUserViewingConversation(
+          receiverId,
+          data.conversationId,
+        );
 
         /**
          * Notification message.
          */
-        let notificationMessage =
-          "Sent you a message";
+        let notificationMessage = "Sent you a message";
 
         switch (data.messageType) {
           case MessageType.TEXT:
-            notificationMessage =
-              data.content?.trim() ||
-              "Sent you a message";
+            notificationMessage = data.content?.trim() || "Sent you a message";
             break;
 
           case MessageType.IMAGE:
-            notificationMessage =
-              "Sent you a photo";
+            notificationMessage = "Sent you a photo";
             break;
 
           case MessageType.VIDEO:
-            notificationMessage =
-              "Sent you a video";
+            notificationMessage = "Sent you a video";
             break;
 
           case MessageType.AUDIO:
-            notificationMessage =
-              "Sent you an audio message";
+            notificationMessage = "Sent you an audio message";
             break;
 
           case MessageType.FILE:
-            notificationMessage =
-              "Sent you a file";
+            notificationMessage = "Sent you a file";
             break;
 
           case MessageType.LINK:
-            notificationMessage =
-              data.content?.trim() ||
-              "Sent you a link";
+            notificationMessage = data.content?.trim() || "Sent you a link";
             break;
         }
 
@@ -389,9 +483,7 @@ export const chatService = {
 
           type: "NEW_MESSAGE",
 
-          title:
-            participant.user?.full_name ??
-            "New message",
+          title: participant.user?.full_name ?? "New message",
 
           message: notificationMessage,
 
@@ -400,29 +492,21 @@ export const chatService = {
 
             targetType: "CHAT",
 
-            targetId:
-              data.conversationId,
+            targetId: data.conversationId,
 
-            conversationId:
-              data.conversationId,
+            conversationId: data.conversationId,
 
-            messageId:
-              message.id,
+            messageId: message.id,
 
-            senderId:
-              data.userId,
+            senderId: data.userId,
 
             // Again, directly use receiverId
             receiverId,
           },
 
-          skipPush:
-            receiverViewingChat,
+          skipPush: receiverViewingChat,
         }).catch((error) => {
-          console.error(
-            "Failed to create chat notification:",
-            error,
-          );
+          console.error("Failed to create chat notification:", error);
         });
       }
     }
@@ -532,21 +616,15 @@ export const chatService = {
   },
 
   //DELETE CONVERSATION
-  async deleteConversation(
-    conversationId: string,
-    userId: string
-  ) {
+  async deleteConversation(conversationId: string, userId: string) {
     // Check whether user belongs to conversation
-    const participant =
-      await chatRepository.findParticipant(
-        conversationId,
-        userId
-      );
+    const participant = await chatRepository.findParticipant(
+      conversationId,
+      userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "Conversation not found or you are not a participant"
-      );
+      throw new Error("Conversation not found or you are not a participant");
     }
 
     // Already deleted
@@ -557,11 +635,10 @@ export const chatService = {
       };
     }
 
-    const deletedParticipant =
-      await chatRepository.deleteConversationForUser(
-        conversationId,
-        userId
-      );
+    const deletedParticipant = await chatRepository.deleteConversationForUser(
+      conversationId,
+      userId,
+    );
 
     return {
       conversationId: deletedParticipant.conversationId,
@@ -570,27 +647,17 @@ export const chatService = {
   },
 
   //CLEAR ALL CHAT
-  async clearChat(
-    conversationId: string,
-    userId: string
-  ) {
-    const participant =
-      await chatRepository.findParticipant(
-        conversationId,
-        userId
-      );
+  async clearChat(conversationId: string, userId: string) {
+    const participant = await chatRepository.findParticipant(
+      conversationId,
+      userId,
+    );
 
     if (!participant) {
-      throw new Error(
-        "Conversation not found or you are not a participant"
-      );
+      throw new Error("Conversation not found or you are not a participant");
     }
 
-    const deletedCount =
-      await chatRepository.clearChat(
-        conversationId,
-        userId
-      );
+    const deletedCount = await chatRepository.clearChat(conversationId, userId);
 
     return {
       conversationId,
@@ -598,11 +665,7 @@ export const chatService = {
     };
   },
 
-  async inviteToEvent(
-    senderId: string,
-    receiverId: string,
-    eventId: string,
-  ) {
+  async inviteToEvent(senderId: string, receiverId: string, eventId: string) {
     // 1. Cannot invite yourself
     if (senderId === receiverId) {
       throw new Error("You cannot invite yourself to an event");
@@ -615,12 +678,44 @@ export const chatService = {
       throw new Error("Event not found");
     }
 
-    // 3. Find existing conversation
-    let conversation =
-      await chatRepository.findConversationBetweenUsers(
-        senderId,
-        receiverId,
+    // ============================================
+    // CHECK EVENT DATE AND TIME BEFORE INVITE
+    // ============================================
+
+    if (!event.eventDate || !event.startTime || !event.endTime) {
+      throw new Error("Event date or time is not configured properly");
+    }
+
+    // Event date stored as date-only UTC midnight
+    const eventDate = event.eventDate.toISOString().split("T")[0];
+
+    // Supports HH:mm or HH:mm:ss (24-hour format)
+    const endTime = event.endTime.trim();
+
+    if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(endTime)) {
+      throw new Error("Invalid event end time format");
+    }
+
+    const normalizedEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
+
+    // Event time assumed to be Indian Standard Time (IST)
+    const eventEndDateTime = new Date(
+      `${eventDate}T${normalizedEndTime}+05:30`,
+    );
+
+    const currentDateTime = new Date();
+
+    if (currentDateTime >= eventEndDateTime) {
+      throw new Error(
+        "This event has already ended. You cannot send invitations for past events.",
       );
+    }
+
+    // 3. Find existing conversation
+    let conversation = await chatRepository.findConversationBetweenUsers(
+      senderId,
+      receiverId,
+    );
 
     // 4. Create conversation if it doesn't exist
     if (!conversation) {
@@ -631,12 +726,11 @@ export const chatService = {
     }
 
     // 5. Create EVENT_INVITE message
-    const message =
-      await chatRepository.createEventInviteMessage(
-        conversation.id,
-        senderId,
-        eventId,
-      );
+    const message = await chatRepository.createEventInviteMessage(
+      conversation.id,
+      senderId,
+      eventId,
+    );
 
     // 🔔 Send notification AFTER transaction successfully commits
     createNotification({
@@ -663,41 +757,38 @@ export const chatService = {
     };
   },
 
-  async getProfileDetails(
-    conversationId: string,
-    currentUserId: string,
-  ) {
-    console.log(
-      "=== GET PROFILE DETAILS SERVICE ===",
-    );
+  async getProfileDetails(conversationId: string, currentUserId: string) {
+    console.log("=== GET PROFILE DETAILS SERVICE ===");
     if (!conversationId) {
-      throw new Error(
-        "Conversation ID is required",
-      );
+      throw new Error("Conversation ID is required");
     }
 
     if (!currentUserId) {
-      throw new Error(
-        "User ID is required",
-      );
+      throw new Error("User ID is required");
     }
 
     /**
      * Get profile information from DB
      */
-    const result =
-      await chatRepository.getConversationUserDetailsRepository(
-        conversationId,
-        currentUserId,
-      );
+    const result = await chatRepository.getConversationUserDetailsRepository(
+      conversationId,
+      currentUserId,
+    );
+
+    // ============================================
+    // DYNAMIC MATCH SCORE - REDIS + PRISMA
+    // ============================================
+
+    const matchScoreMap = await getMatchScoresForUsers(currentUserId, [
+      result.targetUserId,
+    ]);
+
+    const matchScore = matchScoreMap.get(result.targetUserId)?.percentage ?? 0;
 
     /**
      * Get real-time presence from Redis
      */
-    const presence =
-      await presenceService.getPresence(
-        result.targetUserId,
-      );
+    const presence = await presenceService.getPresence(result.targetUserId);
 
     /**
      * Calculate age
@@ -707,26 +798,15 @@ export const chatService = {
     if (result.user.birth_date) {
       const today = new Date();
 
-      const birthDate =
-        new Date(
-          result.user.birth_date,
-        );
+      const birthDate = new Date(result.user.birth_date);
 
-      age =
-        today.getFullYear() -
-        birthDate.getFullYear();
+      age = today.getFullYear() - birthDate.getFullYear();
 
-      const monthDifference =
-        today.getMonth() -
-        birthDate.getMonth();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
 
       if (
         monthDifference < 0 ||
-        (
-          monthDifference === 0 &&
-          today.getDate() <
-          birthDate.getDate()
-        )
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
       ) {
         age--;
       }
@@ -735,19 +815,14 @@ export const chatService = {
     /**
      * Active package
      */
-    const activePackage =
-      result.user.userPackages?.[0];
+    const activePackage = result.user.userPackages?.[0];
 
-    const packageType =
-      activePackage?.package?.name ??
-      "FREE";
+    const packageType = activePackage?.package?.name ?? "FREE";
 
     /**
      * Profile image
      */
-    const profileImage =
-      result.user.photos?.[0]
-        ?.media_url ?? null;
+    const profileImage = result.user.photos?.[0]?.media_url ?? null;
 
     return {
       conversationId: result.conversationId,
@@ -759,17 +834,13 @@ export const chatService = {
 
         packageType,
 
-        isOnline:
-          presence.isOnline,
+        isOnline: presence.isOnline,
 
-        lastSeenAt:
-          presence.lastSeenAt,
+        lastSeenAt: presence.lastSeenAt,
 
-        isBlocked:
-          result.isBlocked,
+        isBlocked: result.isBlocked,
 
-        matchScore:
-          result.matchScore ?? 0,
+        matchScore,
 
         profileImage,
       },

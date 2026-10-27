@@ -128,21 +128,12 @@ export const purchaseRoseWithWalletService = async (
         await tx.walletTransaction.create({
           data: {
             walletId: wallet.id,
-
             amount: purchaseAmount,
-
             type: TransactionType.PURCHASE,
-
             status: TransactionStatus.SUCCESS,
-
-            source:
-              TransactionSource.WALLET_TOPUP,
-
-            description:
-              `Purchased ${roseQuantity} Roses using wallet`,
-
+            source: TransactionSource.WALLET_ROSE,
+            description: `Purchased ${roseQuantity} Roses using wallet`,
             balanceBefore: wallet.balance,
-
             balanceAfter: updatedWallet.balance,
           },
         });
@@ -155,16 +146,10 @@ export const purchaseRoseWithWalletService = async (
         await tx.rosePurchase.create({
           data: {
             userId,
-
             quantity: roseQuantity,
-
             amount: purchaseAmount,
-
-            paymentMethod:
-              PurchasePaymentMethod.WALLET,
-
-            walletTransactionId:
-              walletTransaction.id,
+            paymentMethod: PurchasePaymentMethod.WALLET,
+            walletTransactionId:walletTransaction.id,
           },
         });
 

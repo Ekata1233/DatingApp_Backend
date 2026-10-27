@@ -1,4 +1,4 @@
-import { activateBoostService, upgradeBoostService } from "./boost.service";
+import { activateBoostService, getBoostProgressService, upgradeBoostService } from "./boost.service";
 import { validateActivateBoost, validateUpgradeBoost } from "./boost.validation";
 import { Request, Response } from "express";
 
@@ -79,6 +79,47 @@ export const activateBoostController = async (req: Request, res: Response) => {
     return res.status(400).json({
       success: false,
       message: errorMap[error.message] || "Something went wrong",
+    });
+  }
+};
+
+export const getBoostProgressController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized - User not authenticated",
+      });
+      return;
+    }
+
+    const data = await getBoostProgressService(
+      userId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: data.isBoostActive
+        ? "Active boost progress fetched successfully"
+        : "No active boost found",
+      data,
+    });
+
+  } catch (error: any) {
+    console.error(
+      "GET BOOST PROGRESS ERROR:",
+      error
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Failed to fetch boost progress",
     });
   }
 };

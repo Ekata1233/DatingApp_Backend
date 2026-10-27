@@ -18,6 +18,8 @@ import { MessageType } from "@prisma/client";
 import { calculateAge } from "../chat.repository";
 import { prisma } from "../../../prisma/prismaClient";
 import { incrementRoseAndGiftMessages } from "../../unlockRoseGift/unlockRoseGift.service";
+import { AppError } from "../../rose/AppError";
+import { emitEngagementProgress } from "./engagement-progress.socket";
 
 export const chatSocketService = {
   /**
@@ -65,85 +67,116 @@ export const chatSocketService = {
       payload.conversationId,
       userId,
     );
+
+    // let metadata = payload.metadata;
+
+    // if (payload.messageType === MessageType.GIFT) {
+    //   const payloadMetadata =
+    //     payload.metadata &&
+    //       typeof payload.metadata === "object" &&
+    //       !Array.isArray(payload.metadata)
+    //       ? (payload.metadata as Record<string, unknown>)
+    //       : {};
+
+    //   /**
+    //    * Frontend sends catalog Gift.id
+    //    *
+    //    * Gift.id = Int
+    //    */
+    //   const giftId = Number(payloadMetadata.giftId);
+
+    //   if (!giftId || Number.isNaN(giftId)) {
+    //     throw new Error("Valid Gift ID is required");
+    //   }
+
+    //   /**
+    //    * 4.1 Find catalog Gift
+    //    */
+    //   const gift = await prisma.gift.findUnique({
+    //     where: {
+    //       id: giftId,
+    //     },
+    //   });
+
+    //   if (!gift) {
+    //     throw new Error("Gift not found");
+    //   }
+
+    //   if (!gift.isLive) {
+    //     throw new Error("Gift is currently inactive");
+    //   }
+
+    //   /**
+    //    * 4.2 Create UserGift
+    //    *
+    //    * gift.id       = Int
+    //    * UserGift.id   = UUID
+    //    */
+    //   const userGift = await prisma.userGift.create({
+    //     data: {
+    //       giftId: gift.id,
+    //       giftName: gift.name,
+    //       senderId: userId,
+    //       receiverId: receiverId,
+
+    //       pricePaid: gift.coinCost,
+    //       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    //     },
+    //   });
+
+    //   /**
+    //    * 4.3 IMPORTANT
+    //    *
+    //    * ChatMessage.giftId expects UserGift.id
+    //    * which is UUID.
+    //    *
+    //    * Therefore:
+    //    *
+    //    * Before:
+    //    * {
+    //    *   giftId: 1
+    //    * }
+    //    *
+    //    * After:
+    //    * {
+    //    *   giftId: "uuid-of-user-gift"
+    //    * }
+    //    */
+    //   metadata = {
+    //     ...payloadMetadata,
+    //     giftId: userGift.id,
+    //   };
+    // }
+
     let metadata = payload.metadata;
 
-    if (payload.messageType === MessageType.GIFT) {
-      const payloadMetadata =
-        payload.metadata &&
-          typeof payload.metadata === "object" &&
-          !Array.isArray(payload.metadata)
-          ? (payload.metadata as Record<string, unknown>)
-          : {};
+if (payload.messageType === MessageType.GIFT) {
+  const payloadMetadata =
+    payload.metadata &&
+    typeof payload.metadata === "object" &&
+    !Array.isArray(payload.metadata)
+      ? (payload.metadata as Record<string, unknown>)
+      : {};
 
-      /**
-       * Frontend sends catalog Gift.id
-       *
-       * Gift.id = Int
-       */
-      const giftId = Number(payloadMetadata.giftId);
+  const rawGiftId = payloadMetadata.giftId;
 
-      if (!giftId || Number.isNaN(giftId)) {
-        throw new Error("Valid Gift ID is required");
-      }
+  const giftId =
+    typeof rawGiftId === "number"
+      ? rawGiftId
+      : typeof rawGiftId === "string" &&
+          rawGiftId.trim() !== ""
+        ? Number(rawGiftId)
+        : NaN;
 
-      /**
-       * 4.1 Find catalog Gift
-       */
-      const gift = await prisma.gift.findUnique({
-        where: {
-          id: giftId,
-        },
-      });
+  if (!Number.isSafeInteger(giftId) || giftId <= 0) {
+    throw new AppError(400, "INVALID_GIFT_ID");
+  }
 
-      if (!gift) {
-        throw new Error("Gift not found");
-      }
-
-      if (!gift.isLive) {
-        throw new Error("Gift is currently inactive");
-      }
-
-      /**
-       * 4.2 Create UserGift
-       *
-       * gift.id       = Int
-       * UserGift.id   = UUID
-       */
-      const userGift = await prisma.userGift.create({
-        data: {
-          giftId: gift.id,
-          giftName: gift.name,
-          senderId: userId,
-          receiverId: receiverId,
-
-          pricePaid: gift.coinCost,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
-
-      /**
-       * 4.3 IMPORTANT
-       *
-       * ChatMessage.giftId expects UserGift.id
-       * which is UUID.
-       *
-       * Therefore:
-       *
-       * Before:
-       * {
-       *   giftId: 1
-       * }
-       *
-       * After:
-       * {
-       *   giftId: "uuid-of-user-gift"
-       * }
-       */
-      metadata = {
-        ...payloadMetadata,
-        giftId: userGift.id,
-      };
-    }
+  metadata = {
+    ...payloadMetadata,
+    giftId,
+  };
+}
 
     if (payload.messageType === MessageType.COMPLIMENT) {
       const payloadMetadata =
@@ -224,6 +257,8 @@ export const chatSocketService = {
      * Save message to database.
      * 
      */
+
+    
     const message = await messageService.createMessage({
       userId,
 
@@ -270,6 +305,23 @@ export const chatSocketService = {
         userId,
         receiverId,
       );
+
+      if (
+    interactionResult &&
+    (interactionResult.rose || interactionResult.gift)
+  ) {
+    try {
+      await emitEngagementProgress(
+        io,
+        payload.conversationId,
+        interactionResult,
+      );
+    } catch (error) {
+      console.error(
+        "ENGAGEMENT PROGRESS SOCKET ERROR:",
+        error,
+      );
+    }}
     }
 
     const unreadCount = await chatService.getUnreadCount(

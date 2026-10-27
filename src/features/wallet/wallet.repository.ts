@@ -1,14 +1,17 @@
+
 import {
   Prisma,
   TransactionStatus,
   TransactionType,
+  TransactionSource,
 } from "@prisma/client";
-import { prisma } from "../../prisma/prismaClient";
 
+import { prisma } from "../../prisma/prismaClient";
 
 interface GetWalletTransactionsParams {
   walletId: string;
   filter: "ALL" | "IN" | "OUT";
+  source?: TransactionSource;
   skip: number;
   take: number;
 }
@@ -61,6 +64,7 @@ export const walletRepository = {
   getTransactions: async ({
     walletId,
     filter,
+    source,
     skip,
     take,
   }: GetWalletTransactionsParams) => {
@@ -68,6 +72,7 @@ export const walletRepository = {
       buildTransactionWhere(
         walletId,
         filter,
+        source,
       );
 
     const [transactions, total] =
@@ -106,6 +111,22 @@ export const walletRepository = {
       total,
     };
   },
+  
+  getTotalWalletCredit: async (walletId: string) => {
+  const result = await prisma.walletTransaction.aggregate({
+    where: {
+      walletId,
+      type: TransactionType.DEPOSIT,
+      source: TransactionSource.WALLET_TOPUP,
+      status: TransactionStatus.SUCCESS,
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  return Number(result._sum.amount ?? 0);
+},
 };
 
 // ==========================================
@@ -115,6 +136,7 @@ export const walletRepository = {
 const buildTransactionWhere = (
   walletId: string,
   filter: "ALL" | "IN" | "OUT",
+  source?: TransactionSource,
 ): Prisma.WalletTransactionWhereInput => {
   const where: Prisma.WalletTransactionWhereInput =
     {
@@ -122,6 +144,10 @@ const buildTransactionWhere = (
 
       status: TransactionStatus.SUCCESS,
     };
+
+  // ==========================================
+  // INCOMING TRANSACTIONS
+  // ==========================================
 
   if (filter === "IN") {
     where.type = {
@@ -134,6 +160,10 @@ const buildTransactionWhere = (
     };
   }
 
+  // ==========================================
+  // OUTGOING TRANSACTIONS
+  // ==========================================
+
   if (filter === "OUT") {
     where.type = {
       in: [
@@ -141,6 +171,14 @@ const buildTransactionWhere = (
         TransactionType.PURCHASE,
       ],
     };
+  }
+
+  // ==========================================
+  // TRANSACTION SOURCE FILTER
+  // ==========================================
+
+  if (source) {
+    where.source = source;
   }
 
   return where;

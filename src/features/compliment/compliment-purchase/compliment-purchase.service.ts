@@ -156,26 +156,13 @@ export const purchaseComplimentWithWalletService =
           await tx.walletTransaction.create({
             data: {
               walletId: wallet.id,
-
               amount: purchaseAmount,
-
-              type:
-                TransactionType.PURCHASE,
-
-              status:
-                TransactionStatus.SUCCESS,
-
-              source:
-                TransactionSource.WALLET_TOPUP,
-
-              description:
-                `Purchased ${complimentQuantity} Compliments using wallet`,
-
-              balanceBefore:
-                wallet.balance,
-
-              balanceAfter:
-                updatedWallet.balance,
+              type:TransactionType.PURCHASE,
+              status: TransactionStatus.SUCCESS,
+              source: TransactionSource.WALLET_COMPLIMENT,
+              description: `Purchased ${complimentQuantity} Compliments using wallet`,
+              balanceBefore: wallet.balance,
+              balanceAfter: updatedWallet.balance,
             },
           });
 
@@ -187,18 +174,10 @@ export const purchaseComplimentWithWalletService =
           await tx.complimentPurchase.create({
             data: {
               userId,
-
-              quantity:
-                complimentQuantity,
-
-              amount:
-                purchaseAmount,
-
-              paymentMethod:
-                PurchasePaymentMethod.WALLET,
-
-              walletTransactionId:
-                walletTransaction.id,
+              quantity:complimentQuantity,
+              amount: purchaseAmount,
+              paymentMethod:PurchasePaymentMethod.WALLET,
+              walletTransactionId: walletTransaction.id,
             },
           });
 
@@ -234,21 +213,12 @@ export const purchaseComplimentWithWalletService =
 
             create: {
               userId,
-
-              totalCompliments:
-                complimentQuantity,
-
+              totalCompliments: complimentQuantity,
               freeCompliments: 0,
-
-              purchasedCompliments:
-                complimentQuantity,
-
+              purchasedCompliments: complimentQuantity,
               weeklyLimit: 0,
-
               totalComplimentsSent: 0,
-
               lastResetAt: now,
-
               nextResetAt,
             },
           });

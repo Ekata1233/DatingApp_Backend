@@ -37,14 +37,19 @@ export const getMyBalancesRepository = async (
     // =========================
     // BOOSTS
     // =========================
-    prisma.userBoost.findFirst({
-      where: {
-        user_id: userId,
-      },
-      select: {
-        remaining_boosts: true,
-      },
-    }),
+    prisma.userBoost.aggregate({
+  where: {
+    user_id: userId,
+    is_active: true,
+    OR: [
+      { expires_at: null },
+      { expires_at: { gt: new Date() } },
+    ],
+  },
+  _sum: {
+    remaining_boosts: true,
+  },
+}),
 
     // =========================
     // WALLET

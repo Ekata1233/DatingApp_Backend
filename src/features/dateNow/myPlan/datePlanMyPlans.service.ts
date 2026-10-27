@@ -14,6 +14,7 @@ import {
   SubmitNoShowFeedbackInput,
   UpdateMetUserInput,
 } from "./datePlanMyPlans.types";
+import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 
 /**
  * Calculate user's age
@@ -134,20 +135,17 @@ export const getMyPlansService = async ({
 
     // Exclude plans where the logged-in user
     // has already submitted MET feedback
-   feedbacks: {
-  none: {
-    reviewerId: userId,
+    feedbacks: {
+      none: {
+        reviewerId: userId,
 
-    attendanceStatus: {
-      in: [
-        DatePlanAttendanceStatus.MET,
-        DatePlanAttendanceStatus.NO_SHOW,
-      ],
+        attendanceStatus: {
+          in: [DatePlanAttendanceStatus.MET, DatePlanAttendanceStatus.NO_SHOW],
+        },
+
+        status: DatePlanFeedbackStatus.SUBMITTED,
+      },
     },
-
-    status: DatePlanFeedbackStatus.SUBMITTED,
-  },
-},
   };
 
   /**
@@ -243,6 +241,7 @@ export const getMyPlansService = async ({
                 id: true,
                 full_name: true,
                 birth_date: true,
+                trust_score: true,
                 profile: {
                   select: {
                     country: true,
@@ -301,6 +300,23 @@ export const getMyPlansService = async ({
       where,
     }),
   ]);
+
+  // ============================================
+  // DYNAMIC REQUESTER MATCH SCORE - REDIS + PRISMA
+  // ============================================
+
+  // Collect unique requester IDs across all plans
+  const requesterIds = [
+    ...new Set(
+      plans.flatMap((plan) =>
+        plan.requests.map((request) => request.requester.id),
+      ),
+    ),
+  ];
+
+  // Calculate compatibility between the logged-in host
+  // and each requester in one batch
+  const matchScoreMap = await getMatchScoresForUsers(userId, requesterIds);
 
   const now = new Date();
 
@@ -491,38 +507,23 @@ export const getMyPlansService = async ({
 
         requester: {
           id: request.requester.id,
-
           name: request.requester.full_name,
-
           age: calculateAge(request.requester.birth_date),
-
           photo: request.requester.photos[0]?.media_url ?? null,
-
+          trustScore: request.requester.trust_score ?? 0,
+          matchScore: matchScoreMap.get(request.requester.id)?.percentage ?? 0,
           matchPercentage: null,
-           location: request.requester.profile
-    ? {
-        country:
-          request.requester.profile.country,
-
-        state:
-          request.requester.profile.state,
-
-        city:
-          request.requester.profile.city,
-
-        area:
-          request.requester.profile.area,
-
-        maxDistanceKm:
-          request.requester.profile.max_distance_km,
-
-        latitude:
-          request.requester.profile.latitude,
-
-        longitude:
-          request.requester.profile.longitude,
-      }
-    : null,
+          location: request.requester.profile
+            ? {
+                country: request.requester.profile.country,
+                state: request.requester.profile.state,
+                city: request.requester.profile.city,
+                area: request.requester.profile.area,
+                maxDistanceKm: request.requester.profile.max_distance_km,
+                latitude: request.requester.profile.latitude,
+                longitude: request.requester.profile.longitude,
+              }
+            : null,
         },
       })),
     };
@@ -655,7 +656,7 @@ export const updateMetUser = async ({
       },
     },
   });
-console.log("feedback",feedback);
+  console.log("feedback", feedback);
 
   if (!feedback) {
     throw new Error(

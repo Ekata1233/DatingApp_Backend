@@ -29,15 +29,16 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     birth_date,
     height,
     gender,
-
+    gender_option,
     religionId,
     communityId,
     languageIds,
-
     zodiac,
     loveLanguage,
     communicationStyle,
   } = payload;
+
+  console.log("gender option : ", gender_option)
 
   const result = await prisma.$transaction(async (tx) => {
     //--------------------------------------------------
@@ -55,6 +56,8 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     if (height !== undefined) userData.height = height;
 
     if (gender !== undefined) userData.gender = gender;
+
+    if(gender_option!== undefined) userData.gender_option = gender_option;
 
     if (Object.keys(userData).length) {
       await tx.user.update({
@@ -691,11 +694,35 @@ export async function getEditProfileService(
 
   console.log("📦 Edit Profile from Database");
 
-  const profile = await getEditProfileRepository(userId);
+const profile = await getEditProfileRepository(userId);
 
-  if (!profile) {
-    throw new Error("Profile not found");
-  }
+if (!profile) {
+  throw new Error("Profile not found");
+}
+
+console.log("\n========== EDIT PROFILE DEBUG ==========");
+console.log("USER ID:", userId);
+
+console.log(
+  "FAMILY PROFILE:",
+  JSON.stringify(profile.familyProfile, null, 2)
+);
+
+console.log(
+  "TOTAL SIBLINGS FROM PRISMA:",
+  profile.familyProfile?.siblings?.length ?? 0
+);
+
+console.log(
+  "SIBLINGS RAW DATA:",
+  JSON.stringify(
+    profile.familyProfile?.siblings ?? [],
+    null,
+    2
+  )
+);
+
+console.log("========================================\n");
 
   const photos = profile.photos
     .filter((item) => item.media_type === MediaType.IMAGE)
@@ -736,15 +763,71 @@ export async function getEditProfileService(
 
   console.log("networkingIntent", networkingIntent);
 
-  const siblings = profile.familyProfile?.siblings ?? [];
+ // ===============================================
+// SIBLINGS DATA
+// ===============================================
 
-  const brothers = siblings.filter(
-    (s) => s.siblingType?.value === "Brother"
+const siblings =
+  profile.familyProfile?.siblings ?? [];
+
+console.log(
+  "========== SIBLINGS DEBUG =========="
+);
+
+console.log(
+  "Total siblings:",
+  siblings.length
+);
+
+console.log(
+  "Sibling records:",
+  JSON.stringify(siblings, null, 2)
+);
+
+// ===============================================
+// NORMALIZE SIBLING TYPE
+// ===============================================
+
+const normalizeSiblingType = (
+  value?: string | null
+): string => {
+  return (value ?? "")
+    .trim()
+    .toLowerCase();
+};
+
+// ===============================================
+// FILTER BROTHERS
+// ===============================================
+
+const brothers = siblings.filter((item) => {
+  const type = normalizeSiblingType(
+    item.siblingType?.value
   );
 
-  const sisters = siblings.filter(
-    (s) => s.siblingType?.value === "Sister"
+  return (
+    type.includes("brother") ||
+    type === "male sibling"
   );
+});
+
+// ===============================================
+// FILTER SISTERS
+// ===============================================
+
+const sisters = siblings.filter((item) => {
+  const type = normalizeSiblingType(
+    item.siblingType?.value
+  );
+
+  return (
+    type.includes("sister") ||
+    type === "female sibling"
+  );
+});
+
+console.log("Brothers:", brothers.length);
+console.log("Sisters:", sisters.length);
 
   const response: EditProfileResponse = {
     profileScore: profile.profile_completion ?? 0,
@@ -896,44 +979,64 @@ export async function getEditProfileService(
 
         // ✅ Use the actual UUID from UserSibling
         siblings: {
-          brothers: {
-            count: brothers.length,
-            details: brothers.map((item) => ({
-              id: item.id,
-              occupation: item.occupation
-                ? {
-                  id: item.occupation.id,
-                  value: item.occupation.value,
-                }
-                : null,
-              maritalStatus: item.marital
-                ? {
-                  id: item.marital.id,
-                  value: item.marital.value,
-                }
-                : null,
-            })),
-          },
+  brothers: {
+    count: brothers.length,
 
-          sisters: {
-            count: sisters.length,
-            details: sisters.map((item) => ({
-              id: item.id,
-              occupation: item.occupation
-                ? {
-                  id: item.occupation.id,
-                  value: item.occupation.value,
-                }
-                : null,
-              maritalStatus: item.marital
-                ? {
-                  id: item.marital.id,
-                  value: item.marital.value,
-                }
-                : null,
-            })),
-          },
-        }
+    details: brothers.map((item) => ({
+      id: item.id,
+
+      siblingType: item.siblingType
+        ? {
+            id: item.siblingType.id,
+            value: item.siblingType.value,
+          }
+        : null,
+
+      occupation: item.occupation
+        ? {
+            id: item.occupation.id,
+            value: item.occupation.value,
+          }
+        : null,
+
+      maritalStatus: item.marital
+        ? {
+            id: item.marital.id,
+            value: item.marital.value,
+          }
+        : null,
+    })),
+  },
+
+  sisters: {
+    count: sisters.length,
+
+    details: sisters.map((item) => ({
+      id: item.id,
+
+      siblingType: item.siblingType
+        ? {
+            id: item.siblingType.id,
+            value: item.siblingType.value,
+          }
+        : null,
+
+      occupation: item.occupation
+        ? {
+            id: item.occupation.id,
+            value: item.occupation.value,
+          }
+        : null,
+
+      maritalStatus: item.marital
+        ? {
+            id: item.marital.id,
+            value: item.marital.value,
+          }
+        : null,
+    })),
+  },
+},
       }
       : null,
 

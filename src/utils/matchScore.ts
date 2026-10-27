@@ -962,14 +962,17 @@ export function profileCompletenessScore(user: any) {
  *   ...
  * }
  */
-export function buildAnswerMap(answers: any[]) {
+export function buildAnswerMap(answers: any[] = []) {
   return answers.reduce((map, answer) => {
     map[answer.question.key] = answer.option.value;
     return map;
   }, {} as Record<string, string>);
 }
 
-export function getAnswerValues(answers: any[], key: string): string[] {
+export function getAnswerValues(
+  answers: any[] = [],
+  key: string,
+): string[] {
   return answers
     .filter((a) => a.question.key === key)
     .map((a) => a.option.value);

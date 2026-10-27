@@ -1,6 +1,6 @@
-
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
+import { getMatchScoresForUsers } from "../match-score/match-score.service";
 
 type AdmirerDirection = "RECEIVED" | "SENT";
 
@@ -15,30 +15,20 @@ interface GetAdmirersParams {
 // CALCULATE AGE
 // ==========================================
 
-const calculateAge = (
-  birthDate: Date | null
-): number | null => {
+const calculateAge = (birthDate: Date | null): number | null => {
   if (!birthDate) {
     return null;
   }
 
   const today = new Date();
 
-  let age =
-    today.getFullYear() -
-    birthDate.getFullYear();
+  let age = today.getFullYear() - birthDate.getFullYear();
 
-  const monthDifference =
-    today.getMonth() -
-    birthDate.getMonth();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
 
   if (
     monthDifference < 0 ||
-    (
-      monthDifference === 0 &&
-      today.getDate() <
-      birthDate.getDate()
-    )
+    (monthDifference === 0 && today.getDate() < birthDate.getDate())
   ) {
     age--;
   }
@@ -50,168 +40,136 @@ const calculateAge = (
 // GET TIME AGO
 // ==========================================
 
-const getTimeAgo = (
-  date: Date
-): string => {
+export const getTimeAgo = (date: Date | string): string => {
   const now = new Date();
+  const createdAt = new Date(date);
 
-  const createdAt =
-    new Date(date);
+  const diffMs = Math.max(0, now.getTime() - createdAt.getTime());
+  console.log("-------------------Now", now);
+  console.log("create at", createdAt);
+  console.log("---------------diffms", diffMs);
 
-  const diffMs =
-    now.getTime() -
-    createdAt.getTime();
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
 
-  const diffSeconds =
-    Math.floor(
-      diffMs / 1000
-    );
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
 
-  const diffMinutes =
-    Math.floor(
-      diffSeconds / 60
-    );
-
-  const diffHours =
-    Math.floor(
-      diffMinutes / 60
-    );
-
-  const diffDays =
-    Math.floor(
-      diffHours / 24
-    );
-
-  const diffWeeks =
-    Math.floor(
-      diffDays / 7
-    );
-
-  const diffMonths =
-    Math.floor(
-      diffDays / 30
-    );
-
-  const diffYears =
-    Math.floor(
-      diffDays / 365
-    );
-
-  if (diffSeconds < 60) {
+  if (totalMinutes < 1) {
     return "Just now";
   }
 
-  if (diffMinutes < 60) {
-    return `${diffMinutes}m ago`;
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m ago`;
   }
 
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ago`;
   }
 
-  if (diffDays === 1) {
-    return "Yesterday";
-  }
-
-  if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  }
-
-  if (diffWeeks < 4) {
-    return `${diffWeeks} week${diffWeeks > 1
-      ? "s"
-      : ""
-      } ago`;
-  }
-
-  if (diffMonths < 12) {
-    return `${diffMonths} month${diffMonths > 1
-      ? "s"
-      : ""
-      } ago`;
-  }
-
-  return `${diffYears} year${diffYears > 1
-    ? "s"
-    : ""
-    } ago`;
+  return `${minutes}m ago`;
 };
 
 // ==========================================
 // GET ADMIRERS / LIKES
 // ==========================================
+// ==========================================
+// MASK ADMIRER FULL NAME
+// ==========================================
 
+const maskAdmirerName = (fullName: string | null): string | null => {
+  if (!fullName) {
+    return null;
+  }
+
+  const words = fullName.trim().split(/\s+/);
+
+  return words
+    .map((word, index) => {
+      if (word.length <= 2) {
+        return "*".repeat(word.length);
+      }
+
+      // First name: show first 2 letters
+      if (index === 0) {
+        return word.slice(0, 2) + "*".repeat(word.length - 2);
+      }
+
+      // Middle name: show last 3 letters
+      if (index < words.length - 1) {
+        return "*".repeat(word.length - 3) + word.slice(-3);
+      }
+
+      // Last name: show first 2 letters
+      return word.slice(0, 2) + "*".repeat(word.length - 2);
+    })
+    .join(" ");
+};
 export const getAdmirers = async ({
   userId,
   direction,
   page = 1,
   limit = 20,
 }: GetAdmirersParams) => {
-
-  const skip =
-    (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
   // ==========================================
   // CHECK ACTIVE PACKAGE
   // ==========================================
 
-  const now =
-    new Date();
+  const now = new Date();
 
-  const activePackage =
-    await prisma.userPackage.findFirst({
-      where: {
-        user_id: userId,
+  const activePackage = await prisma.userPackage.findFirst({
+    where: {
+      user_id: userId,
 
-        status: "ACTIVE",
+      status: "ACTIVE",
 
-        startDate: {
-          lte: now,
+      startDate: {
+        lte: now,
+      },
+
+      OR: [
+        {
+          endDate: null,
         },
-
-        OR: [
-          {
-            endDate: null,
+        {
+          endDate: {
+            gte: now,
           },
-          {
-            endDate: {
-              gte: now,
-            },
-          },
-        ],
-      },
+        },
+      ],
+    },
 
-      select: {
-        id: true,
-        packageId: true,
-        startDate: true,
-        endDate: true,
-        status: true,
-      },
+    select: {
+      id: true,
+      packageId: true,
+      startDate: true,
+      endDate: true,
+      status: true,
+    },
 
-      orderBy: {
-        endDate: "desc",
-      },
-    });
+    orderBy: {
+      endDate: "desc",
+    },
+  });
 
-  const hasActivePackage =
-    !!activePackage;
+  const hasActivePackage = !!activePackage;
 
   // ==========================================
   // CURRENT USER LOCATION
   // ==========================================
 
-  const currentUser =
-    await prisma.userProfile.findUnique({
-      where: {
-        user_id: userId,
-      },
+  const currentUser = await prisma.userProfile.findUnique({
+    where: {
+      user_id: userId,
+    },
 
-      select: {
-        latitude: true,
-        longitude: true,
-      },
-    });
+    select: {
+      latitude: true,
+      longitude: true,
+    },
+  });
 
   // ==========================================
   // CREATE CURRENT USER POSTGIS POINT
@@ -219,124 +177,231 @@ export const getAdmirers = async ({
 
   const me =
     currentUser?.latitude !== null &&
-      currentUser?.latitude !== undefined &&
-      currentUser?.longitude !== null &&
-      currentUser?.longitude !== undefined
-
+    currentUser?.latitude !== undefined &&
+    currentUser?.longitude !== null &&
+    currentUser?.longitude !== undefined
       ? Prisma.sql`
                 ST_SetSRID(
                     ST_MakePoint(
-                        ${Number(
-        currentUser.longitude
-      )},
-                        ${Number(
-        currentUser.latitude
-      )}
+                        ${Number(currentUser.longitude)},
+                        ${Number(currentUser.latitude)}
                     ),
                     4326
                 )::geography
             `
-
       : null;
 
   // ==========================================
   // GET ACTIVE MATCHED USER IDS
   // ==========================================
 
-  const activeMatches =
-    await prisma.userMatch.findMany({
-      where: {
-        is_active: true,
-        is_deleted: false,
+  const activeMatches = await prisma.userMatch.findMany({
+    where: {
+      is_active: true,
+      is_deleted: false,
 
-        OR: [
-          {
-            user1Id: userId,
-          },
-          {
-            user2Id: userId,
-          },
-        ],
+      OR: [
+        {
+          user1Id: userId,
+        },
+        {
+          user2Id: userId,
+        },
+      ],
+    },
+
+    select: {
+      user1Id: true,
+      user2Id: true,
+    },
+  });
+
+  const matchedUserIds = activeMatches.map((match) =>
+    match.user1Id === userId ? match.user2Id : match.user1Id,
+  );
+
+  // ==========================================
+  // GET EXISTING CONVERSATION USER IDS
+  // ==========================================
+
+  const existingConversations = await prisma.conversation.findMany({
+    where: {
+      participants: {
+        some: {
+          userId,
+          deletedAt: null,
+        },
       },
+    },
 
-      select: {
-        user1Id: true,
-        user2Id: true,
+    select: {
+      participants: {
+        where: {
+          userId: {
+            not: userId,
+          },
+          deletedAt: null,
+        },
+
+        select: {
+          userId: true,
+        },
       },
-    });
+    },
+  });
 
-  const matchedUserIds =
-    activeMatches.map((match) =>
-      match.user1Id === userId
-        ? match.user2Id
-        : match.user1Id
-    );
+  // ==========================================
+  // EXTRACT CONVERSATION USER IDS
+  // ==========================================
+
+  const conversationUserIds = [
+    ...new Set(
+      existingConversations.flatMap((conversation) =>
+        conversation.participants.map((participant) => participant.userId),
+      ),
+    ),
+  ];
+
+  // ==========================================
+  // COMBINE MATCHED + CONVERSATION USERS
+  // ==========================================
+
+  const excludedSentUserIds = [
+    ...new Set([...matchedUserIds, ...conversationUserIds]),
+  ];
   // ==========================================
   // RECEIVED LIKES COUNT
   // ==========================================
 
-  const receivedLikesCount =
-    await prisma.userSwipe.count({
-      where: {
-        targetUserId: userId,
+  const receivedLikesCount = await prisma.userSwipe.count({
+    where: {
+      targetUserId: userId,
 
-        action: "LIKE",
-        isMutual: false,
-        swiperId: {
-          notIn: matchedUserIds,
-        },
-        swiper: {
-          deleted_at: null,
-        },
+      action: "LIKE",
+      isMutual: false,
+      swiperId: {
+        notIn: matchedUserIds,
       },
-    });
-
-
+      swiper: {
+        deleted_at: null,
+      },
+    },
+  });
 
   // ==========================================
   // WHERE CONDITION
   // ==========================================
 
-  const where:
-    Prisma.UserSwipeWhereInput = {
-
+  const where: Prisma.UserSwipeWhereInput = {
     action: "LIKE",
     isMutual: false,
     ...(direction === "RECEIVED"
-
       ? {
-        targetUserId: userId,
-        swiperId: {
-          notIn: matchedUserIds,
-        },
-        swiper: {
-          deleted_at: null,
-        },
-      }
-
+          targetUserId: userId,
+          swiperId: {
+            notIn: matchedUserIds,
+          },
+          swiper: {
+            deleted_at: null,
+          },
+        }
       : {
-        swiperId: userId,
-        targetUserId: {
-          notIn: matchedUserIds,
-        },
-        targetUser: {
-          deleted_at: null,
-        },
-      }),
+          swiperId: userId,
+          targetUserId: {
+            notIn: excludedSentUserIds,
+          },
+          targetUser: {
+            deleted_at: null,
+          },
+        }),
   };
 
   // ==========================================
   // LOCK RECEIVED LIKES WITHOUT PACKAGE
   // ==========================================
 
-  if (
-    direction === "RECEIVED" &&
-    !hasActivePackage
-  ) {
-    const total =
-      await prisma.userSwipe.count({
+  // ==========================================
+  // LOCK RECEIVED LIKES WITHOUT PACKAGE
+  // SHOW MASKED ADMIRER DETAILS
+  // ==========================================
+
+  if (direction === "RECEIVED" && !hasActivePackage) {
+    const [lockedSwipes, total] = await Promise.all([
+      prisma.userSwipe.findMany({
         where,
-      });
+
+        select: {
+          id: true,
+          created_at: true,
+
+          swiper: {
+            select: {
+              id: true,
+            },
+          },
+        },
+
+        orderBy: {
+          created_at: "desc",
+        },
+
+        skip,
+        take: limit,
+      }),
+
+      prisma.userSwipe.count({
+        where,
+      }),
+    ]);
+
+    // ========================================
+    // FETCH ADMIRER DETAILS
+    // ========================================
+
+    const data = await Promise.all(
+      lockedSwipes.map(async (swipe) => {
+        const admirerId = swipe.swiper.id;
+
+        const details = await getAdmirerDetailsService(userId, admirerId);
+
+        return {
+          interactionId: swipe.id,
+          type: "LIKE",
+
+          userId: admirerId,
+
+          isLocked: true,
+
+          details: {
+            full_name: maskAdmirerName(details.full_name),
+
+            birth_date: details.birth_date,
+
+            age: details.age,
+
+            photo: details.photo,
+          },
+
+          createdAt: swipe.created_at,
+
+          timeAgo: getTimeAgo(swipe.created_at),
+
+          isMatch: false,
+
+          matchedAt: null,
+
+          likeStatus: {
+            sent: true,
+            seen: true,
+            matched: false,
+          },
+        };
+      }),
+    );
+
+    // ========================================
+    // FINAL LOCKED RESPONSE
+    // ========================================
 
     return {
       receivedLikesCount,
@@ -345,16 +410,14 @@ export const getAdmirers = async ({
 
       isLocked: true,
 
-      data: [],
+      data,
 
       pagination: {
         page,
         limit,
         total,
 
-        hasNext:
-          page * limit <
-          total,
+        hasNext: page * limit < total,
       },
     };
   }
@@ -363,11 +426,7 @@ export const getAdmirers = async ({
   // FETCH LIKES
   // ==========================================
 
-  const [
-    swipes,
-    total,
-  ] = await Promise.all([
-
+  const [swipes, total] = await Promise.all([
     prisma.userSwipe.findMany({
       where,
 
@@ -435,152 +494,97 @@ export const getAdmirers = async ({
   // GET OTHER USER IDS
   // ==========================================
 
-  const userIds =
-    swipes.map((swipe) =>
-      direction === "RECEIVED"
-        ? swipe.swiper.id
-        : swipe.targetUser.id
-    );
+  const userIds = swipes.map((swipe) =>
+    direction === "RECEIVED" ? swipe.swiper.id : swipe.targetUser.id,
+  );
 
   // ==========================================
-  // FETCH COMPATIBILITY SCORES
-  // ==========================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// ==========================================
 
-  let compatibilityMap =
-    new Map<
-      string,
-      {
-        score: number;
-        percentage: number;
-      }
-    >();
+const matchScoreStart = performance.now();
 
-  if (userIds.length > 0) {
-    const compatibilityScores =
-      await prisma.userCompatibility.findMany({
-        where: {
-          userId,
+const compatibilityMap = await getMatchScoresForUsers(
+  userId,
+  userIds,
+);
 
-          targetUserId: {
-            in: userIds,
-          },
-        },
-
-        select: {
-          targetUserId: true,
-          score: true,
-          percentage: true,
-        },
-      });
-
-    compatibilityMap =
-      new Map(
-        compatibilityScores.map(
-          (compatibility) => [
-            compatibility.targetUserId,
-            {
-              score:
-                compatibility.score,
-
-              percentage:
-                compatibility.percentage,
-            },
-          ]
-        )
-      );
-  }
-
-  // ==========================================
-  // FETCH MATCHES
-  // ==========================================
+console.log(
+  "Admirers dynamic match scores:",
+  performance.now() - matchScoreStart,
+  "ms",
+);
 
   const matches =
     userIds.length > 0
       ? await prisma.userMatch.findMany({
-        where: {
-          is_active: true,
+          where: {
+            is_active: true,
 
-          is_deleted: false,
+            is_deleted: false,
 
-          OR: [
-            {
-              user1Id: userId,
+            OR: [
+              {
+                user1Id: userId,
 
-              user2Id: {
-                in: userIds,
+                user2Id: {
+                  in: userIds,
+                },
               },
-            },
 
-            {
-              user2Id: userId,
+              {
+                user2Id: userId,
 
-              user1Id: {
-                in: userIds,
+                user1Id: {
+                  in: userIds,
+                },
               },
-            },
-          ],
-        },
+            ],
+          },
 
-        select: {
-          user1Id: true,
-          user2Id: true,
-          matched_at: true,
-        },
-      })
+          select: {
+            user1Id: true,
+            user2Id: true,
+            matched_at: true,
+          },
+        })
       : [];
 
   // ==========================================
   // CREATE MATCH MAP
   // ==========================================
 
-  const matchMap =
-    new Map<
-      string,
-      {
-        isMatch: boolean;
-        matchedAt: Date | null;
-      }
-    >();
+  const matchMap = new Map<
+    string,
+    {
+      isMatch: boolean;
+      matchedAt: Date | null;
+    }
+  >();
 
   matches.forEach((match) => {
-
     const matchedUserId =
-      match.user1Id === userId
-        ? match.user2Id
-        : match.user1Id;
+      match.user1Id === userId ? match.user2Id : match.user1Id;
 
-    matchMap.set(
-      matchedUserId,
-      {
-        isMatch: true,
-        matchedAt:
-          match.matched_at,
-      }
-    );
+    matchMap.set(matchedUserId, {
+      isMatch: true,
+      matchedAt: match.matched_at,
+    });
   });
 
   // ==========================================
   // DISTANCE MAP
   // ==========================================
 
-  let distanceMap =
-    new Map<
-      string,
-      number | null
-    >();
+  let distanceMap = new Map<string, number | null>();
 
-  if (
-    me &&
-    userIds.length > 0
-  ) {
-    const distances =
-      await prisma.$queryRaw<
-        {
-          user_id: string;
-          distance_km:
-          number | null;
-        }[]
-      >`
+  if (me && userIds.length > 0) {
+    const distances = await prisma.$queryRaw<
+      {
+        user_id: string;
+        distance_km: number | null;
+      }[]
+    >`
                 SELECT
                     p.user_id::text AS user_id,
 
@@ -597,128 +601,81 @@ export const getAdmirers = async ({
                 FROM user_profiles p
 
                 WHERE p.user_id IN (
-                    ${Prisma.join(
-        userIds.map(
-          (id) =>
-            Prisma.sql`${id}::uuid`
-        )
-      )}
+                    ${Prisma.join(userIds.map((id) => Prisma.sql`${id}::uuid`))}
                 )
             `;
 
-    distanceMap =
-      new Map(
-        distances.map(
-          (item) => [
-            item.user_id,
-            item.distance_km,
-          ]
-        )
-      );
+    distanceMap = new Map(
+      distances.map((item) => [item.user_id, item.distance_km]),
+    );
   }
 
   // ==========================================
   // FORMAT DATA
   // ==========================================
 
-  const data =
-    swipes.map((swipe) => {
+  const data = swipes.map((swipe) => {
+    const user = direction === "RECEIVED" ? swipe.swiper : swipe.targetUser;
 
-      const user =
-        direction === "RECEIVED"
-          ? swipe.swiper
-          : swipe.targetUser;
+    const compatibility = compatibilityMap.get(user.id);
 
-      const compatibility =
-        compatibilityMap.get(
-          user.id
-        );
+    const match = matchMap.get(user.id);
 
-      const match =
-        matchMap.get(
-          user.id
-        );
+    const isMatch = match?.isMatch ?? false;
 
-      const isMatch =
-        match?.isMatch ??
-        false;
+    const matchedAt = match?.matchedAt ?? null;
 
-      const matchedAt =
-        match?.matchedAt ??
-        null;
+    return {
+      interactionId: swipe.id,
 
-      return {
-        interactionId:
-          swipe.id,
+      type: "LIKE",
 
-        type: "LIKE",
+      user: {
+        id: user.id,
 
-        user: {
-          id:
-            user.id,
+        name: user.full_name,
 
-          name:
-            user.full_name,
+        age: calculateAge(user.birth_date),
 
-          age:
-            calculateAge(
-              user.birth_date
-            ),
+        profileImage: user.photos[0]?.media_url ?? null,
 
-          profileImage:
-            user.photos[0]
-              ?.media_url ??
-            null,
+        distanceKm: distanceMap.get(user.id) ?? null,
 
-          distanceKm:
-            distanceMap.get(
-              user.id
-            ) ??
-            null,
+        matchScore: compatibility?.percentage ?? 0,
+      },
 
-          matchScore:
-            compatibility
-              ?.percentage ??
-            0,
-        },
+      // ==========================================
+      // LIKE INFO
+      // ==========================================
 
-        // ==========================================
-        // LIKE INFO
-        // ==========================================
+      createdAt: swipe.created_at,
 
-        createdAt:
-          swipe.created_at,
+      timeAgo: getTimeAgo(swipe.created_at),
 
-        timeAgo:
-          getTimeAgo(
-            swipe.created_at
-          ),
+      // ==========================================
+      // MATCH INFO
+      // ==========================================
 
-        // ==========================================
-        // MATCH INFO
-        // ==========================================
+      isMatch,
 
-        isMatch,
+      matchedAt,
 
-        matchedAt,
+      // ==========================================
+      // SENT / SEEN / MATCHED STATUS
+      // ==========================================
 
-        // ==========================================
-        // SENT / SEEN / MATCHED STATUS
-        // ==========================================
+      likeStatus: {
+        sent: true,
 
-        likeStatus: {
-          sent: true,
+        // STATIC FOR NOW
+        // No database field required
+        seen: true,
 
-          // STATIC FOR NOW
-          // No database field required
-          seen: true,
-
-          // Dynamic from UserMatch
-          matched:
-            isMatch,
-        },
-      };
-    });
+        // Dynamic from UserMatch
+        matched: isMatch,
+      },
+    };
+  });
 
   // ==========================================
   // FINAL RESPONSE
@@ -727,8 +684,7 @@ export const getAdmirers = async ({
   return {
     receivedLikesCount,
 
-    isPackageActive:
-      hasActivePackage,
+    isPackageActive: hasActivePackage,
 
     isLocked: false,
 
@@ -739,13 +695,10 @@ export const getAdmirers = async ({
       limit,
       total,
 
-      hasNext:
-        page * limit <
-        total,
+      hasNext: page * limit < total,
     },
   };
 };
-
 
 /**
  * ============================================
@@ -758,26 +711,16 @@ export const getAdmirers = async ({
  * Response:
  * 5'11"
  */
-const formatHeight = (
-  heightCm: number | null,
-): string | null => {
-  if (
-    heightCm === null ||
-    heightCm === undefined
-  ) {
+const formatHeight = (heightCm: number | null): string | null => {
+  if (heightCm === null || heightCm === undefined) {
     return null;
   }
 
-  const totalInches =
-    heightCm / 2.54;
+  const totalInches = heightCm / 2.54;
 
-  let feet =
-    Math.floor(totalInches / 12);
+  let feet = Math.floor(totalInches / 12);
 
-  let inches =
-    Math.round(
-      totalInches - feet * 12,
-    );
+  let inches = Math.round(totalInches - feet * 12);
 
   if (inches === 12) {
     feet++;
@@ -796,9 +739,7 @@ const formatHeight = (
  * 8.2 -> "8 km"
  * 0.7 -> "< 1 km"
  */
-const formatDistance = (
-  distanceKm: number | null,
-): string | null => {
+const formatDistance = (distanceKm: number | null): string | null => {
   if (distanceKm === null) {
     return null;
   }
@@ -815,341 +756,322 @@ const formatDistance = (
  * ADMIRER DETAILS SERVICE
  * ============================================
  */
-export const getAdmirerDetailsService =
-  async (
-    userId: string,
-    admirerId: string,
-  ) => {
-    /**
-     * userId
-     * = logged-in user
-     *
-     * admirerId
-     * = person who liked / complimented
-     *   logged-in user
-     */
+export const getAdmirerDetailsService = async (
+  userId: string,
+  admirerId: string,
+) => {
+  /**
+   * userId
+   * = logged-in user
+   *
+   * admirerId
+   * = person who liked / complimented
+   *   logged-in user
+   */
 
-    if (!userId) {
-      throw new Error(
-        "User id is required",
-      );
-    }
+  if (!userId) {
+    throw new Error("User id is required");
+  }
 
-    if (!admirerId) {
-      throw new Error(
-        "Admirer id is required",
-      );
-    }
+  if (!admirerId) {
+    throw new Error("Admirer id is required");
+  }
 
-    if (userId === admirerId) {
-      throw new Error(
-        "Invalid admirer",
-      );
-    }
+  if (userId === admirerId) {
+    throw new Error("Invalid admirer");
+  }
 
-    // ==========================================
-    // 1. CURRENT USER
-    // ==========================================
+  // ==========================================
+  // 1. CURRENT USER
+  // ==========================================
 
-    const currentUser =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
+  const currentUser = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
 
+    select: {
+      id: true,
+
+      profile: {
         select: {
-          id: true,
-
-          profile: {
-            select: {
-              latitude: true,
-              longitude: true,
-            },
-          },
+          latitude: true,
+          longitude: true,
         },
-      });
+      },
+    },
+  });
 
-    if (!currentUser) {
-      throw new Error(
-        "Current user not found",
-      );
-    }
+  if (!currentUser) {
+    throw new Error("Current user not found");
+  }
 
-    // ==========================================
-    // 2. ADMIRER
-    // ==========================================
+  // ==========================================
+  // 2. ADMIRER
+  // ==========================================
 
-    const admirer =
-      await prisma.user.findFirst({
-        where: {
-          id: admirerId,
+  const admirer = await prisma.user.findFirst({
+    where: {
+      id: admirerId,
 
-          account_status: "ACTIVE",
+      account_status: "ACTIVE",
 
-          deleted_at: null,
-        },
+      deleted_at: null,
+    },
 
+    select: {
+      // ====================================
+      // USER
+      // ====================================
+
+      id: true,
+
+      full_name: true,
+
+      birth_date: true,
+
+      height: true,
+
+      trust_score: true,
+
+      looking_for: true,
+
+      // ====================================
+      // PROFILE
+      // ====================================
+
+      profile: {
         select: {
-          // ====================================
-          // USER
-          // ====================================
+          country: true,
 
-          id: true,
+          state: true,
 
-          full_name: true,
+          city: true,
 
-          birth_date: true,
+          area: true,
 
-          height: true,
+          max_distance_km: true,
 
-          trust_score: true,
+          latitude: true,
 
-          looking_for: true,
+          longitude: true,
+        },
+      },
 
-          // ====================================
-          // PROFILE
-          // ====================================
+      // ====================================
+      // EDUCATION + WORK
+      // ====================================
 
-          profile: {
-            select: {
-              country: true,
+      eduWork: {
+        select: {
+          collegeName: true,
 
-              state: true,
+          highestEdu: true,
 
-              city: true,
+          professionId: true,
 
-              area: true,
-
-              max_distance_km: true,
-
-              latitude: true,
-
-              longitude: true,
-            },
-          },
-
-          // ====================================
-          // EDUCATION + WORK
-          // ====================================
-
-          eduWork: {
-            select: {
-              collegeName: true,
-
-              highestEdu: true,
-
-              professionId: true,
-
-              profession: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-
-          // ====================================
-          // FIRST / PRIMARY PHOTO
-          // ====================================
-
-          photos: {
+          profession: {
             select: {
               id: true,
-
-              media_url: true,
-
-              media_type: true,
-
-              is_primary: true,
-
-              order: true,
-            },
-
-            orderBy: [
-              {
-                is_primary: "desc",
-              },
-
-              {
-                order: "asc",
-              },
-
-              {
-                created_at: "asc",
-              },
-            ],
-
-            take: 1,
-          },
-
-          // ====================================
-          // USER ANSWERS
-          //
-          // LIFESTYLE = THE BASICS
-          // THINGS_U_LOVE = INTERESTS
-          // ====================================
-
-          answer: {
-            where: {
-              question: {
-                screen: {
-                  in: [
-                    "LIFESTYLE",
-                    "THINGS_U_LOVE",
-                  ],
-                },
-              },
-            },
-
-            select: {
-              id: true,
-
-              question_id: true,
-
-              option_id: true,
-
-              description: true,
-
-              question: {
-                select: {
-                  id: true,
-                  screen: true,
-                },
-              },
-
-              option: {
-                select: {
-                  id: true,
-                },
-              },
+              name: true,
             },
           },
         },
-      });
+      },
 
-    if (!admirer) {
-      throw new Error(
-        "Admirer not found",
-      );
-    }
+      // ====================================
+      // FIRST / PRIMARY PHOTO
+      // ====================================
 
-    // ==========================================
-    // 3. WHY THEY LIKED YOU
-    // ==========================================
-    //
-    // admirer = sender
-    // logged-in user = receiver
-    //
-    // Example:
-    //
-    // Marcus -> compliment -> Me
-    //
-    // senderId   = Marcus
-    // receiverId = Me
-    // ==========================================
+      photos: {
+        select: {
+          id: true,
 
-    const compliment =
-      await prisma.userCompliment.findFirst({
+          media_url: true,
+
+          media_type: true,
+
+          is_primary: true,
+
+          order: true,
+        },
+
+        orderBy: [
+          {
+            is_primary: "desc",
+          },
+
+          {
+            order: "asc",
+          },
+
+          {
+            created_at: "asc",
+          },
+        ],
+
+        take: 1,
+      },
+
+      // ====================================
+      // USER ANSWERS
+      //
+      // LIFESTYLE = THE BASICS
+      // THINGS_U_LOVE = INTERESTS
+      // ====================================
+
+      answer: {
         where: {
-          senderId: admirerId,
-
-          receiverId: userId,
-
-          /**
-           * Don't force PENDING here.
-           *
-           * If compliment status changes later
-           * to accepted/sent/etc., we should
-           * still be able to show the message.
-           */
-        },
-
-        orderBy: {
-          createdAt: "desc",
+          question: {
+            screen: {
+              in: ["LIFESTYLE", "THINGS_U_LOVE"],
+            },
+          },
         },
 
         select: {
           id: true,
 
-          message: true,
+          question_id: true,
 
-          targetType: true,
+          option_id: true,
 
-          targetId: true,
+          description: true,
 
-          status: true,
+          question: {
+            select: {
+              id: true,
+              screen: true,
+            },
+          },
 
-          createdAt: true,
-
-          ideaId: true,
-
-          idea: true,
+          option: {
+            select: {
+              id: true,
+            },
+          },
         },
-      });
+      },
+    },
+  });
 
-    // ==========================================
-    // 4. CALCULATE DISTANCE
-    // ==========================================
+  if (!admirer) {
+    throw new Error("Admirer not found");
+  }
 
-    let distanceKm:
-      number | null = null;
+  // ==========================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// ==========================================
 
-    const myLatitude =
-      currentUser.profile?.latitude;
+const matchScoreMap = await getMatchScoresForUsers(
+  userId,
+  [admirerId],
+);
 
-    const myLongitude =
-      currentUser.profile?.longitude;
+const matchScore =
+  matchScoreMap.get(admirerId)?.percentage ?? 0;
 
-    const admirerLatitude =
-      admirer.profile?.latitude;
+  // ==========================================
+  // 3. WHY THEY LIKED YOU
+  // ==========================================
+  //
+  // admirer = sender
+  // logged-in user = receiver
+  //
+  // Example:
+  //
+  // Marcus -> compliment -> Me
+  //
+  // senderId   = Marcus
+  // receiverId = Me
+  // ==========================================
 
-    const admirerLongitude =
-      admirer.profile?.longitude;
+  const compliment = await prisma.userCompliment.findFirst({
+    where: {
+      senderId: admirerId,
 
-    const hasMyCoordinates =
-      myLatitude !== null &&
-      myLatitude !== undefined &&
-      myLongitude !== null &&
-      myLongitude !== undefined;
+      receiverId: userId,
 
-    const hasAdmirerCoordinates =
-      admirerLatitude !== null &&
-      admirerLatitude !== undefined &&
-      admirerLongitude !== null &&
-      admirerLongitude !== undefined;
+      /**
+       * Don't force PENDING here.
+       *
+       * If compliment status changes later
+       * to accepted/sent/etc., we should
+       * still be able to show the message.
+       */
+    },
 
-    if (
-      hasMyCoordinates &&
-      hasAdmirerCoordinates
-    ) {
-      const myLat =
-        Number(myLatitude);
+    orderBy: {
+      createdAt: "desc",
+    },
 
-      const myLng =
-        Number(myLongitude);
+    select: {
+      id: true,
 
-      const admirerLat =
-        Number(admirerLatitude);
+      message: true,
 
-      const admirerLng =
-        Number(admirerLongitude);
+      targetType: true,
 
-      const validCoordinates =
-        Number.isFinite(myLat) &&
-        Number.isFinite(myLng) &&
-        Number.isFinite(admirerLat) &&
-        Number.isFinite(admirerLng);
+      targetId: true,
 
-      if (validCoordinates) {
-        const distanceResult =
-          await prisma.$queryRaw<
-            {
-              distance_meters:
-              number | null;
-            }[]
-          >(
-            Prisma.sql`
+      status: true,
+
+      createdAt: true,
+
+      ideaId: true,
+
+      idea: true,
+    },
+  });
+
+  // ==========================================
+  // 4. CALCULATE DISTANCE
+  // ==========================================
+
+  let distanceKm: number | null = null;
+
+  const myLatitude = currentUser.profile?.latitude;
+
+  const myLongitude = currentUser.profile?.longitude;
+
+  const admirerLatitude = admirer.profile?.latitude;
+
+  const admirerLongitude = admirer.profile?.longitude;
+
+  const hasMyCoordinates =
+    myLatitude !== null &&
+    myLatitude !== undefined &&
+    myLongitude !== null &&
+    myLongitude !== undefined;
+
+  const hasAdmirerCoordinates =
+    admirerLatitude !== null &&
+    admirerLatitude !== undefined &&
+    admirerLongitude !== null &&
+    admirerLongitude !== undefined;
+
+  if (hasMyCoordinates && hasAdmirerCoordinates) {
+    const myLat = Number(myLatitude);
+
+    const myLng = Number(myLongitude);
+
+    const admirerLat = Number(admirerLatitude);
+
+    const admirerLng = Number(admirerLongitude);
+
+    const validCoordinates =
+      Number.isFinite(myLat) &&
+      Number.isFinite(myLng) &&
+      Number.isFinite(admirerLat) &&
+      Number.isFinite(admirerLng);
+
+    if (validCoordinates) {
+      const distanceResult = await prisma.$queryRaw<
+        {
+          distance_meters: number | null;
+        }[]
+      >(
+        Prisma.sql`
               SELECT
                 ST_Distance(
                   ST_SetSRID(
@@ -1170,208 +1092,152 @@ export const getAdmirerDetailsService =
                 )::float8
                 AS distance_meters
             `,
-          );
+      );
 
-        const meters =
-          distanceResult[0]
-            ?.distance_meters;
+      const meters = distanceResult[0]?.distance_meters;
 
-        if (
-          meters !== null &&
-          meters !== undefined &&
-          Number.isFinite(
-            Number(meters),
-          )
-        ) {
-          distanceKm =
-            Math.round(
-              (Number(meters) /
-                1000) *
-              100,
-            ) / 100;
-        }
+      if (
+        meters !== null &&
+        meters !== undefined &&
+        Number.isFinite(Number(meters))
+      ) {
+        distanceKm = Math.round((Number(meters) / 1000) * 100) / 100;
       }
     }
+  }
 
-    // ==========================================
-    // 5. SEPARATE LIFESTYLE
-    // ==========================================
+  // ==========================================
+  // 5. SEPARATE LIFESTYLE
+  // ==========================================
 
-    const lifestyleAnswers =
-      admirer.answer
-        .filter(
-          (answer) =>
-            answer.question.screen ===
-            "LIFESTYLE",
-        )
-        .map((answer) => ({
-          id: answer.id,
+  const lifestyleAnswers = admirer.answer
+    .filter((answer) => answer.question.screen === "LIFESTYLE")
+    .map((answer) => ({
+      id: answer.id,
 
-          questionId:
-            answer.question_id,
+      questionId: answer.question_id,
 
-          optionId:
-            answer.option_id,
+      optionId: answer.option_id,
 
-          description:
-            answer.description,
-        }));
+      description: answer.description,
+    }));
 
-    // ==========================================
-    // 6. SEPARATE INTERESTS
-    // ==========================================
+  // ==========================================
+  // 6. SEPARATE INTERESTS
+  // ==========================================
 
-    const interests =
-      admirer.answer
-        .filter(
-          (answer) =>
-            answer.question.screen ===
-            "THINGS_U_LOVE",
-        )
-        .map((answer) => ({
-          id: answer.id,
+  const interests = admirer.answer
+    .filter((answer) => answer.question.screen === "THINGS_U_LOVE")
+    .map((answer) => ({
+      id: answer.id,
 
-          questionId:
-            answer.question_id,
+      questionId: answer.question_id,
 
-          optionId:
-            answer.option_id,
+      optionId: answer.option_id,
 
-          description:
-            answer.description,
-        }));
+      description: answer.description,
+    }));
 
-    // ==========================================
-    // 7. PHOTO
-    // ==========================================
+  // ==========================================
+  // 7. PHOTO
+  // ==========================================
 
-    const firstPhoto =
-      admirer.photos[0] ?? null;
+  const firstPhoto = admirer.photos[0] ?? null;
 
-    // ==========================================
-    // 8. WHY THEY LIKED YOU
-    // ==========================================
+  // ==========================================
+  // 8. WHY THEY LIKED YOU
+  // ==========================================
 
-    const whyTheyLikedYou =
-      compliment?.message ?? null;
+  const whyTheyLikedYou = compliment?.message ?? null;
 
-    // ==========================================
-    // 9. FINAL RESPONSE
-    // ==========================================
+  // ==========================================
+  // 9. FINAL RESPONSE
+  // ==========================================
 
-    return {
-      // ========================================
-      // 1. USER NAME + AGE
-      // ========================================
+  return {
+    // ========================================
+    // 1. USER NAME + AGE
+    // ========================================
 
-      full_name:
-        admirer.full_name,
+    full_name: admirer.full_name,
 
-      birth_date:
-        admirer.birth_date,
+    birth_date: admirer.birth_date,
 
-      age:
-        calculateAge(
-          admirer.birth_date,
-        ),
+    age: calculateAge(admirer.birth_date),
 
-      // ========================================
-      // 2. PHOTO
-      // ========================================
+    // ========================================
+    // 2. PHOTO
+    // ========================================
 
-      photo: firstPhoto
-        ? {
-          id:
-            firstPhoto.id,
+    photo: firstPhoto
+      ? {
+          id: firstPhoto.id,
 
-          media_url:
-            firstPhoto.media_url,
+          media_url: firstPhoto.media_url,
 
-          media_type:
-            firstPhoto.media_type,
+          media_type: firstPhoto.media_type,
 
-          is_primary:
-            firstPhoto.is_primary,
+          is_primary: firstPhoto.is_primary,
 
-          order:
-            firstPhoto.order,
+          order: firstPhoto.order,
         }
-        : null,
+      : null,
 
-      // ========================================
-      // 3. PROFESSION
-      // ========================================
+    // ========================================
+    // 3. PROFESSION
+    // ========================================
 
-      profession:
-        admirer.eduWork
-          ?.profession ?? null,
+    profession: admirer.eduWork?.profession ?? null,
 
-      // ========================================
-      // 4. TRUST
-      // ========================================
+    // ========================================
+    // 4. TRUST
+    // ========================================
 
-      trust_score:
-        admirer.trust_score ?? 0,
+    trust_score: admirer.trust_score ?? 0,
 
-      // ========================================
-      // 5. MATCH - STATIC
-      // ========================================
+    // ========================================
+    // 5. MATCH - STATIC
+    // ========================================
 
-      matchScore: 75,
+    matchScore,
 
-      // ========================================
-      // 6. DISTANCE
-      // ========================================
+    // ========================================
+    // 6. DISTANCE
+    // ========================================
 
-      distanceKm,
+    distanceKm,
 
-      distanceLabel:
-        formatDistance(
-          distanceKm,
-        ),
+    distanceLabel: formatDistance(distanceKm),
 
-      // ========================================
-      // 7. WHY THEY LIKED YOU
-      // UserCompliment.message
-      // ========================================
+    // ========================================
+    // 7. WHY THEY LIKED YOU
+    // UserCompliment.message
+    // ========================================
 
-      whyTheyLikedYou:
-        compliment?.message ??
-        null,
+    whyTheyLikedYou: compliment?.message ?? null,
 
-      // ========================================
-      // 8. BASICS
-      // ========================================
+    // ========================================
+    // 8. BASICS
+    // ========================================
 
-      basics: {
-        lookingFor:
-          admirer.looking_for ??
-          null,
+    basics: {
+      lookingFor: admirer.looking_for ?? null,
 
-        height:
-          admirer.height,
+      height: admirer.height,
 
-        heightFormatted:
-          formatHeight(
-            admirer.height,
-          ),
+      heightFormatted: formatHeight(admirer.height),
 
-        collegeName:
-          admirer.eduWork
-            ?.collegeName ?? null,
+      collegeName: admirer.eduWork?.collegeName ?? null,
 
-        highestEdu:
-          admirer.eduWork
-            ?.highestEdu ?? null,
+      highestEdu: admirer.eduWork?.highestEdu ?? null,
 
-        lifestyle:
-          lifestyleAnswers,
-      },
+      lifestyle: lifestyleAnswers,
+    },
 
-      // ========================================
-      // 9. INTERESTS
-      // ========================================
+    // ========================================
+    // 9. INTERESTS
+    // ========================================
 
-      interests,
-    };
+    interests,
   };
+};

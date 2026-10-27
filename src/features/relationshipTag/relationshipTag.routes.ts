@@ -60,10 +60,10 @@ router.patch(
   endRelationshipController,
 );  
 
-router.post(
-  "/relationship-proposals/:proposalId/accept",
-  authMiddleware,
-  acceptRelationshipProposalController,
-);
+// router.post(
+//   "/relationship-proposals/:proposalId/accept",
+//   authMiddleware,
+//   acceptRelationshipProposalController,
+// );
 
 export default router;

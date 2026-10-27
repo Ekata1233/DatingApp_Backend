@@ -100,6 +100,10 @@ import manualAadhaarAdminRoutes from "../features/verification/manual-government
 import manualAadhaarRoutes from "../features/verification/manual-government-id/manual-government-id.user.routes";
 import incomeVerificationRoutes from "../features/verification/income-verification/income.user.routes";
 import incomeVerificationAdminRoutes from "../features/verification/income-verification/income.admin.routes";
+import conversationPromtRoutes from "../features/admin/conversation/conversationPrompt/conversationPrompt.routes"
+import razorpayRoutes from "../features/payment/razorpayPayment/razorpay.routes"
+import inAppPurchaseRoutes from "../features/payment/inAppPurchase/purchaseVerification.route"
+import purchaseHistoryRoutes from "../features/purchase-history/purchase-history.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -116,13 +120,17 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes,conversationPromtRoutes);
 
 
 
 router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, eventPartnerRoutes);
-router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes)
+router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes,purchaseHistoryRoutes)
 router.use("/legal", legalRoutes);
+router.use("/chat", conversationPromtRoutes);
+router.use("/payment", razorpayRoutes);
+
+
 
 // router.use("/users",usersRoutes)
 
@@ -220,4 +228,7 @@ router.use("/user", roseTopUpRoutes, complimentTopUpRoutes,datePlanTopUpRoutes, 
 
 //MATCH ANALYSIS
 router.use("/user", matchAnalysisRoutes)
+
+//IN APP PURCHASE
+router.use("/user", inAppPurchaseRoutes)
 export default router;
