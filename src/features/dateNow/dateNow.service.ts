@@ -26,6 +26,7 @@ import {
 import { createNotification } from "../notification/notification.service";
 import { chatRepository } from "../chat/chat.repository";
 import { dateNowInviteMessageRepo } from "./dateNow.repository";
+import { getMatchScoresForUsers } from "../match-score/match-score.service";
 
 export const createDraftDatePlan = async (
   userId: string,
@@ -679,17 +680,39 @@ export const discoverDatePlan = async (
     },
   });
 
-  console.log("[DATE DISCOVER] Eligible plans:", plans.length);
+ console.log("[DATE DISCOVER] Eligible plans:", plans.length);
 
-  // ============================================
-  // CALCULATE SCORE AND DISTANCE
-  // ============================================
+// ============================================
+// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+// ============================================
 
-  const ranked = plans.map((plan) => {
-    const matchScore = 75;
-    //  calculateMatchScore(me, plan.user);
+// Extract unique host IDs.
+// One host may have multiple date plans.
+const hostUserIds = [
+  ...new Set(plans.map((plan) => plan.userId)),
+];
 
-    console.log("////////////match score : ", matchScore);
+// Calculate scores once for all unique hosts.
+const matchScoreStart = performance.now();
+
+const matchScoreMap = await getMatchScoresForUsers(
+  userId,
+  hostUserIds,
+);
+
+console.log(
+  "[DATE DISCOVER] Dynamic match scores:",
+  performance.now() - matchScoreStart,
+  "ms",
+);
+
+// ============================================
+// CALCULATE SCORE AND DISTANCE
+// ============================================
+
+const ranked = plans.map((plan) => {
+  const matchScore =
+    matchScoreMap.get(plan.userId)?.percentage ?? 0;
 
     let distanceKm: number | null = null;
 
@@ -1707,7 +1730,22 @@ export const getMyDatePlanRequests = async (userId: string) => {
     orderBy: {
       createdAt: "desc",
     },
-  });
+   });
+
+  // ============================================
+  // DYNAMIC HOST MATCH SCORE - REDIS + PRISMA
+  // ============================================
+
+  const hostUserIds = [
+    ...new Set(
+      requests.map((request) => request.plan.user.id),
+    ),
+  ];
+
+  const matchScoreMap = await getMatchScoresForUsers(
+    userId,
+    hostUserIds,
+  );
 
   return requests.map((request) => ({
     id: request.id,
@@ -1762,8 +1800,8 @@ export const getMyDatePlanRequests = async (userId: string) => {
             ? request.plan.user.photos[0].media_url
             : null,
         trustScore: request.plan.user.trust_score,
-        matchScore: 77,
-      },
+matchScore:
+    matchScoreMap.get(request.plan.user.id)?.percentage ?? 0,      },
     },
   }));
 };
