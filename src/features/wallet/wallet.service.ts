@@ -18,7 +18,22 @@ import {
   verifyWalletGooglePurchase,
 } from "./walletGooglePlay.provider";
 import { createHash } from "node:crypto";
+const generateWalletTransactionId = (
+  id: string,
+  createdAt: Date,
+): string => {
+  const date = new Date(createdAt)
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "");
 
+  const uniqueId = id
+    .replace(/-/g, "")
+    .slice(0, 12)
+    .toUpperCase();
+
+  return `WLT-${date}-${uniqueId}`;
+};
 export const getMyWalletService = async (
   userId: string,
   query: GetWalletQuery,
@@ -127,6 +142,11 @@ export const getMyWalletService = async (
     return {
       id: transaction.id,
       type: transaction.type,
+       transactionId: generateWalletTransactionId(
+    transaction.id,
+    transaction.createdAt,
+  ),
+  
       source: transaction.source,
       status: transaction.status,
       direction,
