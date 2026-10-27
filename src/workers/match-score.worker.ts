@@ -17,7 +17,7 @@ import {
 } from "../queues/match-score.queue";
 
 import {
-  calculateUserMatchScores,
+  getMatchScoresForUsers,
 } from "../features/match-score/match-score.service";
 
 const workerRedis =
@@ -41,9 +41,10 @@ export const matchScoreWorker =
         },
       );
 
-      await calculateUserMatchScores(
-        userId,
-      );
+      // await getMatchScoresForUsers(
+      //   userId,
+      //   userId
+      // );
 
       console.log(
         "✅ Match score calculation completed",

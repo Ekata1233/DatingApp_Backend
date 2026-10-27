@@ -414,6 +414,22 @@ export const getFeedService = async ({
 
   const activePackageName = activeFeedPackage?.package?.name ?? "FREE";
 
+  // ========================================================
+// PACKAGE BASED FEED VISIBILITY
+// ========================================================
+
+const isVipDiscoveryPool =
+  activePackageName === "VIP" ||
+  activePackageName === "VIP_ELITE";
+
+console.log("FEED PACKAGE VISIBILITY:", {
+  userId,
+  activePackageName,
+  discoveryPool: isVipDiscoveryPool
+    ? "VIP_AND_VIP_ELITE"
+    : "FREE_AND_PREMIUM",
+});
+
   // ==========================================
   // PACKAGE BASED DAILY LIMIT
   // ==========================================
