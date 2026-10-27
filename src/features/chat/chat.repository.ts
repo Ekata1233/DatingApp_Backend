@@ -399,12 +399,26 @@ export const chatRepository = {
     // --------------------------------------------------
 
     const where: Prisma.ConversationWhereInput = {
-      participants: {
-        some: {
-          userId,
-          deletedAt: null,
+      AND: [
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
         },
-      },
+        {
+          participants: {
+            some: {
+              userId: {
+                not: userId,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ],
     };
 
     // --------------------------------------------------
@@ -460,6 +474,11 @@ export const chatRepository = {
         some: {
           messageType: MessageType.GIFT,
           deletedAt: null,
+          deletions: {
+            none: {
+              userId,
+            },
+          },
         },
       };
     }
@@ -2184,6 +2203,9 @@ export const chatRepository = {
         birth_date: true,
 
         photos: {
+          where: {
+            media_type: "IMAGE",
+          },
           orderBy: {
             order: "asc",
           },
@@ -2230,24 +2252,24 @@ export const chatRepository = {
      * Check both directions because your UserCompatibility
      * has userId and targetUserId.
      */
-    const compatibility = await prisma.userCompatibility.findFirst({
-      where: {
-        OR: [
-          {
-            userId: currentUserId,
-            targetUserId: targetUserId,
-          },
-          {
-            userId: targetUserId,
-            targetUserId: currentUserId,
-          },
-        ],
-      },
-      select: {
-        score: true,
-        percentage: true,
-      },
-    });
+    // const compatibility = await prisma.userCompatibility.findFirst({
+    //   where: {
+    //     OR: [
+    //       {
+    //         userId: currentUserId,
+    //         targetUserId: targetUserId,
+    //       },
+    //       {
+    //         userId: targetUserId,
+    //         targetUserId: currentUserId,
+    //       },
+    //     ],
+    //   },
+    //   select: {
+    //     score: true,
+    //     percentage: true,
+    //   },
+    // });
 
     /**
      * 5. Check block status
@@ -2275,11 +2297,7 @@ export const chatRepository = {
     return {
       conversationId,
       targetUserId,
-
       user,
-
-      matchScore: compatibility?.percentage ?? compatibility?.score ?? null,
-
       isBlocked: !!block,
     };
   },
@@ -2290,12 +2308,29 @@ export const chatRepository = {
     // ============================================
 
     const baseWhere: Prisma.ConversationWhereInput = {
-      participants: {
-        some: {
-          userId,
-          deletedAt: null,
+      AND: [
+        // Logged-in user must be active participant
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+            },
+          },
         },
-      },
+
+        // Other user must also be active participant
+        {
+          participants: {
+            some: {
+              userId: {
+                not: userId,
+              },
+              deletedAt: null,
+            },
+          },
+        },
+      ],
     };
 
     // ============================================

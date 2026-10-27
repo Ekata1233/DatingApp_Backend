@@ -902,6 +902,53 @@ console.log("FEED PACKAGE VISIBILITY:", {
         u.deleted_at IS NULL
         AND u.account_status = 'ACTIVE'::"AccountStatus"
         AND u.id <> ${userId}::uuid
+      
+AND (
+  CASE
+    WHEN ${isVipDiscoveryPool}::boolean THEN
+
+      EXISTS (
+        SELECT 1
+        FROM user_packages up
+        INNER JOIN package pkg
+          ON pkg.id = up."packageId"
+
+        WHERE up.user_id = u.id
+          AND up.status = 'ACTIVE'::"PackageStatus"
+          AND up."startDate" <= ${now}
+          AND (
+            up."endDate" IS NULL
+            OR up."endDate" > ${now}
+          )
+          AND pkg.name IN (
+            'VIP'::"PackageType",
+            'VIP_ELITE'::"PackageType"
+          )
+      )
+
+    ELSE
+
+      NOT EXISTS (
+        SELECT 1
+        FROM user_packages up
+        INNER JOIN package pkg
+          ON pkg.id = up."packageId"
+
+        WHERE up.user_id = u.id
+          AND up.status = 'ACTIVE'::"PackageStatus"
+          AND up."startDate" <= ${now}
+          AND (
+            up."endDate" IS NULL
+            OR up."endDate" > ${now}
+          )
+          AND pkg.name IN (
+            'VIP'::"PackageType",
+            'VIP_ELITE'::"PackageType"
+          )
+      )
+
+  END
+)
         AND NOT EXISTS (
           SELECT 1
           FROM swipes s

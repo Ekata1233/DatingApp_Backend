@@ -25,6 +25,7 @@ import {
 import { createMatchFromReplyService } from "../match/match.service";
 import console from "console";
 import { MessageType } from "@prisma/client";
+import { getMatchScoresForUsers } from "../match-score/match-score.service";
 
 export const chatService = {
   /**
@@ -60,22 +61,20 @@ export const chatService = {
    * Get user's conversations.
    */
   async getConversations(data: GetConversationsInput) {
-   // ============================================
-  // 1. FETCH CONVERSATIONS AND COUNTS
-  // ============================================
+    // ============================================
+    // 1. FETCH CONVERSATIONS AND COUNTS
+    // ============================================
 
-  const [conversations, counts] = await Promise.all([
-    chatRepository.findUserConversations(
-      data.userId,
-      data.cursor,
-      data.limit,
-      data.type,
-    ),
+    const [conversations, counts] = await Promise.all([
+      chatRepository.findUserConversations(
+        data.userId,
+        data.cursor,
+        data.limit,
+        data.type,
+      ),
 
-    chatRepository.getConversationCounts(
-      data.userId,
-    ),
-  ]);
+      chatRepository.getConversationCounts(data.userId),
+    ]);
 
     const sortedConversations = conversations.sort((a, b) => {
       const timeA = a.lastMessage?.createdAt
@@ -101,7 +100,7 @@ export const chatService = {
 
     return {
       items,
-       counts,
+      counts,
       pagination: {
         hasMore,
         nextCursor,
@@ -144,24 +143,21 @@ export const chatService = {
       ? "This account has been deleted. You can view your previous messages, but you can no longer send new messages to this user."
       : null;
 
-   // ============================================
-// 2. FETCH MESSAGES + COUNTS
-// ============================================
+    // ============================================
+    // 2. FETCH MESSAGES + COUNTS
+    // ============================================
 
-const [messages, counts] = await Promise.all([
-  chatRepository.findMessages(
-    data.conversationId,
-    data.userId,
-    data.cursor,
-    data.limit,
-    data.type ?? "all",
-  ),
+    const [messages, counts] = await Promise.all([
+      chatRepository.findMessages(
+        data.conversationId,
+        data.userId,
+        data.cursor,
+        data.limit,
+        data.type ?? "all",
+      ),
 
-  chatRepository.getMessageCounts(
-    data.conversationId,
-    data.userId,
-  ),
-]);
+      chatRepository.getMessageCounts(data.conversationId, data.userId),
+    ]);
 
     // 3. Pagination
     const hasMore = messages.length > data.limit;
@@ -683,38 +679,37 @@ const [messages, counts] = await Promise.all([
     }
 
     // ============================================
-// CHECK EVENT DATE AND TIME BEFORE INVITE
-// ============================================
+    // CHECK EVENT DATE AND TIME BEFORE INVITE
+    // ============================================
 
-if (!event.eventDate || !event.startTime || !event.endTime) {
-  throw new Error("Event date or time is not configured properly");
-}
+    if (!event.eventDate || !event.startTime || !event.endTime) {
+      throw new Error("Event date or time is not configured properly");
+    }
 
-// Event date stored as date-only UTC midnight
-const eventDate = event.eventDate.toISOString().split("T")[0];
+    // Event date stored as date-only UTC midnight
+    const eventDate = event.eventDate.toISOString().split("T")[0];
 
-// Supports HH:mm or HH:mm:ss (24-hour format)
-const endTime = event.endTime.trim();
+    // Supports HH:mm or HH:mm:ss (24-hour format)
+    const endTime = event.endTime.trim();
 
-if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(endTime)) {
-  throw new Error("Invalid event end time format");
-}
+    if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(endTime)) {
+      throw new Error("Invalid event end time format");
+    }
 
-const normalizedEndTime =
-  endTime.length === 5 ? `${endTime}:00` : endTime;
+    const normalizedEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
 
-// Event time assumed to be Indian Standard Time (IST)
-const eventEndDateTime = new Date(
-  `${eventDate}T${normalizedEndTime}+05:30`,
-);
+    // Event time assumed to be Indian Standard Time (IST)
+    const eventEndDateTime = new Date(
+      `${eventDate}T${normalizedEndTime}+05:30`,
+    );
 
-const currentDateTime = new Date();
+    const currentDateTime = new Date();
 
-if (currentDateTime >= eventEndDateTime) {
-  throw new Error(
-    "This event has already ended. You cannot send invitations for past events.",
-  );
-}
+    if (currentDateTime >= eventEndDateTime) {
+      throw new Error(
+        "This event has already ended. You cannot send invitations for past events.",
+      );
+    }
 
     // 3. Find existing conversation
     let conversation = await chatRepository.findConversationBetweenUsers(
@@ -780,6 +775,16 @@ if (currentDateTime >= eventEndDateTime) {
       currentUserId,
     );
 
+    // ============================================
+    // DYNAMIC MATCH SCORE - REDIS + PRISMA
+    // ============================================
+
+    const matchScoreMap = await getMatchScoresForUsers(currentUserId, [
+      result.targetUserId,
+    ]);
+
+    const matchScore = matchScoreMap.get(result.targetUserId)?.percentage ?? 0;
+
     /**
      * Get real-time presence from Redis
      */
@@ -835,7 +840,7 @@ if (currentDateTime >= eventEndDateTime) {
 
         isBlocked: result.isBlocked,
 
-        matchScore: result.matchScore ?? 0,
+        matchScore,
 
         profileImage,
       },
