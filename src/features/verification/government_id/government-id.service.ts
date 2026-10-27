@@ -119,7 +119,7 @@ export const initGovernmentIdService = async (
     create: {
       userId,
       type: VerificationType.GOVERNMENT_ID,
-      status: VerificationStatus.IN_PROGRESS,
+      status: VerificationStatus.NOT_STARTED,
       points: 0,
       maxPoints: 20,
       governmentIdType: documentType,
@@ -127,7 +127,7 @@ export const initGovernmentIdService = async (
       startedAt: new Date(),
     },
     update: {
-      status: VerificationStatus.IN_PROGRESS,
+      status: VerificationStatus.NOT_STARTED,
       points: 0,
       governmentIdType: documentType,
       provider: "GRIDLINES",
@@ -250,7 +250,7 @@ export const initGovernmentIdService = async (
 
       documentType,
 
-      status: "IN_PROGRESS",
+      status: "NOT_STARTED",
 
       authorizationUrl: result.data.authorization_url,
     };
@@ -320,7 +320,7 @@ export const initGovernmentIdService = async (
 
         providerRef: null,
 
-        status: VerificationStatus.IN_PROGRESS,
+        status: VerificationStatus.NOT_STARTED,
       },
       data: {
         status: VerificationStatus.REJECTED,
@@ -392,7 +392,7 @@ export const handleGovernmentIdCallback = async (
       prisma.userVerification.updateMany({
         where: {
           id: verification.id,
-          status: VerificationStatus.IN_PROGRESS,
+          status: VerificationStatus.NOT_STARTED,
           providerRef: transactionId,
         },
         data: {
@@ -498,7 +498,7 @@ export const completeGovernmentIdService = async (
     attempt.verification.userId !== userId ||
     attempt.verification.type !== VerificationType.GOVERNMENT_ID ||
     attempt.verification.providerRef !== attempt.transactionId ||
-    attempt.verification.status !== VerificationStatus.IN_PROGRESS
+    attempt.verification.status !== VerificationStatus.NOT_STARTED
   ) {
     throw new Error("VERIFICATION_ATTEMPT_MISMATCH");
   }
@@ -615,7 +615,7 @@ const document = await getVerifiedGovernmentDocument({
 
           type: VerificationType.GOVERNMENT_ID,
 
-          status: VerificationStatus.IN_PROGRESS,
+          status: VerificationStatus.NOT_STARTED,
 
           providerRef: attempt.transactionId,
         },

@@ -682,6 +682,40 @@ const [messages, counts] = await Promise.all([
       throw new Error("Event not found");
     }
 
+    // ============================================
+// CHECK EVENT DATE AND TIME BEFORE INVITE
+// ============================================
+
+if (!event.eventDate || !event.startTime || !event.endTime) {
+  throw new Error("Event date or time is not configured properly");
+}
+
+// Event date stored as date-only UTC midnight
+const eventDate = event.eventDate.toISOString().split("T")[0];
+
+// Supports HH:mm or HH:mm:ss (24-hour format)
+const endTime = event.endTime.trim();
+
+if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(endTime)) {
+  throw new Error("Invalid event end time format");
+}
+
+const normalizedEndTime =
+  endTime.length === 5 ? `${endTime}:00` : endTime;
+
+// Event time assumed to be Indian Standard Time (IST)
+const eventEndDateTime = new Date(
+  `${eventDate}T${normalizedEndTime}+05:30`,
+);
+
+const currentDateTime = new Date();
+
+if (currentDateTime >= eventEndDateTime) {
+  throw new Error(
+    "This event has already ended. You cannot send invitations for past events.",
+  );
+}
+
     // 3. Find existing conversation
     let conversation = await chatRepository.findConversationBetweenUsers(
       senderId,
