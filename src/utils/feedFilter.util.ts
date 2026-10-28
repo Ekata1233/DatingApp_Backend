@@ -172,11 +172,14 @@ if (
   // -------------------------
   // INTERESTED IN (FIXED ✔)
   // -------------------------
-  if (filters.interestedIn) {
-    userWhere.gender = {
-      in: [filters.interestedIn.toUpperCase()],
-    };
-  }
+  // if (filters.interestedIn) {
+  //   userWhere.gender = {
+  //     in: [filters.interestedIn.toUpperCase()],
+  //   };
+  // }
+
+
+  
   // -------------------------
   // SEXUAL ORIENTATION (✔ FIX)
   // -------------------------
