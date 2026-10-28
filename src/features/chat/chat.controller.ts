@@ -56,6 +56,7 @@ export const getConversations = async (req: Request, res: Response) => {
       cursor: data.cursor,
       limit: data.limit,
       type: data.type,
+       planId: data.planId,
     });
 
     return res.status(200).json({

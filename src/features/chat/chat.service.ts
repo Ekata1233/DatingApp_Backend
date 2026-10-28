@@ -26,6 +26,7 @@ import { createMatchFromReplyService } from "../match/match.service";
 import console from "console";
 import { MessageType } from "@prisma/client";
 import { getMatchScoresForUsers } from "../match-score/match-score.service";
+import { prisma } from "../../prisma/prismaClient";
 
 export const chatService = {
   /**
@@ -94,18 +95,61 @@ export const chatService = {
       ? sortedConversations.slice(0, data.limit)
       : sortedConversations;
 
+// ============================================
+// DATE PLAN DECLINED REQUEST CHECK
+// ============================================
+
+const declinedRequests =
+  data.planId && items.length > 0
+    ? await prisma.datePlanRequest.findMany({
+        where: {
+          planId: data.planId,
+
+          plan: {
+            userId: data.userId,
+          },
+
+          requesterId: {
+            in: items.map(
+              (conversation) => conversation.user.id,
+            ),
+          },
+
+          status: "DECLINED",
+        },
+
+        select: {
+          requesterId: true,
+        },
+      })
+    : [];
+
+const declinedUserIds = new Set(
+  declinedRequests.map(
+    (request) => request.requesterId,
+  ),
+);
+
+const updatedItems = items.map((conversation) => ({
+  ...conversation,
+
+  isDateInviteDisabled: data.planId
+    ? declinedUserIds.has(conversation.user.id)
+    : false,
+}));
+
     const nextCursor = hasMore
       ? (items[items.length - 1]?.conversationId ?? null)
       : null;
 
     return {
-      items,
-      counts,
-      pagination: {
-        hasMore,
-        nextCursor,
-      },
-    };
+  items: updatedItems,
+  counts,
+  pagination: {
+    hasMore,
+    nextCursor,
+  },
+};
   },
 
   /**
