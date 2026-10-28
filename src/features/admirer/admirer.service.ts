@@ -70,41 +70,6 @@ export const getTimeAgo = (date: Date | string): string => {
   return `${minutes}m ago`;
 };
 
-// ==========================================
-// GET ADMIRERS / LIKES
-// ==========================================
-// ==========================================
-// MASK ADMIRER FULL NAME
-// ==========================================
-
-const maskAdmirerName = (fullName: string | null): string | null => {
-  if (!fullName) {
-    return null;
-  }
-
-  const words = fullName.trim().split(/\s+/);
-
-  return words
-    .map((word, index) => {
-      if (word.length <= 2) {
-        return "*".repeat(word.length);
-      }
-
-      // First name: show first 2 letters
-      if (index === 0) {
-        return word.slice(0, 2) + "*".repeat(word.length - 2);
-      }
-
-      // Middle name: show last 3 letters
-      if (index < words.length - 1) {
-        return "*".repeat(word.length - 3) + word.slice(-3);
-      }
-
-      // Last name: show first 2 letters
-      return word.slice(0, 2) + "*".repeat(word.length - 2);
-    })
-    .join(" ");
-};
 export const getAdmirers = async ({
   userId,
   direction,
@@ -317,112 +282,6 @@ export const getAdmirers = async ({
   };
 
   // ==========================================
-  // LOCK RECEIVED LIKES WITHOUT PACKAGE
-  // ==========================================
-
-  // ==========================================
-  // LOCK RECEIVED LIKES WITHOUT PACKAGE
-  // SHOW MASKED ADMIRER DETAILS
-  // ==========================================
-
-  if (direction === "RECEIVED" && !hasActivePackage) {
-    const [lockedSwipes, total] = await Promise.all([
-      prisma.userSwipe.findMany({
-        where,
-
-        select: {
-          id: true,
-          created_at: true,
-
-          swiper: {
-            select: {
-              id: true,
-            },
-          },
-        },
-
-        orderBy: {
-          created_at: "desc",
-        },
-
-        skip,
-        take: limit,
-      }),
-
-      prisma.userSwipe.count({
-        where,
-      }),
-    ]);
-
-    // ========================================
-    // FETCH ADMIRER DETAILS
-    // ========================================
-
-    const data = await Promise.all(
-      lockedSwipes.map(async (swipe) => {
-        const admirerId = swipe.swiper.id;
-
-        const details = await getAdmirerDetailsService(userId, admirerId);
-
-        return {
-          interactionId: swipe.id,
-          type: "LIKE",
-
-          userId: admirerId,
-
-          isLocked: true,
-
-          details: {
-            full_name: maskAdmirerName(details.full_name),
-
-            birth_date: details.birth_date,
-
-            age: details.age,
-
-            photo: details.photo,
-          },
-
-          createdAt: swipe.created_at,
-
-          timeAgo: getTimeAgo(swipe.created_at),
-
-          isMatch: false,
-
-          matchedAt: null,
-
-          likeStatus: {
-            sent: true,
-            seen: true,
-            matched: false,
-          },
-        };
-      }),
-    );
-
-    // ========================================
-    // FINAL LOCKED RESPONSE
-    // ========================================
-
-    return {
-      receivedLikesCount,
-
-      isPackageActive: false,
-
-      isLocked: true,
-
-      data,
-
-      pagination: {
-        page,
-        limit,
-        total,
-
-        hasNext: page * limit < total,
-      },
-    };
-  }
-
-  // ==========================================
   // FETCH LIKES
   // ==========================================
 
@@ -499,21 +358,18 @@ export const getAdmirers = async ({
   );
 
   // ==========================================
-// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
-// ==========================================
+  // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+  // ==========================================
 
-const matchScoreStart = performance.now();
+  const matchScoreStart = performance.now();
 
-const compatibilityMap = await getMatchScoresForUsers(
-  userId,
-  userIds,
-);
+  const compatibilityMap = await getMatchScoresForUsers(userId, userIds);
 
-console.log(
-  "Admirers dynamic match scores:",
-  performance.now() - matchScoreStart,
-  "ms",
-);
+  console.log(
+    "Admirers dynamic match scores:",
+    performance.now() - matchScoreStart,
+    "ms",
+  );
 
   const matches =
     userIds.length > 0
@@ -960,16 +816,12 @@ export const getAdmirerDetailsService = async (
   }
 
   // ==========================================
-// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
-// ==========================================
+  // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+  // ==========================================
 
-const matchScoreMap = await getMatchScoresForUsers(
-  userId,
-  [admirerId],
-);
+  const matchScoreMap = await getMatchScoresForUsers(userId, [admirerId]);
 
-const matchScore =
-  matchScoreMap.get(admirerId)?.percentage ?? 0;
+  const matchScore = matchScoreMap.get(admirerId)?.percentage ?? 0;
 
   // ==========================================
   // 3. WHY THEY LIKED YOU

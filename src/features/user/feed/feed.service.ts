@@ -161,8 +161,6 @@ const FREE_LOCKED_PROFILE_COUNT = 20;
 const LOCKED_PREVIEW_COUNT = 3;
 const OVERFETCH = 1.5;
 const MAX_ROUNDS = 5;
-const STATIC_MATCH_SCORE = 78;
-const STATIC_TRUST = 75;
 
 // =========================
 // CURSOR (keyset)
@@ -604,11 +602,63 @@ console.log("FEED PACKAGE VISIBILITY:", {
   // PRECOMPUTE MATCH FILTERS
   // ========================================================
 
-  const genderFilter = getGenderFromInterest(myInterest);
+  // const genderFilter = getGenderFromInterest(myInterest);
 
-  const interestedInFilter = ALL_INTEREST_VALUES.filter((v) =>
-    getGenderFromInterest(v).includes(myGender),
+  // const interestedInFilter = ALL_INTEREST_VALUES.filter((v) =>
+  //   getGenderFromInterest(v).includes(myGender),
+  // );
+
+  
+  // ========================================================
+  // PRECOMPUTE MATCH FILTERS
+  // ONBOARDING + EXTERNAL FILTER OVERRIDE
+  // ========================================================
+
+  const externalInterest = filters?.interestedIn?.trim().toUpperCase();
+
+  const allowedInterests = [
+    "MEN",
+    "WOMEN",
+    "NON_BINARY",
+    "PREFER_NOT_TO_SAY",
+    "EVERYONE",
+    "ANY",
+  ];
+
+  if (
+    externalInterest &&
+    !allowedInterests.includes(externalInterest)
+  ) {
+    throw new Error("Invalid interestedIn filter");
+  }
+
+  // External filter overrides onboarding preference
+  // only for this feed request.
+  const effectiveInterest = externalInterest || myInterest;
+
+  const genderFilter = getGenderFromInterest(
+    effectiveInterest === "ANY" ? "EVERYONE" : effectiveInterest,
   );
+
+  // Target user must be interested in current user's gender.
+  const interestedInFilter = ALL_INTEREST_VALUES.filter((value) =>
+    getGenderFromInterest(value).includes(myGender),
+  );
+
+  // Keep existing orientation restriction when no external
+  // interestedIn filter is provided.
+  const shouldApplyOnboardingOrientation = !externalInterest;
+
+  console.log("FEED GENDER FILTER:", {
+    myGender,
+    onboardingInterest: myInterest,
+    externalInterest: externalInterest || null,
+    effectiveInterest,
+    genderFilter,
+    interestedInFilter,
+    shouldApplyOnboardingOrientation,
+  });
+
 
   // ========================================================
   // VIP FILTER: AMBITION
@@ -987,6 +1037,7 @@ AND (
           )
 
        ${
+         shouldApplyOnboardingOrientation &&
          orientationGenderOptions.length > 0
            ? Prisma.sql`
           AND u.gender_option::text =
