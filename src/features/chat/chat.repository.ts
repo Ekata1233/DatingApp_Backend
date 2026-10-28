@@ -912,6 +912,7 @@ export const chatRepository = {
         type: "GIFT" | "ROSE";
         giftName: string | null;
         expiresAt: Date | null;
+        createdAt: Date;
       }
     >();
 
@@ -939,7 +940,9 @@ export const chatRepository = {
       // always the oldest pending gift.
       // ------------------------------------------------
 
-      if (progressMap.has(conversationId)) {
+      const existingProgress = progressMap.get(conversationId);
+
+      if (existingProgress && existingProgress.createdAt >= gift.createdAt) {
         continue;
       }
 
@@ -986,6 +989,7 @@ export const chatRepository = {
         type: "GIFT",
         giftName: gift.giftName,
         expiresAt: gift.expiresAt,
+        createdAt: gift.createdAt,
       });
     }
 
@@ -1009,7 +1013,9 @@ export const chatRepository = {
       // keep Gift progress.
       // ------------------------------------------------
 
-      if (progressMap.has(conversationId)) {
+      const existingProgress = progressMap.get(conversationId);
+
+      if (existingProgress && existingProgress.createdAt >= rose.createdAt) {
         continue;
       }
 
@@ -1053,6 +1059,7 @@ export const chatRepository = {
         type: "ROSE",
         giftName: null,
         expiresAt: rose.expiresAt,
+        createdAt: rose.createdAt,
       });
     }
 
@@ -1117,8 +1124,19 @@ export const chatRepository = {
         // Progress
         // --------------------------------------------------
 
-        const progress = progressMap.get(conversation.id) ?? null;
+        const progressData = progressMap.get(conversation.id);
 
+        const progress = progressData
+          ? {
+              current: progressData.current,
+              target: progressData.target,
+              percentage: progressData.percentage,
+              label: progressData.label,
+              type: progressData.type,
+              giftName: progressData.giftName,
+              expiresAt: progressData.expiresAt,
+            }
+          : null;
         // --------------------------------------------------
         // 18. Latest message - Chat list display content
         // --------------------------------------------------
