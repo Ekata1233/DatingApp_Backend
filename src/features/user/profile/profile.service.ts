@@ -20,6 +20,7 @@ import { redis } from "../../../lib/redis";
 import { queueMatchScoreCalculation } from "../../../queues/match-score.queue";
 import { QUESTION_SCREEN_TO_ONBOARDING_STEP } from "../../../config/onboardingFlows";
 import { clearFeedUserCache, clearUserFeedDetailsCache } from "../user.helper";
+import { resetFaceVerification } from "../../verification/face_match/reset-face-verification.helper";
 
 const MAX_PHOTOS = 6;
 const MAX_VIDEOS = 1;
@@ -1232,15 +1233,53 @@ export const updateUserMediaService = async (
     folder: mediaType === "IMAGE" ? "/user-photos" : "/user-videos",
   });
 
-  const updatedMedia = await prisma.userPhoto.update({
-    where: {
-      id: mediaId,
-    },
-    data: {
-      media_url: uploadResponse.url,
-      media_type: mediaType,
-    },
+  // ==================================================
+  // 3. UPDATE MEDIA + RESET FACE VERIFICATION
+  // ==================================================
+
+  const updatedMedia = await prisma.$transaction(async (tx) => {
+    // NEW: Find photo currently used for Face Verification
+    const verificationPhoto =
+      mediaType === "IMAGE"
+        ? await tx.userPhoto.findFirst({
+            where: {
+              user_id: userId,
+              media_type: "IMAGE",
+            },
+            orderBy: [
+              { is_primary: "desc" },
+              { order: "asc" },
+              { created_at: "asc" },
+            ],
+          })
+        : null;
+
+    // Existing update logic
+    const updated = await tx.userPhoto.update({
+      where: {
+        id: mediaId,
+      },
+      data: {
+        media_url: uploadResponse.url,
+        media_type: mediaType,
+      },
+    });
+
+    // NEW: Reset verification only if selected photo changed
+    if (
+      mediaType === "IMAGE" &&
+      verificationPhoto?.id === mediaId &&
+      verificationPhoto.media_url !== uploadResponse.url
+    ) {
+      await resetFaceVerification(userId, tx);
+    }
+
+    return updated;
   });
+
+  // ==================================================
+  // 4. PROFILE COMPLETION - EXISTING LOGIC
+  // ==================================================
 
   const score = await calculateProfileScore(userId);
 
@@ -1257,55 +1296,24 @@ export const updateUserMediaService = async (
   //   userId,
   // );
 
+  // ==================================================
+  // 5. CLEAR CACHE - EXISTING LOGIC
+  // ==================================================
+
   await redis.del(`profile:edit:${userId}`);
-  //   // await redis.del(`feed:details:${userId}`);
+
+  // await redis.del(`feed:details:${userId}`);
+
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
+
   return updatedMedia;
 };
 
-//primary photo
-export const setPrimaryPhotoService = async (
-  userId: string,
-  photoId: string,
-) => {
-  const result = await prisma.$transaction(async (tx) => {
-    await tx.userPhoto.updateMany({
-      where: {
-        user_id: userId,
-      },
-      data: {
-        is_primary: false,
-      },
-    });
 
-    const photo = await tx.userPhoto.updateMany({
-      where: {
-        id: photoId,
-        user_id: userId,
-        media_type: "IMAGE",
-      },
-      data: {
-        is_primary: true,
-      },
-    });
 
-    return photo;
-  });
 
-  // await queueMatchScoreCalculation(
-  //   userId,
-  // );
-
-  await redis.del(`profile:edit:${userId}`);
-  // await redis.del(`feed:details:${userId}`);
-  await clearUserFeedDetailsCache(userId);
-  await clearFeedUserCache(userId);
-
-  return result;
-};
-
-//Delete Photo
+// Delete Photo
 export const deleteUserMediaService = async (
   userId: string,
   mediaId: string,
@@ -1324,7 +1332,29 @@ export const deleteUserMediaService = async (
   }
 
   await prisma.$transaction(async (tx) => {
-    // Delete media
+    // ==================================================
+    // NEW: FIND PHOTO USED FOR FACE VERIFICATION
+    // ==================================================
+
+    const verificationPhoto =
+      mediaType === "IMAGE"
+        ? await tx.userPhoto.findFirst({
+            where: {
+              user_id: userId,
+              media_type: "IMAGE",
+            },
+            orderBy: [
+              { is_primary: "desc" },
+              { order: "asc" },
+              { created_at: "asc" },
+            ],
+          })
+        : null;
+
+    // ==================================================
+    // EXISTING: DELETE MEDIA
+    // ==================================================
+
     await tx.userPhoto.delete({
       where: {
         id: mediaId,
@@ -1379,6 +1409,14 @@ export const deleteUserMediaService = async (
           },
         });
       }
+
+      // ==================================================
+      // NEW: RESET FACE VERIFICATION + TRUST SCORE
+      // ==================================================
+
+      if (verificationPhoto?.id === mediaId) {
+        await resetFaceVerification(userId, tx);
+      }
     }
   });
 
@@ -1386,12 +1424,20 @@ export const deleteUserMediaService = async (
   //   userId,
   // );
 
+  // ==================================================
+  // EXISTING: CLEAR CACHE
+  // ==================================================
+
   await redis.del(`profile:edit:${userId}`);
 
   await redis.del(`feed:details:${userId}`);
 
   await clearFeedUserCache(userId);
   await clearUserFeedDetailsCache(userId);
+
+  // ==================================================
+  // EXISTING: PROFILE COMPLETION
+  // ==================================================
 
   const score = await calculateProfileScore(userId);
 
@@ -1410,6 +1456,47 @@ export const deleteUserMediaService = async (
   };
 };
 
+
+//primary photo
+export const setPrimaryPhotoService = async (
+  userId: string,
+  photoId: string,
+) => {
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.userPhoto.updateMany({
+      where: {
+        user_id: userId,
+      },
+      data: {
+        is_primary: false,
+      },
+    });
+
+    const photo = await tx.userPhoto.updateMany({
+      where: {
+        id: photoId,
+        user_id: userId,
+        media_type: "IMAGE",
+      },
+      data: {
+        is_primary: true,
+      },
+    });
+
+    return photo;
+  });
+
+  // await queueMatchScoreCalculation(
+  //   userId,
+  // );
+
+  await redis.del(`profile:edit:${userId}`);
+  // await redis.del(`feed:details:${userId}`);
+  await clearUserFeedDetailsCache(userId);
+  await clearFeedUserCache(userId);
+
+  return result;
+};
 export const updateUserVideoService = async (userId: string, file: any) => {
   if (!userId) throw new Error("User ID is required");
 
