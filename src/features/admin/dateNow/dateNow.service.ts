@@ -133,6 +133,7 @@ export const createDatePlanPackage = async (payload: {
   pricePerPlan: number;
   discount?: number;
   isPopular?: boolean;
+  isBestValue?: boolean;
   isActive?: boolean;
   sortOrder?: number;
 }) => {
@@ -151,6 +152,7 @@ export const updateDatePlanPackage = async (
     pricePerPlan?: number;
     discount?: number;
     isPopular?: boolean;
+    isBestValue?: boolean;
     isActive?: boolean;
     sortOrder?: number;
   },
