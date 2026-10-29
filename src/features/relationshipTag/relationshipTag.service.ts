@@ -12,6 +12,7 @@ import {
 import { RelationshipTagProposalInput } from "./relationshipTag.validation";
 import { prisma } from "../../prisma/prismaClient";
 import { buildRelationshipEndedPayload } from "./relationshipTag.helper";
+import { createNotification } from "../notification/notification.service";
 
 export const relationshipTagService = {
   async createProposal(
@@ -310,10 +311,45 @@ export const relationshipTagService = {
   },
 
   async rejectProposal(proposalId: string, userId: string) {
-    const proposal = await relationshipTagRepository.rejectProposal(
+    // ========================================
+    // 1. REJECT PROPOSAL
+    // ========================================
+
+    const result = await relationshipTagRepository.rejectProposal(
       proposalId,
       userId,
     );
+
+    const proposal = result.proposal;
+
+    // ========================================
+    // 2. SEND NOTIFICATION TO PROPOSAL SENDER
+    // ========================================
+
+    try {
+      await createNotification({
+        senderId: userId,
+        receiverId: proposal.senderId,
+        type: "RELATIONSHIP_TAG_REJECTED",
+        title: "Relationship Proposal Rejected",
+        message: "Your relationship tag proposal has been rejected.",
+        data: {
+          type: "RELATIONSHIP_TAG_REJECTED",
+          proposalId,
+          conversationId: result.conversationId,
+          messageId: result.message.id,
+          senderId: userId,
+          receiverId: proposal.senderId,
+          status: "REJECTED",
+        },
+      });
+    } catch (error) {
+      console.error("Relationship tag rejection notification failed:", error);
+    }
+
+    // ========================================
+    // 3. RETURN RESPONSE
+    // ========================================
 
     return {
       id: proposal.id,
@@ -332,6 +368,10 @@ export const relationshipTagService = {
         id: proposal.receiver.id,
         fullName: proposal.receiver.full_name,
       },
+
+      conversationId: result.conversationId,
+
+      chatMessage: result.message,
     };
   },
 
@@ -623,14 +663,8 @@ export const endRelationshipService = async (
     throw new Error("Relationship is already ended");
   }
 
-const {
-    endedRelationship,
-    breakupMessage,
-    conversationId,
-  } = await endRelationshipRepository(
-    relationshipId,
-    userId,
-  );
+  const { endedRelationship, breakupMessage, conversationId } =
+    await endRelationshipRepository(relationshipId, userId);
   const partner =
     endedRelationship.user1Id === userId
       ? endedRelationship.user2
@@ -678,7 +712,7 @@ const {
       profilePhoto: partner.photos[0]?.media_url ?? null,
     },
     relationshipEndedScreen,
-     conversationId,
+    conversationId,
     breakupMessage,
   };
 };
