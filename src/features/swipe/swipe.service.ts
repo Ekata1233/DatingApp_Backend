@@ -12,7 +12,6 @@ import {
   recordDailyFeedView,
 } from "./swipe.helper";
 
-
 const saveOrUpdateSwipe = async (
   tx: Prisma.TransactionClient,
   swiperId: string,
@@ -188,6 +187,7 @@ export const handleSwipe = async (data: {
         );
         return {
           matched: true,
+          isNewMatch: false,
           updated: swipeResult.updated,
           previousAction: swipeResult.previousAction,
           match: existingMatch,
@@ -212,6 +212,7 @@ export const handleSwipe = async (data: {
       return {
         matched: true,
         updated: swipeResult.updated,
+        isNewMatch: true,
         previousAction: swipeResult.previousAction,
         match,
         conversationId,
@@ -346,34 +347,40 @@ export const handleSwipe = async (data: {
   // 6. MATCH NOTIFICATIONS
   // ============================================================
 
-  Promise.all([
-    createNotification({
-      senderId: swiperId,
-      receiverId: targetUserId,
-      type: NotificationType.NEW_MATCH,
-      title: "It's a Match! 🎉",
-      message: `You and ${swiperName} matched! ❤️`,
-      data: {
-        matchId: match.id,
-        userId: swiperId,
-        type: "MATCH",
-      },
-    }),
+  // SEND MATCH NOTIFICATION ONLY ONCE
+  if (result.isNewMatch === true) {
+    await Promise.all([
+      // Notification to User A
+      createNotification({
+        senderId: swiperId,
+        receiverId: targetUserId,
+        type: NotificationType.NEW_MATCH,
+        title: "It's a Match! 🎉",
+        message: `You and ${swiperName} matched! ❤️`,
+        data: {
+          matchId: match.id,
+          conversationId: result.conversationId,
+          userId: swiperId,
+          type: "MATCH",
+        },
+      }),
 
-    createNotification({
-      senderId: targetUserId,
-      receiverId: swiperId,
-      type: NotificationType.NEW_MATCH,
-      title: "It's a Match! 🎉",
-      message: `You and ${targetUserName} matched! ❤️`,
-      data: {
-        matchId: match.id,
-        userId: targetUserId,
-        type: "MATCH",
-      },
-    }),
-  ]).catch(console.error);
-
+      // Notification to User B
+      createNotification({
+        senderId: targetUserId,
+        receiverId: swiperId,
+        type: NotificationType.NEW_MATCH,
+        title: "It's a Match! 🎉",
+        message: `You and ${targetUserName} matched! ❤️`,
+        data: {
+          matchId: match.id,
+          conversationId: result.conversationId,
+          userId: targetUserId,
+          type: "MATCH",
+        },
+      }),
+    ]);
+  }
   // ============================================================
   // 7. GET PRIMARY PROFILE PHOTOS
   // ============================================================
