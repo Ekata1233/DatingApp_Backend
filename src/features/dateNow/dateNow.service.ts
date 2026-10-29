@@ -1501,6 +1501,7 @@ export const approveDatePlanRequest = async (
   };
 };
 
+
 export const declineDatePlanRequest = async (
   userId: string,
   requestId: string,
@@ -1522,15 +1523,68 @@ export const declineDatePlanRequest = async (
     throw new Error("Not authorized");
   }
 
-  return prisma.datePlanRequest.update({
-    where: {
-      id: requestId,
-    },
-    data: {
-      status: "DECLINED",
-    },
+  if (request.status !== "PENDING") {
+    throw new Error("Only pending requests can be declined");
+  }
+
+  // Requester is the receiver
+  const receiverId = request.requesterId;
+
+  // Find existing conversation
+  let conversation =
+    await chatRepository.findConversationBetweenUsers(
+      userId,
+      receiverId,
+    );
+
+  // Create conversation if not exists
+  if (!conversation) {
+    conversation =
+      await chatRepository.createConversation(
+        userId,
+        receiverId,
+      );
+  }
+
+  // Update request and create message atomically
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedRequest = await tx.datePlanRequest.update({
+      where: {
+        id: requestId,
+      },
+      data: {
+        status: "DECLINED",
+      },
+    });
+
+    const message = await tx.chatMessage.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: userId,
+        messageType: "DATE_CANCELLED",
+        content: "Your Date Plan request has been declined.",
+        metadata: {
+          event: "DATE_PLAN_REQUEST_DECLINED",
+          datePlanId: request.planId,
+          requestId: request.id,
+          status: "DECLINED",
+        },
+      },
+    });
+
+    return {
+      request: updatedRequest,
+      message,
+    };
   });
+
+  return {
+    ...result,
+    receiverId,
+    conversationId: conversation.id,
+  };
 };
+
 
 export const topUpDatePlanPackage = async (
   userId: string,
