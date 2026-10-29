@@ -615,6 +615,26 @@ export const cancelDatePlanController = async (req: Request, res: Response) => {
 
     const result = await cancelDatePlanService(userId, planId);
 
+     // ========================================
+    // 2. SEND REAL-TIME CHAT MESSAGES
+    // ========================================
+
+    try {
+      const io = getIO();
+
+      for (const chat of result.chatMessages) {
+        io.to(`user:${chat.receiverId}`).emit(
+          "message:receive",
+          chat.message,
+        );
+      }
+    } catch (socketError) {
+      console.error(
+        "Date Plan cancellation socket error:",
+        socketError,
+      );
+    }
+
     return res.status(200).json({
       success: true,
       message: "Date plan cancelled successfully",

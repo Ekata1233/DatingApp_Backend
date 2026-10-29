@@ -787,16 +787,47 @@ const handleVerifiedUser = async ({
   // CREATE USER SESSION
   // =====================================================
 
-  const session = await prisma.userSession.create({
-    data: {
-      userId: result.id,
+  // const session = await prisma.userSession.create({
+  //   data: {
+  //     userId: result.id,
+  //     isActive: true,
+  //     expiresAt: sessionExpiry,
+  //   },
+  // });
 
-      isActive: true,
+  // ============================================
+  // SINGLE DEVICE LOGIN
+  // ============================================
 
-      expiresAt: sessionExpiry,
-    },
+  const session = await prisma.$transaction(async (tx) => {
+    // Lock this user row to serialize concurrent logins.
+    await tx.$queryRaw`
+    SELECT id FROM users
+    WHERE id = ${result.id}::uuid
+    FOR UPDATE
+  `;
+
+    // Deactivate all previous sessions.
+    await tx.userSession.updateMany({
+      where: {
+        userId: result.id,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+        logoutAt: new Date(),
+      },
+    });
+
+    // Create the only active session.
+    return tx.userSession.create({
+      data: {
+        userId: result.id,
+        isActive: true,
+        expiresAt: sessionExpiry,
+      },
+    });
   });
-
   // =====================================================
   // CREATE JWT
   // =====================================================

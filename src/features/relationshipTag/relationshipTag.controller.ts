@@ -503,6 +503,21 @@ export const relationshipTagController = {
         userId,
       );
 
+      // ========================================
+      // SEND REAL-TIME CHAT MESSAGE
+      // ========================================
+
+      try {
+        const io = getIO();
+
+        io.to(`user:${result.sender.id}`).emit(
+          "message:receive",
+          result.chatMessage,
+        );
+      } catch (socketError) {
+        console.error("Relationship tag rejection socket error:", socketError);
+      }
+
       return res.status(200).json({
         success: true,
         message: "Relationship tag proposal rejected successfully",
@@ -640,9 +655,7 @@ export const endRelationshipController = async (
       });
     }
 
-    const relationshipId = String(
-      req.params.relationshipId,
-    );
+    const relationshipId = String(req.params.relationshipId);
 
     if (!relationshipId || relationshipId === "undefined") {
       return res.status(400).json({
@@ -651,10 +664,7 @@ export const endRelationshipController = async (
       });
     }
 
-    const relationship = await endRelationshipService(
-      userId,
-      relationshipId,
-    );
+    const relationship = await endRelationshipService(userId, relationshipId);
 
     // ============================================
     // SOCKET.IO REAL-TIME EVENT
@@ -671,16 +681,12 @@ export const endRelationshipController = async (
         senderId: userId,
         receiverId: partnerId,
         relationshipId: relationship.id,
-        relationshipEndedScreen:
-          relationship.relationshipEndedScreen,
+        relationshipEndedScreen: relationship.relationshipEndedScreen,
         createdAt: relationship.endedAt,
       };
 
       // SEND TO PARTNER B
-      io.to(`user:${partnerId}`).emit(
-        "message:receive",
-        breakupSocketPayload,
-      );
+      io.to(`user:${partnerId}`).emit("message:receive", breakupSocketPayload);
 
       // SEND TO CURRENT USER A
       // io.to(`user:${userId}`).emit(
@@ -694,10 +700,7 @@ export const endRelationshipController = async (
         relationshipId: relationship.id,
       });
     } catch (socketError) {
-      console.error(
-        "Relationship ended socket emission error:",
-        socketError,
-      );
+      console.error("Relationship ended socket emission error:", socketError);
     }
 
     return res.status(200).json({
@@ -706,15 +709,11 @@ export const endRelationshipController = async (
       data: relationship,
     });
   } catch (error: any) {
-    console.error(
-      "END RELATIONSHIP ERROR:",
-      error,
-    );
+    console.error("END RELATIONSHIP ERROR:", error);
 
     return res.status(400).json({
       success: false,
-      message:
-        error.message || "Failed to end relationship",
+      message: error.message || "Failed to end relationship",
     });
   }
 };

@@ -76,25 +76,25 @@ export const updateDraftDatePlan = async (
 
   const { vibeIds, eventDate, eventTime, activityId, ...planData } = payload;
   let eventDateTime: Date | undefined;
-// ============================================
-// VALIDATE EVENT DATE AND TIME
-// ============================================
+  // ============================================
+  // VALIDATE EVENT DATE AND TIME
+  // ============================================
 
-if (eventDate && eventTime) {
-  eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
+  if (eventDate && eventTime) {
+    eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
 
-  // Check invalid date
-  if (isNaN(eventDateTime.getTime())) {
-    throw new Error("Invalid event date or time.");
+    // Check invalid date
+    if (isNaN(eventDateTime.getTime())) {
+      throw new Error("Invalid event date or time.");
+    }
+
+    // Prevent past date and time
+    if (eventDateTime.getTime() <= Date.now()) {
+      throw new Error(
+        "You cannot select a past date or time. Please select a future date and time.",
+      );
+    }
   }
-
-  // Prevent past date and time
-  if (eventDateTime.getTime() <= Date.now()) {
-    throw new Error(
-      "You cannot select a past date or time. Please select a future date and time.",
-    );
-  }
-}
 
   const updatedPlan = await prisma.$transaction(async (tx) => {
     await tx.datePlan.update({
@@ -205,21 +205,21 @@ export const publishDatePlan = async (planId: string, userId: string) => {
     if (plan.status === PlanStatus.ACTIVE) {
       throw new Error("Plan is already published");
     }
-// ============================================
-// VALIDATE EVENT DATE AND TIME
-// ============================================
+    // ============================================
+    // VALIDATE EVENT DATE AND TIME
+    // ============================================
 
-if (!plan.eventDateTime) {
-  throw new Error(
-    "Please select a date and time before publishing the date plan.",
-  );
-}
+    if (!plan.eventDateTime) {
+      throw new Error(
+        "Please select a date and time before publishing the date plan.",
+      );
+    }
 
-if (plan.eventDateTime.getTime() <= Date.now()) {
-  throw new Error(
-    "You cannot publish a date plan with a past date or time. Please select a future date and time.",
-  );
-}
+    if (plan.eventDateTime.getTime() <= Date.now()) {
+      throw new Error(
+        "You cannot publish a date plan with a past date or time. Please select a future date and time.",
+      );
+    }
     // ============================================
     // 2. GET USER DATE PLAN STATS
     // ============================================
@@ -680,39 +680,33 @@ export const discoverDatePlan = async (
     },
   });
 
- console.log("[DATE DISCOVER] Eligible plans:", plans.length);
+  console.log("[DATE DISCOVER] Eligible plans:", plans.length);
 
-// ============================================
-// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
-// ============================================
+  // ============================================
+  // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+  // ============================================
 
-// Extract unique host IDs.
-// One host may have multiple date plans.
-const hostUserIds = [
-  ...new Set(plans.map((plan) => plan.userId)),
-];
+  // Extract unique host IDs.
+  // One host may have multiple date plans.
+  const hostUserIds = [...new Set(plans.map((plan) => plan.userId))];
 
-// Calculate scores once for all unique hosts.
-const matchScoreStart = performance.now();
+  // Calculate scores once for all unique hosts.
+  const matchScoreStart = performance.now();
 
-const matchScoreMap = await getMatchScoresForUsers(
-  userId,
-  hostUserIds,
-);
+  const matchScoreMap = await getMatchScoresForUsers(userId, hostUserIds);
 
-console.log(
-  "[DATE DISCOVER] Dynamic match scores:",
-  performance.now() - matchScoreStart,
-  "ms",
-);
+  console.log(
+    "[DATE DISCOVER] Dynamic match scores:",
+    performance.now() - matchScoreStart,
+    "ms",
+  );
 
-// ============================================
-// CALCULATE SCORE AND DISTANCE
-// ============================================
+  // ============================================
+  // CALCULATE SCORE AND DISTANCE
+  // ============================================
 
-const ranked = plans.map((plan) => {
-  const matchScore =
-    matchScoreMap.get(plan.userId)?.percentage ?? 0;
+  const ranked = plans.map((plan) => {
+    const matchScore = matchScoreMap.get(plan.userId)?.percentage ?? 0;
 
     let distanceKm: number | null = null;
 
@@ -1501,7 +1495,6 @@ export const approveDatePlanRequest = async (
   };
 };
 
-
 export const declineDatePlanRequest = async (
   userId: string,
   requestId: string,
@@ -1531,19 +1524,14 @@ export const declineDatePlanRequest = async (
   const receiverId = request.requesterId;
 
   // Find existing conversation
-  let conversation =
-    await chatRepository.findConversationBetweenUsers(
-      userId,
-      receiverId,
-    );
+  let conversation = await chatRepository.findConversationBetweenUsers(
+    userId,
+    receiverId,
+  );
 
   // Create conversation if not exists
   if (!conversation) {
-    conversation =
-      await chatRepository.createConversation(
-        userId,
-        receiverId,
-      );
+    conversation = await chatRepository.createConversation(userId, receiverId);
   }
 
   // Update request and create message atomically
@@ -1584,7 +1572,6 @@ export const declineDatePlanRequest = async (
     conversationId: conversation.id,
   };
 };
-
 
 export const topUpDatePlanPackage = async (
   userId: string,
@@ -1784,22 +1771,17 @@ export const getMyDatePlanRequests = async (userId: string) => {
     orderBy: {
       createdAt: "desc",
     },
-   });
+  });
 
   // ============================================
   // DYNAMIC HOST MATCH SCORE - REDIS + PRISMA
   // ============================================
 
   const hostUserIds = [
-    ...new Set(
-      requests.map((request) => request.plan.user.id),
-    ),
+    ...new Set(requests.map((request) => request.plan.user.id)),
   ];
 
-  const matchScoreMap = await getMatchScoresForUsers(
-    userId,
-    hostUserIds,
-  );
+  const matchScoreMap = await getMatchScoresForUsers(userId, hostUserIds);
 
   return requests.map((request) => ({
     id: request.id,
@@ -1854,23 +1836,40 @@ export const getMyDatePlanRequests = async (userId: string) => {
             ? request.plan.user.photos[0].media_url
             : null,
         trustScore: request.plan.user.trust_score,
-matchScore:
-    matchScoreMap.get(request.plan.user.id)?.percentage ?? 0,      },
+        matchScore: matchScoreMap.get(request.plan.user.id)?.percentage ?? 0,
+      },
     },
   }));
 };
 
 export const cancelDatePlanRequest = async (userId: string, planId: string) => {
+  // ========================================
+  // 1. FIND REQUEST WITH DATE PLAN
+  // ========================================
+
   const request = await prisma.datePlanRequest.findFirst({
     where: {
       planId,
       requesterId: userId,
+    },
+    include: {
+      plan: {
+        select: {
+          id: true,
+          userId: true,
+          title: true,
+        },
+      },
     },
   });
 
   if (!request) {
     throw new Error("Request not found");
   }
+
+  // ========================================
+  // 2. CHECK REQUEST STATUS
+  // ========================================
 
   if (request.status === "DECLINED") {
     throw new Error("Request has already been declined");
@@ -1880,14 +1879,52 @@ export const cancelDatePlanRequest = async (userId: string, planId: string) => {
     throw new Error("Request has already been cancelled");
   }
 
+  // ========================================
+  // 3. CANCEL REQUEST
+  // ========================================
+
   const cancelledRequest = await prisma.datePlanRequest.update({
     where: {
       id: request.id,
+      status: request.status,
     },
     data: {
       status: "CANCELLED",
     },
   });
+
+  // ========================================
+  // 4. SEND NOTIFICATION TO PLAN OWNER
+  // ========================================
+
+  const receiverId = request.plan.userId;
+
+  try {
+    await createNotification({
+      senderId: userId,
+      receiverId,
+      type: "DATE_CANCELLED",
+      title: "Date Plan Request Cancelled",
+      message: "A user has cancelled their request to join your Date Plan.",
+      data: {
+        type: "DATE_PLAN_REQUEST_CANCELLED",
+        planId,
+        requestId: request.id,
+        senderId: userId,
+        receiverId,
+        status: "CANCELLED",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Failed to send Date Plan request cancellation notification:",
+      error,
+    );
+  }
+
+  // ========================================
+  // 5. RETURN CANCELLED REQUEST
+  // ========================================
 
   return cancelledRequest;
 };
@@ -2023,32 +2060,32 @@ export const getDatePlanHistory = async (
 ) => {
   const page = Math.max(Number(query.page) || 1, 1);
 
-// ============================================
-// AUTO EXPIRE DATE PLAN
-// ============================================
+  // ============================================
+  // AUTO EXPIRE DATE PLAN
+  // ============================================
 
-await prisma.datePlan.updateMany({
-  where: {
-    userId,
+  await prisma.datePlan.updateMany({
+    where: {
+      userId,
 
-    status: PlanStatus.ACTIVE,
+      status: PlanStatus.ACTIVE,
 
-  eventDateTime: {
-  not: null,
-  lte: new Date(),
-},
+      eventDateTime: {
+        not: null,
+        lte: new Date(),
+      },
 
-    // Do not expire confirmed dates
-    DateConfirmed: {
-      none: {},
+      // Do not expire confirmed dates
+      DateConfirmed: {
+        none: {},
+      },
     },
-  },
 
-  data: {
-    status: PlanStatus.EXPIRED,
-    expiresAt: new Date(),
-  },
-});
+    data: {
+      status: PlanStatus.EXPIRED,
+      expiresAt: new Date(),
+    },
+  });
 
   const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
@@ -3012,11 +3049,7 @@ export const updateDatePlanActivityService = async (
   return updatedPlan;
 };
 
-
-export const cancelDatePlanService = async (
-  userId: string,
-  planId: string,
-) => {
+export const cancelDatePlanService = async (userId: string, planId: string) => {
   // 1. Check if date plan exists
   const datePlan = await prisma.datePlan.findUnique({
     where: {
@@ -3030,16 +3063,11 @@ export const cancelDatePlanService = async (
 
   // 2. Check ownership
   if (datePlan.userId !== userId) {
-    throw new Error(
-      "You are not authorized to cancel this date plan",
-    );
+    throw new Error("You are not authorized to cancel this date plan");
   }
 
   // 3. Validate plan status
-  if (
-    datePlan.status !== "BOOKED" &&
-    datePlan.status !== "ACTIVE"
-  ) {
+  if (datePlan.status !== "BOOKED" && datePlan.status !== "ACTIVE") {
     throw new Error(
       `Date plan cannot be cancelled because its current status is ${datePlan.status}`,
     );
@@ -3056,21 +3084,79 @@ export const cancelDatePlanService = async (
       },
     });
 
-    const approvedRequests =
-      await tx.datePlanRequest.findMany({
+    const approvedRequests = await tx.datePlanRequest.findMany({
+      where: {
+        planId,
+        status: "APPROVED",
+      },
+      select: {
+        id: true,
+        requesterId: true,
+      },
+    });
+
+    // ========================================
+    // 5. CREATE CHAT MESSAGES
+    // ========================================
+
+    const chatMessages = [];
+
+    for (const request of approvedRequests) {
+      const receiverId = request.requesterId;
+
+      let conversation = await tx.conversation.findFirst({
         where: {
-          planId,
-          status: "APPROVED",
-        },
-        select: {
-          id: true,
-          requesterId: true,
+          AND: [
+            {
+              participants: {
+                some: { userId },
+              },
+            },
+            {
+              participants: {
+                some: { userId: receiverId },
+              },
+            },
+          ],
         },
       });
+
+      if (!conversation) {
+        conversation = await tx.conversation.create({
+          data: {
+            participants: {
+              create: [{ userId }, { userId: receiverId }],
+            },
+          },
+        });
+      }
+
+      const message = await tx.chatMessage.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: userId,
+          messageType: "DATE_INVITE",
+          content: "The host has cancelled your Date Plan.",
+          metadata: {
+            event: "DATE_PLAN_CANCELLED",
+            datePlanId: planId,
+            requestId: request.id,
+            status: "CANCELLED",
+          },
+        },
+      });
+
+      chatMessages.push({
+        receiverId,
+        conversationId: conversation.id,
+        message,
+      });
+    }
 
     return {
       cancelledPlan,
       approvedRequests,
+      chatMessages,
     };
   });
 
@@ -3080,10 +3166,9 @@ export const cancelDatePlanService = async (
       createNotification({
         senderId: userId,
         receiverId: request.requesterId,
-        type: "DATE_INVITE",
+        type: "DATE_CANCELLED",
         title: "Date Plan Cancelled",
-        message:
-          "The host has cancelled a date plan you were invited to.",
+        message: "The host has cancelled a date plan you were invited to.",
         data: {
           type: "DATE_PLAN_CANCELLED",
           planId,
@@ -3105,9 +3190,11 @@ export const cancelDatePlanService = async (
     }
   });
 
-  return result.cancelledPlan;
+  return {
+    cancelledPlan: result.cancelledPlan,
+    chatMessages: result.chatMessages,
+  };
 };
-
 
 export const dateNowInviteMessage = {
   async inviteToDatePlan(
