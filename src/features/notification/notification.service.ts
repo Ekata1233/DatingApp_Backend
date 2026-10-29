@@ -1,13 +1,13 @@
 // Working on this file: src/features/notification/notification.repository.ts
 
-import { NotificationType } from "@prisma/client";
+import { NotificationType, Prisma } from "@prisma/client";
 import { getIO } from "../../config/socket";
 import { prisma } from "../../prisma/prismaClient";
 import { incrementBadgeCount } from "./badge.service";
 import { createNotificationSettingRepository, findNotificationByIdRepository, getNotificationCountRepository, getNotificationSettingRepository, getNotificationsRepository, getUnreadNotificationCategoryCountsRepository, getUnreadNotificationCountRepository, markAllNotificationsReadRepository, markNotificationReadRepository, updateNotificationSettingRepository } from "./notification.repository";
 import { CreateNotificationParams, NotificationCategory, notificationCategoryMap, SaveDeviceTokenParams } from "./notification.types";
 import { sendPushNotification } from "./push.service";
-import { canSendPushNotification } from "./notification.helper";
+import { canSendPushNotification, getMatchConversationId } from "./notification.helper";
 
 export const createNotification = async ({
   senderId,
@@ -170,11 +170,7 @@ export const getNotificationsService = async (
       ];
   }
 
-  const [
-    notifications,
-    total,
-    unreadCount,
-  ] = await Promise.all([
+  const [ notifications,total, unreadCount, ] = await Promise.all([
     getNotificationsRepository(
       userId,
       skip,
@@ -193,62 +189,87 @@ export const getNotificationsService = async (
     ),
   ]);
 
+  const notificationsWithConversation = await Promise.all(
+  notifications.map(async (notification) => {
+    const notificationData =
+      notification.data &&
+      typeof notification.data === "object" &&
+      !Array.isArray(notification.data)
+        ? (notification.data as Prisma.JsonObject)
+        : {};
+
+    if (notification.type !== NotificationType.NEW_MATCH) {
+      return {
+        notification,
+        notificationData,
+      };
+    }
+
+    const existingConversationId =
+      notificationData.conversationId;
+
+    if (
+      typeof existingConversationId === "string" &&
+      existingConversationId.length > 0
+    ) {
+      return {
+        notification,
+        notificationData,
+      };
+    }
+
+    const matchedUserId = notification.sender_id;
+
+    const conversationId = matchedUserId
+      ? await getMatchConversationId(userId, matchedUserId)
+      : null;
+
+    return {
+      notification,
+      notificationData: {
+        ...notificationData,
+        conversationId,
+      },
+    };
+  }),
+);
+
   return {
     category,
 
-    notifications:
-      notifications.map(
-        (notification) => ({
-          id: notification.id,
+    notifications: notificationsWithConversation.map(
+  ({ notification, notificationData }) => ({
+    id: notification.id,
 
-          type:
-            notification.type,
+    type: notification.type,
 
-          title:
-            notification.title,
+    title: notification.title,
 
-          message:
-            notification.message,
+    message: notification.message,
 
-          data:
-            notification.data,
+    data: notificationData,
 
-          isRead:
-            notification.is_read,
+    isRead: notification.is_read,
 
-          readAt:
-            notification.readAt,
+    readAt: notification.readAt,
 
-          createdAt:
-            notification.created_at,
+    createdAt: notification.created_at,
 
-          sender:
-            notification.sender
-              ? {
-                id:
-                  notification
-                    .sender.id,
+    sender: notification.sender
+      ? {
+          id: notification.sender.id,
 
-                name:
-                  notification
-                    .sender
-                    .full_name,
+          name: notification.sender.full_name,
 
-                birthDate:
-                  notification
-                    .sender
-                    .birth_date,
+          birthDate: notification.sender.birth_date,
 
-                photo:
-                  notification
-                    .sender
-                    .photos[0]
-                    ?.media_url ??
-                  null,
-              }
-              : null,
-        }),
-      ),
+          photo:
+            notification.sender.photos[0]?.media_url ??
+            null,
+        }
+      : null,
+  }),
+),
 
     pagination: {
       page: safePage,
