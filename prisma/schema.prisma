@@ -1856,6 +1856,7 @@ model DatePlanPackage {
   pricePerPlan Decimal @db.Decimal(10, 2)
   discount     Int?
   isPopular    Boolean @default(false)
+  isBestValue  Boolean @default(false)
   isActive     Boolean @default(true)
   sortOrder    Int     @default(0)
 
@@ -2809,6 +2810,7 @@ enum MessageType {
   RELATIONSHIP_TAG_REJECTED
   RELATIONSHIP_TAG_CANCELLED
   LINK
+  GIF
 }
 
 enum NotificationType {
