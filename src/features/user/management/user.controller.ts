@@ -22,7 +22,7 @@ export const getAllUsersController = async (req: Request, res: Response) => {
   try {
     const users = await userService.getAllUsers();
 
-    console.log("users list : ", users)
+    console.log("users list : ", users);
 
     res.status(200).json({
       success: true,
@@ -39,14 +39,9 @@ export const getAllUsersController = async (req: Request, res: Response) => {
   }
 };
 
-
 // FETCH SINGLE USER
-export const getSingleUserController = async (
-  req: Request,
-  res: Response,
-) => {
+export const getSingleUserController = async (req: Request, res: Response) => {
   try {
-
     console.log("GET USER DETAILS CONTROLLER CALLED");
     const { id } = req.params;
 
@@ -57,8 +52,16 @@ export const getSingleUserController = async (
       });
     }
 
-    const user = await userService.getSingleUser(id);
+    const currentUserId = (req as any).user?.id;
 
+    if (!currentUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await userService.getSingleUser(id, currentUserId);
     return res.status(200).json({
       success: true,
       message: "User fetched successfully",

@@ -2,9 +2,7 @@ import { NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { createNotification } from "../notification/notification.service";
 import {
-  cacheSwipe,
-  checkReverseLike,
-  checkReverseLikeRedis,
+  cacheSwipe
 } from "./swipe.repository";
 import { trackBoostEvent } from "../boost/boost.tracker";
 import {
@@ -356,6 +354,7 @@ export const handleSwipe = async (data: {
       data: {
         matchId: match.id,
         userId: swiperId,
+        conversationId: result.conversationId,
         type: "MATCH",
       },
     }),
@@ -369,6 +368,7 @@ export const handleSwipe = async (data: {
       data: {
         matchId: match.id,
         userId: targetUserId,
+        conversationId: result.conversationId,
         type: "MATCH",
       },
     }),
