@@ -10,7 +10,6 @@ import {
   recordDailyFeedView,
 } from "./swipe.helper";
 
-
 const saveOrUpdateSwipe = async (
   tx: Prisma.TransactionClient,
   swiperId: string,
@@ -186,6 +185,8 @@ export const handleSwipe = async (data: {
         );
         return {
           matched: true,
+          isNewMatch: false,
+          sNewMatch: true,
           updated: swipeResult.updated,
           previousAction: swipeResult.previousAction,
           match: existingMatch,
@@ -209,7 +210,9 @@ export const handleSwipe = async (data: {
 
       return {
         matched: true,
+        sNewMatch: true,
         updated: swipeResult.updated,
+        isNewMatch: true,
         previousAction: swipeResult.previousAction,
         match,
         conversationId,
@@ -344,7 +347,10 @@ export const handleSwipe = async (data: {
   // 6. MATCH NOTIFICATIONS
   // ============================================================
 
-  Promise.all([
+// SEND MATCH NOTIFICATION ONLY ONCE
+if (result.isNewMatch === true) {
+  await Promise.all([
+    // Notification to User A
     createNotification({
       senderId: swiperId,
       receiverId: targetUserId,
@@ -353,12 +359,13 @@ export const handleSwipe = async (data: {
       message: `You and ${swiperName} matched! ❤️`,
       data: {
         matchId: match.id,
-        userId: swiperId,
         conversationId: result.conversationId,
+        userId: swiperId,
         type: "MATCH",
       },
     }),
 
+    // Notification to User B
     createNotification({
       senderId: targetUserId,
       receiverId: swiperId,
@@ -367,12 +374,13 @@ export const handleSwipe = async (data: {
       message: `You and ${targetUserName} matched! ❤️`,
       data: {
         matchId: match.id,
-        userId: targetUserId,
         conversationId: result.conversationId,
+        userId: targetUserId,
         type: "MATCH",
       },
     }),
-  ]).catch(console.error);
+  ]);
+}
 
   // ============================================================
   // 7. GET PRIMARY PROFILE PHOTOS
