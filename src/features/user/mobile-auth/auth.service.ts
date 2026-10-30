@@ -867,40 +867,52 @@ const handleVerifiedUser = async ({
 ========================================================= */
 
 export const logoutService = async (userId: string, sessionId: string) => {
-  // =====================================================
-  // FIND ACTIVE SESSION
-  // =====================================================
+  return await prisma.$transaction(async (tx) => {
+    // 1. Lock user to prevent concurrent login/logout updates
+    await tx.$queryRaw`
+      SELECT id FROM users
+      WHERE id = ${userId}::uuid
+      FOR UPDATE
+    `;
 
-  const session = await prisma.userSession.findFirst({
-    where: {
-      id: sessionId,
-      userId,
-      isActive: true,
-    },
+    // 2. Find active session
+    const session = await tx.userSession.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+        isActive: true,
+      },
+    });
+
+    if (!session) {
+      throw new Error("Session not found or already logged out");
+    }
+
+    // 3. Deactivate session
+    await tx.userSession.update({
+      where: {
+        id: sessionId,
+      },
+      data: {
+        isActive: false,
+        logoutAt: new Date(),
+      },
+    });
+
+    // 4. Remove FCM device token
+    await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        device_token: null,
+      },
+    });
+
+    return {
+      message: "Logged out successfully",
+    };
   });
-
-  if (!session) {
-    throw new Error("Session not found or already logged out");
-  }
-
-  // =====================================================
-  // DEACTIVATE SESSION
-  // =====================================================
-
-  await prisma.userSession.update({
-    where: {
-      id: sessionId,
-    },
-
-    data: {
-      isActive: false,
-      logoutAt: new Date(),
-    },
-  });
-
-  return {
-    message: "Logged out successfully",
-  };
 };
 
 // import https from "https";

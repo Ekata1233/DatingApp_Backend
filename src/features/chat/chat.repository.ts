@@ -1205,6 +1205,13 @@ export const chatRepository = {
                   : "🌹 You received a Rose";
               break;
 
+            case MessageType.GIF:
+              displayContent =
+                message.senderId === userId
+                  ? "🌹 You sent a GIF"
+                  : "🌹 You received a GIF";
+              break;
+
             case MessageType.COMPLIMENT:
               displayContent =
                 message.senderId === userId

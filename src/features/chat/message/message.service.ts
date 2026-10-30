@@ -41,130 +41,100 @@ export const messageService = {
       throw new Error("You are not a participant of this conversation");
     }
 
-// ==========================================
-// GIFT MESSAGE HANDLER
-// ==========================================
+    // ==========================================
+    // GIFT MESSAGE HANDLER
+    // ==========================================
 
-if (data.messageType === MessageType.GIFT) {
-  const metadata = data.metadata;
+    if (data.messageType === MessageType.GIFT) {
+      const metadata = data.metadata;
 
-  console.log("metadata : ", metadata)
-  // 1. Validate metadata is a plain JSON object
-  if (
-    !metadata ||
-    typeof metadata !== "object" ||
-    Array.isArray(metadata) ||
-    "toJSON" in metadata
-  ) {
-    throw new AppError(
-      400,
-      "GIFT_METADATA_REQUIRED"
-    );
-  }
+      console.log("metadata : ", metadata);
+      // 1. Validate metadata is a plain JSON object
+      if (
+        !metadata ||
+        typeof metadata !== "object" ||
+        Array.isArray(metadata) ||
+        "toJSON" in metadata
+      ) {
+        throw new AppError(400, "GIFT_METADATA_REQUIRED");
+      }
 
-  // 2. Convert to a safely accessible object
-  const giftMetadata = metadata as Record<string, unknown>;
+      // 2. Convert to a safely accessible object
+      const giftMetadata = metadata as Record<string, unknown>;
 
-  // 3. Extract giftId
-  const giftId = giftMetadata.giftId;
+      // 3. Extract giftId
+      const giftId = giftMetadata.giftId;
 
-const parsedGiftId =
-  typeof giftId === "number"
-    ? giftId
-    : typeof giftId === "string" && giftId.trim()
-      ? Number(giftId)
-      : NaN;
+      const parsedGiftId =
+        typeof giftId === "number"
+          ? giftId
+          : typeof giftId === "string" && giftId.trim()
+            ? Number(giftId)
+            : NaN;
 
-if (
-  !Number.isSafeInteger(parsedGiftId) ||
-  parsedGiftId <= 0
-) {
-  throw new AppError(
-    400,
-    "INVALID_GIFT_ID: Expected numeric catalog Gift.id"
-  );
-}
+      if (!Number.isSafeInteger(parsedGiftId) || parsedGiftId <= 0) {
+        throw new AppError(
+          400,
+          "INVALID_GIFT_ID: Expected numeric catalog Gift.id",
+        );
+      }
 
-  // 4. Extract optional target information
-  const targetType = giftMetadata.targetType ?? null;
-  const targetId = giftMetadata.targetId ?? null;
+      // 4. Extract optional target information
+      const targetType = giftMetadata.targetType ?? null;
+      const targetId = giftMetadata.targetId ?? null;
 
-  // 5. Validate targetType
-  if (
-    targetType !== null &&
-    targetType !== "PHOTO" &&
-    targetType !== "PROMPT"
-  ) {
-    throw new AppError(
-      400,
-      "INVALID_TARGET_TYPE"
-    );
-  }
+      // 5. Validate targetType
+      if (
+        targetType !== null &&
+        targetType !== "PHOTO" &&
+        targetType !== "PROMPT"
+      ) {
+        throw new AppError(400, "INVALID_TARGET_TYPE");
+      }
 
-  // 6. Validate targetId
-  if (
-    targetId !== null &&
-    (
-      typeof targetId !== "string" ||
-      !targetId.trim()
-    )
-  ) {
-    throw new AppError(
-      400,
-      "INVALID_TARGET_ID"
-    );
-  }
+      // 6. Validate targetId
+      if (
+        targetId !== null &&
+        (typeof targetId !== "string" || !targetId.trim())
+      ) {
+        throw new AppError(400, "INVALID_TARGET_ID");
+      }
 
-  // 7. Validate target combination
-  if (
-    (targetType === "PHOTO" ||
-      targetType === "PROMPT") &&
-    !targetId
-  ) {
-    throw new AppError(
-      400,
-      "TARGET_ID_REQUIRED"
-    );
-  }
+      // 7. Validate target combination
+      if ((targetType === "PHOTO" || targetType === "PROMPT") && !targetId) {
+        throw new AppError(400, "TARGET_ID_REQUIRED");
+      }
 
-  if (targetId && !targetType) {
-    throw new AppError(
-      400,
-      "TARGET_ID_NOT_ALLOWED"
-    );
-  }
+      if (targetId && !targetType) {
+        throw new AppError(400, "TARGET_ID_NOT_ALLOWED");
+      }
 
-  // 8. Find receiver
-  const receiver =
-    await messageRepository.findOtherParticipant(
-      data.conversationId,
-      data.userId
-    );
+      // 8. Find receiver
+      const receiver = await messageRepository.findOtherParticipant(
+        data.conversationId,
+        data.userId,
+      );
 
-  if (!receiver) {
-    throw new AppError(
-      404,
-      "RECEIVER_NOT_FOUND"
-    );
-  }
+      if (!receiver) {
+        throw new AppError(404, "RECEIVER_NOT_FOUND");
+      }
 
-  // 9. Send gift
-  const result = await sendSocketGiftMessage({
-    conversationId: data.conversationId,
-    senderId: data.userId,
-    receiverId: receiver.userId,
+      // 9. Send gift
+      const result = await sendSocketGiftMessage({
+        conversationId: data.conversationId,
+        senderId: data.userId,
+        receiverId: receiver.userId,
 
-    giftId: String(parsedGiftId),
+        giftId: String(parsedGiftId),
 
-    content: data.content?.trim() || null,
+        content: data.content?.trim() || null,
 
-    targetType,
-    targetId: targetId?.trim() ?? null,
-  });
+        targetType,
+        targetId: targetId?.trim() ?? null,
+      });
 
-  return result.data.message;
-}
-
+      return result.data.message;
+    }
 
     /**
      * 2. Validate message content.
@@ -391,6 +361,10 @@ if (
 
             case MessageType.FILE:
               notificationMessage = "Sent you a file";
+              break;
+
+            case MessageType.GIF:
+              notificationMessage = "Sent you a GIF";
               break;
 
             case MessageType.LINK:

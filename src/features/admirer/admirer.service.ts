@@ -231,7 +231,7 @@ export const getAdmirers = async ({
   // COMBINE MATCHED + CONVERSATION USERS
   // ==========================================
 
-  const excludedSentUserIds = [
+  const excludedUserIds = [
     ...new Set([...matchedUserIds, ...conversationUserIds]),
   ];
   // ==========================================
@@ -245,7 +245,7 @@ export const getAdmirers = async ({
       action: "LIKE",
       isMutual: false,
       swiperId: {
-        notIn: matchedUserIds,
+        notIn: excludedUserIds,
       },
       swiper: {
         deleted_at: null,
@@ -260,11 +260,12 @@ export const getAdmirers = async ({
   const where: Prisma.UserSwipeWhereInput = {
     action: "LIKE",
     isMutual: false,
+
     ...(direction === "RECEIVED"
       ? {
           targetUserId: userId,
           swiperId: {
-            notIn: matchedUserIds,
+            notIn: excludedUserIds,
           },
           swiper: {
             deleted_at: null,
@@ -273,7 +274,7 @@ export const getAdmirers = async ({
       : {
           swiperId: userId,
           targetUserId: {
-            notIn: excludedSentUserIds,
+            notIn: excludedUserIds,
           },
           targetUser: {
             deleted_at: null,

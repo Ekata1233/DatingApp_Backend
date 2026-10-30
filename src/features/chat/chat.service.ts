@@ -95,44 +95,69 @@ export const chatService = {
       ? sortedConversations.slice(0, data.limit)
       : sortedConversations;
 
-// ============================================
-// DATE PLAN DECLINED REQUEST CHECK
-// ============================================
+    // ============================================
+    // DYNAMIC MATCH SCORE - REDIS + PRISMA
+    // ============================================
 
-const declinedRequests =
-  data.planId && items.length > 0
-    ? await prisma.datePlanRequest.findMany({
-        where: {
-          planId: data.planId,
+    // Get unique target user IDs from current page
+    const targetUserIds = [
+      ...new Set(items.map((conversation) => conversation.user.id)),
+    ];
 
-          plan: {
-            userId: data.userId,
-          },
+    // Calculate compatibility between logged-in user
+    // and all conversation users
+    const matchScoreMap =
+      targetUserIds.length > 0
+        ? await getMatchScoresForUsers(data.userId, targetUserIds)
+        : new Map<string, { score: number; percentage: number }>();
 
-          requesterId: {
-            in: items.map(
-              (conversation) => conversation.user.id,
-            ),
-          },
+    // ============================================
+    // DATE PLAN DECLINED REQUEST CHECK
+    // ============================================
 
-          status: "DECLINED",
-        },
+    const declinedRequests =
+      data.planId && items.length > 0
+        ? await prisma.datePlanRequest.findMany({
+            where: {
+              planId: data.planId,
 
-        select: {
-          requesterId: true,
-        },
-      })
-    : [];
+              plan: {
+                userId: data.userId,
+              },
 
-const declinedUserIds = new Set(
-  declinedRequests.map(
-    (request) => request.requesterId,
-  ),
-);
+              requesterId: {
+                in: items.map((conversation) => conversation.user.id),
+              },
 
-const updatedItems = items.map((conversation) => ({
+              status: "DECLINED",
+            },
+
+            select: {
+              requesterId: true,
+            },
+          })
+        : [];
+
+    const declinedUserIds = new Set(
+      declinedRequests.map((request) => request.requesterId),
+    );
+
+   const updatedItems = items.map((conversation) => ({
   ...conversation,
 
+  // ============================================
+  // USER DETAILS WITH DYNAMIC MATCH SCORE
+  // ============================================
+  user: {
+    ...conversation.user,
+
+    matchPercentage:
+      matchScoreMap.get(conversation.user.id)?.percentage ?? 0,
+  },
+
+  // ============================================
+  // DATE PLAN INVITE BUTTON
+  // ============================================
   isDateInviteDisabled: data.planId
     ? declinedUserIds.has(conversation.user.id)
     : false,
@@ -143,13 +168,13 @@ const updatedItems = items.map((conversation) => ({
       : null;
 
     return {
-  items: updatedItems,
-  counts,
-  pagination: {
-    hasMore,
-    nextCursor,
-  },
-};
+      items: updatedItems,
+      counts,
+      pagination: {
+        hasMore,
+        nextCursor,
+      },
+    };
   },
 
   /**
@@ -509,6 +534,10 @@ const updatedItems = items.map((conversation) => ({
 
           case MessageType.FILE:
             notificationMessage = "Sent you a file";
+            break;
+
+            case MessageType.GIF:
+            notificationMessage = "Sent you a GIF";
             break;
 
           case MessageType.LINK:
