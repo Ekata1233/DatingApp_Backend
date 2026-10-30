@@ -706,7 +706,7 @@ export const endRelationshipController = async (
     return res.status(200).json({
       success: true,
       message: "Relationship ended successfully",
-      data: relationship,
+      // data: relationship,
     });
   } catch (error: any) {
     console.error("END RELATIONSHIP ERROR:", error);
