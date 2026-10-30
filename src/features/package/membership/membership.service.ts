@@ -497,6 +497,12 @@ export const getMembershipInvoiceService = async (
   // ==========================================
 
   const payment = membership.payment ?? null;
+  const walletTransaction =
+  membership.walletTransaction ?? null;
+
+const isWalletPaid =
+  !payment &&
+  walletTransaction?.status === "SUCCESS";
 
   const selectedPackage =
     membership.currentPackage || membership.package;
@@ -505,7 +511,9 @@ export const getMembershipInvoiceService = async (
   // 2. PAYMENT STATUS
   // ==========================================
 
-  const invoiceStatus = !payment
+const invoiceStatus = isWalletPaid
+  ? "PAID"
+  : !payment
     ? "PENDING"
     : payment.status === "COMPLETED"
       ? "PAID"
@@ -518,10 +526,11 @@ export const getMembershipInvoiceService = async (
   // Actual paid amount is zero if payment
   // does not exist or is not completed.
 
-  const totalPaid =
-    payment?.status === "COMPLETED"
-      ? Number(payment.amount ?? membership.purchasePrice ?? 0)
-      : 0;
+ const totalPaid = isWalletPaid
+  ? Number(walletTransaction!.amount)
+  : payment?.status === "COMPLETED"
+    ? Number(payment.amount ?? membership.purchasePrice ?? 0)
+    : 0;
 
   // Invoice amount from membership purchase price
 
@@ -545,18 +554,26 @@ export const getMembershipInvoiceService = async (
   // 4. DATE
   // ==========================================
 
-  const invoiceDate =
-    payment?.paidAt ||
+const invoiceDate = isWalletPaid
+  ? walletTransaction!.createdAt
+  : payment?.paidAt ||
     payment?.created_at ||
     membership.createdAt;
 
-  const paidAt = payment?.paidAt ?? null;
+const paidAt = isWalletPaid
+  ? walletTransaction!.createdAt
+  : payment?.paidAt ?? null;
 
   // ==========================================
   // 5. PAYMENT METHOD
   // ==========================================
 
-  const paymentMethod = payment
+const paymentMethod = isWalletPaid
+  ? {
+      type: "WALLET",
+      displayValue: "Welvors Wallet",
+    }
+  : payment
     ? extractPaymentMethod(payment.gatewayResponse)
     : {
         type: null,
@@ -655,8 +672,9 @@ export const getMembershipInvoiceService = async (
       gatewayPaymentId:
         payment?.payment_id ?? null,
 
-      transactionId:
-        payment?.transactionId ?? null,
+      transactionId: isWalletPaid
+  ? walletTransaction!.id
+  : payment?.transactionId ?? null,
 
       method: paymentMethod.type,
 
