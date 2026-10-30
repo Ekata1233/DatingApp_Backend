@@ -42,20 +42,53 @@ export const trackBoostEvent = async ({
   eventType,
 }: TrackBoostEventInput) => {
 
+  console.log("\n========== TRACK BOOST EVENT ==========");
+
+  console.log("[TRACK] Boosted User ID:", boostedUserId);
+  console.log("[TRACK] Actor ID:", actorId);
+  console.log("[TRACK] Event Type:", eventType);
+  console.log("[TRACK] Current Time:", new Date().toISOString());
+
   // Don't track own actions
   if (actorId && actorId === boostedUserId) {
+    console.log("[TRACK SKIPPED] User cannot track own action");
     return;
   }
 
-  // Find active boost
+  console.log("[TRACK] Searching for active Boost...");
+
   const usage =
     await findActiveBoostUsageRepository(boostedUserId);
 
+  console.log(
+    "[TRACK] Active Boost Result:",
+    usage
+      ? {
+          id: usage.id,
+          userId: usage.user_id,
+          status: usage.status,
+          isActive: usage.is_active,
+          boostType: usage.boost_type,
+          startedAt: usage.started_at,
+          expectedEndAt: usage.expected_end_at,
+          currentInterests: usage.total_interests,
+        }
+      : null
+  );
+
   if (!usage) {
+    console.log(
+      "[TRACK SKIPPED] No active Boost found for user:",
+      boostedUserId
+    );
     return;
   }
 
+  console.log("[TRACK] Active Boost found:", usage.id);
+
   const hour = getHourStart();
+
+  // Keep your existing prisma.$transaction below.
 
   await prisma.$transaction(async (tx) => {
 
@@ -63,11 +96,12 @@ export const trackBoostEvent = async ({
     // SAVE RAW EVENT
     // =========================================
 
-    await createBoostEventRepository(tx, {
-      boostUsageId: usage.id,
-      actorId,
-      eventType,
-    });
+   await createBoostEventRepository(tx, {
+  boostUsageId: usage.id,
+  boostedUserId,
+  actorId,
+  eventType,
+});
 
     // =========================================
     // IMPRESSION
@@ -180,21 +214,40 @@ export const trackBoostEvent = async ({
     // INTEREST
     // =========================================
 
-    if (eventType === BoostEventType.INTEREST) {
+   if (eventType === BoostEventType.INTEREST) {
 
-      await incrementBoostUsageRepository(
-        tx,
-        usage.id,
-        "total_interests"
-      );
+  console.log("[INTEREST] Starting interest counter update");
 
-      await upsertHourlyStatRepository(
-        tx,
-        usage.id,
-        hour,
-        "interests"
-      );
-    }
+  console.log("[INTEREST] Boost Usage ID:", usage.id);
+
+  console.log(
+    "[INTEREST] Before Count:",
+    usage.total_interests
+  );
+
+  const updatedUsage =
+    await incrementBoostUsageRepository(
+      tx,
+      usage.id,
+      "total_interests"
+    );
+
+  console.log(
+    "[INTEREST] After Count:",
+    updatedUsage.total_interests
+  );
+
+  console.log("[INTEREST] Updating hourly statistics...");
+
+  await upsertHourlyStatRepository(
+    tx,
+    usage.id,
+    hour,
+    "interests"
+  );
+
+  console.log("[INTEREST] Hourly statistics updated");
+}
 
     // =========================================
     // MATCH
@@ -216,6 +269,9 @@ export const trackBoostEvent = async ({
       );
     }
   });
+
+  console.log("[TRACK SUCCESS] Boost transaction committed");
+console.log("=======================================\n");
 };
 
 export const getBoostHistoryService = async (
