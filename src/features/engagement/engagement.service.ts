@@ -1,4 +1,5 @@
 import {
+  BoostEventType,
   MessageType,
   Prisma,
   PrismaClient,
@@ -20,6 +21,7 @@ import { createBundleGift } from "../gift/gift.helper";
 import { updateEngagementProgress } from "./engagement.helper";
 import { createNotification } from "../notification/notification.service";
 import { getComplimentBalance } from "../compliment/compliment.repository";
+import { trackBoostEvent } from "../boost/boostAnalytics/boostAnalytics.service";
 
 export const sendEngagementService = async (
   senderId: string,
@@ -546,7 +548,64 @@ export const sendEngagementService = async (
         remainingComplimentBalance,
       },
     };
-  });
+    });
+
+  // ============================================
+  // BOOST ANALYTICS - TRACK INTEREST
+  // ============================================
+
+  // Rose, Compliment or Gift received during
+  // an active Boost counts as one interest.
+
+ // ============================================
+// DEBUG: BOOST INTEREST TRACKING
+// ============================================
+
+console.log("\n========== BOOST INTEREST DEBUG ==========");
+
+console.log("[ENGAGEMENT] Sender ID:", senderId);
+console.log("[ENGAGEMENT] Receiver ID:", receiverId);
+
+console.log("[ENGAGEMENT] Rose:", result.data.rose);
+console.log("[ENGAGEMENT] Compliment:", result.data.compliment);
+console.log("[ENGAGEMENT] Gift:", result.data.gift);
+
+console.log("[ENGAGEMENT] Engagement successful:", result.success);
+
+if (
+  result.data.rose ||
+  result.data.compliment ||
+  result.data.gift
+) {
+  console.log(
+    "[BOOST] Engagement detected. Starting interest tracking..."
+  );
+
+  try {
+    await trackBoostEvent({
+      boostedUserId: receiverId,
+      actorId: senderId,
+      eventType: BoostEventType.INTEREST,
+    });
+
+    console.log(
+      "[BOOST] trackBoostEvent completed (check service logs for actual update)"
+    );
+
+  } catch (error) {
+    console.error(
+      "[BOOST ERROR] Interest tracking failed:",
+      error
+    );
+  }
+
+} else {
+  console.log(
+    "[BOOST] No Rose, Compliment or Gift found. Skipping."
+  );
+}
+
+console.log("==========================================\n");
 
   const [sender, receiver] = await Promise.all([
     prisma.user.findUnique({
