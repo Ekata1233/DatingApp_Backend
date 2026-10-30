@@ -536,6 +536,10 @@ export const chatService = {
             notificationMessage = "Sent you a file";
             break;
 
+            case MessageType.GIF:
+            notificationMessage = "Sent you a GIF";
+            break;
+
           case MessageType.LINK:
             notificationMessage = data.content?.trim() || "Sent you a link";
             break;

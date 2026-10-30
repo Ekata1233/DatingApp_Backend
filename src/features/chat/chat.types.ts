@@ -7,6 +7,7 @@ export type MessageType =
   | "AUDIO"
   | "FILE"
   | "LINK"
+  | "GIF"
   ;
 
 export interface CreateConversationInput {
