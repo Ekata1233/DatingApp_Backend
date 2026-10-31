@@ -405,6 +405,7 @@ export const chatRepository = {
             some: {
               userId,
               deletedAt: null,
+              clearedAt: null,
             },
           },
         },
@@ -436,6 +437,7 @@ export const chatRepository = {
             some: {
               userId,
               deletedAt: null,
+              clearedAt: null,
             },
           },
         },
@@ -514,6 +516,7 @@ export const chatRepository = {
             some: {
               userId,
               deletedAt: null,
+              clearedAt: null,
             },
           },
         },
@@ -557,6 +560,15 @@ export const chatRepository = {
       }
 
       where.AND = [
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+              clearedAt: null,
+            },
+          },
+        },
         {
           participants: {
             some: {
@@ -2082,8 +2094,49 @@ export const chatRepository = {
   },
 
   //DELETE CONVERSATION
-  async deleteConversationForUser(conversationId: string, userId: string) {
-    return prisma.conversationParticipant.update({
+  // async deleteConversationForUser(conversationId: string, userId: string) {
+  //   return prisma.conversationParticipant.update({
+  //     where: {
+  //       conversationId_userId: {
+  //         conversationId,
+  //         userId,
+  //       },
+  //     },
+  //     data: {
+  //       deletedAt: new Date(),
+  //     },
+  //   });
+  // },
+  async deleteConversationForUser(
+  conversationId: string,
+  userId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    // Mark existing messages as deleted for this user
+    const messages = await tx.chatMessage.findMany({
+      where: {
+        conversationId,
+        deletions: {
+          none: {
+            userId,
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await tx.chatMessageDeletion.createMany({
+      data: messages.map((message) => ({
+        messageId: message.id,
+        userId,
+      })),
+      skipDuplicates: true,
+    });
+
+    // Hide conversation only for this user
+    return tx.conversationParticipant.update({
       where: {
         conversationId_userId: {
           conversationId,
@@ -2094,7 +2147,8 @@ export const chatRepository = {
         deletedAt: new Date(),
       },
     });
-  },
+  });
+},
 
   //CLEAR ALL CHAT
   async clearChat(conversationId: string, userId: string) {
@@ -2121,6 +2175,47 @@ export const chatRepository = {
 
     return messages.length;
   },
+
+  // async clearChat(conversationId: string, userId: string) {
+  //   return prisma.$transaction(async (tx) => {
+  //     // 1. Find messages not already cleared for this user
+  //     const messages = await tx.chatMessage.findMany({
+  //       where: {
+  //         conversationId,
+  //         deletions: {
+  //           none: {
+  //             userId,
+  //           },
+  //         },
+  //       },
+  //       select: {
+  //         id: true,
+  //       },
+  //     });
+
+  //     // 2. Hide old messages only for this user
+  //     const result = await tx.chatMessageDeletion.createMany({
+  //       data: messages.map((message) => ({
+  //         messageId: message.id,
+  //         userId,
+  //       })),
+  //       skipDuplicates: true,
+  //     });
+
+  //     // 3. Hide conversation only for this user
+  //     await tx.conversationParticipant.updateMany({
+  //       where: {
+  //         conversationId,
+  //         userId,
+  //       },
+  //       data: {
+  //         clearedAt: new Date(),
+  //       },
+  //     });
+
+  //     return result.count;
+  //   });
+  // },
 
   async findEventById(eventId: string) {
     return prisma.event.findUnique({

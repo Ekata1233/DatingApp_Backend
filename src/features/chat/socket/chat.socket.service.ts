@@ -304,6 +304,7 @@ if (payload.messageType === MessageType.GIFT) {
       interactionResult = await incrementRoseAndGiftMessages(
         userId,
         receiverId,
+         payload.conversationId,
       );
 
       if (
