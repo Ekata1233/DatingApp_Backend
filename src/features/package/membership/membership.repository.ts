@@ -1,8 +1,10 @@
+
 import {
   PackageStatus,
   PaymentPurpose,
   PaymentStatus,
 } from "@prisma/client";
+
 import { prisma } from "../../../prisma/prismaClient";
 
 /**
@@ -165,11 +167,18 @@ export const getTotalMembershipPaid = async (userId: string) => {
   });
 };
 
+/**
+ * Get membership invoice details.
+ *
+ * Existing gateway payment logic is unchanged.
+ * Additional wallet transaction lookup is used
+ * for successful wallet purchases.
+ */
 export const findMembershipInvoiceById = async (
   userId: string,
   userPackageId: string,
 ) => {
-  return prisma.userPackage.findFirst({
+  const membership = await prisma.userPackage.findFirst({
     where: {
       id: userPackageId,
       user_id: userId,
@@ -229,4 +238,46 @@ export const findMembershipInvoiceById = async (
       },
     },
   });
+
+  if (!membership) {
+    return null;
+  }
+
+  // ==========================================
+  // WALLET TRANSACTION LOOKUP
+  // ==========================================
+
+  const walletTransaction =
+    await prisma.walletTransaction.findFirst({
+      where: {
+        wallet: {
+          userId: userId,
+        },
+
+        type: "PURCHASE",
+
+        status: "SUCCESS",
+
+        source: "PREMIUM_PLAN",
+
+        referenceId: membership.package.id,
+
+        amount:
+          membership.purchasePrice ??
+          membership.price.price,
+      },
+
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+  // ==========================================
+  // RETURN EXISTING DATA + WALLET TRANSACTION
+  // ==========================================
+
+  return {
+    ...membership,
+    walletTransaction,
+  };
 };

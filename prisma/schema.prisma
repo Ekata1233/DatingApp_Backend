@@ -2988,7 +2988,7 @@ model Waitlist {
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   waitlistNumber     Int             @unique
   plan               WaitlistPlan    @default(FREE)
-  amountPaid         Decimal         @db.Decimal(10, 2)P
+  amountPaid         Decimal         @db.Decimal(10, 2)
   paymentStatus      PaymentStatus   @default(PENDING)
   paymentId          String?         @unique @db.Uuid
   payment            Payment?        @relation(fields: [paymentId], references: [id])
