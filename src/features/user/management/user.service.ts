@@ -9,9 +9,115 @@ import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 import { calculateAge } from "../feed/feed.service";
 
 //SERVICE LAYER FOR ALL USER MANAGEMENT
+
+import { prisma } from "../../prisma/prismaClient";
+
 export const getAllUsers = async () => {
-  return prisma.user.findMany();
+  const now = new Date();
+
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      full_name: true,
+      birth_date: true,
+      gender: true,
+      height: true,
+      trust_score: true,
+      account_status: true,
+
+      profile: {
+        select: {
+          city: true,
+        },
+      },
+
+      userPackages: {
+        where: {
+          status: "ACTIVE",
+          startDate: {
+            lte: now,
+          },
+          OR: [
+            { endDate: null },
+            { endDate: { gt: now } },
+          ],
+        },
+        select: {
+          currentPackage: {
+            select: {
+              name: true,
+            },
+          },
+          package: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          startDate: "desc",
+        },
+        take: 1,
+      },
+
+      wallet: {
+        select: {
+          balance: true,
+        },
+      },
+    },
+
+    orderBy: {
+      created_at: "desc",
+    },
+  });
+
+  return users.map((user) => {
+    let age: number | null = null;
+
+    if (user.birth_date) {
+      const today = new Date();
+      const birthDate = new Date(user.birth_date);
+
+      age =
+        today.getUTCFullYear() -
+        birthDate.getUTCFullYear();
+
+      const monthDifference =
+        today.getUTCMonth() -
+        birthDate.getUTCMonth();
+
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 &&
+          today.getUTCDate() < birthDate.getUTCDate())
+      ) {
+        age--;
+      }
+    }
+
+    const activePackage = user.userPackages[0];
+
+    const packageName =
+      activePackage?.currentPackage?.name ??
+      activePackage?.package?.name ??
+      "FREE";
+
+    return {
+      id: user.id,
+      userName: user.full_name,
+      city: user.profile?.city ?? null,
+      gender: user.gender,
+      height: user.height,
+      age,
+      package: packageName,
+      trustScore: user.trust_score,
+      walletBalance: Number(user.wallet?.balance ?? 0),
+      status: user.account_status,
+    };
+  });
 };
+
 
 //SERVICE LAYER FOR FETCHING SINGLE USER
 
