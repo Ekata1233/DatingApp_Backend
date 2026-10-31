@@ -10,7 +10,7 @@ import { calculateAge } from "../feed/feed.service";
 
 //SERVICE LAYER FOR ALL USER MANAGEMENT
 
-import { prisma } from "../../prisma/prismaClient";
+
 
 export const getAllUsers = async () => {
   const now = new Date();
