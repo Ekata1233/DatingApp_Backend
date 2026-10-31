@@ -330,9 +330,69 @@ import { AppError } from "../rose/AppError";
 //   };
 // };
 
+const REDEEM_MESSAGE_TYPES: MessageType[] = [
+  MessageType.TEXT,
+  MessageType.IMAGE,
+  MessageType.VIDEO,
+  MessageType.AUDIO,
+  MessageType.FILE,
+];
+
+const canCountRedeemMessage = async (
+  tx: Prisma.TransactionClient,
+  conversationId: string,
+  rewardSenderId: string,
+  rewardReceiverId: string,
+  rewardCreatedAt: Date,
+): Promise<boolean> => {
+  // Fetch the most recent 4 eligible messages
+  // since the Rose/Gift was sent.
+  const recentMessages = await tx.chatMessage.findMany({
+    where: {
+      conversationId,
+      createdAt: {
+        gte: rewardCreatedAt,
+      },
+      senderId: {
+        in: [rewardSenderId, rewardReceiverId],
+      },
+      messageType: {
+        in: REDEEM_MESSAGE_TYPES,
+      },
+    },
+    select: {
+      senderId: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 4,
+  });
+
+  let consecutiveReceiverMessages = 0;
+
+  for (const message of recentMessages) {
+    // A message from the reward sender (User A)
+    // breaks User B's consecutive-message streak.
+    if (message.senderId === rewardSenderId) {
+      break;
+    }
+
+    if (message.senderId === rewardReceiverId) {
+      consecutiveReceiverMessages++;
+    }
+  }
+
+  // The current message has already been saved.
+  // Therefore, only the first 3 messages qualify.
+  return consecutiveReceiverMessages <= 3;
+};
+
+
 export const incrementRoseAndGiftMessages = async (
   senderId: string,
   receiverId: string,
+  conversationId: string,
 ) => {
   const now = new Date();
 
@@ -454,12 +514,28 @@ export const incrementRoseAndGiftMessages = async (
     // BUNDLE
     // =====================================================
 
-    if (isBundle && pendingRose && pendingGift) {
-      const newRoseMessages = pendingRose.messagesSent + 1;
+if (isBundle && pendingRose && pendingGift) {
+  const canCountRose = await canCountRedeemMessage(
+    tx,
+    conversationId,
+    pendingRose.senderId,
+    pendingRose.receiverId,
+    pendingRose.createdAt,
+  );
 
-      const newGiftMessages = pendingGift.messagesSent + 1;
+  const canCountGift = await canCountRedeemMessage(
+    tx,
+    conversationId,
+    pendingGift.senderId,
+    pendingGift.receiverId,
+    pendingGift.createdAt,
+  );
 
-      console.log("new gift messge sent count : ", newGiftMessages);
+  const newRoseMessages =
+    pendingRose.messagesSent + (canCountRose ? 1 : 0);
+
+  const newGiftMessages =
+    pendingGift.messagesSent + (canCountGift ? 1 : 0);
 
       // -----------------------------------------
       // Update progress first
@@ -533,8 +609,24 @@ export const incrementRoseAndGiftMessages = async (
     // GIFT
     // =====================================================
 
-    if (rewardType === "gift") {
-      const newMessagesSent = pendingGift!.messagesSent + 1;
+if (rewardType === "gift") {
+  const canCount = await canCountRedeemMessage(
+    tx,
+    conversationId,
+    pendingGift!.senderId,
+    pendingGift!.receiverId,
+    pendingGift!.createdAt,
+  );
+
+  if (!canCount) {
+    return {
+      rose: null,
+      gift: pendingGift!,
+      redeemed: [],
+    };
+  }
+
+  const newMessagesSent = pendingGift!.messagesSent + 1;
 
       let gift = await tx.userGift.update({
         where: {
@@ -571,8 +663,23 @@ export const incrementRoseAndGiftMessages = async (
     // ROSE
     // =====================================================
 
-    const newMessagesSent = pendingRose!.messagesSent + 1;
+const canCount = await canCountRedeemMessage(
+  tx,
+  conversationId,
+  pendingRose!.senderId,
+  pendingRose!.receiverId,
+  pendingRose!.createdAt,
+);
 
+if (!canCount) {
+  return {
+    rose: pendingRose!,
+    gift: null,
+    redeemed: [],
+  };
+}
+
+const newMessagesSent = pendingRose!.messagesSent + 1;
     let rose = await tx.userRose.update({
       where: {
         id: pendingRose!.id,

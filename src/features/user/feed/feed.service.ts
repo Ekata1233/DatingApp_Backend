@@ -1007,6 +1007,16 @@ AND (
             AND s."targetUserId" = u.id
         )
 
+          AND NOT EXISTS (
+          SELECT 1
+          FROM "ConversationParticipant" cp_me
+          INNER JOIN "ConversationParticipant" cp_other
+            ON cp_other."conversationId" = cp_me."conversationId"
+          WHERE
+            cp_me."userId" = ${userId}::uuid
+            AND cp_other."userId" = u.id
+        )
+
         AND NOT EXISTS (
           SELECT 1
           FROM "UserBlock" b
