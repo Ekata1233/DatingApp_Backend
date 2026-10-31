@@ -573,39 +573,31 @@ export const discoverDatePlan = async (
       userId: {
         not: userId,
       },
+
+
 // ============================================
 // JOIN REQUEST GENDER FILTER
 // ============================================
 
-...(me.gender
-  ? {
-      OR: [
-        // Date plans open to everyone
-        {
-          joinRequestGender: {
-            is: {
-              label: {
-                equals: "Everyone",
-                mode: "insensitive" as const,
-              },
-            },
-          },
-        },
+OR: [
+  // Everyone can see these plans
+  {
+    joinRequestGender: {
+      is: {
+        value: "EVERYONE",
+      },
+    },
+  },
 
-        // Date plans matching logged-in user's gender
-        {
-          joinRequestGender: {
-            is: {
-              label: {
-                equals: me.gender.replace(/_/g, " "),
-                mode: "insensitive" as const,
-              },
-            },
-          },
-        },
-      ],
-    }
-  : {}),
+  // Match logged-in user's gender
+  {
+    joinRequestGender: {
+      is: {
+        value: me.gender ?? "EVERYONE",
+      },
+    },
+  },
+],
 
       // ============================================
       // PACKAGE-BASED DATE PLAN VISIBILITY
