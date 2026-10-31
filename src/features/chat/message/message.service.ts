@@ -133,6 +133,28 @@ export const messageService = {
         targetId: targetId?.trim() ?? null,
       });
 
+      console.log("@@@@@@@@@@@@@@@@@@@its calling");
+      await prisma.conversationParticipant.updateMany({
+        where: {
+          conversationId: data.conversationId,
+          OR: [
+            {
+              deletedAt: {
+                not: null,
+              },
+            },
+            {
+              clearedAt: {
+                not: null,
+              },
+            },
+          ],
+        },
+        data: {
+          deletedAt: null,
+          clearedAt: null,
+        },
+      });
       return result.data.message;
     }
 
@@ -205,6 +227,29 @@ export const messageService = {
       mediaUrl: data.mediaUrl,
 
       metadata: data.metadata,
+    });
+
+    console.log("@@@@@@@@@@@@@@@@@@@its calling");
+    await prisma.conversationParticipant.updateMany({
+      where: {
+        conversationId: data.conversationId,
+        OR: [
+          {
+            deletedAt: {
+              not: null,
+            },
+          },
+          {
+            clearedAt: {
+              not: null,
+            },
+          },
+        ],
+      },
+      data: {
+        deletedAt: null,
+        clearedAt: null,
+      },
     });
 
     /**

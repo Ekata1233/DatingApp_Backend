@@ -2314,6 +2314,7 @@ model ConversationParticipant {
   lastReadAt     DateTime?
   joinedAt       DateTime     @default(now())
   deletedAt      DateTime?
+  clearedAt      DateTime?
   user           User         @relation(fields: [userId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
