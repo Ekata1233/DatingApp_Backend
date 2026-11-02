@@ -574,6 +574,31 @@ export const discoverDatePlan = async (
         not: userId,
       },
 
+
+// ============================================
+// JOIN REQUEST GENDER FILTER
+// ============================================
+
+OR: [
+  // Everyone can see these plans
+  {
+    joinRequestGender: {
+      is: {
+        value: "EVERYONE",
+      },
+    },
+  },
+
+  // Match logged-in user's gender
+  {
+    joinRequestGender: {
+      is: {
+        value: me.gender ?? "EVERYONE",
+      },
+    },
+  },
+],
+
       // ============================================
       // PACKAGE-BASED DATE PLAN VISIBILITY
       // ============================================
