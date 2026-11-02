@@ -330,41 +330,6 @@ if (payload.messageType === MessageType.GIFT) {
       receiverId,
     );
 
-    // let user;
-
-    // if (isNew) {
-    //   user = await chatService.getOtherParticipantDetails(
-    //     payload.conversationId,
-    //     userId,
-    //   );
-    // }
-
-    // /**
-    //  * 5. Notify receiver's conversation list.
-    //  */
-    // io.to(`user:${receiverId}`).emit("conversation:update", {
-    //   conversationId: payload.conversationId,
-    //   isNew,
-    //   ...(isNew && {
-    //     user,
-    //   }),
-    //   lastMessage: {
-    //     id: message.id,
-    //     content: message.content,
-    //     senderId: message.senderId,
-    //     createdAt: message.createdAt,
-    //   },
-
-    //   senderId: userId,
-    //   unreadCount,
-    // });
-
-    /**
-     * 7. Get receiver details.
-     *
-     * We need this for conversation:update,
-     * especially when the conversation is new.
-     */
     const receiver = await chatService.getUserDetails(receiverId);
 
     if (!receiver) {
