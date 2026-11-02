@@ -10,6 +10,8 @@ import {
   DatePlanFeedbackStatus,
   PackageStatus,
   PackageType,
+  VerificationStatus,
+  VerificationType,
 } from "@prisma/client";
 import {
   UpdateDatePlanActivityDTO,
@@ -1016,8 +1018,37 @@ export const requestToJoinDatePlan = async (
   // EXISTING VALIDATION
   // ============================================
 
+
+
   if (plan.userId === userId) {
     throw new Error("Cannot join your own date");
+  }
+  // ============================================
+  // VERIFIED MEMBERS ONLY VALIDATION
+  // ============================================
+if (plan.verifiedMembersOnly === true) {
+    const governmentVerification =
+      await prisma.userVerification.findUnique({
+        where: {
+          userId_type: {
+            userId,
+            type: VerificationType.GOVERNMENT_ID,
+          },
+        },
+        select: {
+          status: true,
+        },
+      });
+
+    if (
+      !governmentVerification ||
+      governmentVerification.status !==
+        VerificationStatus.VERIFIED
+    ) {
+      throw new Error(
+        "Only ID-verified members can request to join this date plan. Please complete your Government ID verification first.",
+      );
+    }
   }
 
   const existing = await prisma.datePlanRequest.findUnique({
