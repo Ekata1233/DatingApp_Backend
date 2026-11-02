@@ -1952,6 +1952,7 @@ model DatePlan {
   joinRequestGenderId String?    @db.Uuid
   visibilityId        String?    @db.Uuid
   status              PlanStatus @default(DRAFT)
+  verifiedMembersOnly Boolean    @default(false)
   eventDateTime       DateTime?
   expiresAt           DateTime?
   createdAt           DateTime   @default(now())

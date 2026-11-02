@@ -398,29 +398,31 @@ export const chatRepository = {
     // 2. Build conversation WHERE condition
     // --------------------------------------------------
 
-    const where: Prisma.ConversationWhereInput = {
-      AND: [
-        {
-          participants: {
-            some: {
-              userId,
-              deletedAt: null,
-              clearedAt: null,
-            },
+   const where: Prisma.ConversationWhereInput = {
+  AND: [
+    // Current user must not have deleted or cleared chat
+    {
+      participants: {
+        some: {
+          userId,
+          deletedAt: null,
+          clearedAt: null,
+        },
+      },
+    },
+
+    // Other participant only needs to exist
+    {
+      participants: {
+        some: {
+          userId: {
+            not: userId,
           },
         },
-        {
-          participants: {
-            some: {
-              userId: {
-                not: userId,
-              },
-              deletedAt: null,
-            },
-          },
-        },
-      ],
-    };
+      },
+    },
+  ],
+};
 
     // --------------------------------------------------
     // 3. Nearby filter
@@ -609,9 +611,9 @@ export const chatRepository = {
         // --------------------------------------------------
 
         participants: {
-          where: {
-            deletedAt: null,
-          },
+          // where: {
+          //   deletedAt: null,
+          // },
 
           include: {
             user: {
@@ -1220,8 +1222,8 @@ export const chatRepository = {
             case MessageType.GIF:
               displayContent =
                 message.senderId === userId
-                  ? "🌹 You sent a GIF"
-                  : "🌹 You received a GIF";
+                  ? "🎬 You sent a GIF"
+                  : "🎬 You received a GIF";
               break;
 
             case MessageType.COMPLIMENT:
@@ -1999,8 +2001,51 @@ export const chatRepository = {
     };
   },
 
+  // async getUnreadCount(conversationId: string, userId: string) {
+  //   const participant = await prisma.conversationParticipant.findUnique({
+  //     where: {
+  //       conversationId_userId: {
+  //         conversationId,
+  //         userId,
+  //       },
+  //     },
+  //     select: {
+  //       lastReadAt: true,
+  //       deletedAt: true,
+  //     },
+  //   });
+
+  //   if (!participant) {
+  //     throw new Error("Conversation participant not found");
+  //   }
+
+  //   const unreadCount = await prisma.chatMessage.count({
+  //     where: {
+  //       conversationId,
+
+  //       // Don't count your own messages
+  //       senderId: {
+  //         not: userId,
+  //       },
+
+  //       readAt: null,
+  //       // Messages after the user's last read time
+  //       ...(participant.lastReadAt
+  //         ? {
+  //             createdAt: {
+  //               gt: participant.lastReadAt,
+  //             },
+  //           }
+  //         : {}),
+  //     },
+  //   });
+
+  //   return unreadCount;
+  // },
+
   async getUnreadCount(conversationId: string, userId: string) {
-    const participant = await prisma.conversationParticipant.findUnique({
+  const participant =
+    await prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {
           conversationId,
@@ -2009,36 +2054,41 @@ export const chatRepository = {
       },
       select: {
         lastReadAt: true,
+        deletedAt: true,
       },
     });
 
-    if (!participant) {
-      throw new Error("Conversation participant not found");
-    }
+  if (!participant) {
+    throw new Error("Conversation participant not found");
+  }
 
-    const unreadCount = await prisma.chatMessage.count({
-      where: {
-        conversationId,
+  const unreadCount = await prisma.chatMessage.count({
+    where: {
+      conversationId,
 
-        // Don't count your own messages
-        senderId: {
-          not: userId,
+      senderId: {
+        not: userId,
+      },
+
+      readAt: null,
+
+      ...(participant.lastReadAt && {
+        createdAt: {
+          gt: participant.lastReadAt,
         },
+      }),
 
-        readAt: null,
-        // Messages after the user's last read time
-        ...(participant.lastReadAt
-          ? {
-              createdAt: {
-                gt: participant.lastReadAt,
-              },
-            }
-          : {}),
+      // Exclude messages deleted only for this user
+      deletions: {
+        none: {
+          userId,
+        },
       },
-    });
+    },
+  });
 
-    return unreadCount;
-  },
+  return unreadCount;
+},
 
   async findConversationParticipants(conversationId: string, userId: string) {
     return prisma.conversationParticipant.findMany({
@@ -2107,48 +2157,45 @@ export const chatRepository = {
   //     },
   //   });
   // },
-  async deleteConversationForUser(
-  conversationId: string,
-  userId: string,
-) {
-  return prisma.$transaction(async (tx) => {
-    // Mark existing messages as deleted for this user
-    const messages = await tx.chatMessage.findMany({
-      where: {
-        conversationId,
-        deletions: {
-          none: {
+  async deleteConversationForUser(conversationId: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      // Mark existing messages as deleted for this user
+      const messages = await tx.chatMessage.findMany({
+        where: {
+          conversationId,
+          deletions: {
+            none: {
+              userId,
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      await tx.chatMessageDeletion.createMany({
+        data: messages.map((message) => ({
+          messageId: message.id,
+          userId,
+        })),
+        skipDuplicates: true,
+      });
+
+      // Hide conversation only for this user
+      return tx.conversationParticipant.update({
+        where: {
+          conversationId_userId: {
+            conversationId,
             userId,
           },
         },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    await tx.chatMessageDeletion.createMany({
-      data: messages.map((message) => ({
-        messageId: message.id,
-        userId,
-      })),
-      skipDuplicates: true,
-    });
-
-    // Hide conversation only for this user
-    return tx.conversationParticipant.update({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
+        data: {
+          deletedAt: new Date(),
         },
-      },
-      data: {
-        deletedAt: new Date(),
-      },
+      });
     });
-  });
-},
+  },
 
   //CLEAR ALL CHAT
   async clearChat(conversationId: string, userId: string) {
