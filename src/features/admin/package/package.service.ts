@@ -191,6 +191,7 @@ const features = await prisma.packageFeature.findMany({
 });
 
 console.log("STATUS BADGES:", features);
+
   return pkg;
 };
 
