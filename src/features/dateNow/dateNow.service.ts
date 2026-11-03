@@ -10,6 +10,8 @@ import {
   DatePlanFeedbackStatus,
   PackageStatus,
   PackageType,
+  VerificationStatus,
+  VerificationType,
 } from "@prisma/client";
 import {
   UpdateDatePlanActivityDTO,
@@ -76,25 +78,25 @@ export const updateDraftDatePlan = async (
 
   const { vibeIds, eventDate, eventTime, activityId, ...planData } = payload;
   let eventDateTime: Date | undefined;
-// ============================================
-// VALIDATE EVENT DATE AND TIME
-// ============================================
+  // ============================================
+  // VALIDATE EVENT DATE AND TIME
+  // ============================================
 
-if (eventDate && eventTime) {
-  eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
+  if (eventDate && eventTime) {
+    eventDateTime = new Date(`${eventDate}T${eventTime}:00`);
 
-  // Check invalid date
-  if (isNaN(eventDateTime.getTime())) {
-    throw new Error("Invalid event date or time.");
+    // Check invalid date
+    if (isNaN(eventDateTime.getTime())) {
+      throw new Error("Invalid event date or time.");
+    }
+
+    // Prevent past date and time
+    if (eventDateTime.getTime() <= Date.now()) {
+      throw new Error(
+        "You cannot select a past date or time. Please select a future date and time.",
+      );
+    }
   }
-
-  // Prevent past date and time
-  if (eventDateTime.getTime() <= Date.now()) {
-    throw new Error(
-      "You cannot select a past date or time. Please select a future date and time.",
-    );
-  }
-}
 
   const updatedPlan = await prisma.$transaction(async (tx) => {
     await tx.datePlan.update({
@@ -205,21 +207,21 @@ export const publishDatePlan = async (planId: string, userId: string) => {
     if (plan.status === PlanStatus.ACTIVE) {
       throw new Error("Plan is already published");
     }
-// ============================================
-// VALIDATE EVENT DATE AND TIME
-// ============================================
+    // ============================================
+    // VALIDATE EVENT DATE AND TIME
+    // ============================================
 
-if (!plan.eventDateTime) {
-  throw new Error(
-    "Please select a date and time before publishing the date plan.",
-  );
-}
+    if (!plan.eventDateTime) {
+      throw new Error(
+        "Please select a date and time before publishing the date plan.",
+      );
+    }
 
-if (plan.eventDateTime.getTime() <= Date.now()) {
-  throw new Error(
-    "You cannot publish a date plan with a past date or time. Please select a future date and time.",
-  );
-}
+    if (plan.eventDateTime.getTime() <= Date.now()) {
+      throw new Error(
+        "You cannot publish a date plan with a past date or time. Please select a future date and time.",
+      );
+    }
     // ============================================
     // 2. GET USER DATE PLAN STATS
     // ============================================
@@ -575,6 +577,30 @@ export const discoverDatePlan = async (
       },
 
       // ============================================
+      // JOIN REQUEST GENDER FILTER
+      // ============================================
+
+      OR: [
+        // Everyone can see these plans
+        {
+          joinRequestGender: {
+            is: {
+              value: "EVERYONE",
+            },
+          },
+        },
+
+        // Match logged-in user's gender
+        {
+          joinRequestGender: {
+            is: {
+              value: me.gender ?? "EVERYONE",
+            },
+          },
+        },
+      ],
+
+      // ============================================
       // PACKAGE-BASED DATE PLAN VISIBILITY
       // ============================================
 
@@ -680,39 +706,33 @@ export const discoverDatePlan = async (
     },
   });
 
- console.log("[DATE DISCOVER] Eligible plans:", plans.length);
+  console.log("[DATE DISCOVER] Eligible plans:", plans.length);
 
-// ============================================
-// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
-// ============================================
+  // ============================================
+  // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+  // ============================================
 
-// Extract unique host IDs.
-// One host may have multiple date plans.
-const hostUserIds = [
-  ...new Set(plans.map((plan) => plan.userId)),
-];
+  // Extract unique host IDs.
+  // One host may have multiple date plans.
+  const hostUserIds = [...new Set(plans.map((plan) => plan.userId))];
 
-// Calculate scores once for all unique hosts.
-const matchScoreStart = performance.now();
+  // Calculate scores once for all unique hosts.
+  const matchScoreStart = performance.now();
 
-const matchScoreMap = await getMatchScoresForUsers(
-  userId,
-  hostUserIds,
-);
+  const matchScoreMap = await getMatchScoresForUsers(userId, hostUserIds);
 
-console.log(
-  "[DATE DISCOVER] Dynamic match scores:",
-  performance.now() - matchScoreStart,
-  "ms",
-);
+  console.log(
+    "[DATE DISCOVER] Dynamic match scores:",
+    performance.now() - matchScoreStart,
+    "ms",
+  );
 
-// ============================================
-// CALCULATE SCORE AND DISTANCE
-// ============================================
+  // ============================================
+  // CALCULATE SCORE AND DISTANCE
+  // ============================================
 
-const ranked = plans.map((plan) => {
-  const matchScore =
-    matchScoreMap.get(plan.userId)?.percentage ?? 0;
+  const ranked = plans.map((plan) => {
+    const matchScore = matchScoreMap.get(plan.userId)?.percentage ?? 0;
 
     let distanceKm: number | null = null;
 
@@ -951,18 +971,28 @@ export const requestToJoinDatePlan = async (
     },
   });
 
-  console.log("Plan found:", planId);
-  console.log("User details:", userId);
-
   if (!plan) {
     throw new Error("Date plan not found");
   }
 
   // ============================================
-  // CHECK USER ACTIVE PURCHASED PACKAGE
+  // DATE PLAN EVENT DATE & TIME VALIDATION
   // ============================================
 
   const now = new Date();
+
+  if (plan.eventDateTime) {
+    const eventDateTime = new Date(plan.eventDateTime);
+
+    if (eventDateTime.getTime() <= now.getTime()) {
+      throw new Error(
+        "You cannot send a join request because the scheduled date and time have passed.",
+      );
+    }
+  }
+  // ============================================
+  // CHECK USER ACTIVE PURCHASED PACKAGE
+  // ============================================
 
   const activePackage = await prisma.userPackage.findFirst({
     where: {
@@ -999,6 +1029,31 @@ export const requestToJoinDatePlan = async (
 
   if (plan.userId === userId) {
     throw new Error("Cannot join your own date");
+  }
+  // ============================================
+  // VERIFIED MEMBERS ONLY VALIDATION
+  // ============================================
+  if (plan.verifiedMembersOnly === true) {
+    const governmentVerification = await prisma.userVerification.findUnique({
+      where: {
+        userId_type: {
+          userId,
+          type: VerificationType.GOVERNMENT_ID,
+        },
+      },
+      select: {
+        status: true,
+      },
+    });
+
+    if (
+      !governmentVerification ||
+      governmentVerification.status !== VerificationStatus.VERIFIED
+    ) {
+      throw new Error(
+        "Only ID-verified members can request to join this date plan. Please complete your Government ID verification first.",
+      );
+    }
   }
 
   const existing = await prisma.datePlanRequest.findUnique({
@@ -1522,14 +1577,61 @@ export const declineDatePlanRequest = async (
     throw new Error("Not authorized");
   }
 
-  return prisma.datePlanRequest.update({
-    where: {
-      id: requestId,
-    },
-    data: {
-      status: "DECLINED",
-    },
+  if (request.status !== "PENDING") {
+    throw new Error("Only pending requests can be declined");
+  }
+
+  // Requester is the receiver
+  const receiverId = request.requesterId;
+
+  // Find existing conversation
+  let conversation = await chatRepository.findConversationBetweenUsers(
+    userId,
+    receiverId,
+  );
+
+  // Create conversation if not exists
+  if (!conversation) {
+    conversation = await chatRepository.createConversation(userId, receiverId);
+  }
+
+  // Update request and create message atomically
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedRequest = await tx.datePlanRequest.update({
+      where: {
+        id: requestId,
+      },
+      data: {
+        status: "DECLINED",
+      },
+    });
+
+    const message = await tx.chatMessage.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: userId,
+        messageType: "DATE_CANCELLED",
+        content: "Your Date Plan request has been declined.",
+        metadata: {
+          event: "DATE_PLAN_REQUEST_DECLINED",
+          datePlanId: request.planId,
+          requestId: request.id,
+          status: "DECLINED",
+        },
+      },
+    });
+
+    return {
+      request: updatedRequest,
+      message,
+    };
   });
+
+  return {
+    ...result,
+    receiverId,
+    conversationId: conversation.id,
+  };
 };
 
 export const topUpDatePlanPackage = async (
@@ -1730,22 +1832,17 @@ export const getMyDatePlanRequests = async (userId: string) => {
     orderBy: {
       createdAt: "desc",
     },
-   });
+  });
 
   // ============================================
   // DYNAMIC HOST MATCH SCORE - REDIS + PRISMA
   // ============================================
 
   const hostUserIds = [
-    ...new Set(
-      requests.map((request) => request.plan.user.id),
-    ),
+    ...new Set(requests.map((request) => request.plan.user.id)),
   ];
 
-  const matchScoreMap = await getMatchScoresForUsers(
-    userId,
-    hostUserIds,
-  );
+  const matchScoreMap = await getMatchScoresForUsers(userId, hostUserIds);
 
   return requests.map((request) => ({
     id: request.id,
@@ -1800,23 +1897,40 @@ export const getMyDatePlanRequests = async (userId: string) => {
             ? request.plan.user.photos[0].media_url
             : null,
         trustScore: request.plan.user.trust_score,
-matchScore:
-    matchScoreMap.get(request.plan.user.id)?.percentage ?? 0,      },
+        matchScore: matchScoreMap.get(request.plan.user.id)?.percentage ?? 0,
+      },
     },
   }));
 };
 
 export const cancelDatePlanRequest = async (userId: string, planId: string) => {
+  // ========================================
+  // 1. FIND REQUEST WITH DATE PLAN
+  // ========================================
+
   const request = await prisma.datePlanRequest.findFirst({
     where: {
       planId,
       requesterId: userId,
+    },
+    include: {
+      plan: {
+        select: {
+          id: true,
+          userId: true,
+          title: true,
+        },
+      },
     },
   });
 
   if (!request) {
     throw new Error("Request not found");
   }
+
+  // ========================================
+  // 2. CHECK REQUEST STATUS
+  // ========================================
 
   if (request.status === "DECLINED") {
     throw new Error("Request has already been declined");
@@ -1826,14 +1940,52 @@ export const cancelDatePlanRequest = async (userId: string, planId: string) => {
     throw new Error("Request has already been cancelled");
   }
 
+  // ========================================
+  // 3. CANCEL REQUEST
+  // ========================================
+
   const cancelledRequest = await prisma.datePlanRequest.update({
     where: {
       id: request.id,
+      status: request.status,
     },
     data: {
       status: "CANCELLED",
     },
   });
+
+  // ========================================
+  // 4. SEND NOTIFICATION TO PLAN OWNER
+  // ========================================
+
+  const receiverId = request.plan.userId;
+
+  try {
+    await createNotification({
+      senderId: userId,
+      receiverId,
+      type: "DATE_CANCELLED",
+      title: "Date Plan Request Cancelled",
+      message: "A user has cancelled their request to join your Date Plan.",
+      data: {
+        type: "DATE_PLAN_REQUEST_CANCELLED",
+        planId,
+        requestId: request.id,
+        senderId: userId,
+        receiverId,
+        status: "CANCELLED",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Failed to send Date Plan request cancellation notification:",
+      error,
+    );
+  }
+
+  // ========================================
+  // 5. RETURN CANCELLED REQUEST
+  // ========================================
 
   return cancelledRequest;
 };
@@ -1969,32 +2121,32 @@ export const getDatePlanHistory = async (
 ) => {
   const page = Math.max(Number(query.page) || 1, 1);
 
-// ============================================
-// AUTO EXPIRE DATE PLAN
-// ============================================
+  // ============================================
+  // AUTO EXPIRE DATE PLAN
+  // ============================================
 
-await prisma.datePlan.updateMany({
-  where: {
-    userId,
+  await prisma.datePlan.updateMany({
+    where: {
+      userId,
 
-    status: PlanStatus.ACTIVE,
+      status: PlanStatus.ACTIVE,
 
-  eventDateTime: {
-  not: null,
-  lte: new Date(),
-},
+      eventDateTime: {
+        not: null,
+        lte: new Date(),
+      },
 
-    // Do not expire confirmed dates
-    DateConfirmed: {
-      none: {},
+      // Do not expire confirmed dates
+      DateConfirmed: {
+        none: {},
+      },
     },
-  },
 
-  data: {
-    status: PlanStatus.EXPIRED,
-    expiresAt: new Date(),
-  },
-});
+    data: {
+      status: PlanStatus.EXPIRED,
+      expiresAt: new Date(),
+    },
+  });
 
   const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
@@ -2958,11 +3110,7 @@ export const updateDatePlanActivityService = async (
   return updatedPlan;
 };
 
-
-export const cancelDatePlanService = async (
-  userId: string,
-  planId: string,
-) => {
+export const cancelDatePlanService = async (userId: string, planId: string) => {
   // 1. Check if date plan exists
   const datePlan = await prisma.datePlan.findUnique({
     where: {
@@ -2976,16 +3124,11 @@ export const cancelDatePlanService = async (
 
   // 2. Check ownership
   if (datePlan.userId !== userId) {
-    throw new Error(
-      "You are not authorized to cancel this date plan",
-    );
+    throw new Error("You are not authorized to cancel this date plan");
   }
 
   // 3. Validate plan status
-  if (
-    datePlan.status !== "BOOKED" &&
-    datePlan.status !== "ACTIVE"
-  ) {
+  if (datePlan.status !== "BOOKED" && datePlan.status !== "ACTIVE") {
     throw new Error(
       `Date plan cannot be cancelled because its current status is ${datePlan.status}`,
     );
@@ -3002,21 +3145,79 @@ export const cancelDatePlanService = async (
       },
     });
 
-    const approvedRequests =
-      await tx.datePlanRequest.findMany({
+    const approvedRequests = await tx.datePlanRequest.findMany({
+      where: {
+        planId,
+        status: "APPROVED",
+      },
+      select: {
+        id: true,
+        requesterId: true,
+      },
+    });
+
+    // ========================================
+    // 5. CREATE CHAT MESSAGES
+    // ========================================
+
+    const chatMessages = [];
+
+    for (const request of approvedRequests) {
+      const receiverId = request.requesterId;
+
+      let conversation = await tx.conversation.findFirst({
         where: {
-          planId,
-          status: "APPROVED",
-        },
-        select: {
-          id: true,
-          requesterId: true,
+          AND: [
+            {
+              participants: {
+                some: { userId },
+              },
+            },
+            {
+              participants: {
+                some: { userId: receiverId },
+              },
+            },
+          ],
         },
       });
+
+      if (!conversation) {
+        conversation = await tx.conversation.create({
+          data: {
+            participants: {
+              create: [{ userId }, { userId: receiverId }],
+            },
+          },
+        });
+      }
+
+      const message = await tx.chatMessage.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: userId,
+          messageType: "DATE_INVITE",
+          content: "The host has cancelled your Date Plan.",
+          metadata: {
+            event: "DATE_PLAN_CANCELLED",
+            datePlanId: planId,
+            requestId: request.id,
+            status: "CANCELLED",
+          },
+        },
+      });
+
+      chatMessages.push({
+        receiverId,
+        conversationId: conversation.id,
+        message,
+      });
+    }
 
     return {
       cancelledPlan,
       approvedRequests,
+      chatMessages,
     };
   });
 
@@ -3026,10 +3227,9 @@ export const cancelDatePlanService = async (
       createNotification({
         senderId: userId,
         receiverId: request.requesterId,
-        type: "DATE_INVITE",
+        type: "DATE_CANCELLED",
         title: "Date Plan Cancelled",
-        message:
-          "The host has cancelled a date plan you were invited to.",
+        message: "The host has cancelled a date plan you were invited to.",
         data: {
           type: "DATE_PLAN_CANCELLED",
           planId,
@@ -3051,9 +3251,11 @@ export const cancelDatePlanService = async (
     }
   });
 
-  return result.cancelledPlan;
+  return {
+    cancelledPlan: result.cancelledPlan,
+    chatMessages: result.chatMessages,
+  };
 };
-
 
 export const dateNowInviteMessage = {
   async inviteToDatePlan(
@@ -3160,4 +3362,67 @@ export const dateNowInviteMessage = {
       message,
     };
   },
+};
+
+export const getDateInviteList = async (userId: string, planId: string) => {
+  // ============================================
+  // 1. VALIDATE DATE PLAN
+  // ============================================
+
+  const plan = await prisma.datePlan.findFirst({
+    where: {
+      id: planId,
+      userId,
+    },
+
+    select: {
+      id: true,
+    },
+  });
+
+  if (!plan) {
+    throw new Error("Date plan not found");
+  }
+
+  // ============================================
+  // 2. GET CONVERSATION USERS
+  // ============================================
+
+  const { users, declinedUserIds } =
+    await dateNowInviteMessageRepo.findDateInviteList(userId, planId);
+
+  // ============================================
+  // 3. DYNAMIC MATCH SCORE
+  // ============================================
+
+  const targetUserIds = users.map((user) => user.id);
+
+  const matchScoreMap =
+    targetUserIds.length > 0
+      ? await getMatchScoresForUsers(userId, targetUserIds)
+      : new Map<
+          string,
+          {
+            score: number;
+            percentage: number;
+          }
+        >();
+
+  // ============================================
+  // 4. FINAL RESPONSE
+  // ============================================
+
+  return users.map((user) => ({
+    userId: user.id,
+
+    fullName: user.full_name,
+
+    age: user.birth_date ? calculateAge(user.birth_date) : null,
+
+    profilePhoto: user.photos[0]?.media_url ?? null,
+
+    matchPercentage: matchScoreMap.get(user.id)?.percentage ?? 0,
+
+    isDateInviteDisabled: declinedUserIds.has(user.id),
+  }));
 };

@@ -1,3 +1,4 @@
+import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 import {
   getUserForMatchAnalysis,
 } from "./match-analysis.repository";
@@ -295,13 +296,23 @@ export const getMatchAnalysisService = async (
     throw new Error("USER_NOT_FOUND");
   }
 
-  if (!target) {
-    throw new Error(
-      "TARGET_USER_NOT_FOUND"
-    );
-  }
+if (!target) {
+  throw new Error("TARGET_USER_NOT_FOUND");
+}
 
-  const signals: SignalResult[] = [];
+// ============================================
+// DYNAMIC MATCH SCORE - REDIS + PRISMA
+// ============================================
+
+const matchScoreMap = await getMatchScoresForUsers(
+  currentUserId,
+  [targetUserId],
+);
+
+const dynamicMatchScore =
+  matchScoreMap.get(targetUserId)?.percentage ?? 0;
+
+const signals: SignalResult[] = [];
 
   const targetFirstName =
     target.full_name
@@ -981,17 +992,17 @@ export const getMatchAnalysisService = async (
   // BASIC HEADLINE
   // =====================================================
 
-  let matchLabel = "Potential match";
+let matchLabel = "Potential match";
 
-  if (overallScore >= 90) {
-    matchLabel = "Exceptional match";
-  } else if (overallScore >= 80) {
-    matchLabel = "Strong match";
-  } else if (overallScore >= 70) {
-    matchLabel = "Good match";
-  } else if (overallScore >= 60) {
-    matchLabel = "Moderate match";
-  }
+if (dynamicMatchScore >= 90) {
+  matchLabel = "Exceptional match";
+} else if (dynamicMatchScore >= 80) {
+  matchLabel = "Strong match";
+} else if (dynamicMatchScore >= 70) {
+  matchLabel = "Good match";
+} else if (dynamicMatchScore >= 60) {
+  matchLabel = "Moderate match";
+}
 
 
   const strongestNames =
@@ -1055,10 +1066,10 @@ export const getMatchAnalysisService = async (
     },
 
     match: {
-      score: overallScore,
-      label: matchLabel,
-      headline: `You & ${targetFirstName} are a ${matchLabel.toLowerCase()}`,
-    },
+  score: dynamicMatchScore,
+  label: matchLabel,
+  headline: `You & ${targetFirstName} are a ${matchLabel.toLowerCase()}`,
+},
 
     summary: {
       signalsCompared: signals.length,

@@ -7,6 +7,7 @@ export type MessageType =
   | "AUDIO"
   | "FILE"
   | "LINK"
+  | "GIF"
   ;
 
 export interface CreateConversationInput {
@@ -28,6 +29,7 @@ export interface GetMessagesInput {
   cursor?: string;
   limit: number;
   type?: MessageFilterType;
+  
 }
 
 export interface GetConversationsInput {
@@ -35,6 +37,7 @@ export interface GetConversationsInput {
   cursor?: string;
   limit: number;
   type: ConversationFilter;
+  planId?: string;
 }
 export type ConversationFilter =
   | "all"

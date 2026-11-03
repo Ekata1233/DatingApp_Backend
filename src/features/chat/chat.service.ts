@@ -26,6 +26,7 @@ import { createMatchFromReplyService } from "../match/match.service";
 import console from "console";
 import { MessageType } from "@prisma/client";
 import { getMatchScoresForUsers } from "../match-score/match-score.service";
+import { prisma } from "../../prisma/prismaClient";
 
 export const chatService = {
   /**
@@ -94,12 +95,80 @@ export const chatService = {
       ? sortedConversations.slice(0, data.limit)
       : sortedConversations;
 
+    // ============================================
+    // DYNAMIC MATCH SCORE - REDIS + PRISMA
+    // ============================================
+
+    // Get unique target user IDs from current page
+    const targetUserIds = [
+      ...new Set(items.map((conversation) => conversation.user.id)),
+    ];
+
+    // Calculate compatibility between logged-in user
+    // and all conversation users
+    const matchScoreMap =
+      targetUserIds.length > 0
+        ? await getMatchScoresForUsers(data.userId, targetUserIds)
+        : new Map<string, { score: number; percentage: number }>();
+
+    // ============================================
+    // DATE PLAN DECLINED REQUEST CHECK
+    // ============================================
+
+    const declinedRequests =
+      data.planId && items.length > 0
+        ? await prisma.datePlanRequest.findMany({
+            where: {
+              planId: data.planId,
+
+              plan: {
+                userId: data.userId,
+              },
+
+              requesterId: {
+                in: items.map((conversation) => conversation.user.id),
+              },
+
+              status: "DECLINED",
+            },
+
+            select: {
+              requesterId: true,
+            },
+          })
+        : [];
+
+    const declinedUserIds = new Set(
+      declinedRequests.map((request) => request.requesterId),
+    );
+
+   const updatedItems = items.map((conversation) => ({
+  ...conversation,
+
+  // ============================================
+  // USER DETAILS WITH DYNAMIC MATCH SCORE
+  // ============================================
+  user: {
+    ...conversation.user,
+
+    matchPercentage:
+      matchScoreMap.get(conversation.user.id)?.percentage ?? 0,
+  },
+
+  // ============================================
+  // DATE PLAN INVITE BUTTON
+  // ============================================
+  isDateInviteDisabled: data.planId
+    ? declinedUserIds.has(conversation.user.id)
+    : false,
+}));
+
     const nextCursor = hasMore
       ? (items[items.length - 1]?.conversationId ?? null)
       : null;
 
     return {
-      items,
+      items: updatedItems,
       counts,
       pagination: {
         hasMore,
@@ -465,6 +534,10 @@ export const chatService = {
 
           case MessageType.FILE:
             notificationMessage = "Sent you a file";
+            break;
+
+            case MessageType.GIF:
+            notificationMessage = "Sent you a GIF";
             break;
 
           case MessageType.LINK:

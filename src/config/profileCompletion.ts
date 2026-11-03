@@ -23,8 +23,8 @@ export const PROFILE_WEIGHTS = {
   BIO: {
     TOTAL: 5,
 
-    MIN_20_CHARS: 3,
-    MIN_50_CHARS: 4,
+    MIN_20_CHARS: 5,
+    MIN_50_CHARS: 5,
     MIN_100_CHARS: 5,
   },
 
@@ -49,6 +49,7 @@ export const PROFILE_WEIGHTS = {
     ZODIAC: 1,
     LANGUAGES: 1,
     COMMUNICATION_STYLE:1,
+    LOVE_LANGUAGE:1,
   },
 
   INTERESTED_IN: {

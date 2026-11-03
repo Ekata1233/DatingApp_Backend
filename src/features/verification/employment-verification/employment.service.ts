@@ -814,7 +814,7 @@ export const submitEmploymentVerificationService = async (
                 type: "PROFESSIONAL_VERIFICATION",
                 status: "IN_PROGRESS",
                 points: 0,
-                maxPoints: 20,
+                maxPoints: 10,
               },
             });
         } else {

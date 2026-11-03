@@ -9,7 +9,7 @@ export const createConversationSchema = z.object({
 export const sendMessageSchema = z
   .object({
     conversationId: z.string().uuid("Invalid conversation ID"),
-
+planId: z.string().uuid().optional(),
     content: z
       .string()
       .trim()
@@ -106,6 +106,7 @@ export const getConversationsSchema = z.object({
       "gift",
     ])
     .default("all"),
+     planId: z.string().uuid().optional(),
 });
 
 export const markConversationReadSchema = z.object({

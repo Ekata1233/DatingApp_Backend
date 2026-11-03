@@ -477,184 +477,6 @@ const getBillingCycleLabel = (
   }
 };
 
-// export const getMembershipInvoiceService = async (
-//   userId: string,
-//   userPackageId: string,
-// ) => {
-//   const membership = await findMembershipInvoiceById(
-//     userId,
-//     userPackageId,
-//   );
-
-//   if (!membership) {
-//     throw new Error("Membership purchase not found");
-//   }
-
-//   // if (!membership.payment) {
-//   //   throw new Error("Payment information not found");
-//   // }
-
-//   const payment = membership.payment ?? null;
-
-//   const selectedPackage =
-//     membership.currentPackage || membership.package;
-
-//       const invoiceStatus = !payment
-//     ? "PENDING"
-//     : payment.status === "COMPLETED"
-//       ? "PAID"
-//       : payment.status;
-
-// const totalPaid =
-//     payment?.status === "COMPLETED"
-//       ? Number(payment.amount ?? membership.purchasePrice ?? 0)
-//       : 0;
-
-
-//         const totalAmount = Number(
-//     membership.purchasePrice ??
-//       membership.price.price ??
-//       0,
-//   );
-//   /*
-//    * Your Payment.amount should represent final amount paid.
-//    *
-//    * We calculate base amount + GST only for invoice display.
-//    */
-
-//   const taxableAmount = Number(
-//     (totalPaid / (1 + GST_PERCENTAGE / 100)).toFixed(2),
-//   );
-
-//   const gstAmount = Number(
-//     (totalPaid - taxableAmount).toFixed(2),
-//   );
-
-//   const invoiceDate =
-//     payment?.paidAt ||
-//     payment?.created_at ||
-//     membership.createdAt;
-
-//   const paidAt = payment?.paidAt ?? null;
-
-//   // ==========================================
-//   // 5. PAYMENT METHOD
-//   // ==========================================
-
-//   const paymentMethod = payment
-//     ? extractPaymentMethod(payment.gatewayResponse)
-//     : {
-//         type: null,
-//         displayValue: null,
-//       };
-
-
-//   return {
-//     invoice: {
-//      invoiceNumber: generateInvoiceNumber(
-//         membership.id,
-//         invoiceDate,
-//       ),
-
-//       date: paidAt,
-
-//       status: invoiceStatus,
-
-//        currency: payment?.currency || "INR",
-//     },
-
-//     company: {
-//       brandName: COMPANY_DETAILS.name,
-
-//       legalName: COMPANY_DETAILS.legalName,
-
-//       gstin: COMPANY_DETAILS.gstin,
-
-//       sacCode: COMPANY_DETAILS.sacCode,
-
-//       registeredOffice:
-//         COMPANY_DETAILS.registeredOffice,
-//     },
-
-//     billedTo: {
-//       userId: membership.user.id,
-
-//       name:
-//         membership.user.full_name ||
-//         "Welvors User",
-
-//       email: membership.user.email,
-
-//       phone: membership.user.phone_number,
-
-//       /*
-//        * You currently don't store user's GSTIN.
-//        */
-//       gstin: null,
-//     },
-
-//     membership: {
-//       userPackageId: membership.id,
-
-//       packageId: selectedPackage.id,
-
-//       packageName: getPlanDisplayName(
-//         selectedPackage.name,
-//       ),
-
-//       packageCode: selectedPackage.name,
-
-//       billingCycle:
-//         membership.price.billingCycle,
-
-//       months: membership.price.months,
-
-//       durationLabel: getBillingCycleLabel(
-//         membership.price.billingCycle,
-//         membership.price.months,
-//       ),
-
-//       startDate: membership.startDate,
-
-//       endDate: membership.endDate,
-//     },
-
-//     amount: {
-//       taxableAmount,
-
-//       gstPercentage: GST_PERCENTAGE,
-
-//       gstAmount,
-
-//       totalPaid,
-//     },
-
-//     payment: {
-//       paymentId: payment?.id ?? null,
-
-//       gatewayPaymentId:
-//         payment?.payment_id ?? null,
-
-//       transactionId:
-//         payment?.transactionId ?? null,
-
-//       method: paymentMethod.type,
-
-//       displayMethod: paymentMethod.displayValue,
-
-//       paidAt,
-//     },
-
-//     note: `Digital service · SAC ${COMPANY_DETAILS.sacCode} · This is a computer-generated invoice.`,
-
-//     actions: {
-//       pdfAvailable: true,
-
-//       pdfUrl:
-//         `/api/user/membership-plan/invoice/${membership.id}/pdf`,
-//     },
-//   };
-// };
 
 
 export const getMembershipInvoiceService = async (
@@ -675,6 +497,12 @@ export const getMembershipInvoiceService = async (
   // ==========================================
 
   const payment = membership.payment ?? null;
+  const walletTransaction =
+  membership.walletTransaction ?? null;
+
+const isWalletPaid =
+  !payment &&
+  walletTransaction?.status === "SUCCESS";
 
   const selectedPackage =
     membership.currentPackage || membership.package;
@@ -683,7 +511,9 @@ export const getMembershipInvoiceService = async (
   // 2. PAYMENT STATUS
   // ==========================================
 
-  const invoiceStatus = !payment
+const invoiceStatus = isWalletPaid
+  ? "PAID"
+  : !payment
     ? "PENDING"
     : payment.status === "COMPLETED"
       ? "PAID"
@@ -696,10 +526,11 @@ export const getMembershipInvoiceService = async (
   // Actual paid amount is zero if payment
   // does not exist or is not completed.
 
-  const totalPaid =
-    payment?.status === "COMPLETED"
-      ? Number(payment.amount ?? membership.purchasePrice ?? 0)
-      : 0;
+ const totalPaid = isWalletPaid
+  ? Number(walletTransaction!.amount)
+  : payment?.status === "COMPLETED"
+    ? Number(payment.amount ?? membership.purchasePrice ?? 0)
+    : 0;
 
   // Invoice amount from membership purchase price
 
@@ -723,18 +554,26 @@ export const getMembershipInvoiceService = async (
   // 4. DATE
   // ==========================================
 
-  const invoiceDate =
-    payment?.paidAt ||
+const invoiceDate = isWalletPaid
+  ? walletTransaction!.createdAt
+  : payment?.paidAt ||
     payment?.created_at ||
     membership.createdAt;
 
-  const paidAt = payment?.paidAt ?? null;
+const paidAt = isWalletPaid
+  ? walletTransaction!.createdAt
+  : payment?.paidAt ?? null;
 
   // ==========================================
   // 5. PAYMENT METHOD
   // ==========================================
 
-  const paymentMethod = payment
+const paymentMethod = isWalletPaid
+  ? {
+      type: "WALLET",
+      displayValue: "Welvors Wallet",
+    }
+  : payment
     ? extractPaymentMethod(payment.gatewayResponse)
     : {
         type: null,
@@ -764,8 +603,7 @@ export const getMembershipInvoiceService = async (
 
       legalName: COMPANY_DETAILS.legalName,
 
-      gstin: COMPANY_DETAILS.gstin,
-
+ gstin: "27AAJCI0350F1ZU",
       sacCode: COMPANY_DETAILS.sacCode,
 
       registeredOffice:
@@ -834,8 +672,9 @@ export const getMembershipInvoiceService = async (
       gatewayPaymentId:
         payment?.payment_id ?? null,
 
-      transactionId:
-        payment?.transactionId ?? null,
+      transactionId: isWalletPaid
+  ? walletTransaction!.id
+  : payment?.transactionId ?? null,
 
       method: paymentMethod.type,
 

@@ -109,3 +109,44 @@ export const canSendPushNotification = async ({
 
   return true;
 };
+
+export const getMatchConversationId = async (
+  userId: string,
+  matchedUserId: string,
+): Promise<string | null> => {
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      AND: [
+        {
+          participants: {
+            some: {
+              userId: userId,
+            },
+          },
+        },
+        {
+          participants: {
+            some: {
+              userId: matchedUserId,
+            },
+          },
+        },
+      ],
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      match: true,
+    },
+  });
+
+  console.log("NEW_MATCH conversation lookup:", {
+    userId,
+    matchedUserId,
+    conversation,
+  });
+
+  return conversation?.id ?? null;
+};

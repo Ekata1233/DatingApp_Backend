@@ -179,6 +179,18 @@ export const getPackageByIdService = async (id: string) => {
   if (!pkg) {
     throw new Error("Package not found");
   }
+const features = await prisma.packageFeature.findMany({
+  where: {
+    category: "STATUS_BADGES",
+    slug: "premium",
+    active: true,
+  },
+  orderBy: {
+    sortOrder: "asc",
+  },
+});
+
+console.log("STATUS BADGES:", features);
 
   return pkg;
 };

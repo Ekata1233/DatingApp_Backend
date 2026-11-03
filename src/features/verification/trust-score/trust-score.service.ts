@@ -1073,25 +1073,25 @@ export const getPublicTrustScoreService = async (
   return {
     user: {
       id: user.id,
-
       name: user.full_name?.split(" ")[0] ?? "User",
-
       age: calculateAge(user.birth_date),
-
+      birthDate: user.birth_date
+        ? user.birth_date.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            timeZone: "UTC",
+          })
+        : null,
       profilePhoto: user.photos[0]?.media_url ?? null,
     },
 
     trustScore: {
       score: trustScore,
-
       maxScore,
-
       verifiedChecks,
-
       totalChecks,
-
       badge,
-
       description: `A higher Trust Score means more of ${
         user.full_name?.split(" ")[0] ?? "this user's"
       } identity and profile information has been independently checked.`,
@@ -1099,14 +1099,12 @@ export const getPublicTrustScoreService = async (
 
     privacyNotice: {
       title: "Verification documents stay private",
-
       message:
-        "You only see the verification result — never the documents. Verification documents and sensitive data are not shared with other users.",
+        "Only verification results are visible. Documents and sensitive data remain private.",
     },
 
     sections: [
       createSection("BASIC", "01", "Basic verification", basicItems),
-
       createSection("IDENTITY", "02", "Identity verification", identityItems),
 
       createSection(
@@ -1148,6 +1146,5 @@ export const recalculateTrustScore = async (
       trust_score: trustScore,
     },
   });
-
   return trustScore;
 };

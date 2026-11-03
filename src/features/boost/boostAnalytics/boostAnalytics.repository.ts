@@ -12,7 +12,39 @@ export const findActiveBoostUsageRepository = async (
 ) => {
   const now = new Date();
 
-  return prisma.boostUsage.findFirst({
+  console.log("\n========== FIND ACTIVE BOOST ==========");
+
+  console.log("[REPOSITORY] User ID:", userId);
+  console.log("[REPOSITORY] Current Time:", now.toISOString());
+
+  // DEBUG: Get all recent Boost usages
+  const allUsages = await prisma.boostUsage.findMany({
+    where: {
+      user_id: userId,
+    },
+    select: {
+      id: true,
+      user_id: true,
+      boost_type: true,
+      status: true,
+      is_active: true,
+      started_at: true,
+      expected_end_at: true,
+      total_interests: true,
+    },
+    orderBy: {
+      started_at: "desc",
+    },
+    take: 5,
+  });
+
+  console.log(
+    "[REPOSITORY] Recent Boost Usages:",
+    JSON.stringify(allUsages, null, 2)
+  );
+
+  // Existing active Boost query
+  const activeUsage = await prisma.boostUsage.findFirst({
     where: {
       user_id: userId,
       status: BoostUsageStatus.ACTIVE,
@@ -36,6 +68,44 @@ export const findActiveBoostUsageRepository = async (
       started_at: "desc",
     },
   });
+
+  if (!activeUsage) {
+    console.log("[REPOSITORY] NO ACTIVE BOOST FOUND");
+
+    allUsages.forEach((usage) => {
+      console.log("[REPOSITORY] Checking usage:", usage.id);
+
+      console.log(
+        "Status ACTIVE:",
+        usage.status === BoostUsageStatus.ACTIVE
+      );
+
+      console.log(
+        "Is Active:",
+        usage.is_active === true
+      );
+
+      console.log(
+        "Started:",
+        usage.started_at <= now
+      );
+
+      console.log(
+        "Not Expired:",
+        usage.expected_end_at > now
+      );
+    });
+
+  } else {
+    console.log(
+      "[REPOSITORY] ACTIVE BOOST FOUND:",
+      activeUsage.id
+    );
+  }
+
+  console.log("=======================================\n");
+
+  return activeUsage;
 };
 
 // =====================================================
@@ -46,17 +116,46 @@ export const createBoostEventRepository = async (
   tx: any,
   data: {
     boostUsageId: string;
+    boostedUserId: string;
     actorId?: string;
     eventType: BoostEventType;
   }
 ) => {
-  return tx.boostEvent.create({
+  console.log("[BOOST EVENT] Creating event:", data);
+
+  const event = await tx.boostEvent.create({
     data: {
-      boost_usage_id: data.boostUsageId,
-      actor_id: data.actorId,
+      boostUsage: {
+        connect: {
+          id: data.boostUsageId,
+        },
+      },
+
+      // User who owns the active Boost
+      user: {
+        connect: {
+          id: data.boostedUserId,
+        },
+      },
+
+      // User who sent the Rose / Compliment / Gift
+      ...(data.actorId
+        ? {
+            actor: {
+              connect: {
+                id: data.actorId,
+              },
+            },
+          }
+        : {}),
+
       event_type: data.eventType,
     },
   });
+
+  console.log("[BOOST EVENT] Created:", event.id);
+
+  return event;
 };
 
 // =====================================================

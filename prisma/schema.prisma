@@ -1439,16 +1439,12 @@ enum BillingCycle {
 }
 
 enum FeatureCategory {
-  MATCH_DISCOVERY
   CHAT
   TRUST
-  PRIVACY
   STATUS_BADGES
   REAL_LIFE_EVENTS
   PERKS
   FOREVER_LOVE_PROGRAMME
-  ELITE_ACCESS
-  STATUS_PRIVACY
   PREMIUM_EXPERIENCES
   NETWORKING_GROWTH
   EVERYTHING_IN_VIP
@@ -1458,6 +1454,21 @@ enum FeatureCategory {
   WHITE_GLOVE_EXPERIENCES
   GLOBAL_EXPERIENCES
   EXECUTIVE_NETWORK
+  MATCH_DISCOVERY
+  PRIVACY
+  STAND_OUT_INSTANTLY
+  MEET_IN_REAL_LIFE
+  REWARDS_FOR_SERIOUS_DATERS
+  ELITE_ACCESS
+  STATUS_PRIVACY
+  VIP_PERKS
+  EVERYTHING_IN_VIP_AND_MORE
+  ABSOLUTE_PRIVACY
+  SMARTER_CURATED_MATCHES
+  STATUS_THAT_SPEAKS_FIRST
+  WHITE_GLOVE_DATING
+  THE_WORLD_CURATED
+  AN_EXECUTIVE_CIRCLE
 }
 
 model PackageFeature {
@@ -1856,6 +1867,7 @@ model DatePlanPackage {
   pricePerPlan Decimal @db.Decimal(10, 2)
   discount     Int?
   isPopular    Boolean @default(false)
+  isBestValue  Boolean @default(false)
   isActive     Boolean @default(true)
   sortOrder    Int     @default(0)
 
@@ -1951,6 +1963,7 @@ model DatePlan {
   joinRequestGenderId String?    @db.Uuid
   visibilityId        String?    @db.Uuid
   status              PlanStatus @default(DRAFT)
+  verifiedMembersOnly Boolean    @default(false)
   eventDateTime       DateTime?
   expiresAt           DateTime?
   createdAt           DateTime   @default(now())
@@ -2313,6 +2326,7 @@ model ConversationParticipant {
   lastReadAt     DateTime?
   joinedAt       DateTime     @default(now())
   deletedAt      DateTime?
+  clearedAt      DateTime?
   user           User         @relation(fields: [userId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -2809,6 +2823,7 @@ enum MessageType {
   RELATIONSHIP_TAG_REJECTED
   RELATIONSHIP_TAG_CANCELLED
   LINK
+  GIF
 }
 
 enum NotificationType {
@@ -2820,6 +2835,8 @@ enum NotificationType {
   NEW_COMPLIMENT
   EVENT_INVITE
   EVENT_RESPONSE
+  EVENT_CONFIRM
+  EVENT_CANCEL
   PROFILE_VIEW
   SUPER_LIKE
   SUBSCRIPTION_EXPIRING
@@ -2827,6 +2844,11 @@ enum NotificationType {
   BOOST_EXPIRING
   DATE_CONFIRMED
   DATE_INVITE
+  DATE_CANCELLED
+  RELATIONSHIP_TAG_PROPOSAL
+  RELATIONSHIP_TAG_ACCEPTED
+  RELATIONSHIP_TAG_REJECTED
+  RELATIONSHIP_TAG_CANCELLED
 }
 
 enum Gender {

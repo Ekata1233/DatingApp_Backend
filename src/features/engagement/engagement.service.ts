@@ -1,4 +1,10 @@
-import { MessageType, PrismaClient } from "@prisma/client";
+import {
+  BoostEventType,
+  MessageType,
+  Prisma,
+  PrismaClient,
+  StoreFeatureType,
+} from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 import { getOrCreateConversation } from "../chat/chat.helper";
 import { AppError } from "../rose/AppError";
@@ -14,6 +20,8 @@ import { createBundleCompliment } from "../compliment/compliment.helper";
 import { createBundleGift } from "../gift/gift.helper";
 import { updateEngagementProgress } from "./engagement.helper";
 import { createNotification } from "../notification/notification.service";
+import { getComplimentBalance } from "../compliment/compliment.repository";
+import { trackBoostEvent } from "../boost/boostAnalytics/boostAnalytics.service";
 
 export const sendEngagementService = async (
   senderId: string,
@@ -102,6 +110,146 @@ export const sendEngagementService = async (
 
     let matched = false;
     let matchId: string | null = null;
+
+    // ============================================
+    // COMBINED ENGAGEMENT WALLET VALIDATION
+    // ============================================
+
+    const selectedCount =
+      Number(!!roseData) + Number(!!complimentData) + Number(!!giftData);
+
+    // Keep individual engagement behavior unchanged.
+    if (selectedCount > 1) {
+      let totalRequired = new Prisma.Decimal(0);
+
+      const requiredItems: string[] = [];
+
+      // ============================================
+      // ROSE WALLET REQUIREMENT
+      // ============================================
+
+      if (roseData) {
+        const roseBalance = await getOrCreateBalance(
+          senderId,
+          tx as unknown as PrismaClient,
+        );
+
+        const roseFeature = await tx.storeFeature.findUnique({
+          where: {
+            feature: StoreFeatureType.ROSE_SEND_COST,
+          },
+        });
+
+        if (!roseFeature?.enabled) {
+          throw new AppError(400, "Rose sending is currently unavailable.");
+        }
+
+        if (roseFeature.intValue === null || roseFeature.intValue < 0) {
+          throw new AppError(500, "Invalid rose send cost configuration.");
+        }
+
+        if (roseBalance.totalRoses <= 0) {
+          const rosePrice = roseFeature.intValue || 120;
+
+          totalRequired = totalRequired.plus(rosePrice);
+
+          requiredItems.push("Rose");
+        }
+      }
+
+      // ============================================
+      // COMPLIMENT WALLET REQUIREMENT
+      // ============================================
+
+      if (complimentData) {
+        const complimentBalance = await getComplimentBalance(senderId, tx);
+
+        const complimentFeature = await tx.storeFeature.findUnique({
+          where: {
+            feature: StoreFeatureType.COMPLIMENT_SEND_COST,
+          },
+        });
+
+        if (!complimentFeature?.enabled) {
+          throw new AppError(
+            400,
+            "Compliment sending is currently unavailable.",
+          );
+        }
+
+        if (
+          complimentFeature.intValue === null ||
+          complimentFeature.intValue < 0
+        ) {
+          throw new AppError(
+            500,
+            "Invalid compliment send cost configuration.",
+          );
+        }
+
+        if (!complimentBalance || complimentBalance.totalCompliments <= 0) {
+          totalRequired = totalRequired.plus(complimentFeature.intValue);
+
+          requiredItems.push("Compliment");
+        }
+      }
+
+      // ============================================
+      // GIFT WALLET REQUIREMENT
+      // ============================================
+
+      if (giftData) {
+        const gift = await tx.gift.findUnique({
+          where: {
+            id: giftData.giftId,
+          },
+          select: {
+            coinCost: true,
+          },
+        });
+
+        if (!gift) {
+          throw new AppError(404, "Gift not found.");
+        }
+
+        totalRequired = totalRequired.plus(gift.coinCost);
+
+        requiredItems.push("Gift");
+      }
+
+      // ============================================
+      // CHECK TOTAL WALLET BALANCE
+      // ============================================
+
+      if (totalRequired.greaterThan(0)) {
+        const wallet = await tx.wallet.findUnique({
+          where: {
+            userId: senderId,
+          },
+          select: {
+            balance: true,
+          },
+        });
+
+        const availableBalance = wallet?.balance ?? new Prisma.Decimal(0);
+
+        if (availableBalance.lessThan(totalRequired)) {
+          const itemNames =
+            requiredItems.length === 1
+              ? requiredItems[0]
+              : requiredItems.length === 2
+                ? requiredItems.join(" and ")
+                : `${requiredItems.slice(0, -1).join(", ")} and ${
+                    requiredItems[requiredItems.length - 1]
+                  }`;
+
+          throw new AppError(
+            400,
+            `Insufficient wallet balance. ₹${totalRequired.toString()} is required to send ${itemNames}.`,
+          );
+        }
+      }
+    }
 
     // ========================================
     // 3. CHECK REVERSE LIKE FOR ROSE
@@ -400,7 +548,64 @@ export const sendEngagementService = async (
         remainingComplimentBalance,
       },
     };
-  });
+    });
+
+  // ============================================
+  // BOOST ANALYTICS - TRACK INTEREST
+  // ============================================
+
+  // Rose, Compliment or Gift received during
+  // an active Boost counts as one interest.
+
+ // ============================================
+// DEBUG: BOOST INTEREST TRACKING
+// ============================================
+
+console.log("\n========== BOOST INTEREST DEBUG ==========");
+
+console.log("[ENGAGEMENT] Sender ID:", senderId);
+console.log("[ENGAGEMENT] Receiver ID:", receiverId);
+
+console.log("[ENGAGEMENT] Rose:", result.data.rose);
+console.log("[ENGAGEMENT] Compliment:", result.data.compliment);
+console.log("[ENGAGEMENT] Gift:", result.data.gift);
+
+console.log("[ENGAGEMENT] Engagement successful:", result.success);
+
+if (
+  result.data.rose ||
+  result.data.compliment ||
+  result.data.gift
+) {
+  console.log(
+    "[BOOST] Engagement detected. Starting interest tracking..."
+  );
+
+  try {
+    await trackBoostEvent({
+      boostedUserId: receiverId,
+      actorId: senderId,
+      eventType: BoostEventType.INTEREST,
+    });
+
+    console.log(
+      "[BOOST] trackBoostEvent completed (check service logs for actual update)"
+    );
+
+  } catch (error) {
+    console.error(
+      "[BOOST ERROR] Interest tracking failed:",
+      error
+    );
+  }
+
+} else {
+  console.log(
+    "[BOOST] No Rose, Compliment or Gift found. Skipping."
+  );
+}
+
+console.log("==========================================\n");
 
   const [sender, receiver] = await Promise.all([
     prisma.user.findUnique({
@@ -431,7 +636,6 @@ export const sendEngagementService = async (
 
   const notifications: Promise<unknown>[] = [];
   const conversationId = result.data.conversationId;
-
 
   if (result.data.rose) {
     notifications.push(

@@ -746,11 +746,14 @@ export const relationshipTagRepository = {
    */
   async rejectProposal(proposalId: string, userId: string) {
     return prisma.$transaction(async (tx) => {
+      // ========================================
+      // 1. FIND PROPOSAL
+      // ========================================
+
       const proposal = await tx.relationshipTagProposal.findUnique({
         where: {
           id: proposalId,
         },
-
         include: {
           sender: {
             select: {
@@ -758,7 +761,6 @@ export const relationshipTagRepository = {
               full_name: true,
             },
           },
-
           receiver: {
             select: {
               id: true,
@@ -772,7 +774,10 @@ export const relationshipTagRepository = {
         throw new Error("Relationship tag proposal not found");
       }
 
-      // Only receiver can reject
+      // ========================================
+      // 2. VALIDATE RECEIVER
+      // ========================================
+
       if (proposal.receiverId !== userId) {
         throw new Error("You are not authorized to reject this proposal");
       }
@@ -781,16 +786,19 @@ export const relationshipTagRepository = {
         throw new Error(`Proposal is already ${proposal.status.toLowerCase()}`);
       }
 
+      // ========================================
+      // 3. UPDATE PROPOSAL
+      // ========================================
+
       const updatedProposal = await tx.relationshipTagProposal.update({
         where: {
           id: proposalId,
+          status: "PENDING",
         },
-
         data: {
           status: "REJECTED",
           respondedAt: new Date(),
         },
-
         include: {
           sender: {
             select: {
@@ -798,7 +806,6 @@ export const relationshipTagRepository = {
               full_name: true,
             },
           },
-
           receiver: {
             select: {
               id: true,
@@ -808,7 +815,81 @@ export const relationshipTagRepository = {
         },
       });
 
-      return updatedProposal;
+      // ========================================
+      // 4. FIND EXISTING CONVERSATION
+      // ========================================
+
+      let conversation = await tx.conversation.findFirst({
+        where: {
+          AND: [
+            {
+              participants: {
+                some: {
+                  userId: proposal.senderId,
+                },
+              },
+            },
+            {
+              participants: {
+                some: {
+                  userId: proposal.receiverId,
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      // ========================================
+      // 5. CREATE CONVERSATION IF NOT EXISTS
+      // ========================================
+
+      if (!conversation) {
+        conversation = await tx.conversation.create({
+          data: {
+            participants: {
+              create: [
+                {
+                  userId: proposal.senderId,
+                },
+                {
+                  userId: proposal.receiverId,
+                },
+              ],
+            },
+          },
+        });
+      }
+
+      // ========================================
+      // 6. CREATE REJECTION CHAT MESSAGE
+      // ========================================
+
+      const message = await tx.chatMessage.create({
+        data: {
+          conversationId: conversation.id,
+
+          // User rejecting the proposal
+          senderId: userId,
+
+          messageType: "RELATIONSHIP_TAG_REJECTED",
+
+          content: "Your relationship tag proposal has been rejected.",
+
+          metadata: {
+            event: "RELATIONSHIP_TAG_REJECTED",
+            proposalId,
+            tag: proposal.tag,
+            status: "REJECTED",
+          },
+        },
+      });
+
+      return {
+        proposal: updatedProposal,
+        message,
+        conversationId: conversation.id,
+      };
     });
   },
 

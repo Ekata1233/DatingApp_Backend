@@ -30,7 +30,7 @@ router.delete("/info/:name", deleteBoostInfoController);
 // ============================================================
 
 router.post(
-  "/features",
+  "/boost/features",
   createOrUpdateBoostFeaturesController
 );
 

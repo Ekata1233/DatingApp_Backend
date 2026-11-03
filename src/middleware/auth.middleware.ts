@@ -159,13 +159,14 @@ const authMiddleware = async (
         },
       });
 
-    if (!session) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Session expired or logged out",
-      });
-    }
+   if (!session) {
+  return res.status(401).json({
+    success: false,
+    code: "SESSION_EXPIRED",
+    message:
+      "Your account has been logged out. Please log in again.",
+  });
+}
 
     /* =====================================================
        CHECK USER ACCOUNT STATUS

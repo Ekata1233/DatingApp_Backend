@@ -787,16 +787,47 @@ const handleVerifiedUser = async ({
   // CREATE USER SESSION
   // =====================================================
 
-  const session = await prisma.userSession.create({
-    data: {
-      userId: result.id,
+  // const session = await prisma.userSession.create({
+  //   data: {
+  //     userId: result.id,
+  //     isActive: true,
+  //     expiresAt: sessionExpiry,
+  //   },
+  // });
 
-      isActive: true,
+  // ============================================
+  // SINGLE DEVICE LOGIN
+  // ============================================
 
-      expiresAt: sessionExpiry,
-    },
+  const session = await prisma.$transaction(async (tx) => {
+    // Lock this user row to serialize concurrent logins.
+    await tx.$queryRaw`
+    SELECT id FROM users
+    WHERE id = ${result.id}::uuid
+    FOR UPDATE
+  `;
+
+    // Deactivate all previous sessions.
+    await tx.userSession.updateMany({
+      where: {
+        userId: result.id,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+        logoutAt: new Date(),
+      },
+    });
+
+    // Create the only active session.
+    return tx.userSession.create({
+      data: {
+        userId: result.id,
+        isActive: true,
+        expiresAt: sessionExpiry,
+      },
+    });
   });
-
   // =====================================================
   // CREATE JWT
   // =====================================================
@@ -836,40 +867,52 @@ const handleVerifiedUser = async ({
 ========================================================= */
 
 export const logoutService = async (userId: string, sessionId: string) => {
-  // =====================================================
-  // FIND ACTIVE SESSION
-  // =====================================================
+  return await prisma.$transaction(async (tx) => {
+    // 1. Lock user to prevent concurrent login/logout updates
+    await tx.$queryRaw`
+      SELECT id FROM users
+      WHERE id = ${userId}::uuid
+      FOR UPDATE
+    `;
 
-  const session = await prisma.userSession.findFirst({
-    where: {
-      id: sessionId,
-      userId,
-      isActive: true,
-    },
+    // 2. Find active session
+    const session = await tx.userSession.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+        isActive: true,
+      },
+    });
+
+    if (!session) {
+      throw new Error("Session not found or already logged out");
+    }
+
+    // 3. Deactivate session
+    await tx.userSession.update({
+      where: {
+        id: sessionId,
+      },
+      data: {
+        isActive: false,
+        logoutAt: new Date(),
+      },
+    });
+
+    // 4. Remove FCM device token
+    await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        device_token: null,
+      },
+    });
+
+    return {
+      message: "Logged out successfully",
+    };
   });
-
-  if (!session) {
-    throw new Error("Session not found or already logged out");
-  }
-
-  // =====================================================
-  // DEACTIVATE SESSION
-  // =====================================================
-
-  await prisma.userSession.update({
-    where: {
-      id: sessionId,
-    },
-
-    data: {
-      isActive: false,
-      logoutAt: new Date(),
-    },
-  });
-
-  return {
-    message: "Logged out successfully",
-  };
 };
 
 // import https from "https";

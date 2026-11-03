@@ -20,8 +20,13 @@ import {
   cancelDatePlanService,
   getDatePlanHistoryDetails,
   dateNowInviteMessage,
+  getDateInviteList,
 } from "./dateNow.service";
-import { planIdParamSchema, requestToJoinDatePlanSchema, updateDatePlanActivitySchema } from "./dateNow.validation";
+import {
+  planIdParamSchema,
+  requestToJoinDatePlanSchema,
+  updateDatePlanActivitySchema,
+} from "./dateNow.validation";
 import { getIO } from "../../config/socket";
 
 export const createDraftController = async (
@@ -103,37 +108,22 @@ export const discoverDatePlanController = async (
     const userId = (req as any).user.id;
 
     const filter =
-      typeof req.query.filter === "string"
-        ? req.query.filter
-        : undefined;
+      typeof req.query.filter === "string" ? req.query.filter : undefined;
 
     const cursor =
-      typeof req.query.cursor === "string"
-        ? req.query.cursor
-        : undefined;
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined;
 
     const limit =
-      typeof req.query.limit === "string"
-        ? Number(req.query.limit)
-        : 10;
+      typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
 
-    if (
-      !Number.isInteger(limit) ||
-      limit < 1 ||
-      limit > 50
-    ) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
       return res.status(400).json({
         success: false,
         message: "Limit must be between 1 and 50",
       });
     }
 
-    const result = await discoverDatePlan(
-      userId,
-      filter,
-      cursor,
-      limit,
-    );
+    const result = await discoverDatePlan(userId, filter, cursor, limit);
 
     return res.status(200).json({
       success: true,
@@ -169,16 +159,14 @@ export const requestToJoinController = async (
   res: Response,
 ) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
 
     if (!userId) {
       throw new Error("User not authenticated");
     }
 
-    const {
-      message,
-      billSuggestionId,
-    } = requestToJoinDatePlanSchema.parse(req.body);
+    const { message, billSuggestionId } =
+      requestToJoinDatePlanSchema.parse(req.body ?? {});
 
     const request = await requestToJoinDatePlan(
       userId,
@@ -187,16 +175,14 @@ export const requestToJoinController = async (
       billSuggestionId,
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: request,
     });
   } catch (error: any) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
-      message:
-        error?.issues?.[0]?.message ||
-        error.message,
+      message: error?.issues?.[0]?.message || error.message,
     });
   }
 };
@@ -226,98 +212,68 @@ export const getDatePlanRequestsController = async (
 };
 
 export const approveDatePlanRequestController = async (
-    req: Request,
-    res: Response,
-  ) => {
-    try {
-      const userId =
-        (req as any).user.id;
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
 
-      const requestId =
-        req.params.requestId as string;
+    const requestId = req.params.requestId as string;
 
-      if (!requestId) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Request ID is required",
-        });
-      }
-
-      const result =
-        await approveDatePlanRequest(
-          userId,
-          requestId,
-        );
-
-      // ======================================
-      // SOCKET.IO
-      // ======================================
-
-      const io = getIO();
-
-      // Requested user receives
-      // DATE_CONFIRMED instantly
-      io.to(
-        `user:${result.receiverId}`,
-      ).emit(
-        "message:receive",
-        result.message,
-      );
-
-      // Optional:
-      // update sender's other devices too
-      io.to(
-        `user:${result.senderId}`,
-      ).emit(
-        "message:receive",
-        result.message,
-      );
-
-      return res.status(200).json({
-  success: true,
-
-  message:
-    "Date request approved successfully",
-
-  data: {
-    confirmedDateId:
-      result.confirmedDateId,
-
-    conversationId:
-      result.conversation.id,
-
-    message:
-      result.message,
-
-    participantLimit:
-      result.participantLimit,
-
-    approvedParticipants:
-      result.approvedParticipants,
-
-    remainingSlots:
-      result.remainingSlots,
-
-    isPlanFull:
-      result.isPlanFull,
-  },
-});
-    } catch (error: any) {
-      console.error(
-        "approveDatePlanRequestController error:",
-        error,
-      );
-
+    if (!requestId) {
       return res.status(400).json({
         success: false,
-
-        message:
-          error.message ||
-          "Failed to approve Date Plan request",
+        message: "Request ID is required",
       });
     }
-  };
+
+    const result = await approveDatePlanRequest(userId, requestId);
+
+    // ======================================
+    // SOCKET.IO
+    // ======================================
+
+    const io = getIO();
+
+    // Requested user receives
+    // DATE_CONFIRMED instantly
+    io.to(`user:${result.receiverId}`).emit("message:receive", result.message);
+
+    // Optional:
+    // update sender's other devices too
+    io.to(`user:${result.senderId}`).emit("message:receive", result.message);
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Date request approved successfully",
+
+      data: {
+        confirmedDateId: result.confirmedDateId,
+
+        conversationId: result.conversation.id,
+
+        message: result.message,
+
+        participantLimit: result.participantLimit,
+
+        approvedParticipants: result.approvedParticipants,
+
+        remainingSlots: result.remainingSlots,
+
+        isPlanFull: result.isPlanFull,
+      },
+    });
+  } catch (error: any) {
+    console.error("approveDatePlanRequestController error:", error);
+
+    return res.status(400).json({
+      success: false,
+
+      message: error.message || "Failed to approve Date Plan request",
+    });
+  }
+};
 
 export const declineDatePlanRequestController = async (
   req: Request,
@@ -326,19 +282,34 @@ export const declineDatePlanRequestController = async (
   try {
     const userId = (req as any).user.id;
 
-    const request = await declineDatePlanRequest(
+    const result = await declineDatePlanRequest(
       userId,
       req.params.requestId as string,
     );
 
-    res.json({
+    // ========================================
+    // SOCKET.IO
+    // ========================================
+
+    const io = getIO();
+
+    io.to(`user:${result.receiverId}`).emit("message:receive", result.message);
+
+    return res.status(200).json({
       success: true,
-      data: request,
+      message: "Date Plan request declined successfully",
+      data: {
+        request: result.request,
+        message: result.message,
+        conversationId: result.conversationId,
+      },
     });
   } catch (error: any) {
-    res.status(400).json({
+    console.error("declineDatePlanRequest error:", error);
+
+    return res.status(400).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to decline Date Plan request",
     });
   }
 };
@@ -426,7 +397,7 @@ export const cancelDatePlanRequestController = async (
 
 export const withdrawDatePlanRequestController = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const userId = (req as any).user.id;
@@ -440,10 +411,7 @@ export const withdrawDatePlanRequestController = async (
       });
     }
 
-    const result = await withdrawDatePlanRequest(
-      requestId,
-      userId
-    );
+    const result = await withdrawDatePlanRequest(requestId, userId);
 
     return res.status(200).json({
       success: true,
@@ -453,35 +421,23 @@ export const withdrawDatePlanRequestController = async (
       },
     });
   } catch (error: any) {
-    console.error(
-      "Withdraw date plan request error:",
-      error
-    );
+    console.error("Withdraw date plan request error:", error);
 
-    if (
-      error.message === "Date plan request not found"
-    ) {
+    if (error.message === "Date plan request not found") {
       return res.status(404).json({
         success: false,
         message: error.message,
       });
     }
 
-    if (
-      error.message ===
-      "You are not allowed to withdraw this request"
-    ) {
+    if (error.message === "You are not allowed to withdraw this request") {
       return res.status(403).json({
         success: false,
         message: error.message,
       });
     }
 
-    if (
-      error.message.startsWith(
-        "Cannot withdraw a request"
-      )
-    ) {
+    if (error.message.startsWith("Cannot withdraw a request")) {
       return res.status(400).json({
         success: false,
         message: error.message,
@@ -498,7 +454,7 @@ export const withdrawDatePlanRequestController = async (
 export const testMatchScoreController = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const userId = (req as any).user.id;
@@ -511,10 +467,7 @@ export const testMatchScoreController = async (
       });
     }
 
-    const result = await testMatchScore(
-      userId,
-      targetUserId
-    );
+    const result = await testMatchScore(userId, targetUserId);
 
     return res.status(200).json({
       success: true,
@@ -528,36 +481,27 @@ export const testMatchScoreController = async (
 export const getDatePlanHistoryController = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const userId = (req as any).user.id;
 
-    const result =
-      await getDatePlanHistory(
-        userId,
-        {
-          page: Number(req.query.page) || 1,
+    const result = await getDatePlanHistory(userId, {
+      page: Number(req.query.page) || 1,
 
-          limit:
-            Number(req.query.limit) || 10,
+      limit: Number(req.query.limit) || 10,
 
-          status: req.query.status
-            ? String(req.query.status)
-            : "ALL",
-        }
-      );
+      status: req.query.status ? String(req.query.status) : "ALL",
+    });
 
     return res.status(200).json({
       success: true,
 
-      message:
-        "Date plan history fetched successfully",
+      message: "Date plan history fetched successfully",
 
       data: result.data,
 
-      pagination:
-        result.pagination,
+      pagination: result.pagination,
     });
   } catch (error) {
     next(error);
@@ -574,10 +518,7 @@ export const getDatePlanHistoryDetailsController = async (
 
     const planId = req.params.planId as string;
 
-    const result = await getDatePlanHistoryDetails(
-      userId,
-      planId,
-    );
+    const result = await getDatePlanHistoryDetails(userId, planId);
 
     return res.status(200).json({
       success: true,
@@ -639,10 +580,7 @@ export const updateDatePlanActivityController = async (
       data: updatedPlan,
     });
   } catch (error: any) {
-    console.error(
-      "Update Date Plan Activity Error:",
-      error,
-    );
+    console.error("Update Date Plan Activity Error:", error);
 
     if (error.message === "Date plan not found") {
       return res.status(404).json({
@@ -666,10 +604,7 @@ export const updateDatePlanActivityController = async (
   }
 };
 
-export const cancelDatePlanController = async (
-  req: Request,
-  res: Response
-) => {
+export const cancelDatePlanController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { planId } = req.params;
@@ -682,6 +617,26 @@ export const cancelDatePlanController = async (
     }
 
     const result = await cancelDatePlanService(userId, planId);
+
+     // ========================================
+    // 2. SEND REAL-TIME CHAT MESSAGES
+    // ========================================
+
+    try {
+      const io = getIO();
+
+      for (const chat of result.chatMessages) {
+        io.to(`user:${chat.receiverId}`).emit(
+          "message:receive",
+          chat.message,
+        );
+      }
+    } catch (socketError) {
+      console.error(
+        "Date Plan cancellation socket error:",
+        socketError,
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -698,20 +653,14 @@ export const cancelDatePlanController = async (
   }
 };
 
-export const inviteToDatePlan = async (
-  req: Request,
-  res: Response,
-) => {
+export const inviteToDatePlan = async (req: Request, res: Response) => {
   try {
     const senderId = (req as any).user.id;
 
     const { datePlanId } = req.params;
     const { receiverId } = req.body;
 
-    if (
-      typeof datePlanId !== "string" ||
-      !datePlanId
-    ) {
+    if (typeof datePlanId !== "string" || !datePlanId) {
       return res.status(400).json({
         success: false,
         message: "Invalid Date Plan ID",
@@ -725,12 +674,11 @@ export const inviteToDatePlan = async (
       });
     }
 
-    const result =
-      await dateNowInviteMessage.inviteToDatePlan(
-        senderId,
-        receiverId,
-        datePlanId,
-      );
+    const result = await dateNowInviteMessage.inviteToDatePlan(
+      senderId,
+      receiverId,
+      datePlanId,
+    );
 
     // ========================================
     // SOCKET.IO
@@ -738,20 +686,58 @@ export const inviteToDatePlan = async (
 
     const io = getIO();
 
-    io.to(`user:${receiverId}`).emit(
-      "message:receive",
-      result.message,
-    );
+    io.to(`user:${receiverId}`).emit("message:receive", result.message);
 
     return res.status(201).json({
       success: true,
-      message:
-        "Date invitation sent successfully",
+      message: "Date invitation sent successfully",
       data: result.message,
     });
   } catch (error) {
+    console.error("inviteToDatePlan error:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to send Date invitation",
+    });
+  }
+};
+
+export const getDateInviteListController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const planId = req.query.planId;
+
+    if (
+      typeof planId !== "string" ||
+      !planId.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "planId is required",
+      });
+    }
+
+    const result =
+      await getDateInviteList(
+        userId,
+        planId,
+      );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
     console.error(
-      "inviteToDatePlan error:",
+      "getDateInviteList error:",
       error,
     );
 
@@ -760,7 +746,7 @@ export const inviteToDatePlan = async (
       message:
         error instanceof Error
           ? error.message
-          : "Failed to send Date invitation",
+          : "Failed to fetch date invite list",
     });
   }
 };
