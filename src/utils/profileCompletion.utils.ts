@@ -109,6 +109,9 @@ export const calculateProfileScore = async (userId: string) => {
 
   if (userAbout?.zodiac) score += PROFILE_WEIGHTS.BASIC_INFO.ZODIAC;
 
+  if (userAbout?.loveLanguage)
+  score += PROFILE_WEIGHTS.BASIC_INFO.LOVE_LANGUAGE;
+
   if (user?.intentionId) score += PROFILE_WEIGHTS.INTENTION.INTENTION;
 
   // =========================================================
@@ -195,32 +198,44 @@ export const calculateProfileScore = async (userId: string) => {
   // INTERESTS (10)
   // =========================================================
 
-  const interestsAnswered = new Set(
-    answers
-      .filter((a: any) => a.question.screen === QuestionScreen.THINGS_U_LOVE)
-      .map((a: any) => a.question_id),
-  ).size;
+  // const interestsAnswered = new Set(
+  //   answers
+  //     .filter((a: any) => a.question.screen === QuestionScreen.THINGS_U_LOVE)
+  //     .map((a: any) => a.question_id),
+  // ).size;
 
-  switch (Math.min(interestsAnswered, 6)) {
-    case 1:
-      score += PROFILE_WEIGHTS.INTERESTS.ONE;
-      break;
-    case 2:
-      score += PROFILE_WEIGHTS.INTERESTS.TWO;
-      break;
-    case 3:
-      score += PROFILE_WEIGHTS.INTERESTS.THREE;
-      break;
-    case 4:
-      score += PROFILE_WEIGHTS.INTERESTS.FOUR;
-      break;
-    case 5:
-      score += PROFILE_WEIGHTS.INTERESTS.FIVE;
-      break;
-    case 6:
-      score += PROFILE_WEIGHTS.INTERESTS.SIX;
-      break;
-  }
+  // switch (Math.min(interestsAnswered, 6)) {
+  //   case 1:
+  //     score += PROFILE_WEIGHTS.INTERESTS.ONE;
+  //     break;
+  //   case 2:
+  //     score += PROFILE_WEIGHTS.INTERESTS.TWO;
+  //     break;
+  //   case 3:
+  //     score += PROFILE_WEIGHTS.INTERESTS.THREE;
+  //     break;
+  //   case 4:
+  //     score += PROFILE_WEIGHTS.INTERESTS.FOUR;
+  //     break;
+  //   case 5:
+  //     score += PROFILE_WEIGHTS.INTERESTS.FIVE;
+  //     break;
+  //   case 6:
+  //     score += PROFILE_WEIGHTS.INTERESTS.SIX;
+  //     break;
+  // }
+
+  // =========================================================
+  // INTERESTS (MAX 6 POINTS)
+  // =========================================================
+
+  // Count total selected options across all THINGS_U_LOVE questions
+  const interestsSelectedOptions = answers.filter(
+    (a) => a.question.screen === QuestionScreen.THINGS_U_LOVE,
+  ).length;
+
+  // 1 selected option = 1 point, maximum 6 points
+  score += Math.min(interestsSelectedOptions, PROFILE_WEIGHTS.INTERESTS.TOTAL);
 
   // =========================================================
   // LIFESTYLE (5)
@@ -254,16 +269,16 @@ export const calculateProfileScore = async (userId: string) => {
   // PROMPTS (5)
   // =========================================================
 
-  switch (Math.min(promptsCount, 3)) {
-    case 1:
-      score += PROFILE_WEIGHTS.PROMPTS.ONE;
-      break;
-    case 2:
-      score += PROFILE_WEIGHTS.PROMPTS.TWO;
-      break;
-    case 3:
-      score += PROFILE_WEIGHTS.PROMPTS.THREE;
-      break;
+  if (promptsCount >= 1) {
+    score += PROFILE_WEIGHTS.PROMPTS.ONE;
+  }
+
+  if (promptsCount >= 2) {
+    score += PROFILE_WEIGHTS.PROMPTS.TWO;
+  }
+
+  if (promptsCount >= 3) {
+    score += PROFILE_WEIGHTS.PROMPTS.THREE;
   }
 
   // =========================================================

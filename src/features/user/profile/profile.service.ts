@@ -1310,9 +1310,6 @@ export const updateUserMediaService = async (
   return updatedMedia;
 };
 
-
-
-
 // Delete Photo
 export const deleteUserMediaService = async (
   userId: string,
@@ -1455,7 +1452,6 @@ export const deleteUserMediaService = async (
     message: mediaType === "IMAGE" ? "Photo deleted" : "Video deleted",
   };
 };
-
 
 //primary photo
 export const setPrimaryPhotoService = async (
@@ -1705,6 +1701,16 @@ export const updateUserPromptService = async (
   });
 
   // await queueMatchScoreCalculation(userId);
+  const score = await calculateProfileScore(userId);
+
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      profile_completion: score,
+    },
+  });
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);
