@@ -576,30 +576,29 @@ export const discoverDatePlan = async (
         not: userId,
       },
 
+      // ============================================
+      // JOIN REQUEST GENDER FILTER
+      // ============================================
 
-// ============================================
-// JOIN REQUEST GENDER FILTER
-// ============================================
+      OR: [
+        // Everyone can see these plans
+        {
+          joinRequestGender: {
+            is: {
+              value: "EVERYONE",
+            },
+          },
+        },
 
-OR: [
-  // Everyone can see these plans
-  {
-    joinRequestGender: {
-      is: {
-        value: "EVERYONE",
-      },
-    },
-  },
-
-  // Match logged-in user's gender
-  {
-    joinRequestGender: {
-      is: {
-        value: me.gender ?? "EVERYONE",
-      },
-    },
-  },
-],
+        // Match logged-in user's gender
+        {
+          joinRequestGender: {
+            is: {
+              value: me.gender ?? "EVERYONE",
+            },
+          },
+        },
+      ],
 
       // ============================================
       // PACKAGE-BASED DATE PLAN VISIBILITY
@@ -972,18 +971,28 @@ export const requestToJoinDatePlan = async (
     },
   });
 
-  console.log("Plan found:", planId);
-  console.log("User details:", userId);
-
   if (!plan) {
     throw new Error("Date plan not found");
   }
 
   // ============================================
-  // CHECK USER ACTIVE PURCHASED PACKAGE
+  // DATE PLAN EVENT DATE & TIME VALIDATION
   // ============================================
 
   const now = new Date();
+
+  if (plan.eventDateTime) {
+    const eventDateTime = new Date(plan.eventDateTime);
+
+    if (eventDateTime.getTime() <= now.getTime()) {
+      throw new Error(
+        "You cannot send a join request because the scheduled date and time have passed.",
+      );
+    }
+  }
+  // ============================================
+  // CHECK USER ACTIVE PURCHASED PACKAGE
+  // ============================================
 
   const activePackage = await prisma.userPackage.findFirst({
     where: {
@@ -1018,32 +1027,28 @@ export const requestToJoinDatePlan = async (
   // EXISTING VALIDATION
   // ============================================
 
-
-
   if (plan.userId === userId) {
     throw new Error("Cannot join your own date");
   }
   // ============================================
   // VERIFIED MEMBERS ONLY VALIDATION
   // ============================================
-if (plan.verifiedMembersOnly === true) {
-    const governmentVerification =
-      await prisma.userVerification.findUnique({
-        where: {
-          userId_type: {
-            userId,
-            type: VerificationType.GOVERNMENT_ID,
-          },
+  if (plan.verifiedMembersOnly === true) {
+    const governmentVerification = await prisma.userVerification.findUnique({
+      where: {
+        userId_type: {
+          userId,
+          type: VerificationType.GOVERNMENT_ID,
         },
-        select: {
-          status: true,
-        },
-      });
+      },
+      select: {
+        status: true,
+      },
+    });
 
     if (
       !governmentVerification ||
-      governmentVerification.status !==
-        VerificationStatus.VERIFIED
+      governmentVerification.status !== VerificationStatus.VERIFIED
     ) {
       throw new Error(
         "Only ID-verified members can request to join this date plan. Please complete your Government ID verification first.",

@@ -153,17 +153,19 @@ export const skipDatePlanController = async (req: Request, res: Response) => {
   }
 };
 
-export const requestToJoinController = async (req: Request, res: Response) => {
+export const requestToJoinController = async (
+  req: Request,
+  res: Response,
+) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
 
     if (!userId) {
       throw new Error("User not authenticated");
     }
 
-    const { message, billSuggestionId } = requestToJoinDatePlanSchema.parse(
-      req.body,
-    );
+    const { message, billSuggestionId } =
+      requestToJoinDatePlanSchema.parse(req.body ?? {});
 
     const request = await requestToJoinDatePlan(
       userId,
@@ -172,12 +174,12 @@ export const requestToJoinController = async (req: Request, res: Response) => {
       billSuggestionId,
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: request,
     });
   } catch (error: any) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error?.issues?.[0]?.message || error.message,
     });
