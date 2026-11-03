@@ -20,6 +20,7 @@ import {
   cancelDatePlanController,
   getDatePlanHistoryDetailsController,
   inviteToDatePlan,
+  getDateInviteListController,
 } from "./dateNow.controller";
 
 import  authMiddleware  from "../../middleware/auth.middleware";
@@ -135,6 +136,12 @@ router.post(
   "/date-plan/:datePlanId/invite",
   authMiddleware,
   inviteToDatePlan,
+);
+
+router.get(
+  "/date-plan/date-invite-list",
+  authMiddleware,
+  getDateInviteListController,
 );
 
 export default router;

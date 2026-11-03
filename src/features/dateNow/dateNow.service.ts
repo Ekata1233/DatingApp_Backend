@@ -3363,3 +3363,66 @@ export const dateNowInviteMessage = {
     };
   },
 };
+
+export const getDateInviteList = async (userId: string, planId: string) => {
+  // ============================================
+  // 1. VALIDATE DATE PLAN
+  // ============================================
+
+  const plan = await prisma.datePlan.findFirst({
+    where: {
+      id: planId,
+      userId,
+    },
+
+    select: {
+      id: true,
+    },
+  });
+
+  if (!plan) {
+    throw new Error("Date plan not found");
+  }
+
+  // ============================================
+  // 2. GET CONVERSATION USERS
+  // ============================================
+
+  const { users, declinedUserIds } =
+    await dateNowInviteMessageRepo.findDateInviteList(userId, planId);
+
+  // ============================================
+  // 3. DYNAMIC MATCH SCORE
+  // ============================================
+
+  const targetUserIds = users.map((user) => user.id);
+
+  const matchScoreMap =
+    targetUserIds.length > 0
+      ? await getMatchScoresForUsers(userId, targetUserIds)
+      : new Map<
+          string,
+          {
+            score: number;
+            percentage: number;
+          }
+        >();
+
+  // ============================================
+  // 4. FINAL RESPONSE
+  // ============================================
+
+  return users.map((user) => ({
+    userId: user.id,
+
+    fullName: user.full_name,
+
+    age: user.birth_date ? calculateAge(user.birth_date) : null,
+
+    profilePhoto: user.photos[0]?.media_url ?? null,
+
+    matchPercentage: matchScoreMap.get(user.id)?.percentage ?? 0,
+
+    isDateInviteDisabled: declinedUserIds.has(user.id),
+  }));
+};

@@ -20,6 +20,7 @@ import {
   cancelDatePlanService,
   getDatePlanHistoryDetails,
   dateNowInviteMessage,
+  getDateInviteList,
 } from "./dateNow.service";
 import {
   planIdParamSchema,
@@ -701,6 +702,51 @@ export const inviteToDatePlan = async (req: Request, res: Response) => {
         error instanceof Error
           ? error.message
           : "Failed to send Date invitation",
+    });
+  }
+};
+
+export const getDateInviteListController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const planId = req.query.planId;
+
+    if (
+      typeof planId !== "string" ||
+      !planId.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "planId is required",
+      });
+    }
+
+    const result =
+      await getDateInviteList(
+        userId,
+        planId,
+      );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "getDateInviteList error:",
+      error,
+    );
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch date invite list",
     });
   }
 };

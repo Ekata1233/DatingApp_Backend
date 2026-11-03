@@ -1099,14 +1099,12 @@ export const getPublicTrustScoreService = async (
 
     privacyNotice: {
       title: "Verification documents stay private",
-
       message:
         "Only verification results are visible. Documents and sensitive data remain private.",
     },
 
     sections: [
       createSection("BASIC", "01", "Basic verification", basicItems),
-
       createSection("IDENTITY", "02", "Identity verification", identityItems),
 
       createSection(
@@ -1148,6 +1146,5 @@ export const recalculateTrustScore = async (
       trust_score: trustScore,
     },
   });
-
   return trustScore;
 };

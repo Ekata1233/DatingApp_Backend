@@ -1,3 +1,4 @@
+import { AccountStatus } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 
 export const dateNowInviteMessageRepo = {
@@ -78,5 +79,91 @@ export const dateNowInviteMessageRepo = {
         },
       },
     });
+  },
+
+  async findDateInviteList(userId: string, planId: string) {
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        participants: {
+          some: {
+            userId,
+            deletedAt: null,
+            clearedAt: null,
+          },
+        },
+      },
+
+      select: {
+        participants: {
+          where: {
+            userId: {
+              not: userId,
+            },
+            user: {
+              account_status: {
+                not: AccountStatus.DELETED,
+              },
+            },
+          },
+
+          select: {
+            user: {
+              select: {
+                id: true,
+                full_name: true,
+                birth_date: true,
+
+                photos: {
+                  where: {
+                    is_primary: true,
+                  },
+                  take: 1,
+                  select: {
+                    media_url: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const users = [
+      ...new Map(
+        conversations
+          .flatMap((conversation) =>
+            conversation.participants.map((participant) => participant.user),
+          )
+          .map((user) => [user.id, user]),
+      ).values(),
+    ];
+
+    const declinedRequests = await prisma.datePlanRequest.findMany({
+      where: {
+        planId,
+
+        plan: {
+          userId,
+        },
+
+        requesterId: {
+          in: users.map((user) => user.id),
+        },
+
+        status: "DECLINED",
+      },
+
+      select: {
+        requesterId: true,
+      },
+    });
+
+    return {
+      users,
+      declinedUserIds: new Set(
+        declinedRequests.map((request) => request.requesterId),
+      ),
+    };
   },
 };
