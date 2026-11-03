@@ -65,6 +65,28 @@ export const getAllUsers = async () => {
           balance: true,
         },
       },
+      
+photos: {
+  where: {
+    media_type: "IMAGE",
+  },
+  select: {
+    media_url: true,
+  },
+  orderBy: [
+    {
+      is_primary: "desc",
+    },
+    {
+      order: "asc",
+    },
+    {
+      created_at: "asc",
+    },
+  ],
+  take: 1,
+},
+
     },
 
     orderBy: {
@@ -106,6 +128,7 @@ export const getAllUsers = async () => {
     return {
       id: user.id,
       userName: user.full_name,
+      profilePhoto: user.photos[0]?.media_url ?? null,
       city: user.profile?.city ?? null,
       gender: user.gender,
       height: user.height,
