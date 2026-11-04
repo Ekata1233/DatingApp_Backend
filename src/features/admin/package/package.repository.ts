@@ -250,7 +250,6 @@ if (limitsData.length > 0) {
     },
   });
 
-  // Insert only unique feature limits
   await tx.planLimit.createMany({
     data: Array.from(uniqueLimits.values()),
   });
