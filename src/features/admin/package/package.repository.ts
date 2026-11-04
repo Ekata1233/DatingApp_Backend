@@ -46,6 +46,17 @@ export class PackageRepository {
     featureMap: Map<string, string>
   ) {
     return this.prisma.$transaction(async (tx) => {
+      const uniqueCreateLimits = new Map<string, PlanLimitInput>();
+
+  for (const item of limitsData) {
+    const featureId = featureMap.get(item.featureCode);
+
+    if (!featureId) {
+      throw new Error(`Feature not found: ${item.featureCode}`);
+    }
+
+    uniqueCreateLimits.set(featureId, item);
+  }
       return tx.package.create({
         data: {
           name: data.name,
@@ -71,15 +82,21 @@ export class PackageRepository {
             })),
           },
 
-          limits: {
-            create: limitsData.map((limit) => ({
-              featureId: featureMap.get(limit.featureCode)!,
-              enabled: limit.enabled,
-              unlimited: limit.unlimited,
-              limit: limit.limit,
-              resetPeriod: limit.resetPeriod,
-            })),
-          },
+          
+limits: {
+  create: Array.from(uniqueCreateLimits.values()).map(
+    (limit) => ({
+      featureId: featureMap.get(limit.featureCode)!,
+      enabled: limit.enabled,
+      unlimited: limit.unlimited,
+      limit: limit.unlimited
+        ? null
+        : (limit.limit ?? null),
+      resetPeriod: limit.resetPeriod,
+    })
+  ),
+},
+
         },
 
         include: {
@@ -196,32 +213,51 @@ async updatePackage(
     // Update Limits
     // ==========================
 
-    console.time("limit.upsert");
+ 
+console.time("limit.upsert");
 
 if (limitsData.length > 0) {
+  const uniqueLimits = new Map<
+    string,
+    Prisma.PlanLimitCreateManyInput
+  >();
 
+  for (const item of limitsData) {
+    const featureId = featureMap.get(item.featureCode);
+
+    if (!featureId) {
+      throw new Error(
+        `Feature not found: ${item.featureCode}`
+      );
+    }
+
+    uniqueLimits.set(featureId, {
+      packageId,
+      featureId,
+      enabled: item.enabled,
+      unlimited: item.unlimited,
+      limit: item.unlimited
+        ? null
+        : (item.limit ?? null),
+      resetPeriod: item.resetPeriod,
+    });
+  }
+
+  // Delete old package limits
   await tx.planLimit.deleteMany({
     where: {
       packageId,
     },
   });
 
-
+  // Insert only unique feature limits
   await tx.planLimit.createMany({
-    data: limitsData.map((limit) => ({
-      packageId,
-      featureId: featureMap.get(limit.featureCode)!,
-      enabled: limit.enabled,
-      unlimited: limit.unlimited,
-      limit: limit.limit,
-      resetPeriod: limit.resetPeriod,
-    })),
+    data: Array.from(uniqueLimits.values()),
   });
-
 }
 
+console.timeEnd("limit.upsert");
 
-    console.timeEnd("limit.upsert");
 
     // ==========================
     // Final Response
