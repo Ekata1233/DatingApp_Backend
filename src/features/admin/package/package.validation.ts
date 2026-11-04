@@ -108,8 +108,7 @@ export const createPackageSchema = z.object({
      PACKAGE FEATURE LIMITS
      CUSTOM VALIDATION REMOVED
   ----------------------------- */
-
-  limits: z.array(planLimitInputSchema).optional(),
+limits: z.array(planLimitInputSchema).default([]),
 });
 
 /* =====================================================
