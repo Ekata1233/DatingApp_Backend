@@ -275,17 +275,30 @@ const result = await tx.package.findUnique({
       },
     },
    
+
+
 limits: {
-  orderBy: {
-    feature: {
-      sortOrder: "asc",
+  orderBy: [
+    {
+      feature: {
+        category: "asc",
+      },
     },
-  },
+    {
+      feature: {
+        sortOrder: "asc",
+      },
+    },
+    {
+      featureId: "asc",
+    },
+  ],
   include: {
     feature: {
       select: {
         id: true,
         code: true,
+        slug: true,
         title: true,
         category: true,
         description: true,
@@ -294,6 +307,8 @@ limits: {
     },
   },
 },
+
+
 
   },
 });
