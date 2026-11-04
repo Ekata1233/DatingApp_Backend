@@ -3364,9 +3364,11 @@ export const dateNowInviteMessage = {
   },
 };
 
-export const getDateInviteList = async (userId: string, planId: string) => {
+export const getDateInviteList = async (userId: string,
+  planId: string,
+)=> {
   // ============================================
-  // 1. VALIDATE DATE PLAN
+  // 1. GET DATE PLAN WITH GENDER OPTION
   // ============================================
 
   const plan = await prisma.datePlan.findFirst({
@@ -3377,6 +3379,12 @@ export const getDateInviteList = async (userId: string, planId: string) => {
 
     select: {
       id: true,
+
+      joinRequestGender: {
+        select: {
+          value: true,
+        },
+      },
     },
   });
 
@@ -3385,21 +3393,37 @@ export const getDateInviteList = async (userId: string, planId: string) => {
   }
 
   // ============================================
-  // 2. GET CONVERSATION USERS
+  // 2. GET SELECTED GENDER
+  // ============================================
+
+  const genderValue =
+    plan.joinRequestGender?.value ?? null;
+
+  // ============================================
+  // 3. GET FILTERED CONVERSATION USERS
   // ============================================
 
   const { users, declinedUserIds } =
-    await dateNowInviteMessageRepo.findDateInviteList(userId, planId);
+    await dateNowInviteMessageRepo.findDateInviteList(
+      userId,
+      planId,
+      genderValue,
+    );
 
   // ============================================
-  // 3. DYNAMIC MATCH SCORE
+  // 4. DYNAMIC MATCH SCORE
   // ============================================
 
-  const targetUserIds = users.map((user) => user.id);
+  const targetUserIds = users.map(
+    (user) => user.id,
+  );
 
   const matchScoreMap =
     targetUserIds.length > 0
-      ? await getMatchScoresForUsers(userId, targetUserIds)
+      ? await getMatchScoresForUsers(
+          userId,
+          targetUserIds,
+        )
       : new Map<
           string,
           {
@@ -3409,7 +3433,7 @@ export const getDateInviteList = async (userId: string, planId: string) => {
         >();
 
   // ============================================
-  // 4. FINAL RESPONSE
+  // 5. FINAL RESPONSE
   // ============================================
 
   return users.map((user) => ({
@@ -3417,12 +3441,17 @@ export const getDateInviteList = async (userId: string, planId: string) => {
 
     fullName: user.full_name,
 
-    age: user.birth_date ? calculateAge(user.birth_date) : null,
+    age: user.birth_date
+      ? calculateAge(user.birth_date)
+      : null,
 
-    profilePhoto: user.photos[0]?.media_url ?? null,
+    profilePhoto:
+      user.photos[0]?.media_url ?? null,
 
-    matchPercentage: matchScoreMap.get(user.id)?.percentage ?? 0,
+    matchPercentage:
+      matchScoreMap.get(user.id)?.percentage ?? 0,
 
-    isDateInviteDisabled: declinedUserIds.has(user.id),
+    isDateInviteDisabled:
+      declinedUserIds.has(user.id),
   }));
-};
+}
