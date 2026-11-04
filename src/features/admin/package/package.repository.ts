@@ -274,19 +274,27 @@ const result = await tx.package.findUnique({
         createdAt: "asc",
       },
     },
-    limits: {
-      include: {
-        feature: {
-          select: {
-            id: true,
-            code: true,
-            title: true,
-            category: true,
-            description: true,
-          },
-        },
+   
+limits: {
+  orderBy: {
+    feature: {
+      sortOrder: "asc",
+    },
+  },
+  include: {
+    feature: {
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        category: true,
+        description: true,
+        sortOrder: true,
       },
     },
+  },
+},
+
   },
 });
 console.timeEnd("package.findUnique");
