@@ -140,10 +140,6 @@ export const unblockUserService = async (
   };
 };
 
-
-
-
-
 export const getBlockedUsersService = async (
   userId: string,
 ) => {

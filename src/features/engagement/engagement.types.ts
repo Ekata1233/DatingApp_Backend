@@ -30,7 +30,7 @@ export interface SendEngagementResponse {
   data: {
     matched: boolean;
     matchId: string | null;
-
+    conversationId: string;
     message: {
       id: string;
       conversationId: string;

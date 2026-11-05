@@ -121,7 +121,7 @@ export const initGovernmentIdService = async (
       type: VerificationType.GOVERNMENT_ID,
       status: VerificationStatus.NOT_STARTED,
       points: 0,
-      maxPoints: 20,
+      maxPoints: 40,
       governmentIdType: documentType,
       provider: "GRIDLINES",
       startedAt: new Date(),
@@ -630,7 +630,7 @@ const document = await getVerifiedGovernmentDocument({
 
           governmentIdPhotoKey: photoKey,
 
-          points: 20,
+          points: 40,
 
           verifiedAt: now,
 
@@ -686,7 +686,7 @@ const document = await getVerifiedGovernmentDocument({
 
         status: "VERIFIED",
 
-        points: 20,
+        points: 40,
         trustScore,
       };
     });

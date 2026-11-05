@@ -20,7 +20,7 @@ import { recalculateTrustScore } from "../trust-score/trust-score.service";
 // CONFIGURATION
 // =====================================================
 
-const VIDEO_VERIFICATION_POINTS = 10;
+const VIDEO_VERIFICATION_POINTS = 30;
 
 /**
  * Gridlines documentation suggests 0.5.
