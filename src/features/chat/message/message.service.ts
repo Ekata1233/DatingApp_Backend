@@ -217,15 +217,10 @@ export const messageService = {
      */
     const message = await messageRepository.create({
       conversationId: data.conversationId,
-
       senderId: data.userId,
-
       content: data.content,
-
       messageType: data.messageType,
-
       mediaUrl: data.mediaUrl,
-
       metadata: data.metadata,
     });
 
@@ -437,51 +432,23 @@ export const messageService = {
            */
           await createNotification({
             senderId: data.userId,
-
-            /**
-             * This is now string,
-             * NOT { userId: string }
-             */
             receiverId,
-
             type: "NEW_MESSAGE",
-
             title: sender?.full_name ?? "New message",
-
             message: notificationMessage,
-
-            /**
-             * Flutter can use this data
-             * to navigate to the chat.
-             */
             data: {
               type: "MESSAGE",
-
               targetType: "CHAT",
-
               targetId: data.conversationId,
-
               conversationId: data.conversationId,
-
               messageId: message.id,
-
               senderId: data.userId,
-
               receiverId,
             },
-
-            /**
-             * Same chat currently open:
-             * skip FCM push.
-             */
             skipPush: receiverViewingChat,
           });
         }
       } catch (error) {
-        /**
-         * Don't fail message sending just
-         * because notification failed.
-         */
         console.error("CHAT NOTIFICATION ERROR:", error);
       }
     }

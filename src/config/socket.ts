@@ -96,6 +96,7 @@ export const initializeSocket = (server: HttpServer): SocketIOServer => {
     * USER DISCONNECTED
     * ==============================
     */
+   
     socket.on(
       "disconnect",
       async (reason) => {

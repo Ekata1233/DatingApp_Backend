@@ -174,59 +174,6 @@ export const presenceService = {
     };
   },
 
-  /**
-   * Get one user's presence.
-   */
-  // async getPresence(
-  //   userId: string
-  // ): Promise<PresenceResponse> {
-  //   const key = getPresenceKey(userId);
-
-  //   const data =
-  //     await redis.get<string>(key);
-
-  //   /**
-  //    * If Redis has no record,
-  //    * consider user offline.
-  //    */
-  //   if (!data) {
-  //     const lastSeen =
-  //       await redis.get<string>(
-  //         `lastseen:${userId}`
-  //       );
-
-  //     return {
-  //       userId,
-  //       isOnline: false,
-  //       lastSeenAt: lastSeen
-  //         ? new Date(lastSeen)
-  //         : null,
-  //     };
-  //   }
-
-  //   const presence =
-  //     typeof data === "string"
-  //       ? JSON.parse(data) as UserPresence
-  //       : data as UserPresence;
-
-  //   /**
-  //    * Check current status.
-  //    */
-  //   return {
-  //     userId,
-
-  //     isOnline:
-  //       presence.status === "ONLINE",
-
-  //     lastSeenAt:
-  //       presence.lastSeenAt
-  //         ? new Date(
-  //           presence.lastSeenAt
-  //         )
-  //         : null,
-  //   };
-  // },
-
   async getPresence(
     userId: string
   ): Promise<PresenceResponse> {
