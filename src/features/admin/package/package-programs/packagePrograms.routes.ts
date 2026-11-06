@@ -46,7 +46,7 @@ const upload = multer({
 // ==========================================
 
 router.post(
-  "/",
+  "/package-programs/create",
 
   upload.array("images", 20),
   createPackageProgramController
@@ -57,7 +57,7 @@ router.post(
 // ==========================================
 
 router.get(
-  "/",
+  "/package-programs/get",
 
   getAllPackageProgramsController
 );
@@ -67,7 +67,7 @@ router.get(
 // ==========================================
 
 router.get(
-  "/:id",
+  "/package-programs/get/:id",
  
   getPackageProgramByIdController
 );
@@ -77,7 +77,7 @@ router.get(
 // ==========================================
 
 router.patch(
-  "/:id",
+  "/package-programs/update/:id",
  
   upload.array("images", 20),
   updatePackageProgramController
@@ -88,7 +88,7 @@ router.patch(
 // ==========================================
 
 router.delete(
-  "/:id",
+  "/package-programs/delete/:id",
 
   deletePackageProgramController
 );
