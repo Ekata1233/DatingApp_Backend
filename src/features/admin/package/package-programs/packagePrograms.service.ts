@@ -1,8 +1,6 @@
 import { randomUUID } from "crypto";
 import { PackageType } from "@prisma/client";
 
-import { prisma } from "../../../prisma/prismaClient";
-import imagekit from "../../../utils/imagekit";
 
 import {
   CreatePackageProgramInput,
@@ -11,6 +9,8 @@ import {
   PackageProgramDestinationInput,
   UploadedPackageProgramImage,
 } from "./packagePrograms.types";
+import imagekit from "../../../../utils/imagekit";
+import { prisma } from "../../../../prisma/prismaClient";
 
 // ==========================================
 // CUSTOM ERROR
