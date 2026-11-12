@@ -1,5 +1,5 @@
+
 import { Router } from "express";
-import multer from "multer";
 
 import {
   createPackageProgramController,
@@ -9,37 +9,7 @@ import {
   deletePackageProgramController,
 } from "./packagePrograms.controller";
 
-
 const router = Router();
-
-// ==========================================
-// MULTER CONFIGURATION
-// ==========================================
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 20,
-  },
-
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-
-    if (!allowedTypes.includes(file.mimetype)) {
-      return cb(
-        new Error("Only JPG, PNG and WEBP images are allowed")
-      );
-    }
-
-    cb(null, true);
-  },
-});
 
 // ==========================================
 // CREATE PACKAGE PROGRAM
@@ -47,8 +17,6 @@ const upload = multer({
 
 router.post(
   "/package-programs/create",
-
-  upload.array("images", 20),
   createPackageProgramController
 );
 
@@ -58,7 +26,6 @@ router.post(
 
 router.get(
   "/package-programs/get",
-
   getAllPackageProgramsController
 );
 
@@ -68,7 +35,6 @@ router.get(
 
 router.get(
   "/package-programs/get/:id",
- 
   getPackageProgramByIdController
 );
 
@@ -78,8 +44,6 @@ router.get(
 
 router.patch(
   "/package-programs/update/:id",
- 
-  upload.array("images", 20),
   updatePackageProgramController
 );
 
@@ -89,7 +53,6 @@ router.patch(
 
 router.delete(
   "/package-programs/delete/:id",
-
   deletePackageProgramController
 );
 
