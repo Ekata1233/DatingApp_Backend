@@ -611,7 +611,7 @@ export const getSingleUser = async (id: string) => {
     email: user.email,
     phone_number: user.phone_number,
     is_phone_verified: user.is_phone_verified,
-    google_id: user.google_id,
+    
 
     birth_date: formatBirthDate(
       user.birth_date
@@ -623,9 +623,7 @@ export const getSingleUser = async (id: string) => {
 
     gender: user.gender,
     gender_option: user.gender_option,
-    looking_for: user.looking_for,
-    looking_for_option:
-      user.looking_for_option,
+    
 
     // INTENTION
     intentionId: user.intentionId,
