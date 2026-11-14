@@ -68,7 +68,7 @@ export const getGiftCategoriesService = async () => {
   // 2. Fetch from Database
   const categories = await prisma.giftCategory.findMany({
     orderBy: {
-      createdAt: "desc",
+      createdAt: "asc",
     },
   });
 
@@ -382,7 +382,7 @@ export const getAllGiftService = async (
     },
 
     orderBy: {
-      createdAt: "desc",
+      createdAt: "asc",
     },
   });
 
