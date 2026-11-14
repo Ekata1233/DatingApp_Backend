@@ -236,25 +236,15 @@ const status: ActivityStatus =
 
   return {
     userId: targetUser.id,
-
     activity: `${config.icon} ${config.title}`,
-
     status,
-
     title: config.title,
-
     icon: config.icon,
-
     subtitle: config.subtitle,
-
     activeDaysLast7: targetUser.active_days_7,
-
     replyChance: config.replyChance,
-
     description: config.description,
-
     suggestion: config.suggestion,
-
     footer: "Welvors never shows exact times.",
   };
 };
