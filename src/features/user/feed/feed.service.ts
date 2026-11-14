@@ -2108,18 +2108,14 @@ AND (
     const canShowActivity =
       currentUser.show_activity === true && user.show_activity === true;
 
-    const activityTag =
-      canShowActivity && user.activity_status
-        ? ACTIVITY_TAGS[user.activity_status as ActivityStatus]
-        : null;
+   const activityTag =
+  canShowActivity && user.activity_status
+    ? ACTIVITY_TAGS[user.activity_status as ActivityStatus]
+    : null;
 
-    const activity = activityTag
-      ? {
-          status: user.activity_status,
-          label: activityTag.label,
-          icon: activityTag.icon,
-        }
-      : null;
+const activity: FeedActivity = activityTag
+  ? `${activityTag.icon} ${activityTag.label}`
+  : null;
 
     const matchScore = compat?.percentage ?? 0;
 
@@ -2478,13 +2474,9 @@ export const getFeedDetailsService = async (
     currentUser.show_activity === true && userStatus.show_activity === true;
 
   const activity: FeedActivity =
-    canShowActivity && userStatus.activity_status
-      ? {
-          status: userStatus.activity_status,
-          label: ACTIVITY_TAGS[userStatus.activity_status].label,
-          icon: ACTIVITY_TAGS[userStatus.activity_status].icon,
-        }
-      : null;
+  canShowActivity && userStatus.activity_status
+    ? `${ACTIVITY_TAGS[userStatus.activity_status].icon} ${ACTIVITY_TAGS[userStatus.activity_status].label}`
+    : null;
   // =====================================================
   // 1. PREVENT SELF PROFILE VIEW
   // =====================================================
