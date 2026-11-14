@@ -1,4 +1,4 @@
-import { BoostEventType, Prisma } from "@prisma/client";
+import { ActivityStatus, BoostEventType, Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { buildFilterQuery } from "../../../utils/feedFilter.util";
 import { formatLastSeen } from "../../../utils/lastSeen";
@@ -15,7 +15,7 @@ import {
   getReplyTimeLabel,
   MIN_REPLY_SAMPLES,
 } from "../../chat/user-reply-stats.service";
-import { maskAge, maskName } from "./feed.helper";
+import { ACTIVITY_TAGS, FeedActivity, maskAge, maskName } from "./feed.helper";
 import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 
 // =========================
@@ -61,8 +61,6 @@ export const getGenderFromInterest = (myInterest?: string): string[] => {
   if (!value || value === "EVERYONE") return allGenders;
   return allGenders.includes(value) ? [value] : allGenders;
 };
-
-
 
 export const getOrientationCompatibility = (
   orientation?: string | null,
@@ -226,9 +224,8 @@ export const getFeedService = async ({
 
       select: {
         id: true,
-
         gender: true,
-
+        show_activity: true,
         profile: {
           select: {
             interested_in: true,
@@ -413,20 +410,19 @@ export const getFeedService = async ({
   const activePackageName = activeFeedPackage?.package?.name ?? "FREE";
 
   // ========================================================
-// PACKAGE BASED FEED VISIBILITY
-// ========================================================
+  // PACKAGE BASED FEED VISIBILITY
+  // ========================================================
 
-const isVipDiscoveryPool =
-  activePackageName === "VIP" ||
-  activePackageName === "VIP_ELITE";
+  const isVipDiscoveryPool =
+    activePackageName === "VIP" || activePackageName === "VIP_ELITE";
 
-console.log("FEED PACKAGE VISIBILITY:", {
-  userId,
-  activePackageName,
-  discoveryPool: isVipDiscoveryPool
-    ? "VIP_AND_VIP_ELITE"
-    : "FREE_AND_PREMIUM",
-});
+  console.log("FEED PACKAGE VISIBILITY:", {
+    userId,
+    activePackageName,
+    discoveryPool: isVipDiscoveryPool
+      ? "VIP_AND_VIP_ELITE"
+      : "FREE_AND_PREMIUM",
+  });
 
   // ==========================================
   // PACKAGE BASED DAILY LIMIT
@@ -608,7 +604,6 @@ console.log("FEED PACKAGE VISIBILITY:", {
   //   getGenderFromInterest(v).includes(myGender),
   // );
 
-  
   // ========================================================
   // PRECOMPUTE MATCH FILTERS
   // ONBOARDING + EXTERNAL FILTER OVERRIDE
@@ -625,10 +620,7 @@ console.log("FEED PACKAGE VISIBILITY:", {
     "ANY",
   ];
 
-  if (
-    externalInterest &&
-    !allowedInterests.includes(externalInterest)
-  ) {
+  if (externalInterest && !allowedInterests.includes(externalInterest)) {
     throw new Error("Invalid interestedIn filter");
   }
 
@@ -658,7 +650,6 @@ console.log("FEED PACKAGE VISIBILITY:", {
     interestedInFilter,
     shouldApplyOnboardingOrientation,
   });
-
 
   // ========================================================
   // VIP FILTER: AMBITION
@@ -1047,8 +1038,7 @@ AND (
           )
 
        ${
-         shouldApplyOnboardingOrientation &&
-         orientationGenderOptions.length > 0
+         shouldApplyOnboardingOrientation && orientationGenderOptions.length > 0
            ? Prisma.sql`
           AND u.gender_option::text =
             ANY(
@@ -1067,17 +1057,15 @@ AND (
 
   const userSelect: Prisma.UserSelect = {
     id: true,
-
     full_name: true,
-
     birth_date: true,
-
     height: true,
     trust_score: true,
     created_at: true,
-
     last_active_at: true,
-
+    activity_status: true,
+    active_days_7: true,
+    show_activity: true,
     profile: {
       select: {
         city: true,
@@ -1984,25 +1972,6 @@ AND (
   const candidateIds = page.map((user) => user.id);
 
   // ========================================================
-  // REPLY TIME STATS
-  // ========================================================
-
-  const replyStats = await prisma.userReplyStats.findMany({
-    where: {
-      userId: {
-        in: candidateIds,
-      },
-    },
-
-    select: {
-      userId: true,
-      medianReplyMinutes: true,
-      sampleCount: true,
-    },
-  });
-
-  const replyStatsMap = new Map(replyStats.map((stat) => [stat.userId, stat]));
-  // ========================================================
   // BOOSTS
   // ========================================================
 
@@ -2013,11 +1982,8 @@ AND (
       user_id: {
         in: candidateIds,
       },
-
       is_active: true,
-
       status: "ACTIVE",
-
       started_at: {
         lte: now,
       },
@@ -2111,21 +2077,18 @@ AND (
   //   ]),
   // );
   // ========================================================
-// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
-// ========================================================
+  // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+  // ========================================================
 
-const matchScoreStart = performance.now();
+  const matchScoreStart = performance.now();
 
-const compatibilityMap = await getMatchScoresForUsers(
-  userId,
-  candidateIds,
-);
+  const compatibilityMap = await getMatchScoresForUsers(userId, candidateIds);
 
-console.log(
-  "Dynamic match scores:",
-  performance.now() - matchScoreStart,
-  "ms",
-);
+  console.log(
+    "Dynamic match scores:",
+    performance.now() - matchScoreStart,
+    "ms",
+  );
 
   // ========================================================
   // ENRICH USERS
@@ -2142,14 +2105,21 @@ console.log(
 
     const compat = compatibilityMap.get(user.id);
 
-    const replyStat = replyStatsMap.get(user.id);
+    const canShowActivity =
+      currentUser.show_activity === true && user.show_activity === true;
 
-    const replyTime =
-      replyStat &&
-      replyStat.medianReplyMinutes !== null &&
-      replyStat.sampleCount >= MIN_REPLY_SAMPLES
-        ? getReplyTimeLabel(replyStat.medianReplyMinutes)
+    const activityTag =
+      canShowActivity && user.activity_status
+        ? ACTIVITY_TAGS[user.activity_status as ActivityStatus]
         : null;
+
+    const activity = activityTag
+      ? {
+          status: user.activity_status,
+          label: activityTag.label,
+          icon: activityTag.icon,
+        }
+      : null;
 
     const matchScore = compat?.percentage ?? 0;
 
@@ -2231,9 +2201,7 @@ console.log(
         meters != null ? Math.round((meters / 1000) * 100) / 100 : null,
 
       trust: user.trust_score ?? 0,
-
-      replyTime,
-
+      activity,
       lookingFor: user.intention
         ? {
             id: user.intention.id,
@@ -2257,9 +2225,7 @@ console.log(
           },
 
       isOnline: presence?.isOnline || false,
-
       lastActiveAt: presence?.lastActiveAt || null,
-
       lastSeen: formatLastSeen(presence?.lastActiveAt),
 
       // ================================================
@@ -2267,21 +2233,14 @@ console.log(
       // ================================================
 
       isBoosted,
-
       boost: isBoosted
         ? {
             usageId: activeBoost!.id,
-
             type: boostType,
-
             title: activeBoost!.boost?.title ?? null,
-
             durationMinutes: boostDuration,
-
             visibilityMultiplier,
-
             startedAt: boostStartedAt,
-
             endsAt: boostEndsAt,
           }
         : null,
@@ -2294,15 +2253,10 @@ console.log(
 
   const sortedUsers = enriched.sort((a, b) => {
     const aActivity = a.lastActiveAt?.getTime() || 0;
-
     const bActivity = b.lastActiveAt?.getTime() || 0;
-
     const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
-
     const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
-
     const aIsNew = nowMs - aCreated < boostWindow;
-
     const bIsNew = nowMs - bCreated < boostWindow;
 
     // 1. BOOSTED FIRST
@@ -2462,7 +2416,6 @@ export const convertCmToFeet = (
   return `${feet}'${inches}"`;
 };
 
-
 export const getFeedDetailsService = async (
   userId: string,
   currentUserId: string,
@@ -2481,6 +2434,8 @@ export const getFeedDetailsService = async (
       id: true,
       account_status: true,
       deleted_at: true,
+      activity_status: true,
+      show_activity: true,
     },
   });
 
@@ -2505,6 +2460,31 @@ export const getFeedDetailsService = async (
         "This account has been deleted and its profile is no longer available.",
     };
   }
+
+  const currentUser = await prisma.user.findUnique({
+    where: {
+      id: currentUserId,
+    },
+    select: {
+      show_activity: true,
+    },
+  });
+
+  if (!currentUser) {
+    throw new Error("Current user not found");
+  }
+
+  const canShowActivity =
+    currentUser.show_activity === true && userStatus.show_activity === true;
+
+  const activity: FeedActivity =
+    canShowActivity && userStatus.activity_status
+      ? {
+          status: userStatus.activity_status,
+          label: ACTIVITY_TAGS[userStatus.activity_status].label,
+          icon: ACTIVITY_TAGS[userStatus.activity_status].icon,
+        }
+      : null;
   // =====================================================
   // 1. PREVENT SELF PROFILE VIEW
   // =====================================================
@@ -2512,16 +2492,12 @@ export const getFeedDetailsService = async (
   const shouldTrackProfileView = userId !== currentUserId;
 
   // =====================================================
-// DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
-// =====================================================
+  // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
+  // =====================================================
 
-const matchScoreMap = await getMatchScoresForUsers(
-  currentUserId,
-  [userId],
-);
+  const matchScoreMap = await getMatchScoresForUsers(currentUserId, [userId]);
 
-const dynamicMatchScore =
-  matchScoreMap.get(userId)?.percentage ?? 0;
+  const dynamicMatchScore = matchScoreMap.get(userId)?.percentage ?? 0;
 
   // =====================================================
   // 2. CHECK REDIS
@@ -2532,19 +2508,28 @@ const dynamicMatchScore =
   if (cachedFeedDetails) {
     console.log("✅ Feed Details from Redis");
 
-    // Track even when profile comes from Redis
     if (shouldTrackProfileView) {
       await trackBoostEvent({
-        targetUserId: userId, // Profile owner
-        actorId: currentUserId, // Person viewing profile
+        targetUserId: userId,
+        actorId: currentUserId,
         type: "PROFILE_VIEW",
       });
     }
 
-return {
-  ...cachedFeedDetails,
-  matchScore: dynamicMatchScore,
-};  }
+    const {
+      activity: _cachedActivity,
+      replyTime: _oldReplyTime,
+      ...cachedProfile
+    } = cachedFeedDetails as UserFeedResponse & {
+      replyTime?: string;
+    };
+
+    return {
+      ...cachedProfile,
+      matchScore: dynamicMatchScore,
+      activity,
+    } as UserFeedResponse;
+  }
 
   // =====================================================
   // 3. GET PROFILE FROM DATABASE
@@ -2633,74 +2618,54 @@ return {
     throw new Error("User not found");
   }
 
-  // =====================================================
-  // 4. GET REPLY TIME FOR THIS PARTICULAR USER
-  // =====================================================
-
-  const replyStats = await prisma.userReplyStats.findUnique({
-    where: {
-      userId: userId,
-    },
-    select: {
-      userId: true,
-      medianReplyMinutes: true,
-      sampleCount: true,
-    },
-  });
-
-  // Same logic as your main Feed API
-  const replyTime =
-    replyStats &&
-    replyStats.medianReplyMinutes !== null &&
-    replyStats.sampleCount >= MIN_REPLY_SAMPLES
-      ? (getReplyTimeLabel(replyStats.medianReplyMinutes) ?? "")
-      : "";
-
   // 3. Transform data
-// =====================================================
-// TRANSFORM USER DATA
-// =====================================================
+  // =====================================================
+  // TRANSFORM USER DATA
+  // =====================================================
 
-// =====================================================
-// TRANSFORM USER DATA
-// =====================================================
+  // =====================================================
+  // TRANSFORM USER DATA
+  // =====================================================
 
-const transformedResponse = transformUserData(
-  user,
-  replyTime,
-  dynamicMatchScore
-);
+  const transformedResponse = transformUserData(
+    user,
+    activity,
+    dynamicMatchScore,
+  );
 
-// Add heightInFeet immediately after height
-const { height, ...remainingFields } = transformedResponse;
+  // Add heightInFeet immediately after height
+  const { height, ...remainingFields } = transformedResponse;
 
-const response: UserFeedResponse = {
-  ...transformedResponse,
-  height,
-  heightInFeet: convertCmToFeet(height),
-  matchScore: dynamicMatchScore,
-};
+  const response: UserFeedResponse = {
+    ...transformedResponse,
+    height,
+    heightInFeet: convertCmToFeet(height),
+    matchScore: dynamicMatchScore,
+  };
 
-// Reorder fields to place heightInFeet after height
-const responseEntries = Object.entries(response);
-const heightIndex = responseEntries.findIndex(
-  ([key]) => key === "height",
-);
+  // Reorder fields to place heightInFeet after height
+  const responseEntries = Object.entries(response);
+  const heightIndex = responseEntries.findIndex(([key]) => key === "height");
 
-const orderedEntries = responseEntries.filter(
-  ([key]) => key !== "heightInFeet",
-);
+  const orderedEntries = responseEntries.filter(
+    ([key]) => key !== "heightInFeet",
+  );
 
-orderedEntries.splice(heightIndex + 1, 0, [
-  "heightInFeet",
-  response.heightInFeet,
-]);
+  orderedEntries.splice(heightIndex + 1, 0, [
+    "heightInFeet",
+    response.heightInFeet,
+  ]);
 
-const orderedResponse = Object.fromEntries(
-  orderedEntries,
-) as unknown as UserFeedResponse;
+  const orderedResponse = Object.fromEntries(
+    orderedEntries,
+  ) as unknown as UserFeedResponse;
   // 4. Save to Redis
-  await redis.set(CACHE_KEY, orderedResponse, {
+  const {
+  activity: _activity,
+  ...cacheableProfile
+} = orderedResponse;
+
+await redis.set(CACHE_KEY, cacheableProfile, {
   ex: CACHE_TTL,
 });
 
@@ -2721,11 +2686,15 @@ const orderedResponse = Object.fromEntries(
   // =====================================================
   // 7. RETURN
   // =====================================================
- return orderedResponse;
+  return orderedResponse;
 };
 
 // Helper function to transform user data
-const transformUserData = (user: any, replyTime: string, matchScore: number,): UserFeedResponse => {
+const transformUserData = (
+  user: any,
+  activity: FeedActivity,
+  matchScore: number,
+): UserFeedResponse => {
   // Extract lifestyle answers (screen = LIFESTYLE)
   const lifestyleAnswers = user.answer.filter(
     (a: any) => a.question.screen === "LIFESTYLE",
@@ -2766,8 +2735,7 @@ const transformUserData = (user: any, replyTime: string, matchScore: number,): U
     // Static values
     matchScore,
     trust: user.trust_score ?? 0,
-    replyTime: replyTime,
-    // Basic Info
+    activity, // Basic Info
     bio: user.bio?.bio || null,
     lookingFor: user.intention?.option || null,
     lookingFor_subtitle: user.intention?.optDescription || null,

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { ActivityStatus, Prisma } from "@prisma/client";
 import { Preferences } from "../../../utils/feedFilter.util";
 
 export type FeedMode = "date_to_marry" | "dating" | "mature_connection";
@@ -26,18 +26,22 @@ export type CurrentUser = Prisma.UserGetPayload<{
   };
 }>;
 
+export interface UserActivityTag {
+  status: ActivityStatus;
+  label: string;
+  icon: string;
+}
 // types/UserFeedTypes.ts
 export interface UserFeedResponse {
   userId: string;
   fullName: string | null;
   age: number | null;
   gender: string | null;
-  phone_number: string|null;
+  phone_number: string | null;
   // Static values
   matchScore: number;
   trust: number;
-  replyTime: string;
-  
+  activity: UserActivityTag | null;
   // Basic Info
   bio: string | null;
   lookingFor: string | null;
@@ -45,35 +49,35 @@ export interface UserFeedResponse {
   religion: string | null;
   community: string | null;
   motherTongue: string | null;
-height: number | null;
-heightInFeet: string | null;
+  height: number | null;
+  heightInFeet: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
   area: string | null;
   zodiac: string | null;
-  
+
   // Communication & Love Language
   communicationStyle: string | null;
   loveLanguage: string | null;
-  
+
   // Photos
   photos: UserPhoto[];
-  
+
   // Prompts
   prompts: UserPrompt[];
-  
+
   // Career
   career: CareerInfo;
-  
+
   // Lifestyle
   lifestyle: AnswerDetail[];
-  
+
   // Interests
   interests: AnswerDetail[];
 
   networkingAnswers: AnswerDetail[];
-  
+
   // Family
   family: FamilyInfo;
 }

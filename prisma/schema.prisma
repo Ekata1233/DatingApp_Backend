@@ -147,6 +147,15 @@ model User {
   manualGovernmentIdVerification ManualGovernmentIdVerification?
   incomeVerification             IncomeVerification?
 
+  //user activity
+  activity_status ActivityStatus?
+  active_days_7   Int             @default(0)
+  show_activity   Boolean         @default(true)
+
+  activityDays     UserActivityDay[]
+  activityWatching ActivityWatch[]   @relation("ActivityWatcher")
+  activityWatchers ActivityWatch[]   @relation("ActivityTarget")
+
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])
@@ -179,6 +188,45 @@ model UserSession {
 
   @@index([userId])
   @@index([userId, isActive])
+}
+
+enum ActivityStatus {
+  ACTIVE
+  FREQUENT
+  RELAXED
+  BUSY
+  NAPPING
+}
+
+model UserActivityDay {
+  userId String   @db.Uuid
+  dayIst DateTime @db.Date
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, dayIst])
+  @@index([dayIst])
+}
+
+model ActivityReplyRate {
+  id       String         @id @default(uuid()) @db.Uuid
+  tag      ActivityStatus
+  week     DateTime       @db.Date
+  received Int            @default(0)
+  replied  Int            @default(0)
+  pct      Int?
+
+  @@unique([tag, week])
+}
+
+model ActivityWatch {
+  watcherId String   @db.Uuid
+  targetId  String   @db.Uuid
+  createdAt DateTime @default(now())
+  watcher   User     @relation("ActivityWatcher", fields: [watcherId], references: [id], onDelete: Cascade)
+  target    User     @relation("ActivityTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([watcherId, targetId])
+  @@index([targetId])
 }
 
 model UserProfile {

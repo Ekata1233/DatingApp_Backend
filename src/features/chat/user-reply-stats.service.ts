@@ -148,7 +148,6 @@ export const updateUserReplyStats = async (
                     where: {
                         userId,
                     },
-
                     select: {
                         recentSamples: true,
                     },
@@ -214,44 +213,21 @@ export const updateUserReplyStats = async (
 
                 create: {
                     userId,
-
-                    medianReplyMinutes:
-                        median,
-
-                    sampleCount:
-                        samples.length,
-
-                    recentSamples:
-                        samples as Prisma.InputJsonValue,
-
-                    calculatedAt:
-                        new Date(),
+                    medianReplyMinutes: median,
+                    sampleCount: samples.length,
+                    recentSamples: samples as Prisma.InputJsonValue,
+                    calculatedAt:new Date(),
                 },
 
                 update: {
-                    medianReplyMinutes:
-                        median,
-
-                    sampleCount:
-                        samples.length,
-
-                    recentSamples:
-                        samples as Prisma.InputJsonValue,
-
-                    calculatedAt:
-                        new Date(),
+                    medianReplyMinutes:  median,
+                    sampleCount:  samples.length,
+                    recentSamples: samples as Prisma.InputJsonValue,
+                    calculatedAt:new Date(),
                 },
             });
 
-            console.log(
-                "✅ USER REPLY STATS UPDATED:",
-                {
-                    userId,
-                    replyMinutes,
-                    samples,
-                    median,
-                },
-            );
+            
         } catch (error) {
             /**
              * Stats should NEVER break chat.

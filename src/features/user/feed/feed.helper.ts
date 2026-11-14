@@ -1,3 +1,5 @@
+import { ActivityStatus } from "@prisma/client";
+
 export const maskName = (
   name?: string | null,
 ): string => {
@@ -24,3 +26,37 @@ export const maskAge = (
   return `${ageString.charAt(0)}•`;
 };
 
+
+
+export const ACTIVITY_TAGS: Record<
+  ActivityStatus,
+  { label: string; icon: string }
+> = {
+  ACTIVE: {
+    label: "Active",
+    icon: "⚡",
+  },
+  FREQUENT: {
+    label: "Frequent",
+    icon: "🌿",
+  },
+  RELAXED: {
+    label: "Relaxed",
+    icon: "🌙",
+  },
+  BUSY: {
+    label: "Busy",
+    icon: "💼",
+  },
+  NAPPING: {
+    label: "Napping",
+    icon: "😴",
+  },
+};
+
+
+export type FeedActivity = {
+  status: ActivityStatus;
+  label: string;
+  icon: string;
+} | null;

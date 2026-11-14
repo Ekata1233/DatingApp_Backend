@@ -17,15 +17,10 @@ export const dateNowConfirmMessage = {
       data: {
         conversationId,
         senderId,
-
         messageType: "DATE_CONFIRMED",
-
         datePlanId,
-
         metadata: {
           confirmedDateId,
-
-          // Chat card status
           status: "ACTIVE",
         },
       },

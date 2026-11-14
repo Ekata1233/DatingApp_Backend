@@ -17,7 +17,6 @@ import { createMatchFromReplyService } from "../../match/match.service";
 import { createNotification } from "../../notification/notification.service";
 import { isUserViewingConversation } from "../chat.helper";
 import { prisma } from "../../../prisma/prismaClient";
-import { updateUserReplyStats } from "../user-reply-stats.service";
 import { sendSocketGiftMessage } from "./gift.handler";
 import { AppError } from "../../rose/AppError";
 
@@ -281,18 +280,7 @@ export const messageService = {
       MessageType.LINK,
     ];
 
-    const isReply =
-      previousMessage !== null &&
-      previousMessage.senderId !== data.userId &&
-      replyStatsMessageTypes.includes(data.messageType);
-
-    if (isReply) {
-      void updateUserReplyStats(
-        data.userId,
-        previousMessage.createdAt,
-        message.createdAt,
-      );
-    }
+  
 
     /**
      * Check whether this message is
