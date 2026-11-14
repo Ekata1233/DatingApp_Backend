@@ -147,6 +147,15 @@ model User {
   manualGovernmentIdVerification ManualGovernmentIdVerification?
   incomeVerification             IncomeVerification?
 
+  //user activity
+  activity_status ActivityStatus @default(RELAXED)
+  active_days_7   Int            @default(0)
+  show_activity   Boolean        @default(true)
+
+  activityDays     UserActivityDay[]
+  activityWatching ActivityWatch[]   @relation("ActivityWatcher")
+  activityWatchers ActivityWatch[]   @relation("ActivityTarget")
+
   @@index([phone_number])
   @@index([google_id])
   @@index([gender, created_at])

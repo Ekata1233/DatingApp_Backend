@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../prisma/prismaClient";
 
+// -----------------------------------------------------------------------
+// ***************************NOT WORKING********************************* 
+// -----------------------------------------------------------------------
+
 const MAX_REPLY_SAMPLES = 20;
 export const MIN_REPLY_SAMPLES = 3;
 const MAX_REPLY_TIME_MINUTES = 24 * 60;

@@ -26,11 +26,7 @@ export type CurrentUser = Prisma.UserGetPayload<{
   };
 }>;
 
-export interface UserActivityTag {
-  status: ActivityStatus;
-  label: string;
-  icon: string;
-}
+
 // types/UserFeedTypes.ts
 export interface UserFeedResponse {
   userId: string;
@@ -41,7 +37,7 @@ export interface UserFeedResponse {
   // Static values
   matchScore: number;
   trust: number;
-  activity: UserActivityTag | null;
+  activity: string  | null;
   // Basic Info
   bio: string | null;
   lookingFor: string | null;

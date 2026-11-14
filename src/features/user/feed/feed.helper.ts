@@ -54,9 +54,18 @@ export const ACTIVITY_TAGS: Record<
   },
 };
 
+export const getActivityTag = (
+  status: ActivityStatus | null | undefined,
+  canShowActivity: boolean
+): string | null => {
+  if (!canShowActivity || !status) {
+    return null;
+  }
 
-export type FeedActivity = {
-  status: ActivityStatus;
-  label: string;
-  icon: string;
-} | null;
+  const tag = ACTIVITY_TAGS[status];
+
+  return tag ? `${tag.icon} ${tag.label}` : null;
+};
+
+
+export type FeedActivity = string | null;

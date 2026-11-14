@@ -106,6 +106,8 @@ import inAppPurchaseRoutes from "../features/payment/inAppPurchase/purchaseVerif
 import purchaseHistoryRoutes from "../features/purchase-history/purchase-history.routes"
 import packageProgram from "../features/admin/package/package-programs/packagePrograms.routes"
 import usersRoutes from "../features/admin/onboarding/users/users.route"
+
+import activityRoutes from "../features/user/activity/activity.routes"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -148,6 +150,7 @@ router.use("/user", detailsRoutes)
 
 //last seen & online status 
 router.use("/user", lastActivityRoutes)
+router.use("/user", activityRoutes)
 //end of presence handling
 
 //swipe routes
