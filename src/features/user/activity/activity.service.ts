@@ -9,6 +9,7 @@ import {
 } from "./activity.utils";
 
 import { UserActivityResponse } from "./activity.types";
+import { ActivityStatus } from "@prisma/client";
 
 const MIN_SESSION_SECONDS = 10;
 const HEARTBEAT_THROTTLE_SECONDS = 300;
@@ -213,18 +214,19 @@ export const getUserActivityCardService = async (
   // 4. CHECK USER ACTIVITY
   // ==========================================
 
-  if (!targetUser.last_active_at) {
-    return null;
-  }
+  // if (!targetUser.last_active_at) {
+  //   return null;
+  // }
 
   // ==========================================
   // 5. GET ACTIVITY CARD DATA
   // ==========================================
 
-  const status = targetUser.activity_status;
-  if (status === null) {
-    return null;
-  }
+const status: ActivityStatus =
+  !targetUser.last_active_at ||
+  targetUser.activity_status === null
+    ? ActivityStatus.RELAXED
+    : targetUser.activity_status;
 
   const config = ACTIVITY_CARD_CONFIG[status];
 

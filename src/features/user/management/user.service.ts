@@ -1,3 +1,4 @@
+import { ActivityStatus } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import { formatLastSeen } from "../../../utils/lastSeen";
 import {
@@ -7,10 +8,9 @@ import {
 import { getUsersPresence } from "../../lastActivity/lastActivity.service";
 import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 import { calculateAge } from "../feed/feed.service";
+import { ACTIVITY_TAGS } from "../feed/feed.helper";
 
 //SERVICE LAYER FOR ALL USER MANAGEMENT
-
-
 
 export const getAllUsers = async () => {
   const now = new Date();
@@ -37,10 +37,7 @@ export const getAllUsers = async () => {
           startDate: {
             lte: now,
           },
-          OR: [
-            { endDate: null },
-            { endDate: { gt: now } },
-          ],
+          OR: [{ endDate: null }, { endDate: { gt: now } }],
         },
         select: {
           currentPackage: {
@@ -65,28 +62,27 @@ export const getAllUsers = async () => {
           balance: true,
         },
       },
-      
-photos: {
-  where: {
-    media_type: "IMAGE",
-  },
-  select: {
-    media_url: true,
-  },
-  orderBy: [
-    {
-      is_primary: "desc",
-    },
-    {
-      order: "asc",
-    },
-    {
-      created_at: "asc",
-    },
-  ],
-  take: 1,
-},
 
+      photos: {
+        where: {
+          media_type: "IMAGE",
+        },
+        select: {
+          media_url: true,
+        },
+        orderBy: [
+          {
+            is_primary: "desc",
+          },
+          {
+            order: "asc",
+          },
+          {
+            created_at: "asc",
+          },
+        ],
+        take: 1,
+      },
     },
 
     orderBy: {
@@ -101,18 +97,13 @@ photos: {
       const today = new Date();
       const birthDate = new Date(user.birth_date);
 
-      age =
-        today.getUTCFullYear() -
-        birthDate.getUTCFullYear();
+      age = today.getUTCFullYear() - birthDate.getUTCFullYear();
 
-      const monthDifference =
-        today.getUTCMonth() -
-        birthDate.getUTCMonth();
+      const monthDifference = today.getUTCMonth() - birthDate.getUTCMonth();
 
       if (
         monthDifference < 0 ||
-        (monthDifference === 0 &&
-          today.getUTCDate() < birthDate.getUTCDate())
+        (monthDifference === 0 && today.getUTCDate() < birthDate.getUTCDate())
       ) {
         age--;
       }
@@ -141,7 +132,6 @@ photos: {
   });
 };
 
-
 //SERVICE LAYER FOR FETCHING SINGLE USER
 
 // SERVICE LAYER FOR FETCHING SINGLE USER WITH FULL DETAILS
@@ -164,12 +154,7 @@ const formatBirthDate = (date: Date | string | null): string | null => {
   return `${day}-${month}-${year}`;
 };
 
-
-
-export const getSingleUser = async (
-  id: string,
-  currentUserId?: string,
-) => {
+export const getSingleUser = async (id: string, currentUserId?: string) => {
   const now = new Date();
 
   // ==========================================================
@@ -255,10 +240,7 @@ export const getSingleUser = async (
       // PHOTOS / VIDEOS
       // ---------------------------------
       photos: {
-        orderBy: [
-          { order: "asc" },
-          { created_at: "asc" },
-        ],
+        orderBy: [{ order: "asc" }, { created_at: "asc" }],
       },
 
       // ---------------------------------
@@ -388,70 +370,54 @@ export const getSingleUser = async (
   // MAP USER ANSWERS BY QUESTION ID
   // ==========================================================
 
-  const userAnswersMap = new Map<
-    string,
-    typeof user.answer
-  >();
+  const userAnswersMap = new Map<string, typeof user.answer>();
 
   for (const answer of user.answer) {
-    const existingAnswers =
-      userAnswersMap.get(answer.question_id) ?? [];
+    const existingAnswers = userAnswersMap.get(answer.question_id) ?? [];
 
     existingAnswers.push(answer);
 
-    userAnswersMap.set(
-      answer.question_id,
-      existingAnswers,
-    );
+    userAnswersMap.set(answer.question_id, existingAnswers);
   }
 
   // ==========================================================
   // FORMAT QUESTIONS WITH OPTIONS AND SELECTED ANSWERS
   // ==========================================================
 
-  const questionsWithAnswers = allQuestions.map(
-    (question) => {
-      const userAnswers =
-        userAnswersMap.get(question.id) ?? [];
+  const questionsWithAnswers = allQuestions.map((question) => {
+    const userAnswers = userAnswersMap.get(question.id) ?? [];
 
-      const selectedOptionIds = new Set(
-        userAnswers.map(
-          (answer) => answer.option_id,
-        ),
-      );
+    const selectedOptionIds = new Set(
+      userAnswers.map((answer) => answer.option_id),
+    );
 
-      return {
-        id: question.id,
-        key: question.key,
-        title: question.title,
-        category: question.category,
-        screen: question.screen,
-        isMulti: question.isMulti,
+    return {
+      id: question.id,
+      key: question.key,
+      title: question.title,
+      category: question.category,
+      screen: question.screen,
+      isMulti: question.isMulti,
 
-        isAnswered: userAnswers.length > 0,
+      isAnswered: userAnswers.length > 0,
 
-        options: question.options.map((option) => ({
-          id: option.id,
-          value: option.value,
-          label: option.label,
+      options: question.options.map((option) => ({
+        id: option.id,
+        value: option.value,
+        label: option.label,
 
-          isSelected: selectedOptionIds.has(
-            option.id,
-          ),
-        })),
+        isSelected: selectedOptionIds.has(option.id),
+      })),
 
-        selectedOptions: userAnswers.map(
-          (answer) => ({
-            answerId: answer.id,
-            id: answer.option.id,
-            value: answer.option.value,
-            label: answer.option.label,
-            description: answer.description,
-          }),
-        ),
-      };
-    },
-  );
+      selectedOptions: userAnswers.map((answer) => ({
+        answerId: answer.id,
+        id: answer.option.id,
+        value: answer.option.value,
+        label: answer.option.label,
+        description: answer.description,
+      })),
+    };
+  });
 
   // ==========================================================
   // DYNAMIC FEED DETAILS
@@ -472,21 +438,16 @@ export const getSingleUser = async (
   // ==========================================================
 
   if (currentUserId) {
-    const presenceMap = await getUsersPresence([
-      user.id,
-    ]);
+    const presenceMap = await getUsersPresence([user.id]);
 
     const presence = presenceMap[user.id];
 
     if (presence) {
       isOnline = presence.isOnline || false;
 
-      presenceLastActiveAt =
-        presence.lastActiveAt || null;
+      presenceLastActiveAt = presence.lastActiveAt || null;
 
-      lastSeen = formatLastSeen(
-        presence.lastActiveAt,
-      );
+      lastSeen = formatLastSeen(presence.lastActiveAt);
     }
   }
 
@@ -494,28 +455,27 @@ export const getSingleUser = async (
   // ACTIVE BOOST
   // ==========================================================
 
-  const activeBoost =
-    await prisma.boostUsage.findFirst({
-      where: {
-        user_id: user.id,
-        is_active: true,
+  const activeBoost = await prisma.boostUsage.findFirst({
+    where: {
+      user_id: user.id,
+      is_active: true,
 
-        started_at: {
-          lte: now,
-        },
-
-        expected_end_at: {
-          gt: now,
-        },
+      started_at: {
+        lte: now,
       },
 
-      select: {
-        id: true,
-        user_id: true,
-        started_at: true,
-        expected_end_at: true,
+      expected_end_at: {
+        gt: now,
       },
-    });
+    },
+
+    select: {
+      id: true,
+      user_id: true,
+      started_at: true,
+      expected_end_at: true,
+    },
+  });
 
   isBoosted = !!activeBoost;
 
@@ -523,24 +483,16 @@ export const getSingleUser = async (
   // DYNAMIC MATCH SCORE - REDIS + PRISMA
   // ==========================================================
 
-  if (
-    currentUserId &&
-    currentUserId !== user.id
-  ) {
-    const matchScoreMap =
-      await getMatchScoresForUsers(
-        currentUserId,
-        [user.id],
-      );
+  if (currentUserId && currentUserId !== user.id) {
+    const matchScoreMap = await getMatchScoresForUsers(currentUserId, [
+      user.id,
+    ]);
 
-    const compatibility =
-      matchScoreMap.get(user.id);
+    const compatibility = matchScoreMap.get(user.id);
 
-    matchScore =
-      compatibility?.percentage ?? 0;
+    matchScore = compatibility?.percentage ?? 0;
 
-    compatibilityScore =
-      compatibility?.score ?? 0;
+    compatibilityScore = compatibility?.score ?? 0;
   }
 
   // ==========================================================
@@ -553,29 +505,26 @@ export const getSingleUser = async (
     user.profile?.latitude != null &&
     user.profile?.longitude != null
   ) {
-    const currentUser =
-      await prisma.user.findUnique({
-        where: {
-          id: currentUserId,
-        },
+    const currentUser = await prisma.user.findUnique({
+      where: {
+        id: currentUserId,
+      },
 
-        select: {
-          profile: {
-            select: {
-              latitude: true,
-              longitude: true,
-            },
+      select: {
+        profile: {
+          select: {
+            latitude: true,
+            longitude: true,
           },
         },
-      });
+      },
+    });
 
     if (
       currentUser?.profile?.latitude != null &&
       currentUser?.profile?.longitude != null
     ) {
-      const result = await prisma.$queryRaw<
-        { distance: number | null }[]
-      >`
+      const result = await prisma.$queryRaw<{ distance: number | null }[]>`
         SELECT
           ST_Distance(
             a.location::geography,
@@ -592,10 +541,7 @@ export const getSingleUser = async (
       const distance = result[0]?.distance;
 
       if (distance != null) {
-        distanceKm =
-          Math.round(
-            (Number(distance) / 1000) * 100,
-          ) / 100;
+        distanceKm = Math.round((Number(distance) / 1000) * 100) / 100;
       }
     }
   }
@@ -607,17 +553,48 @@ export const getSingleUser = async (
   const trustScore = user.trust_score ?? 0;
 
   // ==========================================================
+  // ACTIVITY TAG
+  // ==========================================================
+
+  // Get logged-in user's activity visibility
+  const currentUserActivity = currentUserId
+    ? await prisma.user.findUnique({
+        where: {
+          id: currentUserId,
+        },
+        select: {
+          show_activity: true,
+        },
+      })
+    : null;
+
+  // Check privacy settings
+  const canShowActivity =
+    user.show_activity === true && currentUserActivity?.show_activity === true;
+
+  // Use RELAXED as fallback when activity data is missing
+  const activityStatus: ActivityStatus =
+    !user.last_active_at || !user.activity_status
+      ? ActivityStatus.RELAXED
+      : user.activity_status;
+
+  // Final activity string
+  const activityTag = ACTIVITY_TAGS[activityStatus];
+
+  const activity: string | null = canShowActivity
+    ? `${activityTag.icon} ${activityTag.label}`
+    : null;
+
+  // ==========================================================
   // VERIFICATION STATUS
   // ==========================================================
 
   const isVerified = user.verifications.some(
-    (verification) =>
-      verification.status === "VERIFIED",
+    (verification) => verification.status === "VERIFIED",
   );
 
   const verifiedCount = user.verifications.filter(
-    (verification) =>
-      verification.status === "VERIFIED",
+    (verification) => verification.status === "VERIFIED",
   ).length;
 
   // ==========================================================
@@ -629,36 +606,8 @@ export const getSingleUser = async (
       (membership) =>
         membership.status === "ACTIVE" &&
         membership.startDate <= now &&
-        (
-          membership.endDate === null ||
-          membership.endDate > now
-        ),
+        (membership.endDate === null || membership.endDate > now),
     ) ?? null;
-
-  // ==========================================================
-  // DYNAMIC REPLY TIME
-  // ==========================================================
-
-  const replyStat =
-    await prisma.userReplyStats.findUnique({
-      where: {
-        userId: user.id,
-      },
-
-      select: {
-        medianReplyMinutes: true,
-        sampleCount: true,
-      },
-    });
-
-  const replyTime =
-    replyStat &&
-    replyStat.medianReplyMinutes !== null &&
-    replyStat.sampleCount >= MIN_REPLY_SAMPLES
-      ? getReplyTimeLabel(
-          replyStat.medianReplyMinutes,
-        )
-      : null;
 
   // ==========================================================
   // HEIGHT CONVERSION (CM TO FEET & INCHES)
@@ -671,18 +620,13 @@ export const getSingleUser = async (
   let heightFormatted: string | null = null;
 
   if (heightCm !== null && heightCm > 0) {
-    const totalInches = Math.round(
-      heightCm / 2.54,
-    );
+    const totalInches = Math.round(heightCm / 2.54);
 
-    heightFeet = Math.floor(
-      totalInches / 12,
-    );
+    heightFeet = Math.floor(totalInches / 12);
 
     heightInches = totalInches % 12;
 
-    heightFormatted =
-      `${heightFeet}' ${heightInches}"`;
+    heightFormatted = `${heightFeet}' ${heightInches}"`;
   }
 
   // ==========================================================
@@ -696,9 +640,7 @@ export const getSingleUser = async (
     id: user.id,
     full_name: user.full_name,
 
-    birth_date: formatBirthDate(
-      user.birth_date,
-    ),
+    birth_date: formatBirthDate(user.birth_date),
 
     age: calculateAge(user.birth_date),
 
@@ -709,8 +651,7 @@ export const getSingleUser = async (
     gender_option: user.gender_option,
 
     looking_for: user.looking_for,
-    looking_for_option:
-      user.looking_for_option,
+    looking_for_option: user.looking_for_option,
 
     created_at: user.created_at,
     last_active_at: user.last_active_at,
@@ -721,8 +662,7 @@ export const getSingleUser = async (
     account_status: user.account_status,
     profile_completion: user.profile_completion,
     badge_count: user.badge_count,
-    onboarding_completed:
-      user.onboarding_completed,
+    onboarding_completed: user.onboarding_completed,
 
     // ---------------------------------
     // PROFILE
@@ -797,11 +737,9 @@ export const getSingleUser = async (
     // ---------------------------------
     // RELATIONSHIPS
     // ---------------------------------
-    relationshipsAsUser1:
-      user.relationshipsAsUser1,
+    relationshipsAsUser1: user.relationshipsAsUser1,
 
-    relationshipsAsUser2:
-      user.relationshipsAsUser2,
+    relationshipsAsUser2: user.relationshipsAsUser2,
 
     // ---------------------------------
     // FEED DETAILS
@@ -810,7 +748,7 @@ export const getSingleUser = async (
     compatibilityScore,
     distanceKm,
     trust: trustScore,
-    replyTime,
+    activity,
 
     // ---------------------------------
     // PRESENCE
@@ -820,5 +758,3 @@ export const getSingleUser = async (
     lastSeen,
   };
 };
-
-
