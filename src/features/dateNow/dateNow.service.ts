@@ -430,9 +430,7 @@ export const discoverDatePlan = async (
   limit: number = DEFAULT_LIMIT,
 ) => {
   const now = new Date();
-
   const pageLimit = Math.min(Math.max(limit, 1), MAX_LIMIT);
-
   const normalizedFilter = (filter || "all").toLowerCase();
 
   if (!["all", "today", "tomorrow", "weekend"].includes(normalizedFilter)) {
@@ -553,9 +551,7 @@ export const discoverDatePlan = async (
 
     // Saturday = 6, Sunday = 0
     const daysUntilSaturday = (6 - day + 7) % 7;
-
     const weekendStart = istMidnightUtc(daysUntilSaturday);
-
     const weekendEnd = istMidnightUtc(daysUntilSaturday + 2);
 
     dateFilter = {
@@ -663,7 +659,10 @@ export const discoverDatePlan = async (
 
           photos: {
             where: {
-              order: 1,
+              media_type: "IMAGE",
+            },
+            orderBy: {
+              order: "asc",
             },
             take: 1,
           },
@@ -706,8 +705,6 @@ export const discoverDatePlan = async (
     },
   });
 
-  console.log("[DATE DISCOVER] Eligible plans:", plans.length);
-
   // ============================================
   // DYNAMIC MATCH SCORE - REDIS + BATCH PRISMA
   // ============================================
@@ -715,17 +712,8 @@ export const discoverDatePlan = async (
   // Extract unique host IDs.
   // One host may have multiple date plans.
   const hostUserIds = [...new Set(plans.map((plan) => plan.userId))];
-
-  // Calculate scores once for all unique hosts.
   const matchScoreStart = performance.now();
-
   const matchScoreMap = await getMatchScoresForUsers(userId, hostUserIds);
-
-  console.log(
-    "[DATE DISCOVER] Dynamic match scores:",
-    performance.now() - matchScoreStart,
-    "ms",
-  );
 
   // ============================================
   // CALCULATE SCORE AND DISTANCE
@@ -786,13 +774,9 @@ export const discoverDatePlan = async (
 
     return {
       ...plan,
-
       matchScore,
-
       distanceKm: distanceKm !== null ? Number(distanceKm.toFixed(1)) : null,
-
       distanceText,
-
       score,
     };
   });
@@ -837,9 +821,7 @@ export const discoverDatePlan = async (
   // ============================================
 
   const pageItems = ranked.slice(startIndex, startIndex + pageLimit + 1);
-
   const hasMore = pageItems.length > pageLimit;
-
   const selectedPlans = pageItems.slice(0, pageLimit);
 
   // ============================================
@@ -864,53 +846,32 @@ export const discoverDatePlan = async (
 
     return {
       id: plan.id,
-
       matchScore: plan.matchScore,
-
       distanceKm: plan.distanceKm,
-
       distanceText: plan.distanceText,
-
       activity: plan.activity?.label,
-
       activityIcon: plan.activity?.icon,
-
       title: plan.title,
-
       quickTitle: plan.quickTitle?.label,
-
       note: plan.note,
-
       photoUrl: plan.photoUrl,
-
       eventDate,
-
       eventTime,
-
       eventDay,
-
       whoPays: plan.whoPays?.label,
-
       duration: plan.duration,
-
       host: {
         id: plan.user.id,
-
         name: plan.user.full_name,
-
         trustScore: plan.user.trust_score,
-
         profilePhoto:
           plan.user.photos.length > 0 ? plan.user.photos[0].media_url : null,
-
         age: plan.user.birth_date
           ? Math.floor(
               (Date.now() - new Date(plan.user.birth_date).getTime()) /
                 (365.25 * 24 * 60 * 60 * 1000),
             )
           : null,
-
-        // HOST PURCHASED PACKAGE
         package: plan.user.userPackages[0]?.package.name ?? "FREE",
       },
     };
@@ -933,14 +894,10 @@ export const discoverDatePlan = async (
 
   return {
     plans: formattedPlans,
-
     pagination: {
       limit: pageLimit,
-
       returnedCount: formattedPlans.length,
-
       hasMore,
-
       nextCursor,
     },
   };
@@ -2149,13 +2106,9 @@ export const getDatePlanHistory = async (
   });
 
   const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
-
   const skip = (page - 1) * limit;
-
   type HistoryStatus = "MET" | "NO_SHOW" | "EXPIRED" | "CANCELLED";
-
   const requestedStatus = String(query.status ?? "ALL").toUpperCase();
-
   const allowedStatuses = ["ALL", "MET", "NO_SHOW", "EXPIRED", "CANCELLED"];
 
   if (!allowedStatuses.includes(requestedStatus)) {
@@ -2164,11 +2117,6 @@ export const getDatePlanHistory = async (
     );
   }
 
-  console.log("========== DATE PLAN HISTORY ==========");
-  console.log("USER ID:", userId);
-  console.log("STATUS:", requestedStatus);
-  console.log("PAGE:", page);
-  console.log("LIMIT:", limit);
 
   /*
    * Eligible feedback:
@@ -2290,9 +2238,7 @@ export const getDatePlanHistory = async (
 
       include: {
         activity: true,
-
         quickTitle: true,
-
         whoPays: true,
 
         /*
@@ -2300,9 +2246,7 @@ export const getDatePlanHistory = async (
          */
         feedbacks: {
           where: validFeedback,
-
           take: 1,
-
           select: {
             id: true,
             attendanceStatus: true,
@@ -2466,11 +2410,8 @@ export const getDatePlanHistory = async (
       MET: participant?.full_name
         ? `You met ${participant.full_name}.`
         : "You attended this date.",
-
       NO_SHOW: "This date was marked as a no-show.",
-
       EXPIRED: "This date plan has expired.",
-
       CANCELLED: "This date plan was cancelled.",
     };
 
@@ -2486,32 +2427,15 @@ export const getDatePlanHistory = async (
 
     return {
       id: plan.id,
-
-      /*
-       * History status
-       */
       status: historyStatus,
-
       statusLabel,
-
-      /*
-       * Original database plan status
-       */
       planStatus: plan.status,
-
-      /*
-       * Attendance feedback
-       */
       attendance: feedback
         ? {
             id: feedback.id,
-
             attendanceStatus: feedback.attendanceStatus,
-
             feedbackStatus: feedback.status,
-
             metUserId: feedback.metUserId,
-
             createdAt: feedback.createdAt,
           }
         : null,
@@ -2520,18 +2444,10 @@ export const getDatePlanHistory = async (
        * Plan details
        */
       title: plan.title,
-
       photoUrl: plan.photoUrl,
-
       activity: plan.activity,
-
       quickTitle: plan.quickTitle,
-
-      /*
-       * Date
-       */
       eventDateTime: plan.eventDateTime,
-
       duration: plan.duration,
 
       /*
@@ -2550,13 +2466,10 @@ export const getDatePlanHistory = async (
       participant: participant
         ? {
             id: participant.id,
-
             name: participant.full_name,
-
             age: participant.birth_date
               ? calculateAge(participant.birth_date)
               : null,
-
             photoUrl: participant.photos[0]?.media_url ?? null,
           }
         : null,
@@ -2566,60 +2479,31 @@ export const getDatePlanHistory = async (
        */
       requests: {
         total: requestStats.total,
-
         pending: requestStats.pending,
-
         approved: requestStats.approved,
-
         declined: requestStats.declined,
-
         cancelled: requestStats.cancelled,
-
         users: plan.requests.map((request) => ({
           id: request.requester.id,
-
           name: request.requester.full_name,
-
           age: request.requester.birth_date
             ? calculateAge(request.requester.birth_date)
             : null,
-
           photoUrl: request.requester.photos[0]?.media_url ?? null,
-
           status: request.status,
         })),
       },
-
-      /*
-       * Payment
-       */
       whoPays: plan.whoPays,
-
-      /*
-       * Confirmation
-       */
       confirmedDate: confirmed
         ? {
             id: confirmed.id,
-
             status: confirmed.status,
-
             eventDateTime: confirmed.eventDateTime,
           }
         : null,
-
-      /*
-       * Existing static review
-       */
       review,
-
-      /*
-       * History message
-       */
       message,
-
       createdAt: plan.createdAt,
-
       updatedAt: plan.updatedAt,
     };
   });
@@ -3364,9 +3248,7 @@ export const dateNowInviteMessage = {
   },
 };
 
-export const getDateInviteList = async (userId: string,
-  planId: string,
-)=> {
+export const getDateInviteList = async (userId: string, planId: string) => {
   // ============================================
   // 1. GET DATE PLAN WITH GENDER OPTION
   // ============================================
@@ -3396,8 +3278,7 @@ export const getDateInviteList = async (userId: string,
   // 2. GET SELECTED GENDER
   // ============================================
 
-  const genderValue =
-    plan.joinRequestGender?.value ?? null;
+  const genderValue = plan.joinRequestGender?.value ?? null;
 
   // ============================================
   // 3. GET FILTERED CONVERSATION USERS
@@ -3414,16 +3295,11 @@ export const getDateInviteList = async (userId: string,
   // 4. DYNAMIC MATCH SCORE
   // ============================================
 
-  const targetUserIds = users.map(
-    (user) => user.id,
-  );
+  const targetUserIds = users.map((user) => user.id);
 
   const matchScoreMap =
     targetUserIds.length > 0
-      ? await getMatchScoresForUsers(
-          userId,
-          targetUserIds,
-        )
+      ? await getMatchScoresForUsers(userId, targetUserIds)
       : new Map<
           string,
           {
@@ -3441,17 +3317,12 @@ export const getDateInviteList = async (userId: string,
 
     fullName: user.full_name,
 
-    age: user.birth_date
-      ? calculateAge(user.birth_date)
-      : null,
+    age: user.birth_date ? calculateAge(user.birth_date) : null,
 
-    profilePhoto:
-      user.photos[0]?.media_url ?? null,
+    profilePhoto: user.photos[0]?.media_url ?? null,
 
-    matchPercentage:
-      matchScoreMap.get(user.id)?.percentage ?? 0,
+    matchPercentage: matchScoreMap.get(user.id)?.percentage ?? 0,
 
-    isDateInviteDisabled:
-      declinedUserIds.has(user.id),
+    isDateInviteDisabled: declinedUserIds.has(user.id),
   }));
-}
+};

@@ -1430,6 +1430,40 @@ model PackagePrice {
   @@map("plan_prices")
 }
 
+model PackagePrograms {
+  id           String                      @id @default(uuid()) @db.Uuid
+  packageType  PackageType
+  title        String
+  tagline      String?
+  description  String?                     @db.Text
+  tags         String[]                    @default([])
+  condition    String?                     @db.Text
+  destinations PackageProgramDestination[]
+  isActive     Boolean                     @default(true)
+  sortOrder    Int                         @default(0)
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+
+  @@index([packageType, isActive])
+  @@map("package_programs")
+}
+
+model PackageProgramDestination {
+  id          String          @id @default(uuid()) @db.Uuid
+  programId   String          @db.Uuid
+  city        String
+  imageUrl    String
+  imageFileId String
+  sortOrder   Int             @default(0)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  program     PackagePrograms @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([programId])
+  @@map("package_program_destinations")
+}
+
 enum BillingCycle {
   MONTHLY
   QUARTERLY

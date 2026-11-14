@@ -82,76 +82,75 @@ export const dateNowInviteMessageRepo = {
   },
 
   async findDateInviteList(
-  userId: string,
-  planId: string,
-  genderValue: string | null,
-) {
-  // ============================================
-  // 1. BUILD GENDER FILTER
-  // ============================================
+    userId: string,
+    planId: string,
+    genderValue: string | null,
+  ) {
+    // ============================================
+    // 1. BUILD GENDER FILTER
+    // ============================================
 
-let genderFilter: Prisma.UserWhereInput = {};
+    let genderFilter: Prisma.UserWhereInput = {};
 
-switch (genderValue) {
-  case "MEN":
-    genderFilter = {
-      gender: Gender.MEN,
-    };
-    break;
+    switch (genderValue) {
+      case "MEN":
+        genderFilter = {
+          gender: Gender.MEN,
+        };
+        break;
 
-  case "WOMEN":
-    genderFilter = {
-      gender: Gender.WOMEN,
-    };
-    break;
+      case "WOMEN":
+        genderFilter = {
+          gender: Gender.WOMEN,
+        };
+        break;
 
-  case "NON_BINARY":
-    genderFilter = {
-      gender: Gender.NON_BINARY,
-    };
-    break;
+      case "NON_BINARY":
+        genderFilter = {
+          gender: Gender.NON_BINARY,
+        };
+        break;
 
-  // Temporary fallback: includes all men
-  case "TRANS_MAN":
-    genderFilter = {
-      gender: Gender.MEN,
-    };
-    break;
+      // Temporary fallback: includes all men
+      case "TRANS_MAN":
+        genderFilter = {
+          gender: Gender.MEN,
+        };
+        break;
 
-  // Temporary fallback: includes all women
-  case "TRANS_WOMAN":
-    genderFilter = {
-      gender: Gender.WOMEN,
-    };
-    break;
+      // Temporary fallback: includes all women
+      case "TRANS_WOMAN":
+        genderFilter = {
+          gender: Gender.WOMEN,
+        };
+        break;
 
-  case "OTHER":
-    genderFilter = {
-      gender: Gender.OTHER,
-    };
-    break;
+      case "OTHER":
+        genderFilter = {
+          gender: Gender.OTHER,
+        };
+        break;
 
-  case "PREFER_NOT_TO_SAY":
-    genderFilter = {
-      gender: Gender.PREFER_NOT_TO_SAY,
-    };
-    break;
+      case "PREFER_NOT_TO_SAY":
+        genderFilter = {
+          gender: Gender.PREFER_NOT_TO_SAY,
+        };
+        break;
 
-  case "EVERYONE":
-    genderFilter = {};
-    break;
+      case "EVERYONE":
+        genderFilter = {};
+        break;
 
-  default:
-    genderFilter = {};
-    break;
-}
+      default:
+        genderFilter = {};
+        break;
+    }
 
-  // ============================================
-  // 2. GET CONVERSATION USERS
-  // ============================================
+    // ============================================
+    // 2. GET CONVERSATION USERS
+    // ============================================
 
-  const conversations =
-    await prisma.conversation.findMany({
+    const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
           some: {
@@ -201,28 +200,25 @@ switch (genderValue) {
       },
     });
 
-  // ============================================
-  // 3. UNIQUE USERS
-  // ============================================
+    // ============================================
+    // 3. UNIQUE USERS
+    // ============================================
 
-  const users = [
-    ...new Map(
-      conversations
-        .flatMap((conversation) =>
-          conversation.participants.map(
-            (participant) => participant.user,
-          ),
-        )
-        .map((user) => [user.id, user]),
-    ).values(),
-  ];
+    const users = [
+      ...new Map(
+        conversations
+          .flatMap((conversation) =>
+            conversation.participants.map((participant) => participant.user),
+          )
+          .map((user) => [user.id, user]),
+      ).values(),
+    ];
 
-  // ============================================
-  // 4. DECLINED REQUEST CHECK
-  // ============================================
+    // ============================================
+    // 4. DECLINED REQUEST CHECK
+    // ============================================
 
-  const declinedRequests =
-    await prisma.datePlanRequest.findMany({
+    const declinedRequests = await prisma.datePlanRequest.findMany({
       where: {
         planId,
 
@@ -242,13 +238,11 @@ switch (genderValue) {
       },
     });
 
-  return {
-    users,
-    declinedUserIds: new Set(
-      declinedRequests.map(
-        (request) => request.requesterId,
+    return {
+      users,
+      declinedUserIds: new Set(
+        declinedRequests.map((request) => request.requesterId),
       ),
-    ),
-  };
-},
+    };
+  },
 };
