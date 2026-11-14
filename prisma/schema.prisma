@@ -148,9 +148,9 @@ model User {
   incomeVerification             IncomeVerification?
 
   //user activity
-  activity_status ActivityStatus?
-  active_days_7   Int             @default(0)
-  show_activity   Boolean         @default(true)
+  activity_status ActivityStatus @default(RELAXED)
+  active_days_7   Int            @default(0)
+  show_activity   Boolean        @default(true)
 
   activityDays     UserActivityDay[]
   activityWatching ActivityWatch[]   @relation("ActivityWatcher")
