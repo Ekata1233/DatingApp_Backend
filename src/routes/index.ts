@@ -105,6 +105,7 @@ import razorpayRoutes from "../features/payment/razorpayPayment/razorpay.routes"
 import inAppPurchaseRoutes from "../features/payment/inAppPurchase/purchaseVerification.route"
 import purchaseHistoryRoutes from "../features/purchase-history/purchase-history.routes"
 import packageProgram from "../features/admin/package/package-programs/packagePrograms.routes"
+import usersRoutes from "../features/admin/onboarding/users/users.route"
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -121,7 +122,7 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes,conversationPromtRoutes,packageProgram);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes,conversationPromtRoutes,packageProgram,usersRoutes);
 
 
 
