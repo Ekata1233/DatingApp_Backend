@@ -11,10 +11,6 @@ import {
 } from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
-import {
-  getReplyTimeLabel,
-  MIN_REPLY_SAMPLES,
-} from "../../chat/user-reply-stats.service";
 import { ACTIVITY_TAGS, FeedActivity, maskAge, maskName } from "./feed.helper";
 import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 

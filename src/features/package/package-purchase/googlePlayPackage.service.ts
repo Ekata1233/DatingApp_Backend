@@ -203,16 +203,13 @@ import { google } from "googleapis";
 //   }
 // };
 
-
 export const verifyGooglePlayPackage = async (
   productId: string,
   purchaseToken: string,
 ) => {
-  const encoded =
-    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
+  const encoded = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
 
-  const packageName =
-    process.env.GOOGLE_PLAY_PACKAGE_NAME;
+  const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME;
 
   if (!encoded || !packageName) {
     throw new Error("GOOGLE_PLAY_NOT_CONFIGURED");
@@ -224,9 +221,7 @@ export const verifyGooglePlayPackage = async (
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: [
-      "https://www.googleapis.com/auth/androidpublisher",
-    ],
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
   });
 
   const publisher = google.androidpublisher({
@@ -236,34 +231,24 @@ export const verifyGooglePlayPackage = async (
 
   try {
     // 1. Verify subscription with Google Play
-    const response =
-      await publisher.purchases.subscriptionsv2.get({
-        packageName,
-        token: purchaseToken,
-      });
+    const response = await publisher.purchases.subscriptionsv2.get({
+      packageName,
+      token: purchaseToken,
+    });
 
     const purchase = response.data;
 
-    console.log(
-      "========== GOOGLE PLAY PACKAGE DEBUG =========="
-    );
+    console.log("========== GOOGLE PLAY PACKAGE DEBUG ==========");
 
     console.log("Requested Product ID:", productId);
-console.log(
-  "Google Order ID:",
-  purchase.lineItems?.[0]?.latestSuccessfulOrderId
-);    console.log(
-      "Subscription State:",
-      purchase.subscriptionState
-    );
     console.log(
-      "Acknowledgement State:",
-      purchase.acknowledgementState
+      "Google Order ID:",
+      purchase.lineItems?.[0]?.latestSuccessfulOrderId,
     );
+    console.log("Subscription State:", purchase.subscriptionState);
+    console.log("Acknowledgement State:", purchase.acknowledgementState);
 
-    console.log(
-      "==============================================="
-    );
+    console.log("===============================================");
 
     // 2. Validate subscription state
     const allowedStates = [
@@ -271,44 +256,30 @@ console.log(
       "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
     ];
 
-    if (
-      !allowedStates.includes(
-        purchase.subscriptionState ?? ""
-      )
-    ) {
-      throw new Error(
-        "GOOGLE_PLAY_PAYMENT_NOT_COMPLETED"
-      );
+    if (!allowedStates.includes(purchase.subscriptionState ?? "")) {
+      throw new Error("GOOGLE_PLAY_PAYMENT_NOT_COMPLETED");
     }
 
     // 3. Validate product ID
     const lineItem = purchase.lineItems?.find(
-      (item) => item.productId === productId
+      (item) => item.productId === productId,
     );
 
     if (!lineItem) {
-      throw new Error(
-        "GOOGLE_PLAY_PRODUCT_MISMATCH"
-      );
+      throw new Error("GOOGLE_PLAY_PRODUCT_MISMATCH");
     }
 
     // 4. Validate subscription expiry
-    if (
-      !lineItem.expiryTime ||
-      new Date(lineItem.expiryTime) <= new Date()
-    ) {
-      throw new Error(
-        "GOOGLE_PLAY_SUBSCRIPTION_EXPIRED"
-      );
+    if (!lineItem.expiryTime || new Date(lineItem.expiryTime) <= new Date()) {
+      throw new Error("GOOGLE_PLAY_SUBSCRIPTION_EXPIRED");
     }
 
     // 5. Validate Google order ID
-   const orderId =
-  lineItem.latestSuccessfulOrderId ?? null;
+    const orderId = lineItem.latestSuccessfulOrderId ?? null;
 
-if (!orderId) {
-  throw new Error("GOOGLE_PLAY_ORDER_ID_MISSING");
-}
+    if (!orderId) {
+      throw new Error("GOOGLE_PLAY_ORDER_ID_MISSING");
+    }
 
     // 6. Return verified purchase information
     return {
@@ -323,8 +294,7 @@ if (!orderId) {
       consumptionState: null,
 
       acknowledgementState:
-        purchase.acknowledgementState ===
-        "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"
+        purchase.acknowledgementState === "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"
           ? 1
           : 0,
 
@@ -332,19 +302,14 @@ if (!orderId) {
 
       expiryTime: lineItem.expiryTime,
 
-      subscriptionState:
-        purchase.subscriptionState,
+      subscriptionState: purchase.subscriptionState,
     };
-
   } catch (error: any) {
-    console.error(
-      "GOOGLE PLAY PACKAGE VERIFICATION ERROR:",
-      {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-      }
-    );
+    console.error("GOOGLE PLAY PACKAGE VERIFICATION ERROR:", {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
 
     const knownErrors = [
       "GOOGLE_PLAY_PAYMENT_NOT_COMPLETED",
@@ -357,8 +322,6 @@ if (!orderId) {
       throw error;
     }
 
-    throw new Error(
-      "GOOGLE_PLAY_VERIFICATION_FAILED"
-    );
+    throw new Error("GOOGLE_PLAY_VERIFICATION_FAILED");
   }
 };
