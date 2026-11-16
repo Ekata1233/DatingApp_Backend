@@ -9,9 +9,7 @@ export const registerPartnerController = async (
   res: Response
 ) => {
   try {
-    console.log("========================================");
-    console.log("PARTNER REGISTRATION");
-    console.log("========================================");
+  
 
     // =====================================================
     // 1. GET TEXT DATA FROM FORM-DATA

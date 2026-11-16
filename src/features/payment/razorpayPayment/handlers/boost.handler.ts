@@ -12,12 +12,7 @@ export const fulfillBoostPayment = async (
   tx: Prisma.TransactionClient,
   payment: Payment,
 ) => {
-  console.log("BOOST FULFILLMENT START:", {
-    paymentId: payment.id,
-    gatewayPaymentId: payment.payment_id,
-    userId: payment.userId,
-    referenceId: payment.referenceId,
-  });
+ 
 
   // ==========================================
   // 1. VALIDATE PAYMENT
@@ -192,16 +187,7 @@ export const fulfillBoostPayment = async (
   // 8. SUCCESS
   // ==========================================
 
-  console.log("BOOST CREDIT SUCCESS:", {
-    userId: payment.userId,
-    purchaseId: purchase.id,
-    transactionId: transaction.id,
-    boostOptionId: option.id,
-    boostType: option.boost.name,
-    quantity: option.boostCount,
-    remainingBoosts: userBoost.remaining_boosts,
-    gatewayPaymentId: payment.payment_id,
-  });
+
 
   return {
     alreadyCredited: false,

@@ -7,9 +7,7 @@ export const blockUserService = async (
   blockedId: string
 ) => {
   // 1. Validation
-  console.log("=== BLOCK USER START ===");
-  console.log("blockerId:", blockerId);
-  console.log("blockedId:", blockedId);
+
   if (!blockedId) {
     throw new Error("Blocked user ID is required");
   }
@@ -37,18 +35,12 @@ export const blockUserService = async (
     },
   });
 
-  console.log(
-    "existingBlock:",
-    existingBlock,
-  );
+  
 
   if (existingBlock) {
     throw new Error("User already blocked");
   }
-  console.log("BLOCK REQUEST:", {
-    blockerId,
-    blockedId,
-  });
+ 
 
   // 4. Create block
   const block = await prisma.userBlock.create({
@@ -58,7 +50,6 @@ export const blockUserService = async (
     },
   });
 
-  console.log("BLOCK CREATED:", block);
 
   const verifyBlock = await prisma.userBlock.findFirst({
     where: {
@@ -75,7 +66,6 @@ export const blockUserService = async (
     },
   });
 
-  console.log("VERIFY BLOCK:", verifyBlock);
 
   return {
     blockerId,
@@ -89,9 +79,7 @@ export const unblockUserService = async (
   blockerId: string,
   blockedId: string
 ) => {
-  console.log("=== UNBLOCK USER START ===");
-  console.log("blockerId:", blockerId);
-  console.log("blockedId:", blockedId);
+
 
   if (!blockedId) {
     throw new Error("Blocked user ID is required");
@@ -111,7 +99,6 @@ export const unblockUserService = async (
     },
   });
 
-  console.log("existingBlock:", existingBlock);
 
   if (!existingBlock) {
     throw new Error("User is not blocked");
@@ -127,10 +114,7 @@ export const unblockUserService = async (
     },
   });
 
-  console.log("USER UNBLOCKED:", {
-    blockerId,
-    blockedId,
-  });
+  
 
   return {
     blockerId,

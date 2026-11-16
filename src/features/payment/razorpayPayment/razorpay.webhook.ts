@@ -87,10 +87,7 @@ export const razorpayWebhookController = async (
       });
     }
 
-    console.log(
-      "RAZORPAY WEBHOOK EVENT:",
-      event.event,
-    );
+   
 
     // =====================================
     // 5. PAYMENT CAPTURED
@@ -114,10 +111,7 @@ export const razorpayWebhookController = async (
         paymentEntity.id,
       );
 
-      console.log(
-        "RAZORPAY PAYMENT PROCESSED:",
-        result.payment.id,
-      );
+      
 
       return res.status(200).json({
         success: true,
@@ -138,10 +132,7 @@ export const razorpayWebhookController = async (
       // Do not credit the wallet or activate
       // packages here again.
 
-      console.log(
-        "RAZORPAY ORDER PAID:",
-        event.payload?.order?.entity?.id,
-      );
+      
 
       return res.status(200).json({
         success: true,
@@ -157,10 +148,7 @@ export const razorpayWebhookController = async (
       const paymentEntity =
         event.payload?.payment?.entity;
 
-      console.log(
-        "RAZORPAY PAYMENT ATTEMPT FAILED:",
-        paymentEntity?.id,
-      );
+      
 
       // Do not mark the entire Payment record
       // FAILED here. Another payment attempt

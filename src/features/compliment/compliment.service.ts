@@ -371,29 +371,7 @@ export const sendComplimentService = async (
                     ?.lastResetAt ?? new Date(),
         };
 
-        console.log(
-            "Compliment sent successfully",
-            {
-                senderId,
-                receiverId,
-                complimentId:
-                    compliment.id,
-
-                paymentMethod,
-
-                walletAmountCharged:
-                    paymentMethod === "WALLET"
-                        ? COMPLIMENT_PRICE
-                        : 0,
-
-                walletBalanceAfter:
-                    walletDeduction
-                        ? walletDeduction.wallet
-                            .balance
-                            .toString()
-                        : null,
-            }
-        );
+        
 
         return {
             success: true,

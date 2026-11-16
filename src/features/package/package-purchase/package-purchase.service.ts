@@ -28,7 +28,6 @@ const PACKAGE_PRIORITY: Record<string, number> = {
 
 const getPackagePriority = (slug: string): number => {
   const normalizedSlug = slug.trim().toLowerCase().replace(/_/g, "-");
-  console.log("Package slug:", normalizedSlug);
   return PACKAGE_PRIORITY[normalizedSlug] ?? 0;
 };
 
@@ -852,10 +851,7 @@ export const purchasePackageWithGooglePlayService = async (
 ) => {
   const { priceId, productId, orderId, purchaseToken } = input;
 
-  console.log("price id : ", priceId)
-  console.log("productId id : ", productId)
-  console.log("orderId id : ", orderId)
-  console.log("purchaseToken id : ", purchaseToken)
+
 
   // ==========================================
   // 1. VERIFY PRODUCT MAPPING

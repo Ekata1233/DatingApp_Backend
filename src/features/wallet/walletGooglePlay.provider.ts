@@ -116,6 +116,8 @@ export const verifyWalletGooglePurchase = async (
     throw new Error("Google Play order mismatch");
   }
 
+
+  console.log("====================node environment==========================", process.env.NODE_ENV)
    // 3. Block test purchases in production
   if (
     process.env.NODE_ENV === "production" &&

@@ -561,25 +561,13 @@ export const sendEngagementService = async (
 // DEBUG: BOOST INTEREST TRACKING
 // ============================================
 
-console.log("\n========== BOOST INTEREST DEBUG ==========");
-
-console.log("[ENGAGEMENT] Sender ID:", senderId);
-console.log("[ENGAGEMENT] Receiver ID:", receiverId);
-
-console.log("[ENGAGEMENT] Rose:", result.data.rose);
-console.log("[ENGAGEMENT] Compliment:", result.data.compliment);
-console.log("[ENGAGEMENT] Gift:", result.data.gift);
-
-console.log("[ENGAGEMENT] Engagement successful:", result.success);
 
 if (
   result.data.rose ||
   result.data.compliment ||
   result.data.gift
 ) {
-  console.log(
-    "[BOOST] Engagement detected. Starting interest tracking..."
-  );
+
 
   try {
     await trackBoostEvent({
@@ -588,9 +576,7 @@ if (
       eventType: BoostEventType.INTEREST,
     });
 
-    console.log(
-      "[BOOST] trackBoostEvent completed (check service logs for actual update)"
-    );
+    
 
   } catch (error) {
     console.error(
@@ -605,7 +591,6 @@ if (
   );
 }
 
-console.log("==========================================\n");
 
   const [sender, receiver] = await Promise.all([
     prisma.user.findUnique({

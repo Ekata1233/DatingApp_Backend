@@ -59,7 +59,6 @@ export async function processPackageActivation(
     },
   });
 
-  console.log("price", price)
 
   if (!price) {
     throw new Error("Package price not found");
@@ -81,14 +80,12 @@ export async function processPackageActivation(
     tx
   );
 
-  console.log(`📋 Subscription action determined: ${action.type}`);
 
   let result;
 
   switch (action.type) {
     case 'DUPLICATE_PENDING':
       // CASE 7 & 8: Return existing package for idempotency
-      console.log(`⚠️ Duplicate request detected: ${action.reason}`);
       return {
         success: true,
         package: {
@@ -106,12 +103,10 @@ export async function processPackageActivation(
 
     case 'LIFETIME_OWNED':
       // CASE 6: User already owns lifetime package
-      console.log(`🚫 Lifetime package already owned`);
       throw new Error("You already own this package.");
 
     case 'NEW_PURCHASE':
       // CASE 1 & 5: New purchase or expired package
-      console.log(`🆕 Processing new purchase`);
       result = await activateNewSubscription(
         payment.userId,
         pkg,
@@ -123,7 +118,6 @@ export async function processPackageActivation(
 
     case 'RENEW':
       // CASE 2: Renew existing package
-      console.log(`🔄 Renewing existing package`);
       result = await renewSubscription(
         action.currentPackage,
         price,
@@ -146,7 +140,6 @@ export async function processPackageActivation(
 
     case 'DOWNGRADE':
       // CASE 4: Schedule downgrade
-      console.log(`⬇️ Scheduling downgrade from ${action.currentPackage.package.slug} to ${pkg.slug}`);
       result = await scheduleDowngrade(
         payment.userId,
         action.currentPackage,
@@ -162,8 +155,7 @@ export async function processPackageActivation(
   }
 
   // 4. Log the result
-  console.log(`✅ Package ${action.type === 'DOWNGRADE' ? 'scheduled' : 'activated'}: ${pkg.name} for user ${payment.userId}`);
-  console.log(`📅 ${action.type === 'DOWNGRADE' ? 'Will start' : 'Expires'}: ${result.endDate}`);
+
 
   if (result.featuresInitialized > 0) {
     console.log(`🎯 Features initialized: ${result.featuresInitialized}`);

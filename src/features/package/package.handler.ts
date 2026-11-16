@@ -85,7 +85,6 @@ async function initializeRoses(
         const newTotalRoses = currentTotalRoses + rosesLimit;
         const newFreeRoses = currentFreeRoses + rosesLimit;
 
-        console.log("paymentId : ", paymentId)
         // Create purchase first (needed for transaction)
         const rosePurchase = await tx.rosePurchase.create({
             data: {
@@ -133,7 +132,6 @@ async function initializeRoses(
             })
         ]);
 
-        console.log(`🌹 Roses initialized: ${rosesLimit}/week (Total: ${newTotalRoses})`);
         return true;
     } catch (error) {
         console.error("Error initializing roses:", error);
@@ -210,7 +208,6 @@ async function initializeCompliments(
             })
         ]);
 
-        console.log(`💌 Compliments initialized: ${complimentsLimit}/week (Total: ${newTotalCompliments})`);
         return true;
     } catch (error) {
         console.error("Error initializing compliments:", error);
@@ -231,7 +228,6 @@ async function initializeBoosts(
     if (boostsLimit <= 0) return false;
 
     try {
-        console.log("in boost feature function")
         const boostOption = await tx.boostOption.findFirst({
             where: {
                 boost: {
@@ -244,7 +240,6 @@ async function initializeBoosts(
             },
         });
 
-        console.log("boostOption : ", boostOption)
         if (!boostOption) {
             throw new Error("Default boost type not found");
         }
@@ -261,7 +256,6 @@ async function initializeBoosts(
             },
         });
 
-        console.log("existing boost : ", existingBoost)
 
         const currentTotalBoosts = existingBoost?.total_boosts || 0;
         const currentRemainingBoosts = existingBoost?.remaining_boosts || 0;
@@ -333,7 +327,6 @@ async function initializeBoosts(
 
         await Promise.all(promises);
 
-        console.log(`🚀 Boosts initialized: ${boostsLimit}/week (Total: ${newTotalBoosts})`);
         return true;
     } catch (error) {
         console.error("Error initializing boosts:", error);
@@ -353,7 +346,6 @@ async function initializeWelcomeCoins(
     if (welcomeCoins <= 0) return false;
 
     try {
-        console.log(`🪙 Initializing welcome coins: ${welcomeCoins}`);
 
         // Get or create user's wallet
         let wallet = await tx.wallet.findUnique({
@@ -371,7 +363,6 @@ async function initializeWelcomeCoins(
                     balance: welcomeCoins,
                 }
             });
-            console.log(`✅ New wallet created for user: ${userId}`);
         } else {
             // Update wallet
             wallet = await tx.wallet.update({
@@ -382,7 +373,6 @@ async function initializeWelcomeCoins(
                     }
                 }
             });
-            console.log(`✅ Wallet updated for user: ${userId}`);
         }
 
         // Create wallet transaction
@@ -400,7 +390,6 @@ async function initializeWelcomeCoins(
             }
         });
 
-        console.log(`🪙 Welcome coins added: ${welcomeCoins} (Total wallet balance: ${balanceAfter})`);
         return true;
     } catch (error) {
         console.error("❌ Error initializing welcome coins:", error);
@@ -477,7 +466,6 @@ async function initializeDatePlans(
             })
         ]);
 
-        console.log(`📅 Date Plans initialized: ${datePlan} (Total: ${newBalance})`);
         return true;
     } catch (error) {
         console.error("Error initializing date plans:", error);

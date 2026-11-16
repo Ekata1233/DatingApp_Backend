@@ -2214,7 +2214,6 @@ export const getDatePlanHistory = async (
     OR: statusConditions,
   };
 
-  console.log("HISTORY WHERE:", JSON.stringify(where, null, 2));
 
   /*
    * Fetch paginated plans and matching total.
@@ -2332,8 +2331,7 @@ export const getDatePlanHistory = async (
     }),
   ]);
 
-  console.log("HISTORY TOTAL:", total);
-  console.log("HISTORY PLANS FOUND:", plans.length);
+ 
 
   /*
    * Map plans to frontend response.
@@ -2417,13 +2415,7 @@ export const getDatePlanHistory = async (
 
     const message = historyMessageMap[historyStatus];
 
-    console.log("HISTORY PLAN:", {
-      planId: plan.id,
-      planStatus: plan.status,
-      attendanceStatus: feedback?.attendanceStatus ?? null,
-      feedbackStatus: feedback?.status ?? null,
-      historyStatus,
-    });
+   
 
     return {
       id: plan.id,
@@ -2513,10 +2505,6 @@ export const getDatePlanHistory = async (
    */
   const totalPages = Math.ceil(total / limit);
 
-  console.log("FINAL HISTORY COUNT:", data.length);
-  console.log("TOTAL:", total);
-  console.log("TOTAL PAGES:", totalPages);
-  console.log("========== END HISTORY ==========");
 
   return {
     data,

@@ -76,7 +76,7 @@ export const sendRoseController = async (req: Request, res: Response) => {
     }
 
     const receiverId = validatedData.receiverId;
-    console.log("receiverId in sendRoseController : ", receiverId);
+
     // ========================================
     // SOCKET.IO
     // ========================================
@@ -87,15 +87,7 @@ export const sendRoseController = async (req: Request, res: Response) => {
 
     const sockets = await io.in(room).fetchSockets();
 
-    console.log("🔥 ROSE RECEIVER ROOM:", room);
-
-    console.log(
-      "🔥 SOCKETS IN RECEIVER ROOM:",
-      sockets.map((socket) => ({
-        socketId: socket.id,
-        userId: (socket as any).user?.id,
-      })),
-    );
+   
 
     io.to(`user:${receiverId}`).emit("message:receive", data.message);
 

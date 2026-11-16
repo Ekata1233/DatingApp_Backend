@@ -8,8 +8,7 @@ export async function createPurchaseService(
     body: CreatePurchaseDto
 ) {
 
-    console.log("user id ", userId)
-    console.log("body : ", body)
+   
 
     /**
      * STEP 2
@@ -22,7 +21,6 @@ export async function createPurchaseService(
         },
     });
 
-    console.log("store pack : ", storePack);
     /**
      * STEP 3
      * Validate Store Pack

@@ -339,7 +339,6 @@ export const chatService = {
       data.userId,
     );
 
-    console.log("participant : ", participant);
 
     if (!participant) {
       throw new Error(
@@ -384,7 +383,6 @@ export const chatService = {
       mediaUrl: data.mediaUrl,
     });
 
-    console.log("message : ", message);
 
     /**
      * Default match response.
@@ -428,7 +426,6 @@ export const chatService = {
         data.userId,
       );
 
-      console.log("matchResult : ", matchResult);
 
       /**
        * First valid reply created the match.
@@ -455,7 +452,6 @@ export const chatService = {
          */
         match = "match" in matchResult ? matchResult.match : null;
 
-        console.log("match : ", match);
 
         // await markConversationMatched(
         //   data.conversationId,
@@ -498,7 +494,6 @@ export const chatService = {
         data.userId,
       );
 
-      console.log("Chat notification receiverId:", receiverId);
 
       if (receiverId) {
         /**
@@ -831,7 +826,6 @@ export const chatService = {
   },
 
   async getProfileDetails(conversationId: string, currentUserId: string) {
-    console.log("=== GET PROFILE DETAILS SERVICE ===");
     if (!conversationId) {
       throw new Error("Conversation ID is required");
     }
