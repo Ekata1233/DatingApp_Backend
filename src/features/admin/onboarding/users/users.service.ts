@@ -168,9 +168,7 @@ const formatBirthDate = (
   return `${day}-${month}-${year}`;
 };
 
-// ==========================================
-// HELPER: CALCULATE AGE
-// ==========================================
+
 
 const getUserAge = (
   birthDate: Date | null
@@ -626,16 +624,14 @@ export const getSingleUser = async (id: string) => {
     
 
     // INTENTION
-    intentionId: user.intentionId,
+    
     intention: user.intention
       ? {
           id: user.intention.id,
           option: user.intention.option,
           optDescription:
             user.intention.optDescription,
-          intentionId:
-            user.intention.intentionId,
-          details: user.intention.intention,
+          
         }
       : null,
 
@@ -674,13 +670,11 @@ export const getSingleUser = async (id: string) => {
     // PROFILE
     profile: user.profile
       ? {
-          religionId:
-            user.profile.religionId,
+        
           religion:
             user.profile.religion,
 
-          communityId:
-            user.profile.communityId,
+         
           community:
             user.profile.community,
 
