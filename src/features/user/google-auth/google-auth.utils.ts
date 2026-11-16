@@ -19,7 +19,6 @@ export const verifyGoogleToken = async (idToken: string) => {
 
     return response.data;
   } catch (error: any) {
-    console.log("Google Token Verification Error:", error.response?.data);
     throw new Error("Invalid Google Token");
   }
 };

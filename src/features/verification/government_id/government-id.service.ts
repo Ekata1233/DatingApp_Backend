@@ -180,22 +180,7 @@ export const initGovernmentIdService = async (
       consent: "Y",
     };
 
-    console.log(
-      "GRIDLINES INIT REQUEST:",
-      JSON.stringify(
-        {
-          url: "/digilocker/init",
-          referenceId,
-          redirectUri: requestBody.redirect_uri,
-          checkAccountLinked: requestBody.check_account_linked,
-          signUpPreference: requestBody.sign_up_preference,
-          consent: requestBody.consent,
-          hasMobileNumber: Boolean(requestBody.mobile_number),
-        },
-        null,
-        2,
-      ),
-    );
+  
 
     const response = await gridlinesClient.post(
       "/digilocker/init",
@@ -734,15 +719,6 @@ export const fetchGovernmentEAadhaar = async (
 
     const eaadhaar = result?.data?.eaadhaar;
 
-    console.log("GRIDLINES EAADHAAR DIAGNOSTICS:", {
-      httpStatus: response.status,
-      responsePath,
-      providerCode,
-      providerMessage: result?.data?.message,
-      transactionMatches: responseTransactionId === transactionId,
-      hasEAadhaar: eaadhaar != null,
-      requestId: result?.request_id,
-    });
 
     // 1. Validate provider response code.
     //
@@ -909,18 +885,6 @@ export const fetchGovernmentIssuedFiles = async (
 
   // Log only non-sensitive diagnostics.
 
-  console.log("GRIDLINES ISSUED FILES DIAGNOSTICS:", {
-    httpStatus: response.status,
-
-    providerCode: result?.data?.code,
-
-    providerMessage: result?.data?.message,
-
-    dataFields:
-      result?.data && typeof result.data === "object"
-        ? Object.keys(result.data)
-        : [],
-  });
 
   return result.data;
 };
@@ -964,7 +928,6 @@ export const fetchGovernmentIssuedFile = async (
     throw new Error("PAN_DOCUMENT_NOT_AVAILABLE");
   }
 
-  console.log("PAN DOCUMENT FIELDS:", Object.keys(document));
 
   return document;
 };

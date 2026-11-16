@@ -360,7 +360,6 @@ const WALLET_PRODUCTS: Record<string, number> = {
 export const addMoneyToWalletService = async (data: AddMoneyData) => {
   const { userId, amount, productId, orderId, purchaseToken } = data;
 
-  console.log("product id : ", productId);
   // ------------------------------------------
   // 1. VALIDATE INPUT
   // ------------------------------------------

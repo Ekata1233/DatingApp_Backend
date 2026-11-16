@@ -355,7 +355,6 @@ export const rewardReferrerOnPackagePurchase = async (
     },
   });
 
-  console.log("refereal : ", referral);
   // User A did not use a referral code
   if (!referral) {
     return null;

@@ -187,7 +187,6 @@ export const getFeedService = async ({
   limit,
   filters,
 }: FeedParams) => {
-  console.log("---------------userid : ", userId);
   const requestedLimit = limit ?? DEFAULT_PAGE_LIMIT;
 
   const decodedCursor = decodeCursor(cursor as string | undefined);
@@ -285,7 +284,6 @@ export const getFeedService = async ({
       SELECT 1;
     `;
 
-  console.log("SELECT 1:", performance.now() - start, "ms");
 
   // ========================================================
   // LOAD CURRENT USER
@@ -295,7 +293,6 @@ export const getFeedService = async ({
 
   const [currentUser] = await Promise.all([currentUserPromise()]);
 
-  console.log("current user:", performance.now() - start1, "ms");
 
   if (!currentUser || !currentUser.profile) {
     throw new Error("User profile not found");
@@ -416,13 +413,7 @@ export const getFeedService = async ({
   const isVipDiscoveryPool =
     activePackageName === "VIP" || activePackageName === "VIP_ELITE";
 
-  console.log("FEED PACKAGE VISIBILITY:", {
-    userId,
-    activePackageName,
-    discoveryPool: isVipDiscoveryPool
-      ? "VIP_AND_VIP_ELITE"
-      : "FREE_AND_PREMIUM",
-  });
+
 
   // ==========================================
   // PACKAGE BASED DAILY LIMIT
@@ -456,12 +447,7 @@ export const getFeedService = async ({
     ? Math.max(dailyProfileLimit + FREE_LOCKED_PROFILE_COUNT, 1)
     : Math.max(1, Math.min(requestedLimit, dailyProfileLimit));
 
-  console.log("DYNAMIC FEED PROFILE LIMIT:", {
-    userId,
-    package: activePackageName,
-    dailyProfileLimit,
-    pageLimit,
-  });
+ 
 
   // ==========================================
   // TODAY'S DATE (INDIA TIMEZONE)
@@ -481,7 +467,6 @@ export const getFeedService = async ({
   // PostgreSQL @db.Date compatible
   const viewDate = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
 
-  console.log("////////////////////viewDate : ", viewDate.toISOString());
 
   // ==========================================
   // FETCH TODAY'S DAILY FEED VIEWS
@@ -497,7 +482,6 @@ export const getFeedService = async ({
     },
   });
 
-  console.log("////////////////////todays views : ", todayFeedViews);
 
   // ==========================================
   // UNIQUE PROFILES VIEWED TODAY
@@ -507,7 +491,6 @@ export const getFeedService = async ({
 
   const seenToday = seenTodayIds.size;
 
-  console.log("////////////////////seenToday views : ", seenToday);
 
   // ==========================================
   // REMAINING DAILY PROFILE LIMIT
@@ -515,7 +498,6 @@ export const getFeedService = async ({
 
   const remainingToday = Math.max(dailyProfileLimit - seenToday, 0);
 
-  console.log("////////////////////remainingToday views : ", remainingToday);
 
   // ========================================================
   // BASIC USER PREFERENCES
@@ -586,13 +568,7 @@ export const getFeedService = async ({
     myLongitude <= 180 &&
     !(myLatitude === 0 && myLongitude === 0);
 
-  console.log("CURRENT USER LOCATION:", {
-    rawLatitude,
-    rawLongitude,
-    myLatitude,
-    myLongitude,
-    validCurrentUserCoordinates,
-  });
+
 
   // ========================================================
   // PRECOMPUTE MATCH FILTERS
@@ -641,15 +617,6 @@ export const getFeedService = async ({
   // interestedIn filter is provided.
   const shouldApplyOnboardingOrientation = !externalInterest;
 
-  console.log("FEED GENDER FILTER:", {
-    myGender,
-    onboardingInterest: myInterest,
-    externalInterest: externalInterest || null,
-    effectiveInterest,
-    genderFilter,
-    interestedInFilter,
-    shouldApplyOnboardingOrientation,
-  });
 
   // ========================================================
   // VIP FILTER: AMBITION
@@ -737,9 +704,7 @@ export const getFeedService = async ({
 
     familyIncomeIds = matchingIncomeRanges.map((income) => income.id);
 
-    console.log("MATCHING FAMILY INCOME:", matchingIncomeRanges);
 
-    console.log("MATCHING FAMILY INCOME IDS:", familyIncomeIds);
   }
 
   // ========================================================
@@ -775,7 +740,6 @@ export const getFeedService = async ({
         where: {},
       };
 
-  console.log("NORMAL FILTER QUERY:", JSON.stringify(filterQuery, null, 2));
 
   const userFilters = Object.fromEntries(
     Object.entries(filterQuery.where || {}).filter(
@@ -794,7 +758,6 @@ export const getFeedService = async ({
     !!filters?.location?.state ||
     !!filters?.location?.country;
 
-  console.log("hasManualLocationFilter", hasManualLocationFilter);
 
   // ========================================================
   // RESOLVE MANUAL LOCATION → LAT/LNG
@@ -860,13 +823,7 @@ export const getFeedService = async ({
       longitude: Number(location.longitude),
     };
 
-    console.log("MANUAL LOCATION RESOLVED:", {
-      city,
-      state,
-      country,
-      latitude: manualLocation.latitude,
-      longitude: manualLocation.longitude,
-    });
+    
   }
 
   // ========================================================
@@ -922,10 +879,7 @@ export const getFeedService = async ({
     });
   }
 
-  console.log(
-    "FALLBACK FILTER QUERY:",
-    JSON.stringify(fallbackFilterQuery, null, 2),
-  );
+
 
   const fallbackUserFilters = Object.fromEntries(
     Object.entries(fallbackFilterQuery.where || {}).filter(
@@ -1200,13 +1154,7 @@ AND (
     // ======================================================
 
     if (hasManualLocationFilter && manualLocation) {
-      console.log("LOCATION MODE: MANUAL LOCATION", {
-        latitude: manualLocation.latitude,
-
-        longitude: manualLocation.longitude,
-
-        distanceKm,
-      });
+     
 
       // ------------------------------------------------------
       // SEARCH POINT
@@ -1295,13 +1243,7 @@ AND (
         LIMIT ${batchSize};
       `;
 
-        console.log(
-          `MANUAL LOCATION candidate round ${round}:`,
-          performance.now() - candidateStart,
-          "ms",
-          "rows:",
-          rows.length,
-        );
+      
 
         if (rows.length === 0) {
           break;
@@ -1362,13 +1304,7 @@ AND (
           select: userSelect,
         });
 
-        console.log(
-          `MANUAL LOCATION hydration round ${round}:`,
-          performance.now() - hydrateStart,
-          "ms",
-          "users:",
-          hydrated.length,
-        );
+    
 
         // ----------------------------------------------------
         // PRESERVE SQL DISTANCE ORDER
@@ -1431,7 +1367,6 @@ AND (
     // DISTANCE / LAT / LNG
     // ======================================================
     else if (validCurrentUserCoordinates) {
-      console.log("LOCATION MODE: DISTANCE", `${distanceKm} KM`);
 
       const me = Prisma.sql`
             ST_SetSRID(
@@ -1514,13 +1449,7 @@ AND (
               LIMIT ${batchSize};
             `;
 
-        console.log(
-          `DISTANCE candidate round ${round}:`,
-          performance.now() - candidateStart,
-          "ms",
-          "rows:",
-          rows.length,
-        );
+     
 
         if (rows.length === 0) {
           break;
@@ -1555,13 +1484,7 @@ AND (
           select: userSelect,
         });
 
-        console.log(
-          `DISTANCE hydration round ${round}:`,
-          performance.now() - hydrateStart,
-          "ms",
-          "users:",
-          hydrated.length,
-        );
+     
 
         const byId = new Map(hydrated.map((user) => [user.id, user]));
 
@@ -1619,9 +1542,7 @@ AND (
        * Directly go to fallback.
        */
 
-      console.log(
-        "CURRENT USER HAS NO VALID LAT/LNG. SKIPPING DISTANCE AND USING FALLBACK.",
-      );
+      
     }
   }
 
@@ -1651,15 +1572,7 @@ AND (
   if (collected.length === 0 && !hasManualLocationFilter) {
     locationFallbackUsed = true;
 
-    console.log("====================================");
-
-    console.log("NO USERS FOUND WITH LOCATION.");
-
-    console.log("RUNNING FALLBACK WITHOUT LOCATION/DISTANCE.");
-
-    console.log("ALL OTHER FILTERS ARE STILL ACTIVE.");
-
-    console.log("====================================");
+   
 
     /**
      * If we already returned
@@ -1756,13 +1669,7 @@ AND (
             LIMIT ${batchSize};
           `;
 
-      console.log(
-        `FALLBACK candidate round ${round}:`,
-        performance.now() - candidateStart,
-        "ms",
-        "rows:",
-        rows.length,
-      );
+    
 
       if (rows.length === 0) {
         break;
@@ -1804,13 +1711,7 @@ AND (
         select: userSelect,
       });
 
-      console.log(
-        `FALLBACK hydration round ${round}:`,
-        performance.now() - hydrateStart,
-        "ms",
-        "users:",
-        hydrated.length,
-      );
+    
 
       const byId = new Map(hydrated.map((user) => [user.id, user]));
 
@@ -2018,7 +1919,6 @@ AND (
     },
   });
 
-  console.log("boosts:", performance.now() - boostStart, "ms");
 
   // ========================================================
   // CREATE ACTIVE BOOST MAP
@@ -2044,7 +1944,6 @@ AND (
 
   const presenceMap = await getUsersPresence(candidateIds);
 
-  console.log("presence:", performance.now() - presenceStart, "ms");
 
   // ========================================================
   // COMPATIBILITY SCORE
@@ -2084,11 +1983,7 @@ AND (
 
   const compatibilityMap = await getMatchScoresForUsers(userId, candidateIds);
 
-  console.log(
-    "Dynamic match scores:",
-    performance.now() - matchScoreStart,
-    "ms",
-  );
+
 
   // ========================================================
   // ENRICH USERS
@@ -2498,7 +2393,6 @@ export const getFeedDetailsService = async (
   const cachedFeedDetails = await redis.get<UserFeedResponse>(CACHE_KEY);
 
   if (cachedFeedDetails) {
-    console.log("✅ Feed Details from Redis");
 
     if (shouldTrackProfileView) {
       await trackBoostEvent({
@@ -2527,7 +2421,6 @@ export const getFeedDetailsService = async (
   // 3. GET PROFILE FROM DATABASE
   // =====================================================
 
-  console.log("📦 Feed Details from Database");
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -2661,7 +2554,6 @@ await redis.set(CACHE_KEY, cacheableProfile, {
   ex: CACHE_TTL,
 });
 
-  console.log("💾 Feed Details cached");
 
   // =====================================================
   // 6. TRACK BOOST PROFILE VIEW

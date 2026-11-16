@@ -837,11 +837,10 @@ export class ReferralService {
         },
       });
 
-      console.log("referral call ......", referral);
 
       // User was not referred
       if (!referral) {
-        console.log("not refer?");
+     
         return;
       }
 
@@ -850,7 +849,7 @@ export class ReferralService {
         referral.status === ReferralStatus.SIGNUP_REWARDED ||
         referral.status === ReferralStatus.PACKAGE_REWARDED
       ) {
-        console.log("already given");
+       
         return;
       }
 
@@ -861,7 +860,6 @@ export class ReferralService {
         },
       });
 
-      console.log("wallet call ......", wallet);
 
       if (!wallet) {
         throw new Error("Referrer wallet not found.");
@@ -870,7 +868,6 @@ export class ReferralService {
       const balanceBefore = Number(wallet.balance);
       const balanceAfter = balanceBefore + signupReward;
 
-      console.log("balanceAfter call ......", balanceAfter);
 
       // Update wallet
       await tx.wallet.update({

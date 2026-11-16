@@ -1,6 +1,4 @@
-console.log(
-  "🚀 Match score worker file loaded",
-);
+
 
 import {
   Worker,
@@ -33,26 +31,14 @@ export const matchScoreWorker =
       const { userId } =
         job.data;
 
-      console.log(
-        "🔥 Processing match score job",
-        {
-          jobId: job.id,
-          userId,
-        },
-      );
+      
 
       // await getMatchScoresForUsers(
       //   userId,
       //   userId
       // );
 
-      console.log(
-        "✅ Match score calculation completed",
-        {
-          jobId: job.id,
-          userId,
-        },
-      );
+    
 
       return {
         userId,
@@ -74,32 +60,21 @@ export const matchScoreWorker =
 matchScoreWorker.on(
   "ready",
   () => {
-    console.log(
-      "🟢 Match score worker ready",
-    );
+    
   },
 );
 
 matchScoreWorker.on(
   "active",
   (job) => {
-    console.log(
-      "🟡 Match score worker picked job",
-      {
-        jobId: job.id,
-        userId:
-          job.data.userId,
-      },
-    );
+    
   },
 );
 
 matchScoreWorker.on(
   "completed",
   (job) => {
-    console.log(
-      `✅ Worker completed job ${job.id}`,
-    );
+ 
   },
 );
 

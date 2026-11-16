@@ -219,7 +219,6 @@ export const verifyOtp = async ({
   const hardcodedOtpAllowed = isHardcodedOtpAllowed();
 
   if (hardcodedOtpAllowed && enteredOtp === HARDCODED_OTP) {
-    console.log("Development test OTP verified");
 
     return await handleVerifiedUser({
       phoneNumber: formattedNumber,
@@ -1011,8 +1010,7 @@ export const logoutService = async (userId: string, sessionId: string) => {
 //       });
 
 //       res.on("end", () => {
-//         console.log("MSG91 Send OTP Status:", res.statusCode);
-//         console.log("MSG91 Send OTP Response:", data);
+
 
 //         try {
 //           const parsedData = JSON.parse(data);
@@ -1135,15 +1133,6 @@ export const logoutService = async (userId: string, sessionId: string) => {
 //         try {
 //           const msg91Response = JSON.parse(body);
 
-//           console.log(
-//             "MSG91 Verify OTP Status:",
-//             res.statusCode,
-//           );
-
-//           console.log(
-//             "MSG91 Verify OTP Response:",
-//             msg91Response,
-//           );
 
 //           /*
 //            * MSG91 API error

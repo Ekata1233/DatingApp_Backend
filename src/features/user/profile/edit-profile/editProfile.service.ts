@@ -38,7 +38,6 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     communicationStyle,
   } = payload;
 
-  console.log("gender option : ", gender_option)
 
   const result = await prisma.$transaction(async (tx) => {
     //--------------------------------------------------
@@ -157,7 +156,6 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
   await clearUserFeedDetailsCache(userId);
   await clearFeedUserCache(userId);
 
-  console.log("🗑️ Edit profile cache cleared");
 
   // ------------------------------------------
   // SOCKET: PROFILE UPDATED
@@ -171,12 +169,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
       userId,
     );
 
-  console.log(
-    "Found conversations for userId:",
-    userId,
-    "Conversations:",
-    conversations,
-  );
+
 
   for (const conversation of conversations) {
     // Your repository already returns the OTHER user here
@@ -184,10 +177,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
       conversation.user?.id;
 
     if (!otherUserId) {
-      console.log(
-        "Other user not found for conversation:",
-        conversation.conversationId,
-      );
+     
 
       continue;
     }
@@ -196,10 +186,7 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
       conversation.conversationId;
 
     if (!conversationId) {
-      console.log(
-        "Conversation ID missing:",
-        conversation,
-      );
+     
 
       continue;
     }
@@ -213,16 +200,9 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
     const sockets =
       await io.in(profileRoom).fetchSockets();
 
-    console.log("PROFILE ROOM:", profileRoom);
-    console.log(
-      "SOCKETS IN PROFILE ROOM:",
-      sockets.length,
-    );
+   
 
-    console.log(
-      "SOCKET IDS:",
-      sockets.map((s) => s.id),
-    );
+  
 
     // Get latest profile details
     const profileDetails =
@@ -231,15 +211,6 @@ export const updateBasicInfoService = async (userId: string, payload: any) => {
         otherUserId,
       );
 
-    console.log(
-      "Emitting profile:details",
-      {
-        profileRoom,
-        conversationId,
-        updatedUserId: userId,
-        otherUserId,
-      },
-    );
 
     io.to(profileRoom).emit(
       "profile:details",
@@ -688,11 +659,9 @@ export async function getEditProfileService(
   const cachedProfile = await redis.get<EditProfileResponse>(CACHE_KEY);
 
   if (cachedProfile) {
-    console.log("✅ Edit Profile from Redis");
     return cachedProfile;
   }
 
-  console.log("📦 Edit Profile from Database");
 
 const profile = await getEditProfileRepository(userId);
 
@@ -700,29 +669,8 @@ if (!profile) {
   throw new Error("Profile not found");
 }
 
-console.log("\n========== EDIT PROFILE DEBUG ==========");
-console.log("USER ID:", userId);
 
-console.log(
-  "FAMILY PROFILE:",
-  JSON.stringify(profile.familyProfile, null, 2)
-);
 
-console.log(
-  "TOTAL SIBLINGS FROM PRISMA:",
-  profile.familyProfile?.siblings?.length ?? 0
-);
-
-console.log(
-  "SIBLINGS RAW DATA:",
-  JSON.stringify(
-    profile.familyProfile?.siblings ?? [],
-    null,
-    2
-  )
-);
-
-console.log("========================================\n");
 
   const photos = profile.photos
     .filter((item) => item.media_type === MediaType.IMAGE)
@@ -761,7 +709,6 @@ console.log("========================================\n");
       description: item.description,
     }));
 
-  console.log("networkingIntent", networkingIntent);
 
  // ===============================================
 // SIBLINGS DATA
@@ -770,19 +717,7 @@ console.log("========================================\n");
 const siblings =
   profile.familyProfile?.siblings ?? [];
 
-console.log(
-  "========== SIBLINGS DEBUG =========="
-);
 
-console.log(
-  "Total siblings:",
-  siblings.length
-);
-
-console.log(
-  "Sibling records:",
-  JSON.stringify(siblings, null, 2)
-);
 
 // ===============================================
 // NORMALIZE SIBLING TYPE
@@ -826,8 +761,6 @@ const sisters = siblings.filter((item) => {
   );
 });
 
-console.log("Brothers:", brothers.length);
-console.log("Sisters:", sisters.length);
 
   const response: EditProfileResponse = {
     profileScore: profile.profile_completion ?? 0,
@@ -1075,7 +1008,6 @@ console.log("Sisters:", sisters.length);
     ex: CACHE_TTL,
   });
 
-  console.log("💾 Edit Profile cached");
 
   return response;
 
