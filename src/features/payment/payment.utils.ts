@@ -48,34 +48,7 @@ export const verifyRazorpaySignature = (
       .update(payload)
       .digest("hex");
 
-  console.log(
-    "========== RAZORPAY SIGNATURE DEBUG ==========",
-  );
-
-  console.log(
-    "PAYLOAD:",
-    payload,
-  );
-
-  console.log(
-    "SECRET EXISTS:",
-    !!secret,
-  );
-
-  console.log(
-    "SECRET LENGTH:",
-    secret.length,
-  );
-
-  console.log(
-    "RECEIVED SIGNATURE:",
-    signature,
-  );
-
-  console.log(
-    "GENERATED SIGNATURE:",
-    generatedSignature,
-  );
+ 
 
   if (
     generatedSignature.length !==

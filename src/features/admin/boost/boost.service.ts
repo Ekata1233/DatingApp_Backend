@@ -564,8 +564,7 @@ export const getMyBoostService = async (
     },
   });
 
-  console.log("Boost:", boost.name);
-  console.log("User Boost:", userBoost);
+
 
   // 3. Return Boost benefits and wallet information
   return {

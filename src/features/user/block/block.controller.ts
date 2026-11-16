@@ -140,16 +140,7 @@ export const unblockUserController = async (
         }
       );
 
-      console.log(
-        "🔥 profile:details emitted after unblock",
-        {
-          profileRoom,
-          conversationId: conversation.id,
-          blockerId,
-          blockedId,
-          isBlocked: false,
-        }
-      );
+     
     }
 
     /**
@@ -166,15 +157,7 @@ export const unblockUserController = async (
       }
     );
 
-    console.log(
-      "🔥 profile:block:updated emitted",
-      {
-        profileRoom,
-        blockerId,
-        blockedId,
-        isBlocked: false,
-      }
-    );
+ 
 
     /**
      * 7. RESPONSE

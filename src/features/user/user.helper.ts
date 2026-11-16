@@ -22,7 +22,6 @@ export const clearFeedUserCache = async (
 export const clearUserFeedDetailsCache = async (userId: string) => {
   const pattern = `feed:details:${userId}:*`;
 
-  console.log("🧹 Clearing user feed details cache:", pattern);
 
   let cursor = "0";
   let totalDeleted = 0;
@@ -36,21 +35,15 @@ export const clearUserFeedDetailsCache = async (userId: string) => {
     cursor = result[0];
     const keys = result[1];
 
-    console.log("🔍 Matching feed detail keys:", keys);
 
     if (keys.length > 0) {
       const deleted = await redis.del(...keys);
 
-      console.log("🗑️ Deleted feed detail keys:", deleted);
 
       totalDeleted += deleted;
     }
   } while (cursor !== "0");
 
-  console.log(
-    `✅ Total feed detail cache deleted for ${userId}:`,
-    totalDeleted
-  );
 
   return totalDeleted;
 };

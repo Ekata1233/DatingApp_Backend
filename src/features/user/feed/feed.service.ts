@@ -11,10 +11,6 @@ import {
 } from "./feed.types";
 import { redis } from "../../../lib/redis";
 import { trackBoostEvent } from "../../boost/boost.tracker";
-import {
-  getReplyTimeLabel,
-  MIN_REPLY_SAMPLES,
-} from "../../chat/user-reply-stats.service";
 import { ACTIVITY_TAGS, FeedActivity, maskAge, maskName } from "./feed.helper";
 import { getMatchScoresForUsers } from "../../match-score/match-score.service";
 
@@ -414,7 +410,6 @@ export const getFeedService = async ({
     activePackageName === "VIP" || activePackageName === "VIP_ELITE";
 
 
-
   // ==========================================
   // PACKAGE BASED DAILY LIMIT
   // ==========================================
@@ -447,7 +442,7 @@ export const getFeedService = async ({
     ? Math.max(dailyProfileLimit + FREE_LOCKED_PROFILE_COUNT, 1)
     : Math.max(1, Math.min(requestedLimit, dailyProfileLimit));
 
- 
+
 
   // ==========================================
   // TODAY'S DATE (INDIA TIMEZONE)
@@ -617,6 +612,7 @@ export const getFeedService = async ({
   // interestedIn filter is provided.
   const shouldApplyOnboardingOrientation = !externalInterest;
 
+ 
 
   // ========================================================
   // VIP FILTER: AMBITION
@@ -704,7 +700,7 @@ export const getFeedService = async ({
 
     familyIncomeIds = matchingIncomeRanges.map((income) => income.id);
 
-
+   
   }
 
   // ========================================================
@@ -823,7 +819,7 @@ export const getFeedService = async ({
       longitude: Number(location.longitude),
     };
 
-    
+  
   }
 
   // ========================================================
@@ -1243,7 +1239,7 @@ AND (
         LIMIT ${batchSize};
       `;
 
-      
+       
 
         if (rows.length === 0) {
           break;
@@ -1304,7 +1300,7 @@ AND (
           select: userSelect,
         });
 
-    
+      
 
         // ----------------------------------------------------
         // PRESERVE SQL DISTANCE ORDER
@@ -1449,7 +1445,7 @@ AND (
               LIMIT ${batchSize};
             `;
 
-     
+       
 
         if (rows.length === 0) {
           break;
@@ -1484,7 +1480,7 @@ AND (
           select: userSelect,
         });
 
-     
+      
 
         const byId = new Map(hydrated.map((user) => [user.id, user]));
 
@@ -1542,7 +1538,6 @@ AND (
        * Directly go to fallback.
        */
 
-      
     }
   }
 
@@ -1572,7 +1567,6 @@ AND (
   if (collected.length === 0 && !hasManualLocationFilter) {
     locationFallbackUsed = true;
 
-   
 
     /**
      * If we already returned

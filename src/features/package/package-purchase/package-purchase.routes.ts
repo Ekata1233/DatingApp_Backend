@@ -6,6 +6,7 @@ import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = Router();
 
+//active package via wallet
 router.post(
   "/package/wallet/purchase",
   authMiddleware,

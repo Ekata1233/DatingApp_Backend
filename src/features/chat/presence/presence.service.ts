@@ -184,9 +184,7 @@ export const presenceService = {
     const lastSeenKey =
       `lastseen:${userId}`;
 
-    console.log("USER ID:", userId);
-    console.log("PRESENCE KEY:", presenceKey);
-    console.log("LAST SEEN KEY:", lastSeenKey);
+   
 
     const data =
       await redis.get<string>(presenceKey);
@@ -194,8 +192,6 @@ export const presenceService = {
     const lastSeen =
       await redis.get<string>(lastSeenKey);
 
-    console.log("PRESENCE DATA:", data);
-    console.log("LAST SEEN DATA:", lastSeen);
 
     if (!data) {
       return {

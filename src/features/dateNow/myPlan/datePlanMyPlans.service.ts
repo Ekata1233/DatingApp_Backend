@@ -656,7 +656,6 @@ export const updateMetUser = async ({
       },
     },
   });
-  console.log("feedback", feedback);
 
   if (!feedback) {
     throw new Error(

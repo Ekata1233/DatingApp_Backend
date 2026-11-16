@@ -760,14 +760,7 @@ export const acceptRelationshipProposalService = async (
       throw new Error("RELATIONSHIP_PROPOSAL_NOT_FOUND");
     }
 
-    console.log("====================================");
-    console.log("RELATIONSHIP PROPOSAL ACCEPT CHECK");
-    console.log("Logged-in userId :", userId);
-    console.log("Proposal ID      :", proposal.id);
-    console.log("Proposal sender  :", proposal.senderId);
-    console.log("Proposal receiver:", proposal.receiverId);
-    console.log("Proposal status  :", proposal.status);
-    console.log("====================================");
+
     // =====================================================
     // 2. ONLY RECEIVER CAN ACCEPT
     // =====================================================

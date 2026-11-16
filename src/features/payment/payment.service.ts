@@ -1228,42 +1228,6 @@ export const createEventBookingForPayment =
   // DEBUG CONSOLE
   // =====================================
 
-  console.log(
-    "======================================",
-  );
-
-  console.log(
-    `🎟️ ${ticketType} TICKET CAPACITY CHECK`,
-  );
-
-  console.log(
-    "Event ID:",
-    event.id,
-  );
-
-  console.log(
-    "Total Capacity:",
-    capacity,
-  );
-
-  console.log(
-    "Confirmed Booked:",
-    alreadyBooked,
-  );
-
-  console.log(
-    "Left Spots:",
-    remaining,
-  );
-
-  console.log(
-    "User Requested:",
-    requestedCount,
-  );
-
-  console.log(
-    "======================================",
-  );
 
   if (
     requestedCount >
@@ -1415,33 +1379,7 @@ export const createEventBookingForPayment =
           gstAmount,
       );
 
-    console.log(
-      "========== EVENT BOOKING AMOUNT ==========",
-    );
 
-    console.log({
-      originalTicketAmount:
-        roundAmount(
-          originalTicketAmount,
-        ),
-
-      discountedTicketAmount:
-        roundAmount(
-          ticketAmount,
-        ),
-
-      discountAmount,
-
-      platformFee,
-
-      gstPercentage,
-
-      taxableAmount,
-
-      gstAmount,
-
-      totalAmount,
-    });
 
     // =====================================
     // BOOKING NUMBER
@@ -1924,29 +1862,6 @@ export const verifyPaymentService =
       );
     }
 
-    console.log(
-      "========== VERIFY PAYMENT ==========",
-    );
-
-    console.log(
-      "Payment DB ID:",
-      payment.id,
-    );
-
-    console.log(
-      "Payment status:",
-      payment.status,
-    );
-
-    console.log(
-      "Payment purpose:",
-      payment.purpose,
-    );
-
-    console.log(
-      "Payment referenceId:",
-      payment.referenceId,
-    );
 
     // =========================================
     // 2. IDEMPOTENCY
@@ -1982,20 +1897,7 @@ export const verifyPaymentService =
       );
     }
 
-    console.log(
-      "Stored Order ID:",
-      storedOrderId,
-    );
-
-    console.log(
-      "Received Order ID:",
-      data.razorpay_order_id,
-    );
-
-    console.log(
-      "Received Payment ID:",
-      data.razorpay_payment_id,
-    );
+   
 
     // =========================================
     // 4. ORDER ID CHECK
@@ -2021,10 +1923,7 @@ export const verifyPaymentService =
         data.razorpay_signature,
       );
 
-    console.log(
-      "Signature valid:",
-      isValid,
-    );
+  
 
     if (!isValid) {
       throw new Error(
@@ -2115,10 +2014,7 @@ export const verifyPaymentService =
               },
             });
 
-          console.log(
-            "Payment completed:",
-            updatedPayment.id,
-          );
+         
 
           let eventBooking =
             null;
@@ -2139,10 +2035,7 @@ export const verifyPaymentService =
               );
             }
 
-            console.log(
-              "Confirming Event Booking:",
-              updatedPayment.referenceId,
-            );
+            
 
             eventBooking =
               await confirmsEventBooking(
@@ -2150,10 +2043,7 @@ export const verifyPaymentService =
                 updatedPayment,
               );
 
-            console.log(
-              "Event Booking confirmed:",
-              eventBooking.id,
-            );
+            
           }
 
           return {
@@ -2473,10 +2363,7 @@ export const handleRazorpayWebhookService =
       }
 
       default: {
-        console.log(
-          "Unhandled Razorpay event:",
-          webhook.event,
-        );
+       
       }
     }
 

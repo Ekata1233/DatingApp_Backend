@@ -12,13 +12,7 @@ export const fulfillDatePlanPayment = async (
   tx: Prisma.TransactionClient,
   payment: Payment
 ) => {
-  console.log("DATE PLAN FULFILLMENT START:", {
-    paymentId: payment.id,
-    gatewayPaymentId: payment.payment_id,
-    userId: payment.userId,
-    referenceId: payment.referenceId,
-    amount: payment.amount.toString(),
-  });
+ 
 
   // ==========================================
   // 1. VALIDATE PAYMENT
@@ -83,10 +77,7 @@ export const fulfillDatePlanPayment = async (
       );
     }
 
-    console.log("DATE PLAN ALREADY CREDITED:", {
-      purchaseId: existingPurchase.id,
-      paymentId: payment.payment_id,
-    });
+   
 
     return {
       alreadyCredited: true,
@@ -175,14 +166,7 @@ export const fulfillDatePlanPayment = async (
   // 7. SUCCESS
   // ==========================================
 
-  console.log("DATE PLAN CREDIT SUCCESS:", {
-    userId: payment.userId,
-    purchaseId: purchase.id,
-    transactionId: transaction.id,
-    quantity: plan.planCount,
-    balanceAfter: stats.balance,
-    paymentId: payment.payment_id,
-  });
+
 
   return {
     alreadyCredited: false,

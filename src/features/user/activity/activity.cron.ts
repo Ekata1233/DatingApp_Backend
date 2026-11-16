@@ -106,7 +106,6 @@ export const recalculateUserActivity = async () => {
     },
   });
 
-  console.log("User activity recalculation completed");
 };
 
 export const startActivityCron = () => {

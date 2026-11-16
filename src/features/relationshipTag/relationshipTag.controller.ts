@@ -361,11 +361,7 @@ export const relationshipTagController = {
             result.acceptedMessage,
           );
 
-          console.log("Relationship accepted socket sent:", {
-            senderId: userId,
-            receiverId: newPartnerId,
-            messageId: result.acceptedMessage.id,
-          });
+          
         }
         // =====================================================
         // B. OLD RELATIONSHIP ENDED MESSAGE
@@ -694,11 +690,7 @@ export const endRelationshipController = async (
       //   breakupSocketPayload,
       // );
 
-      console.log("Relationship ended socket sent:", {
-        senderId: userId,
-        receiverId: partnerId,
-        relationshipId: relationship.id,
-      });
+      
     } catch (socketError) {
       console.error("Relationship ended socket emission error:", socketError);
     }

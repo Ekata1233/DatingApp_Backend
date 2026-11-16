@@ -30,7 +30,6 @@ export const messageService = {
      *    to the conversation.
      */
 
-    console.log("data in message service : ", data);
     const participant = await messageRepository.findConversationParticipant(
       data.conversationId,
       data.userId,
@@ -47,7 +46,6 @@ export const messageService = {
     if (data.messageType === MessageType.GIFT) {
       const metadata = data.metadata;
 
-      console.log("metadata : ", metadata);
       // 1. Validate metadata is a plain JSON object
       if (
         !metadata ||
@@ -132,7 +130,6 @@ export const messageService = {
         targetId: targetId?.trim() ?? null,
       });
 
-      console.log("@@@@@@@@@@@@@@@@@@@its calling");
       await prisma.conversationParticipant.updateMany({
         where: {
           conversationId: data.conversationId,
@@ -223,7 +220,6 @@ export const messageService = {
       metadata: data.metadata,
     });
 
-    console.log("@@@@@@@@@@@@@@@@@@@its calling");
     await prisma.conversationParticipant.updateMany({
       where: {
         conversationId: data.conversationId,
@@ -306,7 +302,6 @@ export const messageService = {
           data.userId,
         );
 
-        console.log("MATCH FROM REPLY RESULT:", matchResult);
       } catch (error) {
         console.error("MATCH FROM REPLY ERROR:", error);
       }
@@ -345,7 +340,6 @@ export const messageService = {
           data.userId,
         );
 
-        console.log("MESSAGE RECEIVER:", receiver);
 
         if (receiver) {
           /**
@@ -353,7 +347,6 @@ export const messageService = {
            */
           const receiverId = receiver.userId;
 
-          console.log("MESSAGE RECEIVER ID:", receiverId);
 
           /**
            * Check whether receiver currently

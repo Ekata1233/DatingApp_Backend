@@ -141,12 +141,7 @@ export const sendRoseService = async (
     const hasReverseLike =
       reverseSwipe?.action === "LIKE" || reverseSwipe?.action === "SUPERLIKE";
 
-    console.log("🌹 ROSE REVERSE LIKE CHECK:", {
-      senderId,
-      receiverId,
-      reverseAction: reverseSwipe?.action ?? null,
-      hasReverseLike,
-    });
+    
 
     // =====================================================
     // 1. CHECK ROSE BALANCE
@@ -328,11 +323,7 @@ export const sendRoseService = async (
       matched = true;
       matchId = match.id;
 
-      console.log("🌹 ROSE AUTO MATCH:", {
-        senderId,
-        receiverId,
-        matchId,
-      });
+      
     }
     // =====================================================
     // 8. UPDATE CONVERSATION
@@ -403,13 +394,7 @@ export const sendRoseService = async (
       lastResetAt: updatedBalance.lastResetAt,
     };
 
-    console.log("Rose sent successfully", {
-      senderId,
-      receiverId,
-      roseId: rose.id,
-      paymentMethod,
-      walletAmountCharged: paymentMethod === "WALLET" ? ROSE_PRICE : 0,
-    });
+    
 
     return {
       success: true,
@@ -527,7 +512,6 @@ export const addPurchasedRosesService = async (
 
   const updatedBalance = await addPurchasedRoses(userId, amount, prisma);
 
-  console.log("Purchased roses added", { userId, amount });
 
   return {
     totalRoses: updatedBalance.totalRoses,

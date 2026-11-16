@@ -12,10 +12,7 @@ export const findActiveBoostUsageRepository = async (
 ) => {
   const now = new Date();
 
-  console.log("\n========== FIND ACTIVE BOOST ==========");
 
-  console.log("[REPOSITORY] User ID:", userId);
-  console.log("[REPOSITORY] Current Time:", now.toISOString());
 
   // DEBUG: Get all recent Boost usages
   const allUsages = await prisma.boostUsage.findMany({
@@ -38,10 +35,7 @@ export const findActiveBoostUsageRepository = async (
     take: 5,
   });
 
-  console.log(
-    "[REPOSITORY] Recent Boost Usages:",
-    JSON.stringify(allUsages, null, 2)
-  );
+
 
   // Existing active Boost query
   const activeUsage = await prisma.boostUsage.findFirst({
@@ -70,30 +64,10 @@ export const findActiveBoostUsageRepository = async (
   });
 
   if (!activeUsage) {
-    console.log("[REPOSITORY] NO ACTIVE BOOST FOUND");
 
     allUsages.forEach((usage) => {
-      console.log("[REPOSITORY] Checking usage:", usage.id);
 
-      console.log(
-        "Status ACTIVE:",
-        usage.status === BoostUsageStatus.ACTIVE
-      );
-
-      console.log(
-        "Is Active:",
-        usage.is_active === true
-      );
-
-      console.log(
-        "Started:",
-        usage.started_at <= now
-      );
-
-      console.log(
-        "Not Expired:",
-        usage.expected_end_at > now
-      );
+     
     });
 
   } else {
@@ -103,7 +77,6 @@ export const findActiveBoostUsageRepository = async (
     );
   }
 
-  console.log("=======================================\n");
 
   return activeUsage;
 };

@@ -699,7 +699,6 @@ export const chatRepository = {
           })
         : [];
 
-    console.log("user presence : ", userPresence);
 
     // --------------------------------------------------
     // 8.2 Convert presence into Map
@@ -842,7 +841,6 @@ export const chatRepository = {
           })
         : [];
 
-    console.log("gift progress : ", giftProgress);
     // --------------------------------------------------
     // 13.2 Get active locked roses
     // --------------------------------------------------
@@ -911,7 +909,6 @@ export const chatRepository = {
           })
         : [];
 
-    console.log("rose progress : ", roseProgress);
     // ==================================================
     // 14. BUILD PROGRESS MAP
     // ==================================================
@@ -1769,7 +1766,6 @@ export const chatRepository = {
         data.metadata && typeof data.metadata === "object"
           ? (data.metadata as Record<string, any>)
           : {};
-      console.log("metadata in repository : ", metadata);
       const message = await tx.chatMessage.create({
         data: {
           conversationId: data.conversationId,
@@ -2301,9 +2297,7 @@ export const chatRepository = {
     conversationId: string,
     currentUserId: string,
   ) {
-    console.log("=== PROFILE REPOSITORY START ===");
-    console.log("conversationId:", conversationId);
-    console.log("currentUserId:", currentUserId);
+
     /**
      * 1. Find conversation and participants
      */
@@ -2320,7 +2314,6 @@ export const chatRepository = {
       },
     });
 
-    console.log("conversation:", conversation);
 
     if (!conversation) {
       throw new Error("Conversation not found");
@@ -2334,7 +2327,6 @@ export const chatRepository = {
       (participant) => participant.userId === currentUserId,
     );
 
-    console.log("currentParticipant:", currentParticipant);
 
     if (!currentParticipant) {
       throw new Error("You are not a participant of this conversation");
@@ -2347,7 +2339,6 @@ export const chatRepository = {
       (participant) => participant.userId !== currentUserId,
     );
 
-    console.log("otherParticipant:", otherParticipant);
 
     if (!otherParticipant) {
       throw new Error("Other user not found in conversation");
@@ -2355,7 +2346,6 @@ export const chatRepository = {
 
     const targetUserId = otherParticipant.userId;
 
-    console.log("targetUserId:", targetUserId);
 
     /**
      * 3. Fetch user details
@@ -2407,7 +2397,6 @@ export const chatRepository = {
       },
     });
 
-    console.log("target user:", user);
 
     if (!user) {
       throw new Error("User not found");

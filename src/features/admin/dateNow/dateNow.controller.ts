@@ -34,12 +34,7 @@ export const upsertDatePlanOptions = async (
   next: NextFunction,
 ) => {
   try {
-    console.log("═══════════════════════════════════════════════");
-    console.log("🖼️ DATE PLAN OPTIONS - FILE DEBUG");
-    console.log("═══════════════════════════════════════════════");
 
-    console.log("📦 req.body:", req.body);
-    console.log("📁 req.files:", req.files);
 
     // =====================================================
     // 1. GET TYPE
@@ -95,8 +90,6 @@ export const upsertDatePlanOptions = async (
 
     const files = req.files as any;
 
-    console.log("📁 Raw files:", files);
-
     // =====================================================
     // 5. CREATE FILE MAP
     // =====================================================
@@ -116,19 +109,12 @@ export const upsertDatePlanOptions = async (
 
           iconFiles[index] = file;
 
-          console.log(
-            `✅ Found icon file for option ${index}:`,
-            file.name || file.originalname,
-          );
+         
         }
       });
     }
 
-    console.log(
-      `📁 Total icon files found: ${
-        Object.keys(iconFiles).length
-      }`,
-    );
+   
 
     // =====================================================
     // 6. UPLOAD ICONS TO IMAGEKIT
@@ -138,9 +124,7 @@ export const upsertDatePlanOptions = async (
       const file = iconFiles[i];
 
       if (!file) {
-        console.log(
-          `ℹ️ No icon uploaded for option ${i}: ${options[i].label}`,
-        );
+        
 
         // Keep existing icon value if one was sent
         if (options[i].icon === undefined) {
@@ -150,11 +134,7 @@ export const upsertDatePlanOptions = async (
         continue;
       }
 
-      console.log(
-        `📤 Uploading icon for option ${i}: ${
-          file.name || file.originalname
-        }`,
-      );
+     
 
       // ===================================================
       // 7. FILE SIZE VALIDATION
@@ -214,9 +194,7 @@ export const upsertDatePlanOptions = async (
         folder: "/date-plan-options",
       });
 
-      console.log(
-        `✅ ImageKit uploaded: ${uploadResponse.url}`,
-      );
+     
 
       // ===================================================
       // 11. ASSIGN IMAGEKIT URL
@@ -229,20 +207,9 @@ export const upsertDatePlanOptions = async (
     // 12. DEBUG FINAL OPTIONS
     // =====================================================
 
-    console.log("📦 FINAL OPTIONS:");
 
     options.forEach((option: any, index: number) => {
-      console.log(
-        `Option ${index + 1}: ${option.label}`,
-      );
-
-      console.log(
-        `Icon: ${
-          option.icon
-            ? option.icon
-            : "❌ No icon"
-        }`,
-      );
+     
     });
 
     // =====================================================

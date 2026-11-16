@@ -109,6 +109,29 @@ export const verifyWalletGooglePurchase = async (
     throw new Error("Google Play order mismatch");
   }
 
+
+  console.log("====================node environment==========================", process.env.NODE_ENV)
+   // 3. Block test purchases in production
+  if (
+    process.env.NODE_ENV === "production" &&
+    purchase.purchaseType === 0
+  ) {
+    throw new Error(
+      "Test Google Play purchases are not allowed in production"
+    );
+  }
+
+  console.log("----------------------purchase type---------------------- : ", purchase.purchaseType);
+  // 4. Block promotional purchases in production
+  if (
+    process.env.NODE_ENV === "production" &&
+    purchase.purchaseType === 1
+  ) {
+    throw new Error(
+      "Promotional purchases are not allowed in production"
+    );
+  }
+
   if (
     purchase.quantity != null &&
     purchase.quantity !== 1
@@ -122,6 +145,7 @@ export const verifyWalletGooglePurchase = async (
     purchaseTime: purchase.purchaseTimeMillis,
     consumptionState: purchase.consumptionState,
     acknowledgementState: purchase.acknowledgementState,
+    purchaseType: purchase.purchaseType,
   };
 };
 

@@ -599,13 +599,7 @@ export async function finalizeRazorpayPayment(
   );
 
   // SECOND: Log payment details
-  console.log("RAZORPAY PAYMENT DETAILS:", {
-    id: gatewayPayment.id,
-    method: gatewayPayment.method,
-    status: gatewayPayment.status,
-    bank: gatewayPayment.bank,
-    wallet: gatewayPayment.wallet,
-  });
+
 
   // THIRD: Validate payment
   if (
@@ -780,18 +774,11 @@ const claim = await tx.payment.updateMany({
                 throw new Error("Invalid Date Plan purchase metadata");
               }
 
-              console.log("DATE PLAN FULFILLMENT START:", {
-  paymentId: updatedPayment.id,
-  gatewayPaymentId: updatedPayment.payment_id,
-  userId: updatedPayment.userId,
-  referenceId: updatedPayment.referenceId,
-  amount: updatedPayment.amount.toString(),
-});
+     
 
 try {
   await fulfillDatePlanPayment(tx, updatedPayment);
 
-  console.log("DATE PLAN FULFILLMENT SUCCESS");
 } catch (error) {
   console.error("DATE PLAN FULFILLMENT FAILED:", error);
   throw error;
@@ -901,24 +888,12 @@ export async function verifyRazorpayPaymentService(
   userId: string,
   data: VerifyRazorpayDTO,
 ) {
-  console.log("\n========== RAZORPAY VERIFY DEBUG ==========");
 
   // ==========================================
   // 1. REQUEST DEBUG
   // ==========================================
 
-  console.log("REQUEST DATA:", {
-    userId,
-    razorpayOrderId: data.razorpay_order_id,
-    razorpayPaymentId: data.razorpay_payment_id,
-    signatureLength: data.razorpay_signature?.length,
-  });
-
-  console.log("RAZORPAY CONFIG:", {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    secretConfigured: Boolean(process.env.RAZORPAY_KEY_SECRET),
-    secretLength: process.env.RAZORPAY_KEY_SECRET?.length ?? 0,
-  });
+  
 
   // ==========================================
   // 2. FIND PAYMENT IN DATABASE
@@ -928,21 +903,7 @@ export async function verifyRazorpayPaymentService(
     data.razorpay_order_id,
   );
 
-  console.log(
-    "DATABASE PAYMENT:",
-    payment
-      ? {
-          id: payment.id,
-          userId: payment.userId,
-          payment_id: payment.payment_id,
-          transactionId: payment.transactionId,
-          status: payment.status,
-          purpose: payment.purpose,
-          amount: payment.amount.toString(),
-          currency: payment.currency,
-        }
-      : null,
-  );
+
 
   if (!payment || payment.userId !== userId) {
     console.error("VERIFY FAILED: Payment order not found");
@@ -961,7 +922,6 @@ export async function verifyRazorpayPaymentService(
   // 3. VERIFY ORDER & PAYMENT WITH RAZORPAY
   // ==========================================
 
-  console.log("FETCHING RAZORPAY ORDER AND PAYMENT");
 
   let gatewayOrder;
   let gatewayPayment;
@@ -972,11 +932,7 @@ export async function verifyRazorpayPaymentService(
       data.razorpay_order_id
     );
 
-    console.log("ORDER FOUND:", {
-      id: gatewayOrder.id,
-      status: gatewayOrder.status,
-      amount: gatewayOrder.amount,
-    });
+  
   } catch (error: any) {
     console.error("ORDER FETCH FAILED:", {
       orderId: data.razorpay_order_id,
@@ -994,12 +950,7 @@ export async function verifyRazorpayPaymentService(
       data.razorpay_payment_id
     );
 
-    console.log("PAYMENT FOUND:", {
-      id: gatewayPayment.id,
-      orderId: gatewayPayment.order_id,
-      status: gatewayPayment.status,
-      amount: gatewayPayment.amount,
-    });
+   
   } catch (error: any) {
     console.error("PAYMENT FETCH FAILED:", {
       paymentId: data.razorpay_payment_id,
@@ -1028,22 +979,7 @@ export async function verifyRazorpayPaymentService(
     gatewayPayment.currency === payment.currency &&
     gatewayOrder.currency === payment.currency;
 
-  console.log("RAZORPAY GATEWAY RESULT:", {
-    gatewayOrderId: gatewayOrder.id,
-    orderStatus: gatewayOrder.status,
-    orderAmount: gatewayOrder.amount,
 
-    gatewayPaymentId: gatewayPayment.id,
-    gatewayPaymentOrderId: gatewayPayment.order_id,
-    paymentStatus: gatewayPayment.status,
-    paymentAmount: gatewayPayment.amount,
-
-    expectedAmountPaise,
-
-    orderMatches,
-    amountMatches,
-    currencyMatches,
-  });
 
   if (!orderMatches) {
     console.error("VERIFY FAILED: Razorpay order mismatch");
@@ -1061,7 +997,6 @@ export async function verifyRazorpayPaymentService(
   // 5. VERIFY CHECKOUT SIGNATURE
   // ==========================================
 
-  console.log("VERIFYING RAZORPAY SIGNATURE");
 
   const isSignatureValid = verifyCheckoutSignature(
     data.razorpay_order_id,
@@ -1069,12 +1004,7 @@ export async function verifyRazorpayPaymentService(
     data.razorpay_signature,
   );
 
-  console.log("SIGNATURE VERIFICATION:", {
-    orderId: data.razorpay_order_id,
-    paymentId: data.razorpay_payment_id,
-    signatureLength: data.razorpay_signature.length,
-    signatureValid: isSignatureValid,
-  });
+  
 
   if (!isSignatureValid) {
     console.error("VERIFY FAILED: Invalid Razorpay signature");
@@ -1089,16 +1019,12 @@ export async function verifyRazorpayPaymentService(
     throw new Error("Invalid Razorpay signature");
   }
 
-  console.log("RAZORPAY SIGNATURE VERIFIED");
 
   // ==========================================
   // 6. CHECK PAYMENT CAPTURE STATUS
   // ==========================================
 
-  console.log("PAYMENT CAPTURE CHECK:", {
-    status: gatewayPayment.status,
-    captured: gatewayPayment.captured,
-  });
+ 
 
   if (gatewayPayment.status !== "captured") {
     throw new Error(
@@ -1110,7 +1036,6 @@ export async function verifyRazorpayPaymentService(
   // 7. FINALIZE PAYMENT
   // ==========================================
 
-  console.log("STARTING PAYMENT FINALIZATION");
 
   let result;
 
@@ -1129,15 +1054,8 @@ export async function verifyRazorpayPaymentService(
   // 8. FINAL DEBUG
   // ==========================================
 
-  console.log("PAYMENT FINALIZATION RESULT:", {
-    paymentId: result.payment.id,
-    gatewayPaymentId: result.payment.payment_id,
-    status: result.payment.status,
-    purpose: result.payment.purpose,
-    alreadyProcessed: result.alreadyProcessed,
-  });
+ 
 
-  console.log("========== RAZORPAY VERIFY COMPLETED ==========\n");
 
   // ==========================================
   // 9. RESPONSE
