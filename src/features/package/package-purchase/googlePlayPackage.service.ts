@@ -238,18 +238,6 @@ export const verifyGooglePlayPackage = async (
 
     const purchase = response.data;
 
-    console.log("========== GOOGLE PLAY PACKAGE DEBUG ==========");
-
-    console.log("Requested Product ID:", productId);
-    console.log(
-      "Google Order ID:",
-      purchase.lineItems?.[0]?.latestSuccessfulOrderId,
-    );
-    console.log("Subscription State:", purchase.subscriptionState);
-    console.log("Acknowledgement State:", purchase.acknowledgementState);
-
-    console.log("===============================================");
-
     // 2. Validate subscription state
     const allowedStates = [
       "SUBSCRIPTION_STATE_ACTIVE",
@@ -273,6 +261,17 @@ export const verifyGooglePlayPackage = async (
     if (!lineItem.expiryTime || new Date(lineItem.expiryTime) <= new Date()) {
       throw new Error("GOOGLE_PLAY_SUBSCRIPTION_EXPIRED");
     }
+
+    // 4. Block test subscriptions in production
+    if (
+      process.env.NODE_ENV === "production" &&
+      purchase.testPurchase != null
+    ) {
+      throw new Error(
+        "Test Google Play subscriptions are not allowed in production",
+      );
+    }
+
 
     // 5. Validate Google order ID
     const orderId = lineItem.latestSuccessfulOrderId ?? null;

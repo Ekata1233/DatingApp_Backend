@@ -97,23 +97,6 @@ export const verifyGooglePlayBoostPurchase = async (
 
     const purchase = response.data;
 
-    console.log(
-      "========== GOOGLE PLAY BOOST DEBUG =========="
-    );
-
-    console.log("Requested Product ID:", productId);
-    console.log("Google Order ID:", purchase.orderId);
-    console.log("Purchase State:", purchase.purchaseState);
-    console.log("Consumption State:", purchase.consumptionState);
-    console.log(
-      "Acknowledgement State:",
-      purchase.acknowledgementState
-    );
-
-    console.log(
-      "============================================="
-    );
-
     // 1. Validate purchase completion
     if (purchase.purchaseState !== 0) {
       throw new Error(
@@ -128,6 +111,26 @@ export const verifyGooglePlayBoostPurchase = async (
       );
     }
 
+     // 3. Block test purchases in production
+    if (
+      process.env.NODE_ENV === "production" &&
+      purchase.purchaseType === 0
+    ) {
+      throw new Error(
+        "Test Google Play purchases are not allowed in production"
+      );
+    }
+
+    // 4. Block promotional purchases in production
+    if (
+      process.env.NODE_ENV === "production" &&
+      purchase.purchaseType === 1
+    ) {
+      throw new Error(
+        "Promotional purchases are not allowed in production"
+      );
+    }
+    
     // 3. Validate quantity
     if (
       purchase.quantity != null &&
