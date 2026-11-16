@@ -118,7 +118,7 @@ export const verifyWalletGooglePurchase = async (
 
    // 3. Block test purchases in production
   if (
-    process.env.NODE_ENV === "production" &&
+    // process.env.NODE_ENV === "production" &&
     purchase.purchaseType === 0
   ) {
     throw new Error(
@@ -129,7 +129,7 @@ export const verifyWalletGooglePurchase = async (
   console.log("----------------------purchase type---------------------- : ", purchase.purchaseType);
   // 4. Block promotional purchases in production
   if (
-    process.env.NODE_ENV === "production" &&
+    // process.env.NODE_ENV === "production" &&
     purchase.purchaseType === 1
   ) {
     throw new Error(
