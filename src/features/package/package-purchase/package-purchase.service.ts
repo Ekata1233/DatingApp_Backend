@@ -15,6 +15,7 @@ import { GooglePlayPackageInput } from "./package-purchase.types";
 import { verifyGooglePlayPackage } from "./googlePlayPackage.service";
 import { PurchasePackageInput } from "./package-purchase.validation";
 import { createHash } from "node:crypto";
+import { creditPackageBenefits } from "./package-benefits.helper";
 
 type Tx = Prisma.TransactionClient;
 
@@ -752,6 +753,23 @@ export const purchasePackageWithWalletService = async (
       }
 
       // ==========================================
+// 14. CREDIT PACKAGE BENEFITS
+// ==========================================
+
+let packageBenefits = null;
+
+if (
+  userPackage.status === PackageStatus.ACTIVE &&
+  (action === "NEW_PURCHASE" || action === "UPGRADE")
+) {
+  packageBenefits = await creditPackageBenefits(
+    tx,
+    userId,
+    selectedPackage.id,
+  );
+}
+
+      // ==========================================
       // 14. CREDIT REFERRAL REWARD
       // ==========================================
 
@@ -770,7 +788,7 @@ export const purchasePackageWithWalletService = async (
         action,
 
         userPackageId: userPackage.id,
-
+packageBenefits,
         package: {
           id: selectedPackage.id,
 
@@ -850,8 +868,6 @@ export const purchasePackageWithGooglePlayService = async (
   input: GooglePlayPackageInput,
 ) => {
   const { priceId, productId, orderId, purchaseToken } = input;
-
-
 
   // ==========================================
   // 1. VERIFY PRODUCT MAPPING
@@ -1238,6 +1254,22 @@ export const purchasePackageWithGooglePlayService = async (
         },
       });
 
+      // ==========================================
+// 16. CREDIT PACKAGE BENEFITS
+// ==========================================
+
+let packageBenefits = null;
+
+if (
+  userPackage.status === PackageStatus.ACTIVE &&
+  (action === "NEW_PURCHASE" || action === "UPGRADE")
+) {
+  packageBenefits = await creditPackageBenefits(
+    tx,
+    userId,
+    selectedPackage.id,
+  );
+}
       // ========================================
       // 16. CREDIT REFERRAL REWARD
       // ========================================
@@ -1326,6 +1358,3 @@ export const purchasePackageWithGooglePlayService = async (
     },
   );
 };
-
-
-//dfdfdf
