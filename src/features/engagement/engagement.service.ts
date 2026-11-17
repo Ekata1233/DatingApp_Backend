@@ -475,14 +475,53 @@ export const sendEngagementService = async (
     // 11. UPDATE CONVERSATION
     // ========================================
 
-    await tx.conversation.update({
-      where: {
-        id: conversation.id,
-      },
-      data: {
-        updatedAt: new Date(),
-      },
-    });
+    // await tx.conversation.update({
+    //   where: {
+    //     id: conversation.id,
+    //   },
+    //   data: {
+    //     updatedAt: new Date(),
+    //   },
+    // });
+
+    // ========================================
+    // 11. UPDATE CONVERSATION
+    // ========================================
+
+    if (matched) {
+      // Immediate match through reverse like
+      await tx.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          match: true,
+          matchPendingForUserId: null,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      // Set pending receiver only for unmatched conversations
+      await tx.conversation.updateMany({
+        where: {
+          id: conversation.id,
+          match: false,
+          matchPendingForUserId: null,
+        },
+        data: {
+          matchPendingForUserId: receiverId,
+        },
+      });
+
+      await tx.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+    }
 
     // ========================================
     // 12. UPDATED ROSE BALANCE
@@ -548,7 +587,7 @@ export const sendEngagementService = async (
         remainingComplimentBalance,
       },
     };
-    });
+  });
 
   // ============================================
   // BOOST ANALYTICS - TRACK INTEREST
@@ -557,40 +596,23 @@ export const sendEngagementService = async (
   // Rose, Compliment or Gift received during
   // an active Boost counts as one interest.
 
- // ============================================
-// DEBUG: BOOST INTEREST TRACKING
-// ============================================
+  // ============================================
+  // DEBUG: BOOST INTEREST TRACKING
+  // ============================================
 
-
-if (
-  result.data.rose ||
-  result.data.compliment ||
-  result.data.gift
-) {
-
-
-  try {
-    await trackBoostEvent({
-      boostedUserId: receiverId,
-      actorId: senderId,
-      eventType: BoostEventType.INTEREST,
-    });
-
-    
-
-  } catch (error) {
-    console.error(
-      "[BOOST ERROR] Interest tracking failed:",
-      error
-    );
+  if (result.data.rose || result.data.compliment || result.data.gift) {
+    try {
+      await trackBoostEvent({
+        boostedUserId: receiverId,
+        actorId: senderId,
+        eventType: BoostEventType.INTEREST,
+      });
+    } catch (error) {
+      console.error("[BOOST ERROR] Interest tracking failed:", error);
+    }
+  } else {
+    console.log("[BOOST] No Rose, Compliment or Gift found. Skipping.");
   }
-
-} else {
-  console.log(
-    "[BOOST] No Rose, Compliment or Gift found. Skipping."
-  );
-}
-
 
   const [sender, receiver] = await Promise.all([
     prisma.user.findUnique({

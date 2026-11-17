@@ -92,16 +92,34 @@ export const createMatchFromReplyService = async (
      */
 
 
-    if (
-      conversation.matchPendingForUserId !==
-      replyingUserId
-    ) {
-      return {
-        matched: false,
-        reason:
-          "USER_NOT_PENDING_FOR_MATCH",
-      };
-    }
+  console.log("========== MATCH VALIDATION ==========");
+
+console.log("Conversation ID:", conversationId);
+
+console.log("Conversation Match:", conversation.match);
+
+console.log(
+  "Pending User ID:",
+  conversation.matchPendingForUserId
+);
+
+console.log("Replying User ID:", replyingUserId);
+
+console.log(
+  "Is Same User:",
+  conversation.matchPendingForUserId === replyingUserId
+);
+
+console.log("======================================");
+
+if (
+  conversation.matchPendingForUserId !== replyingUserId
+) {
+  return {
+    matched: false,
+    reason: "USER_NOT_PENDING_FOR_MATCH",
+  };
+}
 
     /**
      * 2. Find Rose/Gift/Compliment.
@@ -221,6 +239,8 @@ export const createMatchFromReplyService = async (
         replyingUserId,
         otherUserId,
       );
+
+      console.log("=======================match created =============", match)
 
     let matchedBy:
       | "ROSE_REPLY"

@@ -172,6 +172,9 @@ export const creditPackageBenefits = async (
     },
   });
 
+      console.log("boost normalBoost : ", normalBoost)
+
+
   if (boosts > 0 && (!normalBoost || !normalBoost.is_active)) {
     throw new Error("NORMAL_BOOST_NOT_FOUND_OR_INACTIVE");
   }
@@ -189,6 +192,8 @@ export const creditPackageBenefits = async (
         id: true,
       },
     });
+
+    console.log("boost option : ", boostOption)
 
     if (!boostOption) {
       throw new Error("NORMAL_BOOST_OPTION_NOT_FOUND");

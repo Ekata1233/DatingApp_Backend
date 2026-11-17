@@ -276,8 +276,6 @@ export const messageService = {
       MessageType.LINK,
     ];
 
-  
-
     /**
      * Check whether this message is
      * a reply that should create match.
@@ -295,13 +293,18 @@ export const messageService = {
       MessageType.LINK,
     ];
 
+    console.log("===================message type : ", data.messageType);
+
     if (replyTypes.includes(data.messageType)) {
       try {
+        console.log("========= CALLING MATCH SERVICE =========");
+
         const matchResult = await createMatchFromReplyService(
           data.conversationId,
           data.userId,
         );
 
+        console.log("========= MATCH RESULT =========", matchResult);
       } catch (error) {
         console.error("MATCH FROM REPLY ERROR:", error);
       }
@@ -340,13 +343,11 @@ export const messageService = {
           data.userId,
         );
 
-
         if (receiver) {
           /**
            * Extract actual string user ID.
            */
           const receiverId = receiver.userId;
-
 
           /**
            * Check whether receiver currently
