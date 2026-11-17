@@ -398,31 +398,31 @@ export const chatRepository = {
     // 2. Build conversation WHERE condition
     // --------------------------------------------------
 
-   const where: Prisma.ConversationWhereInput = {
-  AND: [
-    // Current user must not have deleted or cleared chat
-    {
-      participants: {
-        some: {
-          userId,
-          deletedAt: null,
-          clearedAt: null,
-        },
-      },
-    },
-
-    // Other participant only needs to exist
-    {
-      participants: {
-        some: {
-          userId: {
-            not: userId,
+    const where: Prisma.ConversationWhereInput = {
+      AND: [
+        // Current user must not have deleted or cleared chat
+        {
+          participants: {
+            some: {
+              userId,
+              deletedAt: null,
+              clearedAt: null,
+            },
           },
         },
-      },
-    },
-  ],
-};
+
+        // Other participant only needs to exist
+        {
+          participants: {
+            some: {
+              userId: {
+                not: userId,
+              },
+            },
+          },
+        },
+      ],
+    };
 
     // --------------------------------------------------
     // 3. Nearby filter
@@ -699,7 +699,6 @@ export const chatRepository = {
           })
         : [];
 
-
     // --------------------------------------------------
     // 8.2 Convert presence into Map
     // --------------------------------------------------
@@ -953,7 +952,7 @@ export const chatRepository = {
 
       const existingProgress = progressMap.get(conversationId);
 
-      if (existingProgress && existingProgress.createdAt >= gift.createdAt) {
+      if (existingProgress && existingProgress.createdAt <= gift.createdAt) {
         continue;
       }
 
@@ -1026,10 +1025,9 @@ export const chatRepository = {
 
       const existingProgress = progressMap.get(conversationId);
 
-      if (existingProgress && existingProgress.createdAt >= rose.createdAt) {
+      if (existingProgress && existingProgress.createdAt <= rose.createdAt) {
         continue;
       }
-
       // ------------------------------------------------
       // Safety check
       // ------------------------------------------------
@@ -2040,8 +2038,7 @@ export const chatRepository = {
   // },
 
   async getUnreadCount(conversationId: string, userId: string) {
-  const participant =
-    await prisma.conversationParticipant.findUnique({
+    const participant = await prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {
           conversationId,
@@ -2054,37 +2051,37 @@ export const chatRepository = {
       },
     });
 
-  if (!participant) {
-    throw new Error("Conversation participant not found");
-  }
+    if (!participant) {
+      throw new Error("Conversation participant not found");
+    }
 
-  const unreadCount = await prisma.chatMessage.count({
-    where: {
-      conversationId,
+    const unreadCount = await prisma.chatMessage.count({
+      where: {
+        conversationId,
 
-      senderId: {
-        not: userId,
-      },
-
-      readAt: null,
-
-      ...(participant.lastReadAt && {
-        createdAt: {
-          gt: participant.lastReadAt,
+        senderId: {
+          not: userId,
         },
-      }),
 
-      // Exclude messages deleted only for this user
-      deletions: {
-        none: {
-          userId,
+        readAt: null,
+
+        ...(participant.lastReadAt && {
+          createdAt: {
+            gt: participant.lastReadAt,
+          },
+        }),
+
+        // Exclude messages deleted only for this user
+        deletions: {
+          none: {
+            userId,
+          },
         },
       },
-    },
-  });
+    });
 
-  return unreadCount;
-},
+    return unreadCount;
+  },
 
   async findConversationParticipants(conversationId: string, userId: string) {
     return prisma.conversationParticipant.findMany({
@@ -2298,7 +2295,6 @@ export const chatRepository = {
     conversationId: string,
     currentUserId: string,
   ) {
-
     /**
      * 1. Find conversation and participants
      */
@@ -2315,7 +2311,6 @@ export const chatRepository = {
       },
     });
 
-
     if (!conversation) {
       throw new Error("Conversation not found");
     }
@@ -2328,7 +2323,6 @@ export const chatRepository = {
       (participant) => participant.userId === currentUserId,
     );
 
-
     if (!currentParticipant) {
       throw new Error("You are not a participant of this conversation");
     }
@@ -2340,13 +2334,11 @@ export const chatRepository = {
       (participant) => participant.userId !== currentUserId,
     );
 
-
     if (!otherParticipant) {
       throw new Error("Other user not found in conversation");
     }
 
     const targetUserId = otherParticipant.userId;
-
 
     /**
      * 3. Fetch user details
@@ -2397,7 +2389,6 @@ export const chatRepository = {
         },
       },
     });
-
 
     if (!user) {
       throw new Error("User not found");
@@ -2803,76 +2794,67 @@ export const chatRepository = {
     };
   },
 
-  async findActiveProgress(
-  conversationId: string,
-  userId: string,
-) {
-  const now = new Date();
+  async findActiveProgress(conversationId: string, userId: string) {
+    const now = new Date();
 
-  return prisma.chatMessage.findFirst({
-    where: {
-      conversationId,
-      deletedAt: null,
+    return prisma.chatMessage.findFirst({
+      where: {
+        conversationId,
+        deletedAt: null,
 
-      deletions: {
-        none: {
-          userId,
-        },
-      },
-
-      OR: [
-        {
-          rose: {
-            is: {
-              isUnlocked: false,
-              OR: [
-                { expiresAt: null },
-                { expiresAt: { gt: now } },
-              ],
-            },
+        deletions: {
+          none: {
+            userId,
           },
         },
-        {
-          gift: {
-            is: {
-              isUnlocked: false,
-              expiresAt: {
-                gt: now,
+
+        OR: [
+          {
+            rose: {
+              is: {
+                isUnlocked: false,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
               },
             },
           },
-        },
-      ],
-    },
-
-    orderBy: [
-      { createdAt: "asc" },
-      { id: "asc" },
-    ],
-
-    select: {
-      id: true,
-      messageType: true,
-
-      rose: {
-        select: {
-          messagesSent: true,
-          requiredMessages: true,
-          isUnlocked: true,
-          expiresAt: true,
-        },
+          {
+            gift: {
+              is: {
+                isUnlocked: false,
+                expiresAt: {
+                  gt: now,
+                },
+              },
+            },
+          },
+        ],
       },
 
-      gift: {
-        select: {
-          messagesSent: true,
-          requiredMessages: true,
-          isUnlocked: true,
-          expiresAt: true,
-          giftName: true,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+
+      select: {
+        id: true,
+        messageType: true,
+
+        rose: {
+          select: {
+            messagesSent: true,
+            requiredMessages: true,
+            isUnlocked: true,
+            expiresAt: true,
+          },
+        },
+
+        gift: {
+          select: {
+            messagesSent: true,
+            requiredMessages: true,
+            isUnlocked: true,
+            expiresAt: true,
+            giftName: true,
+          },
         },
       },
-    },
-  });
-},
+    });
+  },
 };
