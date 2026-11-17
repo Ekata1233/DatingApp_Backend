@@ -216,18 +216,40 @@ export const chatService = {
     // 2. FETCH MESSAGES + COUNTS
     // ============================================
 
-    const [messages, counts] = await Promise.all([
-      chatRepository.findMessages(
-        data.conversationId,
-        data.userId,
-        data.cursor,
-        data.limit,
-        data.type ?? "all",
-      ),
+    // const [messages, counts] = await Promise.all([
+    //   chatRepository.findMessages(
+    //     data.conversationId,
+    //     data.userId,
+    //     data.cursor,
+    //     data.limit,
+    //     data.type ?? "all",
+    //   ),
 
-      chatRepository.getMessageCounts(data.conversationId, data.userId),
-    ]);
+    //   chatRepository.getMessageCounts(data.conversationId, data.userId),
+    // ]);
 
+    const [messages, counts, activeProgressMessage] =
+  await Promise.all([
+    chatRepository.findMessages(
+      data.conversationId,
+      data.userId,
+      data.cursor,
+      data.limit,
+      data.type ?? "all",
+    ),
+
+    chatRepository.getMessageCounts(
+      data.conversationId,
+      data.userId,
+    ),
+
+    chatRepository.findActiveProgress(
+      data.conversationId,
+      data.userId,
+    ),
+  ]);
+
+  
     // 3. Pagination
     const hasMore = messages.length > data.limit;
 
@@ -268,37 +290,93 @@ export const chatService = {
       return targetMap.get(`${record.targetType}:${record.targetId}`) ?? null;
     };
 
+    const now = new Date();
+
+const activeProgress = activeProgressMessage
+  ? buildMessageProgress({
+      ...activeProgressMessage,
+
+      rose:
+        activeProgressMessage.rose &&
+        !activeProgressMessage.rose.isUnlocked &&
+        (
+          !activeProgressMessage.rose.expiresAt ||
+          activeProgressMessage.rose.expiresAt > now
+        )
+          ? activeProgressMessage.rose
+          : null,
+
+      gift:
+        activeProgressMessage.gift &&
+        !activeProgressMessage.gift.isUnlocked &&
+        activeProgressMessage.gift.expiresAt > now
+          ? activeProgressMessage.gift
+          : null,
+    })
+  : null;
     // 6. Attach details and progress
-    const itemsWithProgress = items.map((message) => {
-      const progress = buildMessageProgress(message);
+    // const itemsWithProgress = items.map((message) => {
+    //   const progress = buildMessageProgress(message);
 
-      return {
-        ...message,
+    //   return {
+    //     ...message,
 
-        rose: message.rose
-          ? {
-              ...message.rose,
-              targetDetails: getTargetDetails(message.rose),
-            }
-          : null,
+    //     rose: message.rose
+    //       ? {
+    //           ...message.rose,
+    //           targetDetails: getTargetDetails(message.rose),
+    //         }
+    //       : null,
 
-        gift: message.gift
-          ? {
-              ...message.gift,
-              targetDetails: getTargetDetails(message.gift),
-            }
-          : null,
+    //     gift: message.gift
+    //       ? {
+    //           ...message.gift,
+    //           targetDetails: getTargetDetails(message.gift),
+    //         }
+    //       : null,
 
-        compliment: message.compliment
-          ? {
-              ...message.compliment,
-              targetDetails: getTargetDetails(message.compliment),
-            }
-          : null,
+    //     compliment: message.compliment
+    //       ? {
+    //           ...message.compliment,
+    //           targetDetails: getTargetDetails(message.compliment),
+    //         }
+    //       : null,
 
-        progress,
-      };
-    });
+    //     progress,
+    //   };
+    // });
+
+    const itemsWithProgress = items.map((message, index) => {
+  return {
+    ...message,
+
+    rose: message.rose
+      ? {
+          ...message.rose,
+          targetDetails: getTargetDetails(message.rose),
+        }
+      : null,
+
+    gift: message.gift
+      ? {
+          ...message.gift,
+          targetDetails: getTargetDetails(message.gift),
+        }
+      : null,
+
+    compliment: message.compliment
+      ? {
+          ...message.compliment,
+          targetDetails: getTargetDetails(message.compliment),
+        }
+      : null,
+
+    // Show active progress only in the first message
+    progress: index === 0 && !data.cursor
+      ? activeProgress
+      : null,
+  };
+});
 
     // 7. Next cursor
     const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;

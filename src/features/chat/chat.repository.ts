@@ -2153,6 +2153,7 @@ export const chatRepository = {
   //     },
   //   });
   // },
+
   async deleteConversationForUser(conversationId: string, userId: string) {
     return prisma.$transaction(async (tx) => {
       // Mark existing messages as deleted for this user
@@ -2801,4 +2802,77 @@ export const chatRepository = {
       events,
     };
   },
+
+  async findActiveProgress(
+  conversationId: string,
+  userId: string,
+) {
+  const now = new Date();
+
+  return prisma.chatMessage.findFirst({
+    where: {
+      conversationId,
+      deletedAt: null,
+
+      deletions: {
+        none: {
+          userId,
+        },
+      },
+
+      OR: [
+        {
+          rose: {
+            is: {
+              isUnlocked: false,
+              OR: [
+                { expiresAt: null },
+                { expiresAt: { gt: now } },
+              ],
+            },
+          },
+        },
+        {
+          gift: {
+            is: {
+              isUnlocked: false,
+              expiresAt: {
+                gt: now,
+              },
+            },
+          },
+        },
+      ],
+    },
+
+    orderBy: [
+      { createdAt: "asc" },
+      { id: "asc" },
+    ],
+
+    select: {
+      id: true,
+      messageType: true,
+
+      rose: {
+        select: {
+          messagesSent: true,
+          requiredMessages: true,
+          isUnlocked: true,
+          expiresAt: true,
+        },
+      },
+
+      gift: {
+        select: {
+          messagesSent: true,
+          requiredMessages: true,
+          isUnlocked: true,
+          expiresAt: true,
+          giftName: true,
+        },
+      },
+    },
+  });
+},
 };

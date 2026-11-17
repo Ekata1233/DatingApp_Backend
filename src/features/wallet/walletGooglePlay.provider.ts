@@ -1,28 +1,21 @@
-
 import { google } from "googleapis";
 
 const getAndroidPublisher = () => {
-  const base64 =
-    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
+  const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
 
-  const packageName =
-    process.env.GOOGLE_PLAY_PACKAGE_NAME;
+  const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME;
 
   if (!base64 || !packageName) {
-    throw new Error(
-      "Google Play billing is not configured"
-    );
+    throw new Error("Google Play billing is not configured");
   }
 
   const credentials = JSON.parse(
-    Buffer.from(base64, "base64").toString("utf8")
+    Buffer.from(base64, "base64").toString("utf8"),
   );
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: [
-      "https://www.googleapis.com/auth/androidpublisher",
-    ],
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
   });
 
   return {
@@ -92,57 +85,45 @@ const getAndroidPublisher = () => {
 export const verifyWalletGooglePurchase = async (
   productId: string,
   purchaseToken: string,
-  orderId: string
+  orderId: string,
 ) => {
-  const { publisher, packageName } =
-    getAndroidPublisher();
+  const { publisher, packageName } = getAndroidPublisher();
 
-  const response =
-    await publisher.purchases.products.get({
-      packageName,
-      productId,
-      token: purchaseToken,
-    });
+  const response = await publisher.purchases.products.get({
+    packageName,
+    productId,
+    token: purchaseToken,
+  });
 
   const purchase = response.data;
 
   if (purchase.purchaseState !== 0) {
-    throw new Error(
-      "Google Play purchase is not completed"
-    );
+    throw new Error("Google Play purchase is not completed");
   }
 
   if (!purchase.orderId || purchase.orderId !== orderId) {
     throw new Error("Google Play order mismatch");
   }
 
-
-  console.log("====================node environment==========================", process.env.NODE_ENV)
-   // 3. Block test purchases in production
-  if (
-    process.env.NODE_ENV === "production" &&
-    purchase.purchaseType === 0
-  ) {
-    throw new Error(
-      "Test Google Play purchases are not allowed in production"
-    );
+  console.log(
+    "====================node environment==========================",
+    process.env.NODE_ENV,
+  );
+  // 3. Block test purchases in production
+  if (process.env.NODE_ENV === "production" && purchase.purchaseType === 0) {
+    throw new Error("Test Google Play purchases are not allowed in production");
   }
 
-  console.log("----------------------purchase type---------------------- : ", purchase.purchaseType);
+  console.log(
+    "----------------------purchase type---------------------- : ",
+    purchase.purchaseType,
+  );
   // 4. Block promotional purchases in production
-  if (
-    process.env.NODE_ENV === "production" &&
-    purchase.purchaseType === 1
-  ) {
-    throw new Error(
-      "Promotional purchases are not allowed in production"
-    );
+  if (process.env.NODE_ENV === "production" && purchase.purchaseType === 1) {
+    throw new Error("Promotional purchases are not allowed in production");
   }
 
-  if (
-    purchase.quantity != null &&
-    purchase.quantity !== 1
-  ) {
+  if (purchase.quantity != null && purchase.quantity !== 1) {
     throw new Error("Unsupported purchase quantity");
   }
 
@@ -158,10 +139,9 @@ export const verifyWalletGooglePurchase = async (
 
 export const consumeWalletGooglePurchase = async (
   productId: string,
-  purchaseToken: string
+  purchaseToken: string,
 ) => {
-  const { publisher, packageName } =
-    getAndroidPublisher();
+  const { publisher, packageName } = getAndroidPublisher();
 
   await publisher.purchases.products.consume({
     packageName,
