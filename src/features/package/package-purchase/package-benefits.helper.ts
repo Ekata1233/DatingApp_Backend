@@ -177,11 +177,29 @@ export const creditPackageBenefits = async (
   }
 
   if (normalBoost && boosts > 0) {
+    const boostOption = await tx.boostOption.findFirst({
+      where: {
+        boost_id: normalBoost.id,
+        is_active: true,
+      },
+      orderBy: {
+        boostCount: "asc",
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!boostOption) {
+      throw new Error("NORMAL_BOOST_OPTION_NOT_FOUND");
+    }
     const existingPackageBoost = await tx.userBoost.findFirst({
       where: {
         user_id: userId,
         boostId: normalBoost.id,
-        boost_option_id: null,
+        weeklyLimit: {
+          gt: 0,
+        },
         is_active: true,
       },
     });
@@ -212,7 +230,7 @@ export const creditPackageBenefits = async (
         data: {
           user_id: userId,
           boostId: normalBoost.id,
-          boost_option_id: null,
+          boost_option_id: boostOption.id,
 
           total_boosts: boosts,
           remaining_boosts: boosts,
@@ -299,12 +317,29 @@ export const creditPackageBenefits = async (
   });
 
   // ==========================================
+  // CREATE DATE PLAN TRANSACTION
+  // ==========================================
+
+  if (datePlans > 0) {
+    await tx.datePlanTransaction.create({
+      data: {
+        userId,
+        type: "PACKAGE_CREDIT",
+        quantity: datePlans,
+        balanceAfter: datePlanStats.balance,
+        referenceId: packageId,
+        description: "Free date plans credited from membership package",
+      },
+    });
+  }
+
+  // ==========================================
   // 6. CREDIT WELCOME COINS
   // ==========================================
 
   const welcomeCoins = await creditPackageWelcomeCoins(tx, userId, packageId);
   // ==========================================
-  // 6. RETURN CREDITED BENEFITS
+  // 7. RETURN CREDITED BENEFITS
   // ==========================================
 
   return {
