@@ -76,8 +76,17 @@ export const updateDraftDatePlan = async (
     throw new Error("Plan not found");
   }
 
-  const { vibeIds, eventDate, eventTime, activityId, ...planData } = payload;
+  const {
+    vibeIds,
+    eventDate,
+    eventTime,
+    activityId,
+    verifiedMembersOnly,
+    ...planData
+  } = payload;
+
   let eventDateTime: Date | undefined;
+
   // ============================================
   // VALIDATE EVENT DATE AND TIME
   // ============================================
@@ -106,6 +115,11 @@ export const updateDraftDatePlan = async (
       data: {
         ...planData,
         ...(eventDateTime && { eventDateTime }),
+
+        // VERIFIED MEMBERS ONLY
+        ...(verifiedMembersOnly !== undefined && {
+          verifiedMembersOnly,
+        }),
       } as Prisma.DatePlanUncheckedUpdateInput,
     });
 

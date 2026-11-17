@@ -433,6 +433,10 @@ export const getMyPlansService = async ({
       participantLimit,
 
       /**
+ * Verified members only
+ */
+verifiedMembersOnly: plan.verifiedMembersOnly,
+      /**
        * Join request gender
        */
       joinRequestGender: plan.joinRequestGender
