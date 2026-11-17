@@ -41,6 +41,8 @@ import { prisma } from "./prisma/prismaClient";
 import http from "http";
 import { initializeSocket } from "./config/socket";
 import { startBoostExpiryJob } from "./jobs/boostExpiry.job";
+import { startWeeklyPackageRenewalCron } from "./features/package/package-renew/weekly-package-renewal.cron";
+import { startActivityCron } from "./features/user/activity/activity.cron";
 
 const PORT = process.env.PORT || 4000;
 
@@ -61,6 +63,8 @@ const startServer = async () => {
      */
     initializeSocket(server);
     startBoostExpiryJob();
+    startWeeklyPackageRenewalCron();
+    startActivityCron();
 
     server.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);

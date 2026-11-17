@@ -13,6 +13,7 @@ export const creditPackageBenefits = async (
   tx: Prisma.TransactionClient,
   userId: string,
   packageId: string,
+   isWeeklyRenewal: boolean = false,
 ) => {
   const now = new Date();
   const nextResetAt = addDays(now, 7);
@@ -342,8 +343,17 @@ export const creditPackageBenefits = async (
   // 6. CREDIT WELCOME COINS
   // ==========================================
 
-  const welcomeCoins = await creditPackageWelcomeCoins(tx, userId, packageId);
-  // ==========================================
+const welcomeCoins = isWeeklyRenewal
+  ? {
+      credited: false,
+      amount: 0,
+      reason: "WEEKLY_RENEWAL",
+    }
+  : await creditPackageWelcomeCoins(
+      tx,
+      userId,
+      packageId,
+    );  // ==========================================
   // 7. RETURN CREDITED BENEFITS
   // ==========================================
 
