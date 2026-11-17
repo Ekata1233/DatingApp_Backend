@@ -22,7 +22,6 @@ export const getAllUsersController = async (req: Request, res: Response) => {
   try {
     const users = await userService.getAllUsers();
 
-    console.log("users list : ", users);
 
     res.status(200).json({
       success: true,
@@ -42,7 +41,6 @@ export const getAllUsersController = async (req: Request, res: Response) => {
 // FETCH SINGLE USER
 export const getSingleUserController = async (req: Request, res: Response) => {
   try {
-    console.log("GET USER DETAILS CONTROLLER CALLED");
     const { id } = req.params;
 
     if (Array.isArray(id) || !id) {

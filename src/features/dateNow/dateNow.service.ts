@@ -76,8 +76,17 @@ export const updateDraftDatePlan = async (
     throw new Error("Plan not found");
   }
 
-  const { vibeIds, eventDate, eventTime, activityId, ...planData } = payload;
+  const {
+    vibeIds,
+    eventDate,
+    eventTime,
+    activityId,
+    verifiedMembersOnly,
+    ...planData
+  } = payload;
+
   let eventDateTime: Date | undefined;
+
   // ============================================
   // VALIDATE EVENT DATE AND TIME
   // ============================================
@@ -106,6 +115,11 @@ export const updateDraftDatePlan = async (
       data: {
         ...planData,
         ...(eventDateTime && { eventDateTime }),
+
+        // VERIFIED MEMBERS ONLY
+        ...(verifiedMembersOnly !== undefined && {
+          verifiedMembersOnly,
+        }),
       } as Prisma.DatePlanUncheckedUpdateInput,
     });
 
@@ -823,7 +837,40 @@ export const discoverDatePlan = async (
   const pageItems = ranked.slice(startIndex, startIndex + pageLimit + 1);
   const hasMore = pageItems.length > pageLimit;
   const selectedPlans = pageItems.slice(0, pageLimit);
+// ============================================
+// UPDATE ACTIVE DATE PLAN BOOST VIEW COUNT
+// ============================================
 
+const selectedPlanIds = selectedPlans.map(
+  (plan) => plan.id,
+);
+
+if (selectedPlanIds.length > 0) {
+  const boostNow = new Date();
+
+  await prisma.datePlanUserBoost.updateMany({
+    where: {
+      datePlanId: {
+        in: selectedPlanIds,
+      },
+      userId: {
+        not: userId,
+      },
+      status: "ACTIVE",
+      startedAt: {
+        lte: boostNow,
+      },
+      expiresAt: {
+        gt: boostNow,
+      },
+    },
+    data: {
+      viewCount: {
+        increment: 1,
+      },
+    },
+  });
+}
   // ============================================
   // RESPONSE MAPPING
   // ============================================

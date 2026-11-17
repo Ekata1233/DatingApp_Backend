@@ -40,7 +40,7 @@
 //     throw new Error("User ID is required");
 //   }
 
-//   console.log("before match score queue")
+
 //   await matchScoreQueue.add(
 //     "calculate-user-match-scores",
 //     {
@@ -51,9 +51,7 @@
 //     },
 //   );
 
-//   console.log(
-//     `📌 Match score job queued for ${userId}`,
-//   );
+
 // };
 
 import { Queue } from "bullmq";
@@ -106,10 +104,7 @@ export const queueMatchScoreCalculation =
       );
     }
 
-    console.log(
-      "📤 Adding match score job",
-      { userId },
-    );
+  
 
     await matchScoreQueue.add(
       "calculate-user-match-scores",
@@ -121,7 +116,5 @@ export const queueMatchScoreCalculation =
       },
     );
 
-    console.log(
-      `📌 Match score job queued for ${userId}`,
-    );
+    
   };

@@ -15,8 +15,7 @@ const ffprobeInstaller = require("@ffprobe-installer/ffprobe");
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
-console.log("FFMPEG PATH:", ffmpegInstaller.path);
-console.log("FFPROBE PATH:", ffprobeInstaller.path);
+
 export const extractVerificationFrames = async (
   videoPath: string
 ): Promise<ExtractedFrame[]> => {

@@ -613,8 +613,7 @@ export const updateVideoController = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
-    console.log("User ID:", userId);
-    console.log("Files received:", req.files);
+
 
     // CHANGE START
     if (!req.files || !req.files.video) {
@@ -627,7 +626,6 @@ export const updateVideoController = async (req: Request, res: Response) => {
     const video = req.files.video as any;
     // CHANGE END
 
-    console.log("Video received:", video);
 
     if (!video.mimetype.startsWith("video")) {
       return res.status(400).json({

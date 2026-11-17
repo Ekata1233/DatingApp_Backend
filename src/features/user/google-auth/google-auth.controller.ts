@@ -9,7 +9,6 @@ export const googleLoginController = async (req: Request, res: Response) => {
 
     res.json(data);
   } catch (error) {
-    console.log("Google Login Error:", error); 
     res.status(400).json({ message: "Google Authentication Failed" });
   }
 };

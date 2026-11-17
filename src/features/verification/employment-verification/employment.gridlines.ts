@@ -154,11 +154,6 @@ export const fetchUANByMobile = async (
       { headers: getHeaders(referenceId), timeout: REQUEST_TIMEOUT_MS }
     );
 
-    console.log("Gridlines Fetch UAN:", {
-      status: response.status,
-      code: response.data?.data?.code,
-      requestId: response.data?.request_id,
-    });
 
     return response.data;
   } catch (error: unknown) {
@@ -184,11 +179,7 @@ export const fetchLatestEmploymentByUAN = async (
       { headers: getHeaders(referenceId), timeout: REQUEST_TIMEOUT_MS }
     );
 
-    console.log("Gridlines Fetch Latest:", {
-      status: response.status,
-      code: response.data?.data?.code,
-      requestId: response.data?.request_id,
-    });
+ 
 
     return response.data;
   } catch (error: unknown) {

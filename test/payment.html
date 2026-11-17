@@ -30,7 +30,7 @@ var options = {
 
     handler:function(response){
 
-        console.log(response);
+        
 
         alert(JSON.stringify(response));
 
@@ -90,20 +90,7 @@ rzp.open();
 
                 handler: function (response) {
 
-                    console.log(
-                        "razorpay_payment_id:",
-                        response.razorpay_payment_id
-                    );
-
-                    console.log(
-                        "razorpay_order_id:",
-                        response.razorpay_order_id
-                    );
-
-                    console.log(
-                        "razorpay_signature:",
-                        response.razorpay_signature
-                    );
+                 
 
                     alert(
                         "Payment Successful!\n\n" +

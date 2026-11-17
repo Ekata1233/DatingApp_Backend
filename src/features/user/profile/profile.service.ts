@@ -107,7 +107,6 @@ export const updateInterestedInService = async (
   // 👉 Calculate next step
   const currentStep = "INTERESTED_IN";
   const nextStep = getNextStep(currentStep);
-  console.log("nextStep", nextStep);
 
   const updatedProfile = await prisma.userProfile.upsert({
     where: { user_id: userId },
@@ -555,11 +554,7 @@ export const updateLocationService = async (
     },
   });
 
-  console.log("before bull mq");
-  // await queueMatchScoreCalculation(
-  //   userId,
-  // );
-  console.log("after bullmq");
+
 
   await redis.del(`profile:edit:${userId}`);
   // await redis.del(`feed:details:${userId}`);

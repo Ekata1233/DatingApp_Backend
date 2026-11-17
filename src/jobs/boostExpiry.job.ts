@@ -8,9 +8,7 @@ export const startBoostExpiryJob = () => {
       const result = await endExpiredBoostsService();
 
       if (result.endedCount > 0) {
-        console.log(
-          `Boost expiry job: ${result.endedCount} boost(s) ended`
-        );
+        
       }
     } catch (error) {
       console.error(
@@ -20,5 +18,4 @@ export const startBoostExpiryJob = () => {
     }
   });
 
-  console.log("✅ Boost expiry job started");
 };

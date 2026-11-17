@@ -17,8 +17,7 @@ export const verifyVideoLivenessController = async (
       });
     }
 
-    console.log("BODY:", req.body);
-    console.log("FILES:", req.files);
+   
 
     // Consent
     if (req.body.consent !== "Y") {
@@ -54,20 +53,13 @@ export const verifyVideoLivenessController = async (
       });
     }
 
-    console.log("VIDEO:", {
-      name: video.name,
-      size: video.size,
-      mimetype: video.mimetype,
-    });
+  
 
     // Write ONLY this video to temp disk
     const videoPath =
       await createTemporaryVideo(video);
 
-    console.log(
-      "TEMP VIDEO PATH:",
-      videoPath
-    );
+   
 
     const result =
       await verifyVideoLivenessService({

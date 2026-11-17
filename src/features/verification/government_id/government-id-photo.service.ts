@@ -63,15 +63,8 @@ export type GovernmentIdPhoto = {
 
 //   // 5. Download the original image
 //   // from private ImageKit storage
-// console.log("ImageKit file details:", {
-//   fileId: file.fileId,
-//   name: file.name,
-//   filePath: file.filePath,
-//   url: file.url,
-//   isPrivateFile: file.isPrivateFile,
-// });
 
-// console.log("Generated signed URL:", signedUrl);
+
 
 //   const response = await axios.get<ArrayBuffer>(
 //     signedUrl,
@@ -148,13 +141,6 @@ export const getGovernmentIdPhoto = async (
   const file =
     await imagekit.getFileDetails(photoKey);
 
-  console.log("ImageKit file details:", {
-    fileId: file.fileId,
-    name: file.name,
-    filePath: file.filePath,
-    url: file.url,
-    isPrivateFile: file.isPrivateFile,
-  });
 
   if (
     !file ||
@@ -186,10 +172,7 @@ export const getGovernmentIdPhoto = async (
     expireSeconds: 300,
   });
 
-  console.log(
-    "Generated signed URL:",
-    signedUrl
-  );
+
 
   try {
     const response =

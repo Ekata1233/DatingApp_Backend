@@ -64,9 +64,6 @@ export const verifyVideoLivenessService = async ({
     // 1. CHECK USER
     // =================================================
 
-    console.log("VIDEO VERIFICATION START:", {
-      userId,
-    });
 
     const user = await prisma.user.findUnique({
       where: {
@@ -127,16 +124,11 @@ export const verifyVideoLivenessService = async ({
         },
       });
 
-    console.log(
-      "VERIFICATION RECORD:",
-      verification.id
-    );
 
     // =================================================
     // 3. EXTRACT VIDEO FRAMES
     // =================================================
 
-    console.log("FFMPEG EXTRACTION START");
 
     console.time("FFMPEG_EXTRACTION");
 
@@ -145,10 +137,7 @@ export const verifyVideoLivenessService = async ({
 
     console.timeEnd("FFMPEG_EXTRACTION");
 
-    console.log(
-      "FRAMES EXTRACTED:",
-      frames.length
-    );
+   
 
     if (frames.length === 0) {
       throw new Error(
@@ -170,9 +159,7 @@ export const verifyVideoLivenessService = async ({
     //
     // =================================================
 
-    console.log(
-      "GRIDLINES LIVENESS CHECK START"
-    );
+
 
     console.time("GRIDLINES_TOTAL");
 
@@ -184,13 +171,7 @@ export const verifyVideoLivenessService = async ({
           const referenceId =
             crypto.randomUUID();
 
-          console.log(
-            `GRIDLINES FRAME ${frameNumber} START`
-          );
-
-          console.time(
-            `GRIDLINES_FRAME_${frameNumber}`
-          );
+         
 
           try {
             const result =
@@ -199,17 +180,7 @@ export const verifyVideoLivenessService = async ({
                 referenceId
               );
 
-            console.log(
-              `GRIDLINES FRAME ${frameNumber} RESULT:`,
-              {
-                code: result.code,
-                message: result.message,
-                confidence:
-                  result.confidence,
-                transactionId:
-                  result.transactionId,
-              }
-            );
+           
 
             /**
              * Gridlines:
@@ -292,10 +263,7 @@ export const verifyVideoLivenessService = async ({
 
     console.timeEnd("GRIDLINES_TOTAL");
 
-    console.log(
-      "ALL GRIDLINES RESULTS:",
-      results
-    );
+
 
     // =================================================
     // 5. CALCULATE LIVENESS RESULT
@@ -348,27 +316,7 @@ export const verifyVideoLivenessService = async ({
       passedFrames.length >=
       MIN_PASSED_FRAMES;
 
-    console.log(
-      "LIVENESS SUMMARY:",
-      {
-        totalFrames:
-          results.length,
-
-        passedFrames:
-          passedFrames.length,
-
-        failedFrames,
-
-        averageConfidence,
-
-        highestConfidence,
-
-        threshold:
-          LIVENESS_THRESHOLD,
-
-        isLive,
-      }
-    );
+    
 
     // =================================================
     // 6. LIVENESS FAILED
@@ -431,9 +379,7 @@ export const verifyVideoLivenessService = async ({
         }
       );
 
-      console.log(
-        "VIDEO VERIFICATION REJECTED"
-      );
+     
 
       return {
         verified: false,
@@ -551,10 +497,7 @@ export const verifyVideoLivenessService = async ({
       }
     );
 
-    console.log(
-      "VIDEO VERIFICATION VERIFIED:",
-      verified.id
-    );
+  
 
     // =================================================
     // 8. RETURN SUCCESS
@@ -622,19 +565,14 @@ export const verifyVideoLivenessService = async ({
     // even when Gridlines throws an error.
     // =================================================
 
-    console.log(
-      "VIDEO VERIFICATION CLEANUP START"
-    );
-
+ 
     try {
       await cleanupVerificationFiles(
         videoPath,
         frames
       );
 
-      console.log(
-        "VIDEO VERIFICATION CLEANUP COMPLETE"
-      );
+  
     } catch (cleanupError) {
       console.error(
         "VIDEO VERIFICATION CLEANUP ERROR:",

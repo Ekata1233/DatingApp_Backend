@@ -32,6 +32,8 @@ export interface UpdateDatePlanInput {
 
   participantLimit?: number;
 
+verifiedMembersOnly?: boolean;
+
   joinRequestGenderId?: string;
 
   visibilityId?: string;

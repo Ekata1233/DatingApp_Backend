@@ -44,14 +44,7 @@ const getAndroidPublisher = () => {
 
 //   const purchase = response.data;
 
-// console.log("========== GOOGLE PLAY DEBUG ==========");
 
-// console.log("Requested Product ID:", productId);
-// console.log("Google Product ID:", purchase.productId);
-
-// console.log("Full Google Response:", JSON.stringify(purchase, null, 2));
-
-// console.log("=======================================");
 
 //   if (purchase.purchaseState !== 0) {
 //     throw new Error(

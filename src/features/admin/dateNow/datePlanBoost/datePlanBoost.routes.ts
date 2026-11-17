@@ -15,9 +15,11 @@ router.get(
   "/date-plan-boosts/get-all",
   getDatePlanBoostController,
 );
+
 router.get(
   "/date-plan-boosts/get",
   authMiddleware,
   getActiveDatePlanBoostForMobileController,
 );
+
 export default router;
