@@ -319,7 +319,53 @@ export const getMyPlansService = async ({
   const matchScoreMap = await getMatchScoresForUsers(userId, requesterIds);
 
   const now = new Date();
+// ============================================
+// FETCH DATE PLAN BOOST DETAILS
+// ============================================
 
+const planIds = plans.map((plan) => plan.id);
+
+const boosts = await prisma.datePlanUserBoost.findMany({
+  where: {
+    datePlanId: {
+      in: planIds,
+    },
+    userId,
+  },
+  select: {
+    datePlanId: true,
+    status: true,
+    startedAt: true,
+    expiresAt: true,
+    viewCount: true,
+  },
+});
+
+// Map boost details by date plan ID
+const boostMap = new Map<
+  string,
+  {
+    viewCount: number;
+    isBoosted: boolean;
+  }
+>();
+
+for (const boost of boosts) {
+  const existing = boostMap.get(boost.datePlanId) ?? {
+    viewCount: 0,
+    isBoosted: false,
+  };
+
+  const isActive =
+    boost.status === "ACTIVE" &&
+    boost.startedAt <= now &&
+    boost.expiresAt > now;
+
+  boostMap.set(boost.datePlanId, {
+    viewCount: existing.viewCount + boost.viewCount,
+    isBoosted: existing.isBoosted || isActive,
+  });
+}
   /**
    * Format response
    */
@@ -355,6 +401,9 @@ export const getMyPlansService = async ({
       id: plan.id,
 
       status: plan.status,
+        viewCount: boostMap.get(plan.id)?.viewCount ?? 0,
+
+  isBoosted: boostMap.get(plan.id)?.isBoosted ?? false,
 
       statusLabel: isLiveNow ? "LIVE NOW" : plan.status,
 
