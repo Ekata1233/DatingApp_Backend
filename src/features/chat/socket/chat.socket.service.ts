@@ -19,7 +19,8 @@ import { calculateAge } from "../chat.repository";
 import { prisma } from "../../../prisma/prismaClient";
 import { incrementRoseAndGiftMessages } from "../../unlockRoseGift/unlockRoseGift.service";
 import { AppError } from "../../rose/AppError";
-import { emitEngagementProgress } from "./engagement-progress.socket";
+import { buildMessageProgress } from "../chat.helper";
+import { emitEngagementProgress, readMessageRewards } from "./engagement-progress.socket";
 
 export const chatSocketService = {
   /**
@@ -269,6 +270,16 @@ if (payload.messageType === MessageType.GIFT) {
       metadata: metadata,
     });
 
+    const liveMessage = message.roseId || message.giftId
+      ? {
+          ...message,
+          progress: buildMessageProgress({
+            messageType: message.messageType,
+            ...(await readMessageRewards(message, receiverId)),
+          }),
+        }
+      : message;
+
     /**
      * Send message to conversation room.
      *
@@ -281,7 +292,7 @@ if (payload.messageType === MessageType.GIFT) {
      */
     io.to(`conversation:${payload.conversationId}`).emit(
       "message:receive",
-      message,
+      liveMessage,
     );
 
     /**
@@ -426,7 +437,7 @@ if (payload.messageType === MessageType.GIFT) {
     /**
      * Return saved message to event handler.
      */
-    return message;
+    return liveMessage;
   },
 
   /**

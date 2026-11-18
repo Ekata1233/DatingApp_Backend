@@ -4,8 +4,11 @@ import { ZodError } from "zod";
 import { sendEngagementService } from "./engagement.service";
 import { sendEngagementSchema } from "./engagement.validation";
 import { getIO } from "../../config/socket";
-import { prisma } from "../../prisma/prismaClient";
-import { emitEngagementProgress } from "../chat/socket/engagement-progress.socket";
+import { buildMessageProgress } from "../chat/chat.helper";
+import {
+  emitEngagementProgress,
+  readMessageRewards,
+} from "../chat/socket/engagement-progress.socket";
 
 export const sendEngagement = async (req: Request, res: Response) => {
   try {
@@ -38,70 +41,19 @@ export const sendEngagement = async (req: Request, res: Response) => {
       const message = result.data?.message;
 
       if (message) {
-        // ========================================
-        // SEND MESSAGE TO RECEIVER
-        // ========================================
+        const rewards = await readMessageRewards(message, receiverId);
+        const liveMessage = message.roseId || message.giftId
+          ? { ...message, progress: buildMessageProgress({ ...message, ...rewards }) }
+          : message;
 
-        io.to(`user:${receiverId}`).emit("message:receive", message);
-        io.to(`user:${senderId}`).emit("message:receive", message);
+        io.to(`user:${receiverId}`).emit("message:receive", liveMessage);
+        io.to(`user:${senderId}`).emit("message:receive", liveMessage);
 
-        // ==========================================
-        // INITIAL ROSE & GIFT PROGRESS
-        // ==========================================
-
-        const conversationId = result.data?.conversationId;
-
-        if (conversationId && (result.data?.rose || result.data?.gift)) {
-          // ========================================
-          // ROSE PROGRESS
-          // ========================================
-
-          const rose = result.data.rose
-            ? await prisma.userRose.findUnique({
-                where: {
-                  id: result.data.rose.id,
-                },
-                select: {
-                  id: true,
-                  messagesSent: true,
-                  requiredMessages: true,
-                  isUnlocked: true,
-                  expiresAt: true,
-                },
-              })
-            : null;
-
-          // ========================================
-          // GIFT PROGRESS
-          // ========================================
-
-          const gift = result.data.gift
-            ? await prisma.userGift.findUnique({
-                where: {
-                  id: result.data.gift.id,
-                },
-                select: {
-                  id: true,
-                  messagesSent: true,
-                  requiredMessages: true,
-                  isUnlocked: true,
-                  expiresAt: true,
-                  giftName: true,
-                },
-              })
-            : null;
-
-          // ========================================
-          // EMIT PROGRESS TO CONVERSATION
-          // ========================================
-
-          if (rose || gift) {
-            await emitEngagementProgress(io, conversationId, {
-              rose,
-              gift,
-              redeemed: [],
-            });
-          }
+        if (rewards.rose || rewards.gift) {
+          await emitEngagementProgress(io, message.conversationId, {
+            ...rewards,
+            redeemed: [],
+          });
         }
       }
     } catch (socketError) {

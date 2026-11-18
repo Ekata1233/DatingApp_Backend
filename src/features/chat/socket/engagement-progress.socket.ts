@@ -22,6 +22,42 @@ type RewardResult = {
   redeemed: string[];
 };
 
+export const readMessageRewards = async (
+  message: { senderId: string; roseId: string | null; giftId: string | null },
+  receiverId: string,
+): Promise<Pick<RewardResult, "rose" | "gift">> => {
+  const participants = { senderId: message.senderId, receiverId };
+  const select = {
+    id: true,
+    messagesSent: true,
+    requiredMessages: true,
+    isUnlocked: true,
+    expiresAt: true,
+  } as const;
+
+  try {
+    const [rose, gift] = await Promise.all([
+      message.roseId
+        ? prisma.userRose.findUnique({
+            where: { id: message.roseId, ...participants },
+            select,
+          })
+        : null,
+      message.giftId
+        ? prisma.userGift.findUnique({
+            where: { id: message.giftId, ...participants },
+            select: { ...select, giftName: true },
+          })
+        : null,
+    ]);
+
+    return { rose, gift };
+  } catch (error) {
+    console.error("Failed to load message rewards:", error);
+    return { rose: null, gift: null };
+  }
+};
+
 export const emitEngagementProgress = async (
   io: Server,
   conversationId: string,

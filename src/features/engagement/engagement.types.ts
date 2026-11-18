@@ -35,7 +35,7 @@ export interface SendEngagementResponse {
       id: string;
       conversationId: string;
       senderId: string;
-      messageType: string;
+      messageType: import("@prisma/client").MessageType;
       roseId: string | null;
       complimentId: string | null;
       giftId: string | null;

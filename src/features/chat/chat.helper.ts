@@ -193,6 +193,10 @@ export const isUserViewingConversation = async (
 export const resolveMessageTargets = async (targets: TargetInput[]) => {
   const result = new Map<string, any>();
 
+  // =====================================================
+  // 1. RESOLVE PHOTO TARGETS (EXISTING LOGIC)
+  // =====================================================
+
   const photoIds = [
     ...new Set(
       targets
@@ -221,6 +225,57 @@ export const resolveMessageTargets = async (targets: TargetInput[]) => {
         targetType: "PHOTO",
         targetId: photo.id,
         photo: photo,
+      });
+    }
+  }
+
+  // =====================================================
+  // 2. RESOLVE PROMPT TARGETS (NEW LOGIC)
+  // =====================================================
+
+  const promptIds = [
+    ...new Set(
+      targets
+        .filter((t) => t.targetType === "PROMPT" && t.targetId)
+        .map((t) => t.targetId as string),
+    ),
+  ];
+
+  if (promptIds.length > 0) {
+    const userPrompts = await prisma.userPrompt.findMany({
+      where: {
+        id: {
+          in: promptIds,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        promptId: true,
+        answer: true,
+        displayOrder: true,
+
+        prompt: {
+          select: {
+            id: true,
+            question: true,
+          },
+        },
+      },
+    });
+
+    for (const userPrompt of userPrompts) {
+      result.set(`PROMPT:${userPrompt.id}`, {
+        targetType: "PROMPT",
+        targetId: userPrompt.id,
+        prompt: {
+          id: userPrompt.id,
+          userId: userPrompt.userId,
+          promptId: userPrompt.promptId,
+          question: userPrompt.prompt.question,
+          answer: userPrompt.answer,
+          displayOrder: userPrompt.displayOrder,
+        },
       });
     }
   }
