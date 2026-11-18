@@ -342,6 +342,26 @@ export const publishDatePlan = async (planId: string, userId: string) => {
         throw new Error("Insufficient wallet balance");
       }
 
+      const walletAfterDeduction = await tx.wallet.findUniqueOrThrow({
+  where: {
+    id: wallet.id,
+  },
+});
+
+await tx.walletTransaction.create({
+  data: {
+    walletId: wallet.id,
+    amount: costToPostPlan,
+    type: TransactionType.PURCHASE,
+    status: TransactionStatus.SUCCESS,
+    source: TransactionSource.WALLET_DATE_PLAN,
+    referenceId: planId,
+    description: "Published Date Plan using wallet",
+    balanceBefore: walletAfterDeduction.balance.plus(costToPostPlan),
+    balanceAfter: walletAfterDeduction.balance,
+  },
+});
+
       paymentMethod = "WALLET";
       deductedAmount = costToPostPlan;
     }
