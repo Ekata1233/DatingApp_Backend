@@ -16,33 +16,52 @@ import {
 export const partnerAuthMiddleware = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader =
+      req.headers.authorization;
 
-    // 1. Check authorization token
+    // ==========================================
+    // CHECK AUTHORIZATION TOKEN
+    // ==========================================
+
     if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "Authorization token is required",
+
+        message:
+          "Authorization token is required",
       });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.slice(7).trim();
 
-    const secret = process.env.PARTNER_JWT_SECRET;
+    const secret =
+      process.env.PARTNER_JWT_SECRET;
 
     if (!secret) {
-      throw new Error("PARTNER_JWT_SECRET is not configured");
+      throw new Error(
+        "PARTNER_JWT_SECRET is not configured",
+      );
     }
 
-    // 2. Verify JWT token
-    const decoded = jwt.verify(token, secret, {
-      algorithms: ["HS256"],
-    }) as PartnerTokenPayload;
+    // ==========================================
+    // VERIFY JWT
+    // ==========================================
 
-    // 3. Validate token data
+    const decoded = jwt.verify(
+      token,
+      secret,
+      {
+        algorithms: ["HS256"],
+      },
+    ) as PartnerTokenPayload;
+
+    // ==========================================
+    // VALIDATE TOKEN DATA
+    // ==========================================
+
     if (
       decoded.tokenType !== "PARTNER" ||
       typeof decoded.partnerId !== "string" ||
@@ -56,19 +75,60 @@ export const partnerAuthMiddleware = async (
       });
     }
 
-    // 4. Find partner account
-    const partner = await prisma.eventPartner.findUnique({
-      where: {
-        id: decoded.partnerId,
-      },
-      select: {
-        id: true,
-        sessionId: true,
-        accountStatus: true,
-        isPhoneVerified: true,
-        deletedAt: true,
-      },
-    });
+    if (
+      decoded.role !== undefined &&
+      decoded.role !== "ORGANIZER" &&
+      decoded.role !== "HOST"
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid partner role",
+      });
+    }
+
+    if (
+      Boolean(decoded.role) !==
+      Boolean(decoded.businessId)
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid account context",
+      });
+    }
+
+    if (
+      decoded.businessId !== undefined &&
+      (
+        typeof decoded.businessId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          decoded.businessId,
+        )
+      )
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid business ID",
+      });
+    }
+
+    // ==========================================
+    // FIND PARTNER
+    // ==========================================
+
+    const partner =
+      await prisma.eventPartner.findUnique({
+        where: {
+          id: decoded.partnerId,
+        },
+
+        select: {
+          id: true,
+          sessionId: true,
+          accountStatus: true,
+          isPhoneVerified: true,
+          deletedAt: true,
+        },
+      });
 
     if (!partner || partner.deletedAt) {
       return res.status(401).json({
@@ -77,7 +137,10 @@ export const partnerAuthMiddleware = async (
       });
     }
 
-    // 5. Check account status
+    // ==========================================
+    // CHECK ACCOUNT STATUS
+    // ==========================================
+
     if (partner.accountStatus !== "ACTIVE") {
       return res.status(403).json({
         success: false,
@@ -85,7 +148,10 @@ export const partnerAuthMiddleware = async (
       });
     }
 
-    // 6. Check phone verification
+    // ==========================================
+    // PHONE VERIFICATION
+    // ==========================================
+
     if (!partner.isPhoneVerified) {
       return res.status(403).json({
         success: false,
@@ -93,23 +159,35 @@ export const partnerAuthMiddleware = async (
       });
     }
 
-    // 7. Validate session
+    // ==========================================
+    // SINGLE DEVICE SESSION
+    // ==========================================
+
     if (
       !partner.sessionId ||
       partner.sessionId !== decoded.sessionId
     ) {
       return res.status(401).json({
         success: false,
+
         code: "SESSION_EXPIRED",
-        message: "Session expired. Please login again",
+
+        message:
+          "Session expired. Please login again",
       });
     }
 
-    // 8. Attach partner details to request
+    // ==========================================
+    // ATTACH PARTNER TO REQUEST
+    // ==========================================
+
     (req as PartnerRequest).partner = {
       id: partner.id,
+
       sessionId: decoded.sessionId,
+
       role: decoded.role,
+
       businessId: decoded.businessId,
     };
 
@@ -131,7 +209,10 @@ export const partnerAuthMiddleware = async (
       });
     }
 
-    console.error("Partner authentication error:", error);
+    console.error(
+      "Partner authentication error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,

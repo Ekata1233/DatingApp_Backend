@@ -108,6 +108,10 @@ import packageProgram from "../features/admin/package/package-programs/packagePr
 import usersRoutes from "../features/admin/onboarding/users/users.route"
 
 import activityRoutes from "../features/user/activity/activity.routes"
+
+import partnerAuthRoutes from "../features/event-partner/auth/partnerAuth.routes"
+
+
 const router = Router();
 
 router.use("/interested-in", interestRoutes);
@@ -236,4 +240,12 @@ router.use("/user", matchAnalysisRoutes)
 
 //IN APP PURCHASE
 router.use("/user", inAppPurchaseRoutes)
+
+router.use("/event-partner",partnerAuthRoutes)
+
+
+
+
+
+
 export default router;

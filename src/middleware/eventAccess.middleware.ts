@@ -6,19 +6,21 @@ import {
 
 import { prisma } from "../prisma/prismaClient";
 
-import { PartnerRequest } from "../types/partnerAuth.types";
+import {
+  PartnerRequest,
+} from "../types/partnerAuth.types";
 
 export const validateEventAccess = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
-    const partner = (req as PartnerRequest).partner;
+    const partner =
+      (req as PartnerRequest).partner;
 
     const { eventId } = req.params;
 
-    // 1. Validate partner
     if (!partner) {
       return res.status(401).json({
         success: false,
@@ -26,10 +28,11 @@ export const validateEventAccess = async (
       });
     }
 
-    // 2. Validate event ID
     if (
       typeof eventId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        eventId,
+      )
     ) {
       return res.status(400).json({
         success: false,
@@ -57,12 +60,16 @@ export const validateEventAccess = async (
 
           business: {
             partnerId: partner.id,
+
             status: "ACTIVE",
+
             onboardingCompleted: true,
           },
         },
+
         select: {
           id: true,
+
           businessDetailsId: true,
         },
       });
@@ -76,7 +83,9 @@ export const validateEventAccess = async (
 
       (req as PartnerRequest).eventAccess = {
         eventId: event.id,
-        businessDetailsId: event.businessDetailsId,
+
+        businessDetailsId:
+          event.businessDetailsId,
       };
 
       return next();
@@ -94,33 +103,50 @@ export const validateEventAccess = async (
         });
       }
 
-      const assignment = await prisma.eventHost.findFirst({
-        where: {
-          eventId,
-          hostId: partner.hostId,
-          status: "ACTIVE",
+      const assignment =
+        await prisma.eventHost.findFirst({
+          where: {
+            eventId,
 
-          host: {
-            partnerId: partner.id,
-            businessId: partner.businessId,
+            hostId: partner.hostId,
+
             status: "ACTIVE",
-            onboardingCompleted: true,
 
-            business: {
+            host: {
+              partnerId: partner.id,
+
+              businessId: partner.businessId,
+
               status: "ACTIVE",
+
+              acceptedAt: {
+                not: null,
+              },
+
+              declinedAt: null,
+
+              removedAt: null,
+
               onboardingCompleted: true,
+
+              business: {
+                status: "ACTIVE",
+
+                onboardingCompleted: true,
+              },
+            },
+
+            event: {
+              businessDetailsId:
+                partner.businessId,
             },
           },
 
-          event: {
-            businessDetailsId: partner.businessId,
+          select: {
+            id: true,
+            eventId: true,
           },
-        },
-        select: {
-          id: true,
-          eventId: true,
-        },
-      });
+        });
 
       if (!assignment) {
         return res.status(404).json({
@@ -131,7 +157,9 @@ export const validateEventAccess = async (
 
       (req as PartnerRequest).eventAccess = {
         eventId: assignment.eventId,
-        businessDetailsId: partner.businessId,
+
+        businessDetailsId:
+          partner.businessId,
       };
 
       return next();
@@ -143,7 +171,10 @@ export const validateEventAccess = async (
     });
 
   } catch (error) {
-    console.error("Event access validation error:", error);
+    console.error(
+      "Event access validation error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,

@@ -1,28 +1,58 @@
 import { Request } from "express";
+import { JwtPayload } from "jsonwebtoken";
 
-export type PartnerRole = "ORGANIZER" | "HOST";
+export type PartnerRole =
+  | "ORGANIZER"
+  | "HOST";
 
-export interface PartnerTokenPayload {
+// ======================================================
+// JWT TOKEN PAYLOAD
+// ======================================================
+
+export interface PartnerTokenPayload extends JwtPayload {
   partnerId: string;
+
   sessionId: string;
-  role?: PartnerRole;
-  businessId?: string;
+
   tokenType: "PARTNER";
+
+  role?: PartnerRole;
+
+  businessId?: string;
 }
 
-export interface PartnerAuthData {
+// ======================================================
+// AUTHENTICATED PARTNER
+// ======================================================
+
+export interface AuthenticatedPartner {
   id: string;
+
   sessionId: string;
+
   role?: PartnerRole;
+
   businessId?: string;
+
   hostId?: string;
 }
 
-export interface PartnerRequest extends Request {
-  partner?: PartnerAuthData;
+// ======================================================
+// EVENT ACCESS
+// ======================================================
 
-  eventAccess?: {
-    eventId: string;
-    businessDetailsId: string;
-  };
+export interface PartnerEventAccess {
+  eventId: string;
+
+  businessDetailsId: string;
+}
+
+// ======================================================
+// EXPRESS REQUEST
+// ======================================================
+
+export interface PartnerRequest extends Request {
+  partner?: AuthenticatedPartner;
+
+  eventAccess?: PartnerEventAccess;
 }

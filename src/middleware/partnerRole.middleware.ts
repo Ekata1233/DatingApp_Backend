@@ -12,17 +12,21 @@ import {
 } from "../types/partnerAuth.types";
 
 export const requirePartnerRole = (
-  requiredRole: PartnerRole
+  requiredRole: PartnerRole,
 ) => {
   return async (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     try {
-      const partner = (req as PartnerRequest).partner;
+      const partner =
+        (req as PartnerRequest).partner;
 
-      // 1. Check authentication
+      // ========================================
+      // AUTHENTICATION VALIDATION
+      // ========================================
+
       if (!partner) {
         return res.status(401).json({
           success: false,
@@ -30,15 +34,19 @@ export const requirePartnerRole = (
         });
       }
 
-      // 2. Check selected role
+      // ========================================
+      // ROLE VALIDATION
+      // ========================================
+
       if (partner.role !== requiredRole) {
         return res.status(403).json({
           success: false,
-          message: `${requiredRole} access required`,
+
+          message:
+            `${requiredRole} access required`,
         });
       }
 
-      // 3. Check selected business
       if (!partner.businessId) {
         return res.status(403).json({
           success: false,
@@ -46,17 +54,19 @@ export const requirePartnerRole = (
         });
       }
 
-      // ==========================================
+      // ========================================
       // ORGANIZER ACCESS
-      // ==========================================
+      // ========================================
 
       if (requiredRole === "ORGANIZER") {
         const business =
           await prisma.businessDetails.findFirst({
             where: {
               id: partner.businessId,
+
               partnerId: partner.id,
             },
+
             select: {
               id: true,
               status: true,
@@ -67,7 +77,9 @@ export const requirePartnerRole = (
         if (!business) {
           return res.status(403).json({
             success: false,
-            message: "You are not the organizer of this business",
+
+            message:
+              "You are not the organizer of this business",
           });
         }
 
@@ -77,30 +89,45 @@ export const requirePartnerRole = (
         ) {
           return res.status(403).json({
             success: false,
-            message: "Business onboarding or approval is pending",
+
+            message:
+              "Business onboarding or approval is pending",
           });
         }
 
         return next();
       }
 
-      // ==========================================
+      // ========================================
       // HOST ACCESS
-      // ==========================================
+      // ========================================
 
       if (requiredRole === "HOST") {
         const host = await prisma.host.findFirst({
           where: {
             partnerId: partner.id,
+
             businessId: partner.businessId,
+
             status: "ACTIVE",
+
+            acceptedAt: {
+              not: null,
+            },
+
+            declinedAt: null,
+
+            removedAt: null,
+
             onboardingCompleted: true,
 
             business: {
               status: "ACTIVE",
+
               onboardingCompleted: true,
             },
           },
+
           select: {
             id: true,
             businessId: true,
@@ -110,11 +137,14 @@ export const requirePartnerRole = (
         if (!host) {
           return res.status(403).json({
             success: false,
-            message: "You are not an active host of this business",
+
+            message:
+              "You are not an active host of this business",
           });
         }
 
-        // Attach host ID for event assignment validation
+        // Attach verified host ID
+
         partner.hostId = host.id;
 
         return next();
@@ -126,7 +156,10 @@ export const requirePartnerRole = (
       });
 
     } catch (error) {
-      console.error("Partner role validation error:", error);
+      console.error(
+        "Partner role validation error:",
+        error,
+      );
 
       return res.status(500).json({
         success: false,
