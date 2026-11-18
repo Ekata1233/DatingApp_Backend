@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  previewFeatures = ["postgresqlExtensions", "prismaSchemaFolder"]
 }
 
 datasource db {
@@ -2515,9 +2515,7 @@ model Event {
   //---------------------------------
   // Step 2
   //---------------------------------
-  city           String?
-  eventPartnerId String?
-  eventPartner   EventPartner? @relation(fields: [eventPartnerId], references: [id])
+  city String?
 
   // Existing EventTag - KEEP THIS
   eventTag EventTag?
@@ -2592,13 +2590,15 @@ model Event {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  EventBooking EventBooking[]
+  EventBooking      EventBooking[]
+  BusinessDetails   BusinessDetails? @relation(fields: [businessDetailsId], references: [id])
+  businessDetailsId String?          @db.Uuid
+  EventHost         EventHost[]
 
   @@index([status])
   @@index([city])
   @@index([eventDate])
   @@index([currentStep])
-  @@index([eventPartnerId])
 }
 
 enum EventTag {
@@ -3290,67 +3290,6 @@ enum PermissionModule {
   PAYMENT
   REPORT
   SETTINGS
-}
-
-enum PartnerStatus {
-  PENDING
-  IN_REVIEW
-  APPROVED
-  REJECTED
-  SUSPENDED
-}
-
-enum BusinessType {
-  INDIVIDUAL
-  LLP
-  PRIVATE_LIMITED
-  PARTNERSHIP
-  OPC
-  NGO
-  OTHER
-}
-
-model EventPartner {
-  id               String        @id @default(uuid())
-  businessName     String
-  legalEntity      String
-  businessType     BusinessType
-  contactPerson    String
-  email            String        @unique
-  phone            String
-  gstNumber        String?       @unique
-  panNumber        String?
-  experienceYears  Int?
-  description      String?       @db.Text
-  monthlyEventsMin Int?
-  monthlyEventsMax Int?
-  teamSize         Int?
-  venueNames       String[]      @default([])
-  address          String?
-  areaName         String?
-  city             String?
-  state            String?
-  country          String?
-  pincode          String?
-  coverageAreas    String[]      @default([])
-  references       String[]      @default([])
-  website          String?
-  logo             String?
-  gstCertificate   String?
-  businessProof    String?
-  status           PartnerStatus @default(PENDING)
-  isActive         Boolean       @default(true)
-  isDeleted        Boolean       @default(false)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  events Event[]
-
-  @@index([businessName])
-  @@index([city])
-  @@index([state])
-  @@index([status])
-  @@map("event_partners")
 }
 
 enum PurchasePaymentMethod {
