@@ -44,10 +44,8 @@ import userWaitlistRoutes from "../features/waitlist/waitlist.routes"
 import paymentRoutes from "../features/payment/payment.routes";
 import giftsRoutes from "../features/admin/revenue/gifts/gifts.routes"
 import complimentRoutes from "../features/admin/revenue/compliment/compliment.routes"
-import eventRoutes from "../features/admin/event/event.routes"
 import employeeRoutes from "../features/admin/employee/roles-permissions/employee.routes"
 import employeesRoutes from "../features/admin/employee/registration-login/employees.routes"
-import eventPartnerRoutes from "../features/admin/event/partner/partner.routes"
 import roseRoutes from "../features/rose/rose.routes"
 import compliRoutes from "../features/compliment/compliment.routes"
 import editProfileRoutes from "../features/user/profile/edit-profile/editProfile.routes"
@@ -57,7 +55,7 @@ import giftRoutes from "../features/gift/gift.routes"
 import chatRoutes from "../features/chat/chat.routes";
 import mediaRoutes from "../features/chat/media/media.routes"
 import newMatchesRoutes from "../features/chat/match/match.routes"
-import eventsRoutes from "../features/event/event.routes"
+// import eventsRoutes from "../features/event/event.routes"
 import admirersRoutes from "../features/admirer/admirer.routes"
 import userRoutes from "../features/user/management/user.route"
 import engagementtRoutes from "../features/engagement/engagement.route"
@@ -128,11 +126,11 @@ router.use("/dreamsFuture", dreamsFutureRoutes);
 router.use("/question", questionRoutes);
 router.use("/package", packageRoutes)
 router.use("/intention", intentionRoutes)
-router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes, eventRoutes, employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes,conversationPromtRoutes,packageProgram,usersRoutes);
+router.use("/admin", professionRoutes, employmentTypeRoutes, ExperienceRoutes, ambitionRoutes, salaryRangeRoutes, promptRoutes, familyProfileRoutes, languageRoutes, waitlistRoutes, referEarnRoute, giftsRoutes, complimentRoutes,  employeeRoutes, employeesRoutes, purchaseRoutes, boostRoutes, reportRoutes, supportRoutes, globalAmountsRoutes,employementAdminVerificationRoutes,educationAdminVefication, manualAadhaarAdminRoutes,incomeVerificationAdminRoutes,conversationPromtRoutes,packageProgram,usersRoutes);
 
 
 
-router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, eventPartnerRoutes);
+router.use("/onboarding", professionRoutes, employmentTypeRoutes, ExperienceRoutes, intentionRoutes, interestRoutes, ambitionRoutes, salaryRangeRoutes, languageRoutes, promptRoutes, referEarnRoute, );
 router.use("/user", waitlistRoutes, userRoutes,employementVerificationRoutes,incomeVerificationRoutes,purchaseHistoryRoutes)
 router.use("/legal", legalRoutes);
 router.use("/chat", conversationPromtRoutes);
@@ -142,9 +140,9 @@ router.use("/payment", razorpayRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes, eventsRoutes, privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes,  privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes, eventsRoutes, payoutMethodRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes,  payoutMethodRoutes)
 router.use("/user", blockRoutes)
 router.use("/user", reportRoutes)
 router.use("/user", feedRoutes)
