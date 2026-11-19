@@ -108,7 +108,9 @@ import usersRoutes from "../features/admin/onboarding/users/users.route"
 import activityRoutes from "../features/user/activity/activity.routes"
 
 import partnerAuthRoutes from "../features/event-partner/auth/partnerAuth.routes"
+import emailVerificationRoutes from "../features/email-verification/email-verification.routes"
 
+import organizerRoutes from "../features/event-partner/onboarding/organizer/organizer.routes"
 
 const router = Router();
 
@@ -239,7 +241,7 @@ router.use("/user", matchAnalysisRoutes)
 //IN APP PURCHASE
 router.use("/user", inAppPurchaseRoutes)
 
-router.use("/event-partner",partnerAuthRoutes)
+router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 
 
 
