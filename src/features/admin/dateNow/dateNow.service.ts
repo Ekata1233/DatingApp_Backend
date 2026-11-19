@@ -482,13 +482,11 @@ export const getDatePlanDetailsService = async (planId: string) => {
   };
 };
 
-export const createDatePlanPackageInfoService = async (
-  payload: {
-    howOnePlanWorks?: Prisma.InputJsonValue;
-    whyPeopleBuyPlans?: Prisma.InputJsonValue;
-    goodToKnow?: Prisma.InputJsonValue;
-  },
-) => {
+export const createDatePlanPackageInfoService = async (payload: {
+  howOnePlanWorks?: Prisma.InputJsonValue;
+  whyPeopleBuyPlans?: Prisma.InputJsonValue;
+  goodToKnow?: Prisma.InputJsonValue;
+}) => {
   return prisma.$transaction(async (tx) => {
     // Find existing common info
     const existing = await tx.datePlanPackageInfo.findFirst();
@@ -524,18 +522,15 @@ export const getDatePlanPackageInfoService = async () => {
   return prisma.datePlanPackageInfo.findFirst();
 };
 
+export const createDatePlanPackageFeaturesService = async (payload: {
+  costToPostPlan?: number;
+  costToPostPlanActive?: boolean;
+  costToPostPlanPaidOnly?: boolean;
 
-export const createDatePlanPackageFeaturesService = async (
-  payload: {
-    costToPostPlan?: number;
-    costToPostPlanActive?: boolean;
-    costToPostPlanPaidOnly?: boolean;
-
-    planBoostPrice?: number;
-    planBoostActive?: boolean;
-    planBoostPaidOnly?: boolean;
-  },
-) => {
+  planBoostPrice?: number;
+  planBoostActive?: boolean;
+  planBoostPaidOnly?: boolean;
+}) => {
   return prisma.$transaction(async (tx) => {
     // Find existing common features
     const existing = await tx.datePlanPackageFeatures.findFirst();
@@ -553,9 +548,7 @@ export const createDatePlanPackageFeaturesService = async (
     return tx.datePlanPackageFeatures.create({
       data: {
         ...(payload.costToPostPlan !== undefined && {
-          costToPostPlan: new Prisma.Decimal(
-            payload.costToPostPlan,
-          ),
+          costToPostPlan: new Prisma.Decimal(payload.costToPostPlan),
         }),
 
         ...(payload.costToPostPlanActive !== undefined && {
@@ -567,9 +560,7 @@ export const createDatePlanPackageFeaturesService = async (
         }),
 
         ...(payload.planBoostPrice !== undefined && {
-          planBoostPrice: new Prisma.Decimal(
-            payload.planBoostPrice,
-          ),
+          planBoostPrice: new Prisma.Decimal(payload.planBoostPrice),
         }),
 
         ...(payload.planBoostActive !== undefined && {
@@ -611,11 +602,8 @@ export const getAllDatePlanPackageDataService = async () => {
   };
 };
 
-export const getDatePlanPackageDataService = async (
-   userId: string
-) => {
-  
-  const [packages, info, features,userStats] = await Promise.all([
+export const getDatePlanPackageDataService = async (userId: string) => {
+  const [packages, info, features, userStats] = await Promise.all([
     prisma.datePlanPackage.findMany({
       where: {
         isActive: true,
@@ -627,8 +615,12 @@ export const getDatePlanPackageDataService = async (
 
     prisma.datePlanPackageInfo.findFirst(),
 
-    prisma.datePlanPackageFeatures.findFirst(),
-     prisma.datePlanUserStats.findUnique({
+    prisma.datePlanPackageFeatures.findFirst({
+      select: {
+        costToPostPlan: true,
+      },
+    }),
+    prisma.datePlanUserStats.findUnique({
       where: {
         userId,
       },
@@ -640,9 +632,8 @@ export const getDatePlanPackageDataService = async (
 
   return {
     availableDatePlan: userStats?.balance ?? 0,
+    costToPostPlan: Number(features?.costToPostPlan ?? 100),
     packages,
     info,
-    
-     
   };
 };

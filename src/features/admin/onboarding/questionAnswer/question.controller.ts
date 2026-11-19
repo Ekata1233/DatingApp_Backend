@@ -48,14 +48,42 @@ export const createQuestionController = async (
 };
 
 // GET QUESTIONS
+// export const getQuestionController = async (
+//   req: Request,
+//   res: Response
+// ) => {
+//   try {
+//     const { category, screen } = getQuestionValidation.parse(req.query);
+
+//     const questions = await getQuestionService(category, screen);
+
+//     return res.status(200).json({
+//       success: true,
+//       data: questions,
+//     });
+//   } catch (error: any) {
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
 export const getQuestionController = async (
   req: Request,
   res: Response
 ) => {
   try {
-    const { category, screen } = getQuestionValidation.parse(req.query);
+    const userId = (req as any).user?.id;
 
-    const questions = await getQuestionService(category, screen);
+    const { category, screen } =
+      getQuestionValidation.parse(req.query);
+
+    const questions = await getQuestionService(
+      userId,
+      category,
+      screen
+    );
 
     return res.status(200).json({
       success: true,

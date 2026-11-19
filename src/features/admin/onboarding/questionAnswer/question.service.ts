@@ -1,4 +1,9 @@
-import { QuestionCategory, QuestionScreen } from "@prisma/client";
+import {
+  PackageStatus,
+  PackageType,
+  QuestionCategory,
+  QuestionScreen,
+} from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import { redis } from "../../../../lib/redis";
 
@@ -17,7 +22,7 @@ export const createQuestionService = async (
   category: QuestionCategory,
   screen: QuestionScreen,
   isMulti: boolean,
-  options: { value: string; label: string }[]
+  options: { value: string; label: string }[],
 ) => {
   // check duplicate key
   const existing = await prisma.question.findUnique({
@@ -53,39 +58,149 @@ export const createQuestionService = async (
 };
 
 // GET QUESTIONS
-export const getQuestionService = async (
-  category?: QuestionCategory,
-  screen?: QuestionScreen
-) => {
-  // Generate unique cache key
-  const cacheKey = `questions:${category ?? "all"}:${screen ?? "all"}`;
+// export const getQuestionService = async (
+//   category?: QuestionCategory,
+//   screen?: QuestionScreen
+// ) => {
+//   // Generate unique cache key
+//   const cacheKey = `questions:${category ?? "all"}:${screen ?? "all"}`;
 
-  // 1. Check Redis
+//   // 1. Check Redis
+//   const cachedQuestions = await redis.get(cacheKey);
+
+//   if (cachedQuestions) {
+//     console.log(`✅ Cache Hit: ${cacheKey}`);
+//     return cachedQuestions;
+//   }
+
+//   console.log(`📦 Cache Miss: ${cacheKey}`);
+
+//   // 2. Fetch from Database
+//   const questions = await prisma.question.findMany({
+//     where: {
+//       ...(category && { category }),
+//       ...(screen && { screen }),
+//     },
+//     include: {
+//       options: true,
+//     },
+//     orderBy: {
+//       created_at: "asc",
+//     },
+//   });
+
+//   // 3. Store in Redis for 10 minutes
+//   await redis.set(cacheKey, questions);
+
+//   return questions;
+// };
+
+const VIP_ONLY_QUESTION_KEY = "vip";
+export const getQuestionService = async (
+  userId?: string,
+  category?: QuestionCategory,
+  screen?: QuestionScreen,
+) => {
+  let isVipUser = false;
+
+  /* -------------------------------------------------------- */
+  /*                CHECK USER ACTIVE PACKAGE                 */
+  /* -------------------------------------------------------- */
+
+  if (userId) {
+    const now = new Date();
+
+    const activeVipPackage = await prisma.userPackage.findFirst({
+      where: {
+        user_id: userId,
+
+        status: PackageStatus.ACTIVE,
+
+        startDate: {
+          lte: now,
+        },
+
+        OR: [
+          {
+            endDate: null,
+          },
+          {
+            endDate: {
+              gt: now,
+            },
+          },
+        ],
+
+        package: {
+          name: {
+            in: [PackageType.VIP, PackageType.VIP_ELITE],
+          },
+        },
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+    isVipUser = Boolean(activeVipPackage);
+  }
+
+  /* -------------------------------------------------------- */
+  /*                    GENERATE CACHE KEY                    */
+  /* -------------------------------------------------------- */
+
+  const accessType = isVipUser ? "vip" : "regular";
+
+  const cacheKey = `questions:v2:${category ?? "all"}:${screen ?? "all"}:${accessType}`;
+
+  /* -------------------------------------------------------- */
+  /*                       CHECK REDIS                        */
+  /* -------------------------------------------------------- */
+
   const cachedQuestions = await redis.get(cacheKey);
 
   if (cachedQuestions) {
     console.log(`✅ Cache Hit: ${cacheKey}`);
+
     return cachedQuestions;
   }
 
   console.log(`📦 Cache Miss: ${cacheKey}`);
 
-  // 2. Fetch from Database
+  /* -------------------------------------------------------- */
+  /*                     FETCH QUESTIONS                      */
+  /* -------------------------------------------------------- */
+
   const questions = await prisma.question.findMany({
     where: {
       ...(category && { category }),
+
       ...(screen && { screen }),
+
+      ...(!isVipUser && {
+        key: {
+          not: VIP_ONLY_QUESTION_KEY,
+        },
+      }),
     },
+
     include: {
       options: true,
     },
+
     orderBy: {
       created_at: "asc",
     },
   });
 
-  // 3. Store in Redis for 10 minutes
-  await redis.set(cacheKey, questions);
+  /* -------------------------------------------------------- */
+  /*                  CACHE FOR 10 MINUTES                    */
+  /* -------------------------------------------------------- */
+
+  await redis.set(cacheKey, questions, {
+    ex: 600,
+  });
 
   return questions;
 };
@@ -129,7 +244,7 @@ export const deleteQuestionService = async (id: string) => {
 export const updateQuestionService = async (
   id: string,
   title: string,
-  isMulti: boolean
+  isMulti: boolean,
 ) => {
   const existing = await prisma.question.findUnique({
     where: { id },
@@ -158,7 +273,7 @@ export const updateQuestionService = async (
 export const addQuestionOptionService = async (
   question_id: string,
   value: string,
-  label: string
+  label: string,
 ) => {
   const question = await prisma.question.findUnique({
     where: {
@@ -171,22 +286,22 @@ export const addQuestionOptionService = async (
   }
 
   const option = await prisma.questionOption.create({
-  data: {
-    question_id,
-    value,
-    label,
-  },
-});
+    data: {
+      question_id,
+      value,
+      label,
+    },
+  });
 
-await clearQuestionCache();
+  await clearQuestionCache();
 
-return option;
+  return option;
 };
 
 export const updateQuestionOptionService = async (
   optionId: string,
   value: string,
-  label: string
+  label: string,
 ) => {
   const option = await prisma.questionOption.findUnique({
     where: {
@@ -199,23 +314,21 @@ export const updateQuestionOptionService = async (
   }
 
   const options = await prisma.questionOption.update({
-  where: {
-    id: optionId,
-  },
-  data: {
-    value,
-    label,
-  },
-});
+    where: {
+      id: optionId,
+    },
+    data: {
+      value,
+      label,
+    },
+  });
 
-await clearQuestionCache();
+  await clearQuestionCache();
 
-return options;
+  return options;
 };
 
-export const deleteQuestionWithOptionsService = async (
-  questionId: string
-) => {
+export const deleteQuestionWithOptionsService = async (questionId: string) => {
   const question = await prisma.question.findUnique({
     where: {
       id: questionId,
@@ -241,7 +354,7 @@ export const deleteQuestionWithOptionsService = async (
       },
     });
   });
-  
+
   await clearQuestionCache();
 
   return {

@@ -1,0 +1,501 @@
+
+
+model Event {
+  id                   String             @id @default(uuid()) @db.Uuid
+
+  // Business
+  businessDetailsId    String?            @db.Uuid
+  businessDetails      BusinessDetails?   @relation(fields: [businessDetailsId], references: [id])
+
+  // Step 1 - Basics
+  eventDurationType    EventDurationType?
+  tripType             TripType?
+  categoryId           String?            @db.Uuid
+  category             EventCategory?     @relation(fields: [categoryId], references: [id])
+  title                String?
+  tagline              String?
+  about                String?
+  visibility           EventVisibility?
+
+  // Step 2 - Photos
+  highlightsCaption    String?
+
+  // Experience
+  experienceSubtitle   String?
+
+  // Tickets & Crowd
+  price                Decimal?           @db.Decimal(12, 2)
+  originalPrice        Decimal?           @db.Decimal(12, 2)
+  priceType            EventPriceType      @default(PER_PERSON)
+  totalSeats           Int?
+  maxTicketsPerPerson  Int                @default(1)
+  crowdMix             CrowdMix?
+  minAge               Int?
+  maxAge               Int?
+  groupSize            Int?
+  intent               EventIntent?
+  waitlistEnabled      Boolean            @default(true)
+
+  // Included & Packing
+  included             String[]           @default([])
+  notIncluded          String[]           @default([])
+  whatToBring          String[]           @default([])
+  dressCode            EventDressCode     @default(NONE)
+
+  // Host / Trip Captain
+  hostPhotoUrl         String?
+  hostTitle            String?
+  hostSpeciality       String?
+  hostLanguages        String[]           @default([])
+  hostMessage          String?
+  afterEventLine       String?
+
+  // FAQs & Policies
+  cancellationPolicy   EventCancellationPolicy?
+  rules                String[]           @default([])
+  safetyOptions        EventSafetyOption[] @default([])
+
+  // Draft & Submission
+  status               EventStatus        @default(DRAFT)
+  currentStep          Int                @default(1)
+  completedSteps       Int[]              @default([])
+  submittedAt          DateTime?
+  approvedAt           DateTime?
+  publishedAt          DateTime?
+  rejectionReason      String?
+
+  // Relations
+  photos               EventPhoto[]
+  dates                EventDate[]
+  venue                EventVenue?
+  experience           EventExperience[]
+  tripDetails          TripDetails?
+  faqs                 EventFAQ[]
+  hosts                EventHost[]
+
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([businessDetailsId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([visibility, status])
+  @@index([eventDurationType, status])
+  @@index([businessDetailsId, status, updatedAt])
+
+  @@map("events")
+}
+
+
+model EventPhoto {
+  id          String         @id @default(uuid()) @db.Uuid
+  eventId     String         @db.Uuid
+  event       Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photoUrl    String
+  fileId      String?
+  photoType   EventPhotoType
+  sortOrder   Int
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([eventId, photoType, sortOrder])
+  @@map("event_photos")
+}
+
+model EventDate {
+  id               String           @id @default(uuid()) @db.Uuid
+  eventId          String           @db.Uuid
+  event            Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  startDateTime    DateTime
+  endDateTime      DateTime?
+  gateOpensAt      DateTime?
+  timezone         String           @default("Asia/Kolkata")
+  totalSeats       Int?
+  womenSeats       Int?
+  menSeats         Int?
+  status           EventDateStatus  @default(SCHEDULED)
+  isPrimary        Boolean          @default(false)
+  cancelledAt      DateTime?
+  cancellationReason String?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([eventId, startDateTime])
+  @@index([eventId, status])
+  @@index([status, startDateTime])
+  @@map("event_dates")
+}
+
+model EventVenue {
+  id                 String      @id @default(uuid()) @db.Uuid
+  eventId            String      @unique @db.Uuid
+  event              Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // Venue
+  venueName          String?
+  fullAddress        String?
+  venueType          VenueType?
+  venueCapacity      Int?
+  // Venue Card
+  whySpecial         String?
+  tags               String[]    @default([])
+  photoUrl           String?
+  // Meeting Details
+  exactMeetingPoint  String?
+  distanceFromCity   String?
+  landmark           String?
+  parking            String?
+  publicTransport    String?
+  googleMapsLink     String?
+  latitude           Float?
+  longitude          Float?
+
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@map("event_venues")
+}
+
+
+model EventExperience {
+  id            String    @id @default(uuid()) @db.Uuid
+  eventId       String    @db.Uuid
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title         String?
+  description   String?
+  photoUrl      String?
+  tags          String[]  @default([])
+  sortOrder     Int
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([eventId, sortOrder])
+  @@map("event_experiences")
+}
+
+model TripDetails {
+  id                   String       @id @default(uuid()) @db.Uuid
+  eventId              String       @unique @db.Uuid
+  event                Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // Dates & Route
+  totalDays            Int          @default(2)
+  travelBy             TravelType?
+  // Pickup
+  pickupCity           String?
+  pickupPoint          String?
+  exactPickupSpot      String?
+  pickupMapsLink       String?
+  pickupLatitude       Float?
+  pickupLongitude      Float?
+  // Destination
+  destinationPlace     String?
+  destinationArea      String?
+  journeyThere         String?
+  journeyBack          String?
+  destinationIcon      String?
+  // Drop
+  dropCity             String?
+  dropPoint            String?
+  // Rooms
+  roomSharing          RoomSharing?
+  stayTile             String?
+  mealsTile            String?
+  // Ride Ops - Host Only
+  vehiclePhotos        String[]     @default([])
+  vehicleOperator      String?
+  vehicleModel         String?
+  vehicleCapacity      Int?
+  vehicleSpecs         String[]     @default([])
+  onBoard              String[]     @default([])
+  safetyNoteTitle      String?
+  safetyNote           String?
+  // Relations
+  days                 TripDay[]
+  stays                TripStay[]
+  places               TripPlace[]
+  roomOptions          TripRoomOption[]
+
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@map("trip_details")
+}
+
+model TripDay {
+  id              String       @id @default(uuid()) @db.Uuid
+  tripDetailsId   String       @db.Uuid
+  tripDetails     TripDetails  @relation(fields: [tripDetailsId], references: [id], onDelete: Cascade)
+  dayNumber       Int
+  headline        String?
+  photoUrl        String?
+  highlightPhotos String[]     @default([])
+  mealsIncluded   MealType[]   @default([])
+  level           TripLevel?
+  // Night Stay
+  nightType       TripNightType?
+  stayId          String?      @db.Uuid
+  stay            TripStay?    @relation(fields: [stayId], references: [id], onDelete: Restrict)
+  // Relations
+  stops           TripStop[]
+  games           TripGame[]
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([tripDetailsId, dayNumber])
+  @@index([stayId])
+  @@map("trip_days")
+}
+
+model TripStop {
+  id            String       @id @default(uuid()) @db.Uuid
+  tripDayId     String       @db.Uuid
+  tripDay       TripDay      @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
+  title         String?
+  description   String?
+  timeLabel     String?
+  icon          String?
+  tag           TripStopTag  @default(NONE)
+  photoUrl      String?
+  sortOrder     Int
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([tripDayId, sortOrder])
+  @@map("trip_stops")
+}
+
+model TripStay {
+  id              String       @id @default(uuid()) @db.Uuid
+  tripDetailsId   String       @db.Uuid
+  tripDetails     TripDetails  @relation(fields: [tripDetailsId], references: [id], onDelete: Cascade)
+  stayName        String?
+  area            String?
+  tagline         String?
+  photos          String[]     @default([])
+  amenities       String[]     @default([])
+  checkIn         String?
+  checkOut        String?
+  // Host Only
+  address         String?
+  contact         String?
+  // Relations
+  days            TripDay[]
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([tripDetailsId])
+  @@map("trip_stays")
+}
+
+model TripPlace {
+  id              String       @id @default(uuid()) @db.Uuid
+  tripDetailsId   String       @db.Uuid
+  tripDetails     TripDetails  @relation(fields: [tripDetailsId], references: [id], onDelete: Cascade)
+  icon            String?
+  name            String?
+  when            String?
+  whySpecial      String?
+  tags            String[]     @default([])
+  photoUrl        String?
+  sortOrder       Int
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([tripDetailsId, sortOrder])
+  @@map("trip_places")
+}
+
+model TripGame {
+  id          String    @id @default(uuid()) @db.Uuid
+  tripDayId   String    @db.Uuid
+  tripDay     TripDay   @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
+  icon        String?
+  name        String?
+  howItPlays  String?
+  whyItWorks  String?
+  sortOrder   Int
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tripDayId, sortOrder])
+  @@map("trip_games")
+}
+
+model TripRoomOption {
+  id              String       @id @default(uuid()) @db.Uuid
+  tripDetailsId   String       @db.Uuid
+  tripDetails     TripDetails  @relation(fields: [tripDetailsId], references: [id], onDelete: Cascade)
+  name            String?
+  upgradePrice    Decimal      @default(0) @db.Decimal(12, 2)
+  isIncluded      Boolean      @default(false)
+  sortOrder       Int
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([tripDetailsId, sortOrder])
+  @@map("trip_room_options")
+}
+
+model EventFAQ {
+  id          String    @id @default(uuid()) @db.Uuid
+  eventId     String    @db.Uuid
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  question    String?
+  answer      String?
+  sortOrder   Int
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([eventId, sortOrder])
+  @@map("event_faqs")
+}
+
+enum EventDurationType {
+  SINGLE_DAY
+  MULTI_DAY
+  BOTH
+}
+
+enum TripType {
+  GROUP_TRIP
+  COUPLES_TRIP
+}
+
+enum EventVisibility {
+  FREE_AND_PREMIUM
+  VIP_AND_VIP_ELITE
+}
+
+enum EventPhotoType {
+  EVENT
+  HIGHLIGHT
+}
+
+enum EventStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum EventDateStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum VenueType {
+  CAFE_BAR
+  RESTAURANT
+  STUDIO
+  ROOFTOP
+  OUTDOOR_TRAIL
+  CAMPSITE
+  RESORT_VILLA
+  PUBLIC_PLACE
+}
+
+enum EventPriceType {
+  PER_PERSON
+  PER_COUPLE
+}
+
+enum CrowdMix {
+  BALANCED
+  OPEN
+}
+
+enum EventIntent {
+  SERIOUS_DATING
+  CASUAL_SOCIAL
+  OPEN_TO_BOTH
+}
+
+enum EventDressCode {
+  NONE
+  CASUAL
+  SMART_CASUAL
+  ACTIVEWEAR
+  TREK_GEAR
+  ETHNIC
+  ALL_WHITE
+}
+
+enum TravelType {
+  AC_SLEEPER_BUS
+  AC_SEATER_BUS
+  TEMPO_TRAVELLER
+  TRAIN_3AC
+  SELF_DRIVE_CONVOY
+  FLIGHT
+  PRIVATE_CAB
+}
+
+enum MealType {
+  BREAKFAST
+  BRUNCH
+  LUNCH
+  SNACKS
+  DINNER
+}
+
+enum TripLevel {
+  EASY
+  MODERATE
+  CHALLENGING
+}
+
+enum TripNightType {
+  STAY
+  OVERNIGHT_TRAVEL
+  RETURN_HOME
+}
+
+enum TripStopTag {
+  NONE
+  INCLUDED
+  NOT_INCLUDED
+  PICK_ONE
+  PICKUP_POINT
+  DROP_OFF_POINT
+}
+
+
+enum RoomSharing {
+  TWIN_SHARING
+  DORM
+  TENT_SHARING
+  TRIPLE_SHARING
+  PRIVATE_ROOM
+}
+
+enum EventCancellationPolicy {
+  STANDARD
+  TRIPS_AND_CAMPING
+  STRICT
+}
+
+enum EventSafetyOption {
+  TRAINED_HOST
+  VETTED_VENUE
+  WOMAN_ON_HOST_TEAM
+  SEPARATE_ROOMS_FOR_WOMEN
+  SAFETY_BRIEF_AND_SOS
+  RESPONSIBLE_ALCOHOL_SERVICE
+  IDENTITY_CHECK
+  CONTROLLED_ENTRY
+  CCTV_MONITORED
+}

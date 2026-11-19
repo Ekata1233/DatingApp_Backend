@@ -10,6 +10,8 @@ import {
   addQuestionOptionController,
   deleteQuestionWithOptionsController,
 } from "./question.controller";
+import authMiddleware from "../../../../middleware/auth.middleware";
+import { optionalAuthMiddleware } from "../../../../middleware/optional.middleware";
 
 
 const router = express.Router();
@@ -18,7 +20,7 @@ const router = express.Router();
 router.post("/create", createQuestionController);
 
 // GET ALL QUESTIONS (for onboarding)
-router.get("/fetch", getQuestionController);
+router.get("/fetch", optionalAuthMiddleware, getQuestionController);
 
 // GET SINGLE QUESTION
 router.get("/question/:id", getQuestionByIdController);

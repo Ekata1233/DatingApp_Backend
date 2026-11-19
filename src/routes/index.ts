@@ -111,6 +111,7 @@ import partnerAuthRoutes from "../features/event-partner/auth/partnerAuth.routes
 import emailVerificationRoutes from "../features/email-verification/email-verification.routes"
 
 import organizerRoutes from "../features/event-partner/onboarding/organizer/organizer.routes"
+import createHostRoutes from "../features/event-partner/host-management/host.routes"
 
 const router = Router();
 
@@ -242,7 +243,7 @@ router.use("/user", matchAnalysisRoutes)
 router.use("/user", inAppPurchaseRoutes)
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
-
+router.use("/event-partner/hosts", createHostRoutes)
 
 
 
