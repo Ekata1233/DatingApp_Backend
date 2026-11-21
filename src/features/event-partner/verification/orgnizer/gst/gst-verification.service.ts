@@ -1,18 +1,18 @@
 
-import axios from "axios";
 import { randomUUID } from "crypto";
-import { BusinessConstitution } from "@prisma/client";
 
-import { prisma } from "../../../../../prisma/prismaClient";
 
-import {
+
+import type {
   VerifyGstInput,
-  ApiBankingGstResponse,
+  GstVerificationResult,
 } from "./gst-verification.types";
 
-/* -------------------------------------------------------------------------- */
-/* ERROR CLASS */
-/* -------------------------------------------------------------------------- */
+// IMPORTANT: Replace this with your existing Prisma client import.
+import { prisma } from "../../../../../prisma/prismaClient";
+import { requestLpFintechGstVerification } from "../../../../../lpfintech/lpfintech-gst.client";
+import { LpFintechError } from "../../../../../lpfintech/lpfintech.errors";
+
 
 export class GstVerificationError extends Error {
   constructor(
@@ -24,188 +24,30 @@ export class GstVerificationError extends Error {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* HELPERS */
-/* -------------------------------------------------------------------------- */
-
-const cleanString = (
-  value: unknown
-): string | null => {
+const clean = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
-
-  const result = value.trim();
-
-  if (!result || result.toUpperCase() === "NA") {
-    return null;
-  }
-
-  return result;
+  return value.trim() || null;
 };
 
-const parseGstDate = (value: unknown): Date | null => {
-  const text = cleanString(value);
-
-  if (!text) return null;
-
-  const match =
-    /^(\d{2})[/-](\d{2})[/-](\d{4})$/.exec(text);
-
-  if (!match) return null;
-
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-
-  const date = new Date(
-    Date.UTC(year, month - 1, day)
-  );
-
-  if (
-    date.getUTCDate() !== day ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCFullYear() !== year
-  ) {
-    return null;
-  }
-
-  return date;
-};
-
-const extractPincode = (
-  address: string | null
-): string | null => {
-  if (!address) return null;
-
-  return address.match(/\b[1-9][0-9]{5}\b/)?.[0] ?? null;
-};
-
-const mapBusinessConstitution = (
-  value: unknown
-): BusinessConstitution | null => {
-  const text = cleanString(value)?.toLowerCase();
-
-  if (!text) return null;
-
-  switch (text) {
-    case "proprietorship":
-    case "sole proprietorship":
-      return BusinessConstitution.SOLE_PROPRIETORSHIP;
-
-    case "partnership":
-    case "partnership firm":
-      return BusinessConstitution.PARTNERSHIP;
-
-    case "limited liability partnership":
-    case "llp":
-      return BusinessConstitution.LLP;
-
-    case "private limited company":
-      return BusinessConstitution.PRIVATE_LIMITED;
-
-    case "public limited company":
-      return BusinessConstitution.PUBLIC_LIMITED;
-
-    case "one person company":
-      return BusinessConstitution.ONE_PERSON_COMPANY;
-
-    case "hindu undivided family":
-      return BusinessConstitution.HUF;
-
-    case "trust":
-      return BusinessConstitution.TRUST;
-
-    case "society":
-      return BusinessConstitution.SOCIETY;
-
-    default:
-      return BusinessConstitution.OTHER;
-  }
-};
-
-/* -------------------------------------------------------------------------- */
-/* LP FINTECH CONFIG */
-/* -------------------------------------------------------------------------- */
-
-const getLpFintechConfig = () => {
-  const baseUrl =
-    process.env.LPFINTECH_BASE_URL?.trim();
-
-  const path =
-    process.env.LPFINTECH_GST_ADVANCED_PATH?.trim() ||
-    "/apibanking/api/v1/gstinAuthenticationAdvanced";
-
-  const authorization =
-    process.env.LPFINTECH_AUTHORIZATION?.trim();
-
-  const rawAccessToken =
-    process.env.LPFINTECH_ACCESS_TOKEN?.trim();
-
-  if (!baseUrl) {
-    throw new GstVerificationError(
-      500,
-      "LPFINTECH_BASE_URL is missing"
-    );
-  }
-
-  if (!authorization) {
-    throw new GstVerificationError(
-      500,
-      "LPFINTECH_AUTHORIZATION is missing"
-    );
-  }
-
-  if (!rawAccessToken) {
-    throw new GstVerificationError(
-      500,
-      "LPFINTECH_ACCESS_TOKEN is missing"
-    );
-  }
-
-  const accessToken =
-    /^Bearer\s+/i.test(rawAccessToken)
-      ? rawAccessToken
-      : `Bearer ${rawAccessToken}`;
-
-  const url =
-    `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
-
-  return {
-    url,
-    authorization,
-    accessToken,
-  };
-};
-
-/* -------------------------------------------------------------------------- */
-/* VERIFY GST SERVICE */
-/* -------------------------------------------------------------------------- */
+const gstRegex =
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 export const verifyEventPartnerGstService = async ({
   partnerId,
   businessId,
   gstNumber,
-}: VerifyGstInput) => {
-  // 1. Validate GSTIN
+}: VerifyGstInput): Promise<GstVerificationResult> => {
+  const normalizedGstin = gstNumber.trim().toUpperCase();
 
-  const normalizedGst = gstNumber
-    ?.trim()
-    .toUpperCase();
-
-  const gstRegex =
-    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-
-  if (
-    !normalizedGst ||
-    !gstRegex.test(normalizedGst)
-  ) {
+  // Step 1: Validate GSTIN format
+  if (!gstRegex.test(normalizedGstin)) {
     throw new GstVerificationError(
       400,
       "Invalid GST number format"
     );
   }
 
-  // 2. Validate business ownership
-
+  // Step 2: Verify organizer owns the business
   const business = await prisma.businessDetails.findFirst({
     where: {
       id: businessId,
@@ -216,234 +58,125 @@ export const verifyEventPartnerGstService = async ({
     },
     select: {
       id: true,
+      legalName: true,
+      tradeName: true,
     },
   });
 
   if (!business) {
     throw new GstVerificationError(
       404,
-      "Business not found or access denied"
+      "Business not found or unauthorized"
     );
   }
 
-  // 3. Get configuration
+  // Step 3: Unique transaction ID
+  const clientTransactionId = `gst_${randomUUID()}`;
 
-  const config = getLpFintechConfig();
-
-  const clientTransactionId =
-    `gst_${randomUUID()}`;
-
-  console.log("LP FINTECH GST REQUEST:", {
-    url: config.url,
-    clientTransactionId,
-    authorizationConfigured: true,
-    accessTokenConfigured: true,
-  });
-
-  // 4. Call provider
-
-  let providerResult: ApiBankingGstResponse;
+  // Step 4: Call LP Fintech
+  let response;
 
   try {
-    const response =
-      await axios.post<ApiBankingGstResponse>(
-        config.url,
-        {
-          clientTransactionId,
-          gstin: normalizedGst,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: config.authorization,
-            "X-Access-Token": config.accessToken,
-          },
-          timeout: 30000,
-        }
-      );
-
-    providerResult = response.data;
+    response = await requestLpFintechGstVerification(
+      normalizedGstin,
+      clientTransactionId
+    );
   } catch (error: unknown) {
-    if (axios.isAxiosError(error)) {
-      const providerError = error.response?.data as
-        | {
-            code?: string;
-            status?: string;
-            message?: string;
-          }
-        | undefined;
-
-      console.error("LP FINTECH GST ERROR:", {
-        httpStatus: error.response?.status,
-        code: providerError?.code,
-        message: providerError?.message,
-      });
-
-      if (
-        error.response?.status === 401 ||
-        error.response?.status === 403
-      ) {
-        throw new GstVerificationError(
-          502,
-          "LP Fintech authentication failed. Check provider credentials and access token."
-        );
-      }
-
-      if (error.code === "ECONNABORTED") {
-        throw new GstVerificationError(
-          504,
-          "LP Fintech GST request timed out"
-        );
-      }
-
+    if (error instanceof LpFintechError) {
       throw new GstVerificationError(
-        502,
-        "LP Fintech GST API request failed"
+        error.statusCode,
+        error.message
       );
     }
 
     throw error;
   }
 
-  // 5. Validate response
-
-  const providerData = providerResult.data;
+  // Step 5: Check provider success response
+  const code = String(response.code ?? "");
+  const status = response.status?.toUpperCase();
+  const innerStatus = response.data?.status?.toUpperCase();
 
   if (
-    String(providerResult.code) !== "200" ||
-    providerResult.status?.toLowerCase() !== "success" ||
-    providerData?.status?.toUpperCase() !== "SUCCESS"
+    code !== "200" ||
+    status !== "SUCCESS" ||
+    innerStatus !== "SUCCESS"
   ) {
     throw new GstVerificationError(
-      422,
-      providerData?.responseMessage ||
-        providerResult.message ||
-        "GST verification failed"
+      502,
+      response.message ||
+        "GST verification failed at LP Fintech"
     );
   }
 
-  const details = providerData.details;
+  const details = response.data?.details;
   const taxpayer = details?.taxpayerDetails;
 
   if (!taxpayer) {
     throw new GstVerificationError(
       502,
-      "GST taxpayer details missing in provider response"
+      "Taxpayer details not returned"
     );
   }
 
-  const returnedGstin =
-    cleanString(taxpayer.gstin)?.toUpperCase();
+  // Step 6: Confirm provider returned the requested GSTIN
+  const returnedGstin = clean(taxpayer.gstin);
 
-  if (returnedGstin !== normalizedGst) {
+  if (
+    !returnedGstin ||
+    returnedGstin.toUpperCase() !== normalizedGstin
+  ) {
     throw new GstVerificationError(
       502,
       "GSTIN mismatch in provider response"
     );
   }
 
-  // 6. Extract GST details
-
-  const registeredAddress =
-    details?.business_places?.pradr;
-
-  const registrationStatus =
-    cleanString(taxpayer.sts);
-
+  // Step 7: Check registration status
+  const gstStatus = clean(taxpayer.sts);
   const isActive =
-    registrationStatus?.toLowerCase() === "active";
+    gstStatus?.toUpperCase() === "ACTIVE";
 
-  const address =
-    cleanString(registeredAddress?.adr);
-
-  const contact = taxpayer.contacted;
-
-  // 7. Return result - no database update
-
+  // Step 8: Format response
   return {
-    businessId,
-
-    gstNumber: normalizedGst,
-
-    isGstActive: isActive,
-
-    gstVerificationStatus: isActive
-      ? "VERIFIED"
-      : "FAILED",
-
+    verified: isActive,
     verificationMessage: isActive
-      ? "GST verified successfully"
-      : `GST registration status is ${
-          registrationStatus ?? "unknown"
-        }`,
+      ? "GST verification completed successfully"
+      : "GST details fetched, but registration is not active",
 
-    verifiedAt: isActive ? new Date() : null,
+    businessId: business.id,
+    gstNumber: normalizedGstin,
+    gstStatus,
 
     gstDetails: {
-      gstin: normalizedGst,
+      legalName: clean(taxpayer.lgnm),
+      tradeName: clean(taxpayer.tradeNam),
+      constitution: clean(taxpayer.ctb),
+      registrationDate: clean(taxpayer.rgdt),
+      cancellationDate: clean(taxpayer.cxdt),
+      taxpayerType: clean(taxpayer.dty),
 
-      legalName: cleanString(taxpayer.lgnm),
+      contact: taxpayer.contacted ?? null,
 
-      tradeName: cleanString(taxpayer.tradeNam),
-
-      constitution:
-        mapBusinessConstitution(taxpayer.ctb),
-
-      constitutionName:
-        cleanString(taxpayer.ctb),
-
-      taxpayerType:
-        cleanString(taxpayer.dty),
-
-      registrationDate:
-        parseGstDate(taxpayer.rgdt),
-
-      cancellationDate:
-        parseGstDate(taxpayer.cxdt),
-
-      registrationStatus,
-
-      address,
-
-      registeredPincode:
-        extractPincode(address),
-
-      businessActivities:
-        cleanString(registeredAddress?.ntr),
-
-      contact: {
-        name: cleanString(contact?.name),
-
-        email: cleanString(contact?.email),
-
-        mobile:
-          contact?.mobNum != null
-            ? String(contact.mobNum)
-            : null,
-      },
-
-      members: taxpayer.mbr ?? [],
+      principalAddress:
+        clean(details?.business_places?.pradr?.adr),
 
       additionalPlaces:
         details?.business_places?.adadr ?? [],
 
-      goodsServices:
-        details?.goods_service ?? null,
-
-      filingDetails:
+      taxpayerReturnDetails:
         details?.taxpayerReturnDetails ?? null,
+
+      goodsAndServices:
+        details?.goods_service ?? null,
     },
 
     provider: {
+      name: "LPFINTECH",
       clientTransactionId:
-        providerData.clientTransactionId ??
+        response.data?.clientTransactionId ??
         clientTransactionId,
-
-      gatewayId:
-        providerData.gatewayId ?? null,
-
-      responseMessage:
-        providerData.responseMessage ?? null,
+      gatewayId: response.data?.gatewayId ?? null,
     },
   };
 };

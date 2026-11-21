@@ -1,4 +1,3 @@
-
 export class LpFintechConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -10,9 +9,7 @@ const required = (key: string): string => {
   const value = process.env[key]?.trim();
 
   if (!value) {
-    throw new LpFintechConfigError(
-      `${key} is missing`
-    );
+    throw new LpFintechConfigError(`${key} is missing`);
   }
 
   return value;
@@ -24,9 +21,7 @@ const secureUrl = (value: string, name: string): string => {
   try {
     url = new URL(value);
   } catch {
-    throw new LpFintechConfigError(
-      `${name} is not a valid URL`
-    );
+    throw new LpFintechConfigError(`${name} is not a valid URL`);
   }
 
   if (
@@ -36,55 +31,57 @@ const secureUrl = (value: string, name: string): string => {
     url.search ||
     url.hash
   ) {
-    throw new LpFintechConfigError(
-      `${name} must be a valid HTTPS URL`
-    );
+    throw new LpFintechConfigError(`${name} must be a valid HTTPS URL`);
   }
 
   return url.toString();
 };
 
-export const getLpFintechConfig = () => {
-  const baseUrl = secureUrl(
-    required("LPFINTECH_BASE_URL"),
-    "LPFINTECH_BASE_URL"
-  );
+export interface LpFintechConfig {
+  baseUrl: string;
+  tokenUrl: string;
+  gstUrl: string;
+  clientId: string;
+  clientSecret: string;
+  // "Basic base64(clientId:clientSecret)" - sent as the Authorization header
+  // on the token API and on every verification API.
+  basicAuthorization: string;
+}
 
-  const tokenUrl = secureUrl(
-    required("LPFINTECH_TOKEN_URL"),
-    "LPFINTECH_TOKEN_URL"
-  );
+export const getLpFintechConfig = (): LpFintechConfig => {
+  const baseUrl = secureUrl(required("LPFINTECH_BASE_URL"), "LPFINTECH_BASE_URL");
+  const tokenUrl = secureUrl(required("LPFINTECH_TOKEN_URL"), "LPFINTECH_TOKEN_URL");
 
   const gstPath =
     process.env.LPFINTECH_GST_ADVANCED_PATH?.trim() ||
     "/apibanking/api/v1/gstinAuthenticationAdvanced";
 
-  if (
-    !gstPath.startsWith("/") ||
-    gstPath.startsWith("//")
-  ) {
-    throw new LpFintechConfigError(
-      "Invalid LPFINTECH_GST_ADVANCED_PATH"
-    );
+  if (!gstPath.startsWith("/") || gstPath.startsWith("//")) {
+    throw new LpFintechConfigError("Invalid LPFINTECH_GST_ADVANCED_PATH");
   }
 
   const gstUrl = new URL(gstPath, baseUrl);
-  const baseOrigin = new URL(baseUrl).origin;
 
-  if (gstUrl.origin !== baseOrigin) {
+  if (gstUrl.origin !== new URL(baseUrl).origin) {
     throw new LpFintechConfigError(
       "GST endpoint must use the configured provider origin"
     );
   }
 
+  const clientId = required("LPFINTECH_CLIENT_ID");
+  const clientSecret = required("LPFINTECH_CLIENT_SECRET");
+
+  // Built from ID + secret. LPFINTECH_GST_AUTHORIZATION is now OPTIONAL.
+  const basicAuthorization =
+    process.env.LPFINTECH_GST_AUTHORIZATION?.trim() ||
+    `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`;
+
   return {
     baseUrl,
     tokenUrl,
     gstUrl: gstUrl.toString(),
-    clientId: required("LPFINTECH_CLIENT_ID"),
-    clientSecret: required("LPFINTECH_CLIENT_SECRET"),
-    gstAuthorization: required(
-      "LPFINTECH_GST_AUTHORIZATION"
-    ),
+    clientId,
+    clientSecret,
+    basicAuthorization,
   };
 };
