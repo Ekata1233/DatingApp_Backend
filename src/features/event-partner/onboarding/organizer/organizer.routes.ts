@@ -5,8 +5,11 @@ import {
 } from "../../../../middleware/partnerAuth.middleware";
 
 import {
+  completePartnerGovernmentIdController,
   getOrganizerAboutYouController,
+  initPartnerGovernmentIdController,
   saveOrganizerAboutYouController,
+  verifyEventPartnerPanController,
 } from "./organizer.controller";
 
 const router = Router();
@@ -17,9 +20,7 @@ const router = Router();
 
 router.get(
   "/organizer/about-you",
-
   partnerAuthMiddleware,
-
   getOrganizerAboutYouController,
 );
 
@@ -29,10 +30,37 @@ router.get(
 
 router.patch(
   "/organizer/about-you",
-
   partnerAuthMiddleware,
-
   saveOrganizerAboutYouController,
 );
 
+
+// ======================================================
+// PAN VERIFY
+// ======================================================
+router.post(
+  "/pan",
+  partnerAuthMiddleware,
+  verifyEventPartnerPanController,
+);
+
+/* -------------------------------------------------------------------------- */
+/*                           GOVERNMENT ID INIT                               */
+/* -------------------------------------------------------------------------- */
+
+router.post(
+  "/government-id/init",
+  authMiddleware,
+  initPartnerGovernmentIdController,
+);
+
+/* -------------------------------------------------------------------------- */
+/*                         GOVERNMENT ID COMPLETE                             */
+/* -------------------------------------------------------------------------- */
+
+router.post(
+  "/government-id/complete",
+  authMiddleware,
+  completePartnerGovernmentIdController,
+);
 export default router;

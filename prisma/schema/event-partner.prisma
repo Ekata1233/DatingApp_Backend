@@ -359,6 +359,38 @@ model VerifyId {
   @@map("verify_ids")
 }
 
+enum PartnerGovernmentIdAttemptStatus {
+  INITIATING
+  PENDING
+  AUTHORIZED
+  VERIFIED
+  REJECTED
+  FAILED
+  EXPIRED
+}
+
+model PartnerGovernmentIdAttempt {
+  id                String                           @id @default(uuid()) @db.Uuid
+  partnerId         String                           @db.Uuid
+  businessId        String                           @db.Uuid
+  referenceId       String                           @unique
+  transactionId     String?                          @unique
+  providerRequestId String?
+  callbackStateHash String                           @unique
+  documentType      String                           @default("AADHAAR")
+  status            PartnerGovernmentIdAttemptStatus @default(INITIATING)
+  consentGivenAt    DateTime
+  authorizedAt      DateTime?
+  completedAt       DateTime?
+  expiresAt         DateTime?
+  failureReason     String?
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+
+  @@index([partnerId, businessId, status])
+  @@map("partner_government_id_attempts")
+}
+
 model YourEvents {
   id String @id @default(uuid()) @db.Uuid
 

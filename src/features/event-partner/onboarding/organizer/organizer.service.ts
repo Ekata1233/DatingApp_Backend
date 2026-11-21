@@ -6,7 +6,13 @@ import {
   OrganizerAboutYouInput,
   OrganizerOnboardingError,
   ConsentDocument,
+  VerifyPanInput,
+  GridlinesPanResponse,
+  GridlinesPanData,
 } from "./organizer.types";
+import { PartnerVerificationStatus } from "@prisma/client";
+import { normalizeName, PanVerificationError } from "./organizer.helper";
+import axios from "axios";
 
 // ======================================================
 // CONSENT DOCUMENT CONFIGURATION
@@ -784,4 +790,682 @@ if (
           : "ABOUT_YOU",
     };
   });
+};
+
+
+/* -------------------------------------------------------------------------- */
+/*                            VERIFY PAN SERVICE                              */
+/* -------------------------------------------------------------------------- */
+
+export const verifyEventPartnerPanService = async ({
+  partnerId,
+  businessId,
+  panNumber,
+  consent,
+}: VerifyPanInput) => {
+  /* ------------------------------------------------------------------------ */
+  /*                            1. VALIDATE INPUT                             */
+  /* ------------------------------------------------------------------------ */
+
+  const normalizedPan = panNumber?.trim().toUpperCase();
+
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+
+  if (!normalizedPan || !panRegex.test(normalizedPan)) {
+    throw new PanVerificationError(
+      400,
+      "Invalid PAN number format",
+    );
+  }
+
+  if (consent !== true) {
+    throw new PanVerificationError(
+      400,
+      "PAN verification consent is required",
+    );
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                       2. VALIDATE BUSINESS OWNER                         */
+  /* ------------------------------------------------------------------------ */
+
+  const business = await prisma.businessDetails.findFirst({
+    where: {
+      id: businessId,
+      partnerId,
+    },
+    select: {
+      id: true,
+      partnerId: true,
+
+      partner: {
+        select: {
+          id: true,
+          fullName: true,
+          accountStatus: true,
+        },
+      },
+    },
+  });
+
+  if (!business) {
+    throw new PanVerificationError(
+      404,
+      "Business not found or access denied",
+    );
+  }
+
+  if (business.partner.accountStatus !== "ACTIVE") {
+    throw new PanVerificationError(
+      403,
+      "Partner account is not active",
+    );
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                        3. VALIDATE PARTNER NAME                          */
+  /* ------------------------------------------------------------------------ */
+
+  const partnerName = business.partner.fullName?.trim();
+
+  if (!partnerName) {
+    throw new PanVerificationError(
+      400,
+      "Partner full name is required before PAN verification",
+    );
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                        4. GRIDLINES CONFIGURATION                        */
+  /* ------------------------------------------------------------------------ */
+
+  const apiKey = process.env.GRIDLINES_API_KEY?.trim();
+
+  const apiUrl =
+    process.env.GRIDLINES_PAN_URL ||
+    "https://api.gridlines.io/pan-api/fetch-detailed";
+
+  if (!apiKey) {
+    throw new Error("GRIDLINES_API_KEY is missing");
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                           5. CALL GRIDLINES                              */
+  /* ------------------------------------------------------------------------ */
+
+  let panData: GridlinesPanData;
+  let panReferenceId: string | null = null;
+
+  try {
+    const response = await axios.post<GridlinesPanResponse>(
+      apiUrl,
+      {
+        pan_number: normalizedPan,
+        consent: "Y",
+      },
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-API-Key": apiKey,
+          "X-Auth-Type": "API-Key",
+        },
+        timeout: 30000,
+      },
+    );
+
+    const result = response.data;
+
+    const providerData = result.data ?? result;
+
+    const verifiedPan = providerData.pan_data;
+
+    /* ---------------------------------------------------------------------- */
+    /*                       6. VALIDATE PAN RESPONSE                         */
+    /* ---------------------------------------------------------------------- */
+
+    const isValidPan =
+      verifiedPan?.document_type?.toUpperCase() === "PAN" &&
+      verifiedPan?.document_id?.toUpperCase() === normalizedPan &&
+      providerData.message?.trim().toLowerCase() === "valid pan.";
+
+    if (!verifiedPan || !isValidPan) {
+      throw new PanVerificationError(
+        422,
+        "PAN verification was not successful",
+      );
+    }
+
+    panData = verifiedPan;
+
+    panReferenceId =
+      providerData.reference_id ??
+      result.reference_id ??
+      null;
+  } catch (error: unknown) {
+    if (error instanceof PanVerificationError) {
+      throw error;
+    }
+
+    if (axios.isAxiosError(error)) {
+      console.error("Gridlines PAN Verification Error:", {
+        status: error.response?.status,
+        code: error.code,
+        message: error.message,
+      });
+
+      throw new PanVerificationError(
+        502,
+        error.response
+          ? "Unable to verify PAN with Gridlines"
+          : "PAN verification provider is unavailable",
+      );
+    }
+
+    throw error;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                         7. EXTRACT PAN DETAILS                           */
+  /* ------------------------------------------------------------------------ */
+
+  const panName = panData.name?.trim() || null;
+
+  const address = panData.address_data ?? {};
+
+  /* ------------------------------------------------------------------------ */
+  /*                          8. COMPARE NAMES                                */
+  /* ------------------------------------------------------------------------ */
+
+  const isPanNameMatched = Boolean(
+    panName &&
+    normalizeName(panName) === normalizeName(partnerName),
+  );
+
+  const nameMatchMessage = !panName
+    ? "PAN name is missing from provider response"
+    : isPanNameMatched
+      ? "PAN name matches the registered partner name"
+      : "PAN name does not match the registered partner name";
+
+  /* ------------------------------------------------------------------------ */
+  /*                      9. DETERMINE VERIFICATION STATUS                    */
+  /* ------------------------------------------------------------------------ */
+
+  const verificationStatus: PartnerVerificationStatus =
+    isPanNameMatched
+      ? PartnerVerificationStatus.VERIFIED
+      : PartnerVerificationStatus.REJECTED;
+
+  const verifiedAt = isPanNameMatched ? new Date() : null;
+
+  const failureReason = isPanNameMatched
+    ? null
+    : nameMatchMessage;
+
+  /* ------------------------------------------------------------------------ */
+  /*                       10. SAVE DETAILS IN VERIFY ID                      */
+  /* ------------------------------------------------------------------------ */
+
+  const savedVerification = await prisma.verifyId.upsert({
+    where: {
+      businessId: business.id,
+    },
+
+    create: {
+      businessId: business.id,
+
+      panLastFour: normalizedPan.slice(-4),
+
+      panName: panName,
+
+      isPanNameMatched,
+
+      panStatus: verificationStatus,
+
+      panVerifiedAt: verifiedAt,
+
+      panReferenceId,
+
+      panProvider: "GRIDLINES",
+
+      panFailureReason: failureReason,
+
+      isAadhaarLinked:
+        address.aadhaar_linked ?? null,
+    },
+
+    update: {
+      panLastFour: normalizedPan.slice(-4),
+
+      panName: panName,
+
+      isPanNameMatched,
+
+      panStatus: verificationStatus,
+
+      panVerifiedAt: verifiedAt,
+
+      panReferenceId,
+
+      panProvider: "GRIDLINES",
+
+      panFailureReason: failureReason,
+
+      isAadhaarLinked:
+        address.aadhaar_linked ?? null,
+    },
+    select: {
+      id: true,
+      businessId: true,
+
+      panName: true,
+      panLastFour: true,
+      isPanNameMatched: true,
+
+      panStatus: true,
+      panVerifiedAt: true,
+
+      panProvider: true,
+      panReferenceId: true,
+      panFailureReason: true,
+    },
+  });
+
+  /* ------------------------------------------------------------------------ */
+  /*                           11. FINAL MESSAGE                              */
+  /* ------------------------------------------------------------------------ */
+
+  const message = isPanNameMatched
+    ? "PAN verified successfully. Name matched."
+    : "PAN is valid, but the name does not match the registered partner name.";
+
+  /* ------------------------------------------------------------------------ */
+  /*                           12. RETURN RESPONSE                            */
+  /* ------------------------------------------------------------------------ */
+
+  return {
+    isVerified: isPanNameMatched,
+
+    verificationStatus,
+
+    isSaved: true,
+
+    message,
+
+    businessId: business.id,
+
+    verificationId: savedVerification.id,
+
+    // TOP-LEVEL NAME DETAILS
+    panName,
+    partnerName,
+
+    isPanNameMatched,
+
+    nameMatchMessage,
+
+    panDetails: {
+      panNumber: normalizedPan,
+
+      documentType: panData.document_type ?? null,
+      documentId: panData.document_id ?? null,
+
+      fullName: panName,
+
+      firstName: panData.first_name ?? null,
+      middleName: panData.middle_name ?? null,
+      lastName: panData.last_name ?? null,
+
+      category: panData.category ?? null,
+      dateOfBirth: panData.date_of_birth ?? null,
+
+      gender: address.gender ?? null,
+
+      maskedAadhaarNumber:
+        panData.masked_aadhaar_number ?? null,
+
+      isAadhaarLinked:
+        address.aadhaar_linked ?? null,
+
+      taxpayerProfile:
+        panData.taxpayer_profile ?? null,
+
+      isPanNameMatched,
+
+      expectedName: partnerName,
+
+      address: {
+        line1: address.line_1 ?? null,
+        line2: address.line_2 ?? null,
+        street: address.street ?? null,
+        city: address.city ?? null,
+        line5: address.line_5 ?? null,
+        state: address.state ?? null,
+        pincode: address.pincode ?? null,
+        email: address.email ?? null,
+        phone: address.phone ?? null,
+      },
+    },
+
+    savedVerification,
+  };
+};
+
+
+const hashState = (state: string) =>
+  createHash("sha256").update(state).digest("hex");
+
+const gridlinesClient = axios.create({
+  baseURL:
+    process.env.GRIDLINES_BASE_URL ||
+    "https://api.gridlines.io",
+
+  timeout: 30000,
+
+  headers: {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "X-API-Key": process.env.GRIDLINES_API_KEY,
+    "X-Auth-Type": "API-Key",
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/*                           VALIDATE PARTNER BUSINESS                        */
+/* -------------------------------------------------------------------------- */
+
+const getPartnerBusiness = async (
+  partnerId: string,
+  businessId: string,
+) => {
+  const business = await prisma.businessDetails.findFirst({
+    where: {
+      id: businessId,
+      partnerId,
+    },
+    select: {
+      id: true,
+      partner: {
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+          isPhoneVerified: true,
+          accountStatus: true,
+        },
+      },
+    },
+  });
+
+  if (!business) {
+    throw new PartnerGovernmentIdError(
+      404,
+      "Business not found or access denied",
+    );
+  }
+
+  if (business.partner.accountStatus !== "ACTIVE") {
+    throw new PartnerGovernmentIdError(
+      403,
+      "Partner account is not active",
+    );
+  }
+
+  if (!business.partner.fullName?.trim()) {
+    throw new PartnerGovernmentIdError(
+      400,
+      "Partner full name is required",
+    );
+  }
+
+  return business;
+};
+
+/* -------------------------------------------------------------------------- */
+/*                       INIT GOVERNMENT ID SERVICE                           */
+/* -------------------------------------------------------------------------- */
+
+export const initPartnerGovernmentIdService = async ({
+  partnerId,
+  businessId,
+  documentType,
+  consent,
+}: InitPartnerGovernmentIdInput) => {
+  if (documentType !== "AADHAAR") {
+    throw new PartnerGovernmentIdError(
+      400,
+      "Only AADHAAR verification is supported",
+    );
+  }
+
+  if (consent !== true) {
+    throw new PartnerGovernmentIdError(
+      400,
+      "Verification consent is required",
+    );
+  }
+
+  const business = await getPartnerBusiness(
+    partnerId,
+    businessId,
+  );
+
+  if (!business.partner.isPhoneVerified) {
+    throw new PartnerGovernmentIdError(
+      403,
+      "Partner phone number must be verified",
+    );
+  }
+
+  const mobileNumber = normalizeIndianMobile(
+    business.partner.phoneNumber,
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /*                     CHECK EXISTING VERIFICATION                          */
+  /* ------------------------------------------------------------------------ */
+
+  const existing = await prisma.verifyId.findUnique({
+    where: {
+      businessId,
+    },
+    select: {
+      aadhaarStatus: true,
+    },
+  });
+
+  if (
+    existing?.aadhaarStatus ===
+    PartnerVerificationStatus.VERIFIED
+  ) {
+    throw new PartnerGovernmentIdError(
+      409,
+      "Aadhaar is already verified",
+    );
+  }
+
+  if (
+    existing?.aadhaarStatus ===
+    PartnerVerificationStatus.LOCKED
+  ) {
+    throw new PartnerGovernmentIdError(
+      403,
+      "Aadhaar verification is locked",
+    );
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                      CHECK ACTIVE ATTEMPT                                */
+  /* ------------------------------------------------------------------------ */
+
+  const now = new Date();
+
+  const activeAttempt =
+    await prisma.partnerGovernmentIdAttempt.findFirst({
+      where: {
+        partnerId,
+        businessId,
+        status: {
+          in: [
+            AttemptStatus.INITIATING,
+            AttemptStatus.PENDING,
+            AttemptStatus.AUTHORIZED,
+          ],
+        },
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: now } },
+        ],
+      },
+    });
+
+  if (activeAttempt) {
+    throw new PartnerGovernmentIdError(
+      409,
+      "Aadhaar verification is already in progress",
+    );
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                       GENERATE SECURE REFERENCES                         */
+  /* ------------------------------------------------------------------------ */
+
+  const referenceId = randomUUID();
+  const callbackState = randomBytes(32).toString("hex");
+  const callbackStateHash = hashState(callbackState);
+
+  const callbackBase =
+    process.env.GRIDLINES_PARTNER_CALLBACK_URL;
+
+  if (!callbackBase) {
+    throw new Error(
+      "GRIDLINES_PARTNER_CALLBACK_URL is missing",
+    );
+  }
+
+  const callbackUrl = new URL(callbackBase);
+
+  callbackUrl.searchParams.set(
+    "state",
+    callbackState,
+  );
+
+  const expiresAt = new Date(
+    Date.now() + 15 * 60 * 1000,
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /*                          CREATE ATTEMPT                                  */
+  /* ------------------------------------------------------------------------ */
+
+  const attempt =
+    await prisma.partnerGovernmentIdAttempt.create({
+      data: {
+        partnerId,
+        businessId,
+        referenceId,
+        callbackStateHash,
+        documentType,
+        consentGivenAt: new Date(),
+        expiresAt,
+        status: AttemptStatus.INITIATING,
+      },
+    });
+
+  try {
+    /* ---------------------------------------------------------------------- */
+    /*                          GRIDLINES INIT                                */
+    /* ---------------------------------------------------------------------- */
+
+    const response = await gridlinesClient.post(
+      "/digilocker/init",
+      {
+        redirect_uri: callbackUrl.toString(),
+        mobile_number: mobileNumber,
+        check_account_linked: "true",
+        sign_up_preference: "PIN",
+        consent: "Y",
+      },
+      {
+        headers: {
+          "X-Reference-ID": referenceId,
+        },
+      },
+    );
+
+    const result = response.data;
+
+    if (
+      String(result?.data?.code) !== "1000" ||
+      !result?.data?.transaction_id ||
+      !result?.data?.authorization_url
+    ) {
+      throw new Error("DIGILOCKER_INIT_FAILED");
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*                     SAVE TRANSACTION DETAILS                           */
+    /* ---------------------------------------------------------------------- */
+
+    await prisma.partnerGovernmentIdAttempt.update({
+      where: {
+        id: attempt.id,
+      },
+      data: {
+        transactionId: result.data.transaction_id,
+        providerRequestId:
+          result.request_id ?? null,
+        status: AttemptStatus.PENDING,
+      },
+    });
+
+    /* ---------------------------------------------------------------------- */
+    /*                           RETURN RESPONSE                              */
+    /* ---------------------------------------------------------------------- */
+
+    return {
+      businessId,
+      attemptId: attempt.id,
+      documentType: "AADHAAR",
+      status: "PENDING",
+      authorizationUrl:
+        result.data.authorization_url,
+      expiresAt,
+    };
+  } catch (error: unknown) {
+    const providerError = axios.isAxiosError(error)
+      ? error.response?.data
+      : null;
+
+    const failureReason =
+      providerError?.error?.code ??
+      (error instanceof Error
+        ? error.message
+        : "DIGILOCKER_INIT_FAILED");
+
+    await prisma.partnerGovernmentIdAttempt.update({
+      where: {
+        id: attempt.id,
+      },
+      data: {
+        status: AttemptStatus.FAILED,
+        failureReason,
+      },
+    });
+
+    if (axios.isAxiosError(error)) {
+      console.error("Partner DigiLocker Init Error:", {
+        status: error.response?.status,
+        code: providerError?.error?.code,
+      });
+
+      throw new PartnerGovernmentIdError(
+        502,
+        "Unable to initialize DigiLocker verification",
+      );
+    }
+
+    throw error;
+  }
 };

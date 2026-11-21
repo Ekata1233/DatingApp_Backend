@@ -7,11 +7,13 @@ import {
 import {
   getOrganizerAboutYouService,
   saveOrganizerAboutYouService,
+  verifyEventPartnerPanService,
 } from "./organizer.service";
 
 import {
   OrganizerOnboardingError,
 } from "./organizer.types";
+import { PanVerificationError } from "./organizer.helper";
 
 // ======================================================
 // VALIDATE UUID
@@ -249,5 +251,194 @@ export const saveOrganizerAboutYouController = async (
       error,
       res,
     );
+  }
+};
+
+
+// ======================================================
+// PAN VERIFY
+// ======================================================
+export const verifyEventPartnerPanController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const partnerId = (req as any).partner.id;
+
+    const {
+      businessId,
+      panNumber,
+      consent,
+    } = req.body;
+
+    const result = await verifyEventPartnerPanService({
+      partnerId,
+      businessId,
+      panNumber,
+      consent,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error: unknown) {
+    console.error("PAN Verification Error:", error);
+
+    if (error instanceof PanVerificationError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const initPartnerGovernmentIdController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const partnerId = (req as any).user?.id;
+
+    if (!partnerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const {
+      businessId,
+      documentType,
+      consent,
+    } = req.body ?? {};
+
+    if (
+      typeof businessId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        businessId,
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid businessId is required",
+      });
+    }
+
+    if (documentType !== "AADHAAR") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid document type",
+        allowedTypes: ["AADHAAR"],
+      });
+    }
+
+    if (consent !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification consent is required",
+      });
+    }
+
+    const result = await initPartnerGovernmentIdService({
+      partnerId,
+      businessId,
+      documentType,
+      consent,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "DigiLocker authorization URL generated",
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof PartnerGovernmentIdError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return next(error);
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/*                         COMPLETE CONTROLLER                                */
+/* -------------------------------------------------------------------------- */
+
+export const completePartnerGovernmentIdController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const partnerId = (req as any).user?.id;
+
+    if (!partnerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const {
+      businessId,
+      attemptId,
+    } = req.body ?? {};
+
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (
+      typeof businessId !== "string" ||
+      !uuidRegex.test(businessId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid businessId is required",
+      });
+    }
+
+    if (
+      typeof attemptId !== "string" ||
+      !uuidRegex.test(attemptId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid attemptId is required",
+      });
+    }
+
+    const result = await completePartnerGovernmentIdService({
+      partnerId,
+      businessId,
+      attemptId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: result.message ?? "Government ID verification processed",
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof PartnerGovernmentIdError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return next(error);
   }
 };
