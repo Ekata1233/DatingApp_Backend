@@ -1,25 +1,23 @@
+
 import axios from "axios";
 import { randomUUID } from "crypto";
-
-import {
-  BusinessConstitution,
-} from "@prisma/client";
+import { BusinessConstitution } from "@prisma/client";
 
 import { prisma } from "../../../../../prisma/prismaClient";
 
 import {
-  ApiBankingGstResponse,
   VerifyGstInput,
+  ApiBankingGstResponse,
 } from "./gst-verification.types";
 
 /* -------------------------------------------------------------------------- */
-/*                                  ERROR                                     */
+/* ERROR CLASS */
 /* -------------------------------------------------------------------------- */
 
 export class GstVerificationError extends Error {
   constructor(
     public statusCode: number,
-    message: string,
+    message: string
   ) {
     super(message);
     this.name = "GstVerificationError";
@@ -27,17 +25,68 @@ export class GstVerificationError extends Error {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         MAP BUSINESS CONSTITUTION                          */
+/* HELPERS */
 /* -------------------------------------------------------------------------- */
 
+const cleanString = (
+  value: unknown
+): string | null => {
+  if (typeof value !== "string") return null;
+
+  const result = value.trim();
+
+  if (!result || result.toUpperCase() === "NA") {
+    return null;
+  }
+
+  return result;
+};
+
+const parseGstDate = (value: unknown): Date | null => {
+  const text = cleanString(value);
+
+  if (!text) return null;
+
+  const match =
+    /^(\d{2})[/-](\d{2})[/-](\d{4})$/.exec(text);
+
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  const date = new Date(
+    Date.UTC(year, month - 1, day)
+  );
+
+  if (
+    date.getUTCDate() !== day ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCFullYear() !== year
+  ) {
+    return null;
+  }
+
+  return date;
+};
+
+const extractPincode = (
+  address: string | null
+): string | null => {
+  if (!address) return null;
+
+  return address.match(/\b[1-9][0-9]{5}\b/)?.[0] ?? null;
+};
+
 const mapBusinessConstitution = (
-  value?: string,
+  value: unknown
 ): BusinessConstitution | null => {
-  if (!value) return null;
+  const text = cleanString(value)?.toLowerCase();
 
-  const constitution = value.trim().toLowerCase();
+  if (!text) return null;
 
-  switch (constitution) {
+  switch (text) {
     case "proprietorship":
     case "sole proprietorship":
       return BusinessConstitution.SOLE_PROPRIETORSHIP;
@@ -74,72 +123,61 @@ const mapBusinessConstitution = (
 };
 
 /* -------------------------------------------------------------------------- */
-/*                              PARSE GST DATE                                */
+/* LP FINTECH CONFIG */
 /* -------------------------------------------------------------------------- */
 
-const parseGstDate = (value?: string): Date | null => {
-  if (!value || value.trim().toUpperCase() === "NA") {
-    return null;
+const getLpFintechConfig = () => {
+  const baseUrl =
+    process.env.LPFINTECH_BASE_URL?.trim();
+
+  const path =
+    process.env.LPFINTECH_GST_ADVANCED_PATH?.trim() ||
+    "/apibanking/api/v1/gstinAuthenticationAdvanced";
+
+  const authorization =
+    process.env.LPFINTECH_AUTHORIZATION?.trim();
+
+  const rawAccessToken =
+    process.env.LPFINTECH_ACCESS_TOKEN?.trim();
+
+  if (!baseUrl) {
+    throw new GstVerificationError(
+      500,
+      "LPFINTECH_BASE_URL is missing"
+    );
   }
 
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
-
-  if (!match) return null;
-
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-
-  const date = new Date(
-    Date.UTC(year, month - 1, day),
-  );
-
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
+  if (!authorization) {
+    throw new GstVerificationError(
+      500,
+      "LPFINTECH_AUTHORIZATION is missing"
+    );
   }
 
-  return date;
+  if (!rawAccessToken) {
+    throw new GstVerificationError(
+      500,
+      "LPFINTECH_ACCESS_TOKEN is missing"
+    );
+  }
+
+  const accessToken =
+    /^Bearer\s+/i.test(rawAccessToken)
+      ? rawAccessToken
+      : `Bearer ${rawAccessToken}`;
+
+  const url =
+    `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+
+  return {
+    url,
+    authorization,
+    accessToken,
+  };
 };
 
 /* -------------------------------------------------------------------------- */
-/*                              CLEAN STRING                                  */
-/* -------------------------------------------------------------------------- */
-
-const cleanString = (
-  value?: string,
-): string | null => {
-  if (
-    !value ||
-    value.trim().toUpperCase() === "NA"
-  ) {
-    return null;
-  }
-
-  return value.trim();
-};
-
-/* -------------------------------------------------------------------------- */
-/*                             EXTRACT PINCODE                                */
-/* -------------------------------------------------------------------------- */
-
-const extractPincode = (
-  address?: string,
-): string | null => {
-  if (!address) return null;
-
-  const match = address.match(
-    /\b[1-9][0-9]{5}\b/,
-  );
-
-  return match?.[0] ?? null;
-};
-
-/* -------------------------------------------------------------------------- */
-/*                       VERIFY EVENT PARTNER GST                             */
+/* VERIFY GST SERVICE */
 /* -------------------------------------------------------------------------- */
 
 export const verifyEventPartnerGstService = async ({
@@ -147,10 +185,7 @@ export const verifyEventPartnerGstService = async ({
   businessId,
   gstNumber,
 }: VerifyGstInput) => {
-
-  /* ------------------------------------------------------------------------ */
-  /*                          1. VALIDATE GST NUMBER                          */
-  /* ------------------------------------------------------------------------ */
+  // 1. Validate GSTIN
 
   const normalizedGst = gstNumber
     ?.trim()
@@ -165,26 +200,20 @@ export const verifyEventPartnerGstService = async ({
   ) {
     throw new GstVerificationError(
       400,
-      "Invalid GST number format",
+      "Invalid GST number format"
     );
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                        2. VALIDATE BUSINESS OWNER                        */
-  /* ------------------------------------------------------------------------ */
-
-  // READ ONLY - NO DATABASE UPDATE
+  // 2. Validate business ownership
 
   const business = await prisma.businessDetails.findFirst({
     where: {
       id: businessId,
       partnerId,
-
       partner: {
         accountStatus: "ACTIVE",
       },
     },
-
     select: {
       id: true,
     },
@@ -193,53 +222,32 @@ export const verifyEventPartnerGstService = async ({
   if (!business) {
     throw new GstVerificationError(
       404,
-      "Business not found or access denied",
+      "Business not found or access denied"
     );
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                       3. LP FINTECH CONFIGURATION                        */
-  /* ------------------------------------------------------------------------ */
+  // 3. Get configuration
 
-  const baseUrl =
-    process.env.LPFINTECH_BASE_URL?.trim();
-
-  const apiPath =
-    process.env.LPFINTECH_GST_ADVANCED_PATH ||
-    "/apibanking/api/v1/gstinAuthenticationAdvanced";
-
-  const authorization =
-    process.env.LPFINTECH_AUTHORIZATION?.trim() ||
-    process.env.LPFINTECH_API_KEY?.trim();
-
-  if (!baseUrl) {
-    throw new Error(
-      "LPFINTECH_BASE_URL is missing",
-    );
-  }
-
-  if (!authorization) {
-    throw new Error(
-      "LP Fintech authorization is missing",
-    );
-  }
+  const config = getLpFintechConfig();
 
   const clientTransactionId =
     `gst_${randomUUID()}`;
 
-  const url =
-    `${baseUrl.replace(/\/$/, "")}/${apiPath.replace(/^\//, "")}`;
+  console.log("LP FINTECH GST REQUEST:", {
+    url: config.url,
+    clientTransactionId,
+    authorizationConfigured: true,
+    accessTokenConfigured: true,
+  });
 
-  /* ------------------------------------------------------------------------ */
-  /*                       4. CALL GST VERIFICATION API                       */
-  /* ------------------------------------------------------------------------ */
+  // 4. Call provider
 
   let providerResult: ApiBankingGstResponse;
 
   try {
     const response =
       await axios.post<ApiBankingGstResponse>(
-        url,
+        config.url,
         {
           clientTransactionId,
           gstin: normalizedGst,
@@ -247,36 +255,29 @@ export const verifyEventPartnerGstService = async ({
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: authorization,
+            Authorization: config.authorization,
+            "X-Access-Token": config.accessToken,
           },
-
           timeout: 30000,
-        },
+        }
       );
 
     providerResult = response.data;
-
   } catch (error: unknown) {
-
     if (axios.isAxiosError(error)) {
+      const providerError = error.response?.data as
+        | {
+            code?: string;
+            status?: string;
+            message?: string;
+          }
+        | undefined;
 
-      const providerError =
-        error.response?.data as
-          | {
-              code?: string;
-              message?: string;
-              status?: string;
-            }
-          | undefined;
-
-      console.error(
-        "LP FINTECH GST ERROR:",
-        {
-          httpStatus: error.response?.status,
-          providerCode: providerError?.code,
-          providerMessage: providerError?.message,
-        },
-      );
+      console.error("LP FINTECH GST ERROR:", {
+        httpStatus: error.response?.status,
+        code: providerError?.code,
+        message: providerError?.message,
+      });
 
       if (
         error.response?.status === 401 ||
@@ -284,29 +285,27 @@ export const verifyEventPartnerGstService = async ({
       ) {
         throw new GstVerificationError(
           502,
-          "LP Fintech authentication failed",
+          "LP Fintech authentication failed. Check provider credentials and access token."
         );
       }
 
       if (error.code === "ECONNABORTED") {
         throw new GstVerificationError(
           504,
-          "GST verification request timed out",
+          "LP Fintech GST request timed out"
         );
       }
 
       throw new GstVerificationError(
         502,
-        "GST verification provider request failed",
+        "LP Fintech GST API request failed"
       );
     }
 
     throw error;
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                        5. VALIDATE API RESPONSE                          */
-  /* ------------------------------------------------------------------------ */
+  // 5. Validate response
 
   const providerData = providerResult.data;
 
@@ -319,66 +318,47 @@ export const verifyEventPartnerGstService = async ({
       422,
       providerData?.responseMessage ||
         providerResult.message ||
-        "GST verification failed",
+        "GST verification failed"
     );
   }
 
   const details = providerData.details;
-
   const taxpayer = details?.taxpayerDetails;
 
   if (!taxpayer) {
     throw new GstVerificationError(
-      422,
-      "GST taxpayer details not found",
+      502,
+      "GST taxpayer details missing in provider response"
     );
   }
 
-  if (
-    taxpayer.gstin?.trim().toUpperCase() !==
-    normalizedGst
-  ) {
+  const returnedGstin =
+    cleanString(taxpayer.gstin)?.toUpperCase();
+
+  if (returnedGstin !== normalizedGst) {
     throw new GstVerificationError(
-      422,
-      "GST number mismatch in provider response",
+      502,
+      "GSTIN mismatch in provider response"
     );
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                       6. EXTRACT GST INFORMATION                         */
-  /* ------------------------------------------------------------------------ */
+  // 6. Extract GST details
 
   const registeredAddress =
     details?.business_places?.pradr;
 
-  const gstStatus =
+  const registrationStatus =
     cleanString(taxpayer.sts);
 
   const isActive =
-    gstStatus?.toLowerCase() === "active";
-
-  const constitution =
-    mapBusinessConstitution(taxpayer.ctb);
-
-  const registeredSince =
-    parseGstDate(taxpayer.rgdt);
-
-  const cancellationDate =
-    parseGstDate(taxpayer.cxdt);
+    registrationStatus?.toLowerCase() === "active";
 
   const address =
     cleanString(registeredAddress?.adr);
 
   const contact = taxpayer.contacted;
 
-  /* ------------------------------------------------------------------------ */
-  /*                       7. RETURN RESPONSE ONLY                            */
-  /* ------------------------------------------------------------------------ */
-
-  // NO prisma.create()
-  // NO prisma.update()
-  // NO prisma.upsert()
-  // NO DATABASE SAVE
+  // 7. Return result - no database update
 
   return {
     businessId,
@@ -393,22 +373,21 @@ export const verifyEventPartnerGstService = async ({
 
     verificationMessage: isActive
       ? "GST verified successfully"
-      : `GST details fetched, but registration status is ${gstStatus ?? "unknown"}`,
+      : `GST registration status is ${
+          registrationStatus ?? "unknown"
+        }`,
 
-    verifiedAt: isActive
-      ? new Date()
-      : null,
+    verifiedAt: isActive ? new Date() : null,
 
     gstDetails: {
       gstin: normalizedGst,
 
-      legalName:
-        cleanString(taxpayer.lgnm),
+      legalName: cleanString(taxpayer.lgnm),
 
-      tradeName:
-        cleanString(taxpayer.tradeNam),
+      tradeName: cleanString(taxpayer.tradeNam),
 
-      constitution,
+      constitution:
+        mapBusinessConstitution(taxpayer.ctb),
 
       constitutionName:
         cleanString(taxpayer.ctb),
@@ -417,12 +396,12 @@ export const verifyEventPartnerGstService = async ({
         cleanString(taxpayer.dty),
 
       registrationDate:
-        registeredSince,
+        parseGstDate(taxpayer.rgdt),
 
-      cancellationDate,
+      cancellationDate:
+        parseGstDate(taxpayer.cxdt),
 
-      registrationStatus:
-        gstStatus,
+      registrationStatus,
 
       address,
 
@@ -433,11 +412,9 @@ export const verifyEventPartnerGstService = async ({
         cleanString(registeredAddress?.ntr),
 
       contact: {
-        name:
-          cleanString(contact?.name),
+        name: cleanString(contact?.name),
 
-        email:
-          cleanString(contact?.email),
+        email: cleanString(contact?.email),
 
         mobile:
           contact?.mobNum != null
@@ -445,8 +422,7 @@ export const verifyEventPartnerGstService = async ({
             : null,
       },
 
-      members:
-        taxpayer.mbr ?? [],
+      members: taxpayer.mbr ?? [],
 
       additionalPlaces:
         details?.business_places?.adadr ?? [],

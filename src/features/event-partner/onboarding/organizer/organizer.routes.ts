@@ -50,7 +50,7 @@ router.post(
 
 router.post(
   "/government-id/init",
-  authMiddleware,
+  partnerAuthMiddleware,
   initPartnerGovernmentIdController,
 );
 
@@ -60,7 +60,7 @@ router.post(
 
 router.post(
   "/government-id/complete",
-  authMiddleware,
+  partnerAuthMiddleware,
   completePartnerGovernmentIdController,
 );
 export default router;
