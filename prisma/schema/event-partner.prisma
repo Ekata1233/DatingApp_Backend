@@ -1,3 +1,456 @@
+model EventPartner {
+  id               String             @id @default(uuid()) @db.Uuid
+  fullName         String?
+  phoneNumber      String             @unique
+  isPhoneVerified  Boolean            @default(false)
+  phoneVerifiedAt  DateTime?
+  email            String?            @unique
+  isEmailVerified  Boolean            @default(false)
+  emailVerifiedAt  DateTime?
+  gender           HostGender?
+  languages        String[]           @default([])
+  profilePhoto     String?
+  whatsappUpdates  Boolean            @default(false)
+  accountStatus    PartnerStatus      @default(ACTIVE)
+  sessionId        String?
+  deviceToken      String?
+  lastLoginAt      DateTime?
+  lastActiveAt     DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  businesses       BusinessDetails[]
+  hosts            Host[]
+  signedAgreements PartnerAgreement[]
+  consents         PartnerConsent[]
+
+  @@map("event_partners")
+}
+
+model BusinessDetails {
+  id                       String                     @id @default(uuid()) @db.Uuid
+  partnerId                String                     @db.Uuid
+  legalName                String?
+  tradeName                String?
+  brandName                String?
+  constitution             BusinessConstitution?
+  hasGst                   Boolean?
+  gstNumber                String?
+  gstStatus                String?
+  gstVerificationStatus    PartnerVerificationStatus  @default(NOT_STARTED)
+  gstVerifiedAt            DateTime?
+  registeredSince          DateTime?
+  panNumberEncrypted       String?
+  panLastFour              String?                    @db.VarChar(4)
+  panName                  String?
+  panStatus                String?
+  panCategory              String?
+  panVerificationStatus    PartnerVerificationStatus  @default(NOT_STARTED)
+  panVerifiedAt            DateTime?
+  isAadhaarLinked          Boolean?
+  registrationType         RegistrationType?
+  registrationNumber       String?
+  incorporationDate        DateTime?
+  companyStatus            String?
+  mcaVerificationStatus    PartnerVerificationStatus  @default(NOT_STARTED)
+  mcaVerifiedAt            DateTime?
+  directorsOrPartners      Json?
+  principalPlace           String?
+  state                    String?
+  registeredPincode        String?
+  representativeName       String?
+  designation              RepresentativeDesignation?
+  isMcaNameMatched         Boolean?
+  partnershipDeedKey       String?
+  authorizationDocumentKey String?
+  authorizationStatus      PartnerVerificationStatus  @default(NOT_STARTED)
+  businessConfirmedAt      DateTime?
+  logoUrl                  String?
+  coverPhotoUrl            String?
+  tagline                  String?
+  description              String?
+  instagramUrl             String?
+  onboardingStep           OrganizerStep              @default(PERSONAL_DETAILS)
+  onboardingCompleted      Boolean                    @default(false)
+  status                   BusinessStatus             @default(DRAFT)
+  submittedAt              DateTime?
+  approvedAt               DateTime?
+  activatedAt              DateTime?
+  rejectedAt               DateTime?
+  rejectionReason          String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  events                   Event[]
+  bankDetails              BankDetails[]
+  partner                  EventPartner               @relation(fields: [partnerId], references: [id])
+  hosts                    Host[]
+  agreements               PartnerAgreement[]
+  consents                 PartnerConsent[]
+  reviews                  PartnerReview[]
+  verifyId                 VerifyId?
+  yourEvents               YourEvents?
+
+  @@index([partnerId, status])
+  @@index([gstNumber])
+  @@index([registrationNumber])
+  @@index([status])
+  @@map("business_details")
+}
+
+model VerifyId {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  businessId            String                    @unique @db.Uuid
+  aadhaarLastFour       String?                   @db.VarChar(4)
+  aadhaarName           String?
+  dateOfBirth           DateTime?                 @db.Date
+  city                  String?
+  state                 String?
+  isAdult               Boolean?
+  isNameMatched         Boolean?
+  aadhaarStatus         PartnerVerificationStatus @default(NOT_STARTED)
+  aadhaarVerifiedAt     DateTime?
+  aadhaarReferenceId    String?
+  panNumberEncrypted    String?
+  panLastFour           String?                   @db.VarChar(4)
+  panName               String?
+  isPanNameMatched      Boolean?
+  panStatus             PartnerVerificationStatus @default(NOT_STARTED)
+  panVerifiedAt         DateTime?
+  panReferenceId        String?
+  selfieKey             String?
+  faceMatchScore        Decimal?                  @db.Decimal(5, 2)
+  livenessScore         Decimal?                  @db.Decimal(5, 2)
+  isFaceMatched         Boolean?
+  isLivenessPassed      Boolean?
+  faceStatus            PartnerVerificationStatus @default(NOT_STARTED)
+  faceVerifiedAt        DateTime?
+  faceReferenceId       String?
+  isAadhaarLinked       Boolean?
+  aadhaarProvider       String?
+  aadhaarFailureReason  String?
+  panProvider           String?
+  panFailureReason      String?
+  faceProvider          String?
+  faceFailureReason     String?
+  livenessStatus        PartnerVerificationStatus @default(NOT_STARTED)
+  livenessVerifiedAt    DateTime?
+  livenessReferenceId   String?
+  livenessProvider      String?
+  livenessFailureReason String?
+  status                PartnerVerificationStatus @default(NOT_STARTED)
+  verifiedAt            DateTime?
+  expiresAt             DateTime?
+  failureReason         String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  business              BusinessDetails           @relation(fields: [businessId], references: [id])
+
+  @@index([status, expiresAt])
+  @@map("verify_ids")
+}
+
+model PartnerGovernmentIdAttempt {
+  id                String                           @id @default(uuid()) @db.Uuid
+  partnerId         String                           @db.Uuid
+  businessId        String                           @db.Uuid
+  referenceId       String                           @unique
+  transactionId     String?                          @unique
+  providerRequestId String?
+  callbackStateHash String                           @unique
+  documentType      String                           @default("AADHAAR")
+  status            PartnerGovernmentIdAttemptStatus @default(INITIATING)
+  consentGivenAt    DateTime
+  authorizedAt      DateTime?
+  completedAt       DateTime?
+  expiresAt         DateTime?
+  failureReason     String?
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+
+  @@index([partnerId, businessId, status])
+  @@map("partner_government_id_attempts")
+}
+
+model YourEvents {
+  id                    String            @id @default(uuid()) @db.Uuid
+  businessId            String            @unique @db.Uuid
+  eventDurationType     EventDurationType
+  baseCity              String
+  hostingCities         String[]          @default([])
+  targetAudience        EventAudience
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  vipApprovalStatus     ApprovalStatus    @default(NOT_REQUESTED)
+  vipApprovedAt         DateTime?
+  vipRejectionReason    String?
+  hasAgreedToHostRules  Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  business              BusinessDetails   @relation(fields: [businessId], references: [id])
+  categories            EventCategory[]   @relation("YourEventCategories")
+
+  @@map("your_events")
+}
+
+model EventCategory {
+  id         String       @id @default(uuid()) @db.Uuid
+  label      String
+  value      String       @unique
+  icon       String?
+  sortOrder  Int          @default(0)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  yourEvents YourEvents[] @relation("YourEventCategories")
+
+  @@index([isActive, sortOrder])
+  @@map("partner_event_categories")
+}
+
+model Host {
+  id                        String           @id @default(uuid()) @db.Uuid
+  businessId                String           @db.Uuid
+  partnerId                 String?          @db.Uuid
+  fullName                  String
+  phoneNumber               String
+  email                     String?
+  gender                    HostGender?
+  languages                 String[]         @default([])
+  invitationTokenHash       String?          @unique
+  invitedAt                 DateTime         @default(now())
+  invitationExpiresAt       DateTime
+  acceptedAt                DateTime?
+  declinedAt                DateTime?
+  canViewGuestList          Boolean          @default(true)
+  canCheckInGuests          Boolean          @default(true)
+  canUpdateRunSheetProgress Boolean          @default(true)
+  canViewRoomList           Boolean          @default(true)
+  canReportIncidentSOS      Boolean          @default(true)
+  canMessageGuests          Boolean          @default(true)
+  canReplyToReviews         Boolean          @default(false)
+  canCreateSubmitEvent      Boolean          @default(false)
+  canEditEvent              Boolean          @default(false)
+  canCancelEventRefund      Boolean          @default(false)
+  canManagePayouts          Boolean          @default(false)
+  onboardingStep            HostStep         @default(INVITE_ACCEPTANCE)
+  onboardingCompleted       Boolean          @default(false)
+  status                    HostStatus       @default(INVITED)
+  emergencyContactName      String?
+  emergencyContactPhone     String?
+  joinedAt                  DateTime?
+  pausedAt                  DateTime?
+  removedAt                 DateTime?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  assignedEvents            EventHost[]
+  verifyId                  HostVerifyId?
+  business                  BusinessDetails  @relation(fields: [businessId], references: [id])
+  partner                   EventPartner?    @relation(fields: [partnerId], references: [id])
+  consents                  PartnerConsent[]
+
+  @@unique([businessId, phoneNumber])
+  @@unique([businessId, partnerId])
+  @@index([partnerId])
+  @@index([phoneNumber, status])
+  @@index([businessId, status])
+  @@index([status, invitationExpiresAt])
+  @@map("hosts")
+}
+
+model HostVerifyId {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  hostId                String                    @unique @db.Uuid
+  aadhaarLastFour       String?                   @db.VarChar(4)
+  aadhaarName           String?
+  dateOfBirth           DateTime?                 @db.Date
+  city                  String?
+  state                 String?
+  isAdult               Boolean?
+  isNameMatched         Boolean?
+  aadhaarStatus         PartnerVerificationStatus @default(NOT_STARTED)
+  aadhaarVerifiedAt     DateTime?
+  aadhaarReferenceId    String?
+  aadhaarProvider       String?
+  aadhaarFailureReason  String?
+  panNumberEncrypted    String?
+  panLastFour           String?                   @db.VarChar(4)
+  panName               String?
+  panCategory           String?
+  isPanNameMatched      Boolean?
+  isAadhaarLinked       Boolean?
+  panStatus             PartnerVerificationStatus @default(NOT_STARTED)
+  panVerifiedAt         DateTime?
+  panReferenceId        String?
+  panProvider           String?
+  panFailureReason      String?
+  selfieKey             String?
+  faceMatchScore        Decimal?                  @db.Decimal(5, 2)
+  isFaceMatched         Boolean?
+  faceStatus            PartnerVerificationStatus @default(NOT_STARTED)
+  faceVerifiedAt        DateTime?
+  faceReferenceId       String?
+  faceProvider          String?
+  faceFailureReason     String?
+  livenessScore         Decimal?                  @db.Decimal(5, 2)
+  isLivenessPassed      Boolean?
+  livenessStatus        PartnerVerificationStatus @default(NOT_STARTED)
+  livenessVerifiedAt    DateTime?
+  livenessReferenceId   String?
+  livenessProvider      String?
+  livenessFailureReason String?
+  status                PartnerVerificationStatus @default(NOT_STARTED)
+  verifiedAt            DateTime?
+  expiresAt             DateTime?
+  failureReason         String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  host                  Host                      @relation(fields: [hostId], references: [id])
+
+  @@index([status, expiresAt])
+  @@map("host_verify_ids")
+}
+
+model PartnerConsent {
+  id              String             @id @default(uuid()) @db.Uuid
+  partnerId       String             @db.Uuid
+  businessId      String?            @db.Uuid
+  hostId          String?            @db.Uuid
+  consentType     PartnerConsentType
+  isAccepted      Boolean
+  documentVersion String
+  documentHash    String
+  documentKey     String?
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime           @default(now())
+  business        BusinessDetails?   @relation(fields: [businessId], references: [id])
+  host            Host?              @relation(fields: [hostId], references: [id])
+  partner         EventPartner       @relation(fields: [partnerId], references: [id])
+
+  @@index([partnerId, consentType])
+  @@index([businessId, consentType])
+  @@index([hostId, consentType])
+  @@map("partner_consents")
+}
+
+model PartnerAgreement {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  businessId            String                    @db.Uuid
+  signerId              String                    @db.Uuid
+  agreementNumber       String                    @unique
+  agreementVersion      String
+  businessLegalName     String
+  signerName            String
+  signerDesignation     RepresentativeDesignation
+  commissionPercentage  Decimal                   @db.Decimal(5, 2)
+  commissionGst         Decimal                   @db.Decimal(5, 2)
+  tdsPercentage         Decimal                   @db.Decimal(5, 2)
+  payoutCycle           PayoutCycle
+  payoutDelayDays       Int
+  terminationNoticeDays Int
+  signatureMethod       SignatureMethod?
+  esignProvider         String?
+  esignTransactionId    String?
+  esignReferenceId      String?
+  unsignedDocumentKey   String?
+  unsignedDocumentHash  String?
+  signedDocumentKey     String?
+  signedDocumentHash    String?
+  status                AgreementStatus           @default(PENDING)
+  signedAt              DateTime?
+  effectiveFrom         DateTime?
+  expiresAt             DateTime?
+  terminatedAt          DateTime?
+  failureReason         String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  business              BusinessDetails           @relation(fields: [businessId], references: [id])
+  signer                EventPartner              @relation(fields: [signerId], references: [id])
+
+  @@unique([esignProvider, esignTransactionId])
+  @@index([businessId, status])
+  @@index([signerId])
+  @@map("partner_agreements")
+}
+
+model BankDetails {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  businessId             String                    @db.Uuid
+  accountHolderName      String
+  accountNumberEncrypted String
+  accountNumberLastFour  String                    @db.VarChar(4)
+  ifscCode               String
+  bankName               String?
+  branchName             String?
+  cancelledChequeKey     String?
+  bankStatementKey       String?
+  payoutCycle            PayoutCycle
+  verificationStatus     PartnerVerificationStatus @default(NOT_STARTED)
+  isNameMatched          Boolean?
+  providerReferenceId    String?
+  pennyDropVerifiedAt    DateTime?
+  verifiedAt             DateTime?
+  failureReason          String?
+  isPrimary              Boolean                   @default(false)
+  isActive               Boolean                   @default(true)
+  payoutHoldUntil        DateTime?
+  deactivatedAt          DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  business               BusinessDetails           @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, isActive])
+  @@map("bank_details")
+}
+
+model PartnerReview {
+  id                   String          @id @default(uuid()) @db.Uuid
+  businessId           String          @db.Uuid
+  businessApproval     ApprovalStatus  @default(PENDING)
+  identityApproval     ApprovalStatus  @default(PENDING)
+  backgroundApproval   ApprovalStatus  @default(PENDING)
+  vipApproval          ApprovalStatus  @default(NOT_REQUESTED)
+  interviewStatus      InterviewStatus @default(NOT_REQUIRED)
+  interviewScheduledAt DateTime?
+  interviewMeetingUrl  String?
+  interviewCompletedAt DateTime?
+  interviewRemarks     String?
+  status               ApprovalStatus  @default(PENDING)
+  reviewedByAdminId    String?         @db.Uuid
+  remarks              String?
+  rejectionReason      String?
+  reviewedAt           DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  business             BusinessDetails @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, status])
+  @@index([reviewedByAdminId])
+  @@index([interviewStatus, interviewScheduledAt])
+  @@map("partner_reviews")
+}
+
+model EventHost {
+  id          String          @id @default(uuid()) @db.Uuid
+  eventId     String          @db.Uuid
+  hostId      String          @db.Uuid
+  status      EventHostStatus @default(ACTIVE)
+  assignedAt  DateTime        @default(now())
+  removedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  event       Event           @relation(fields: [eventId], references: [id])
+  host        Host            @relation(fields: [hostId], references: [id])
+
+  @@unique([eventId, hostId])
+  @@index([hostId, status])
+  @@index([eventId, status])
+  @@map("event_hosts")
+}
+
 enum PartnerStatus {
   ACTIVE
   SUSPENDED
@@ -157,208 +610,6 @@ enum PartnerConsentType {
   SAFETY_AND_POSH_RULES
 }
 
-model EventPartner {
-  id String @id @default(uuid()) @db.Uuid
-
-  fullName        String?
-  phoneNumber     String    @unique
-  isPhoneVerified Boolean   @default(false)
-  phoneVerifiedAt DateTime?
-
-  email           String?   @unique
-  isEmailVerified Boolean   @default(false)
-  emailVerifiedAt DateTime?
-
-  gender       HostGender?
-  languages    String[]    @default([])
-  profilePhoto String?
-
-  whatsappUpdates Boolean @default(false)
-
-  accountStatus PartnerStatus @default(ACTIVE)
-
-  sessionId    String?
-  deviceToken  String?
-  lastLoginAt  DateTime?
-  lastActiveAt DateTime?
-  deletedAt    DateTime?
-
-  businesses BusinessDetails[]
-  hosts      Host[]
-
-  consents         PartnerConsent[]
-  signedAgreements PartnerAgreement[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("event_partners")
-}
-
-model BusinessDetails {
-  id String @id @default(uuid()) @db.Uuid
-
-  partnerId String       @db.Uuid
-  partner   EventPartner @relation(fields: [partnerId], references: [id])
-
-  // Business details
-  legalName    String?
-  tradeName    String?
-  brandName    String?
-  constitution BusinessConstitution?
-
-  // GST details
-  hasGst                Boolean?
-  gstNumber             String?
-  gstStatus             String?
-  gstVerificationStatus PartnerVerificationStatus @default(NOT_STARTED)
-  gstVerifiedAt         DateTime?
-  registeredSince       DateTime?
-
-  // Business PAN details
-  panNumberEncrypted    String?
-  panLastFour           String?                   @db.VarChar(4)
-  panName               String?
-  panStatus             String?
-  panCategory           String?
-  panVerificationStatus PartnerVerificationStatus @default(NOT_STARTED)
-  panVerifiedAt         DateTime?
-  isAadhaarLinked       Boolean?
-
-  // MCA details
-  registrationType      RegistrationType?
-  registrationNumber    String?
-  incorporationDate     DateTime?
-  companyStatus         String?
-  mcaVerificationStatus PartnerVerificationStatus @default(NOT_STARTED)
-  mcaVerifiedAt         DateTime?
-  directorsOrPartners   Json?
-
-  // Registered address
-  principalPlace    String?
-  state             String?
-  registeredPincode String?
-
-  // Representative details
-  representativeName String?
-  designation        RepresentativeDesignation?
-  isMcaNameMatched   Boolean?
-
-  // Supporting documents
-  partnershipDeedKey       String?
-  authorizationDocumentKey String?
-  authorizationStatus      PartnerVerificationStatus @default(NOT_STARTED)
-
-  businessConfirmedAt DateTime?
-
-  // Brand profile
-  logoUrl       String?
-  coverPhotoUrl String?
-  tagline       String?
-  description   String?
-  instagramUrl  String?
-
-  // Onboarding
-  onboardingStep      OrganizerStep  @default(PERSONAL_DETAILS)
-  onboardingCompleted Boolean        @default(false)
-  status              BusinessStatus @default(DRAFT)
-
-  submittedAt     DateTime?
-  approvedAt      DateTime?
-  activatedAt     DateTime?
-  rejectedAt      DateTime?
-  rejectionReason String?
-
-  // Relations
-  yourEvents  YourEvents?
-  verifyId    VerifyId?
-  hosts       Host[]
-  bankDetails BankDetails[]
-  agreements  PartnerAgreement[]
-  reviews     PartnerReview[]
-  consents    PartnerConsent[]
-  events      Event[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([partnerId, status])
-  @@index([gstNumber])
-  @@index([registrationNumber])
-  @@index([status])
-  @@map("business_details")
-}
-
-model VerifyId {
-  id String @id @default(uuid()) @db.Uuid
-
-  businessId String          @unique @db.Uuid
-  business   BusinessDetails @relation(fields: [businessId], references: [id])
-
-  // Aadhaar verification
-  aadhaarLastFour String?   @db.VarChar(4)
-  aadhaarName     String?
-  dateOfBirth     DateTime? @db.Date
-  city            String?
-  state           String?
-
-  isAdult       Boolean?
-  isNameMatched Boolean?
-
-  aadhaarStatus      PartnerVerificationStatus @default(NOT_STARTED)
-  aadhaarVerifiedAt  DateTime?
-  aadhaarReferenceId String?
-
-  // Personal PAN verification
-  panNumberEncrypted String?
-  panLastFour        String?  @db.VarChar(4)
-  panName            String?
-  isPanNameMatched   Boolean?
-
-  panStatus      PartnerVerificationStatus @default(NOT_STARTED)
-  panVerifiedAt  DateTime?
-  panReferenceId String?
-
-  // Face verification
-  selfieKey      String?
-  faceMatchScore Decimal? @db.Decimal(5, 2)
-  livenessScore  Decimal? @db.Decimal(5, 2)
-
-  isFaceMatched    Boolean?
-  isLivenessPassed Boolean?
-
-  faceStatus      PartnerVerificationStatus @default(NOT_STARTED)
-  faceVerifiedAt  DateTime?
-  faceReferenceId String?
-
-  isAadhaarLinked Boolean?
-
-  aadhaarProvider      String?
-  aadhaarFailureReason String?
-  panProvider          String?
-  panFailureReason     String?
-  faceProvider         String?
-  faceFailureReason    String?
-
-  livenessStatus        PartnerVerificationStatus @default(NOT_STARTED)
-  livenessVerifiedAt    DateTime?
-  livenessReferenceId   String?
-  livenessProvider      String?
-  livenessFailureReason String?
-
-  // Overall verification
-  status        PartnerVerificationStatus @default(NOT_STARTED)
-  verifiedAt    DateTime?
-  expiresAt     DateTime?
-  failureReason String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status, expiresAt])
-  @@map("verify_ids")
-}
-
 enum PartnerGovernmentIdAttemptStatus {
   INITIATING
   PENDING
@@ -367,356 +618,4 @@ enum PartnerGovernmentIdAttemptStatus {
   REJECTED
   FAILED
   EXPIRED
-}
-
-model PartnerGovernmentIdAttempt {
-  id                String                           @id @default(uuid()) @db.Uuid
-  partnerId         String                           @db.Uuid
-  businessId        String                           @db.Uuid
-  referenceId       String                           @unique
-  transactionId     String?                          @unique
-  providerRequestId String?
-  callbackStateHash String                           @unique
-  documentType      String                           @default("AADHAAR")
-  status            PartnerGovernmentIdAttemptStatus @default(INITIATING)
-  consentGivenAt    DateTime
-  authorizedAt      DateTime?
-  completedAt       DateTime?
-  expiresAt         DateTime?
-  failureReason     String?
-  createdAt         DateTime                         @default(now())
-  updatedAt         DateTime                         @updatedAt
-
-  @@index([partnerId, businessId, status])
-  @@map("partner_government_id_attempts")
-}
-
-model YourEvents {
-  id String @id @default(uuid()) @db.Uuid
-
-  businessId String          @unique @db.Uuid
-  business   BusinessDetails @relation(fields: [businessId], references: [id])
-
-  eventDurationType EventDurationType
-
-  categories EventCategory[] @relation("YourEventCategories")
-
-  baseCity      String
-  hostingCities String[] @default([])
-
-  targetAudience EventAudience
-
-  emergencyContactName  String?
-  emergencyContactPhone String?
-
-  vipApprovalStatus    ApprovalStatus @default(NOT_REQUESTED)
-  vipApprovedAt        DateTime?
-  vipRejectionReason   String?
-  hasAgreedToHostRules Boolean        @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("your_events")
-}
-
-model EventCategory {
-  id        String  @id @default(uuid()) @db.Uuid
-  label     String
-  value     String  @unique
-  icon      String?
-  sortOrder Int     @default(0)
-  isActive  Boolean @default(true)
-
-  yourEvents YourEvents[] @relation("YourEventCategories")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive, sortOrder])
-  @@map("partner_event_categories")
-}
-
-model Host {
-  id String @id @default(uuid()) @db.Uuid
-
-  businessId String          @db.Uuid
-  business   BusinessDetails @relation(fields: [businessId], references: [id])
-
-  // Assigned after phone verification
-  partnerId String?       @db.Uuid
-  partner   EventPartner? @relation(fields: [partnerId], references: [id])
-
-  // Invitation details
-  fullName    String
-  phoneNumber String
-  email       String?
-  gender      HostGender?
-  languages   String[]    @default([])
-
-  invitationTokenHash String?   @unique
-  invitedAt           DateTime  @default(now())
-  invitationExpiresAt DateTime
-  acceptedAt          DateTime?
-  declinedAt          DateTime?
-
-  // Optional permissions
-  canViewGuestList          Boolean @default(true)
-  canCheckInGuests          Boolean @default(true)
-  canUpdateRunSheetProgress Boolean @default(true)
-  canViewRoomList           Boolean @default(true)
-  canReportIncidentSOS      Boolean @default(true)
-  canMessageGuests          Boolean @default(true)
-  canReplyToReviews         Boolean @default(false)
-  canCreateSubmitEvent      Boolean @default(false)
-  canEditEvent              Boolean @default(false)
-  canCancelEventRefund      Boolean @default(false)
-  canManagePayouts          Boolean @default(false)
-
-  // Onboarding
-  onboardingStep      HostStep @default(INVITE_ACCEPTANCE)
-  onboardingCompleted Boolean  @default(false)
-
-  status HostStatus @default(INVITED)
-
-  emergencyContactName  String?
-  emergencyContactPhone String?
-  verifyId              HostVerifyId?
-
-  joinedAt  DateTime?
-  pausedAt  DateTime?
-  removedAt DateTime?
-
-  assignedEvents EventHost[]
-  consents       PartnerConsent[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([businessId, phoneNumber])
-  @@unique([businessId, partnerId])
-  @@index([partnerId])
-  @@index([phoneNumber, status])
-  @@index([businessId, status])
-  @@index([status, invitationExpiresAt])
-  @@map("hosts")
-}
-
-model HostVerifyId {
-  id String @id @default(uuid()) @db.Uuid
-
-  hostId String @unique @db.Uuid
-  host   Host   @relation(fields: [hostId], references: [id])
-
-  // Aadhaar verification
-  aadhaarLastFour String?   @db.VarChar(4)
-  aadhaarName     String?
-  dateOfBirth     DateTime? @db.Date
-  city            String?
-  state           String?
-
-  isAdult       Boolean?
-  isNameMatched Boolean?
-
-  aadhaarStatus        PartnerVerificationStatus @default(NOT_STARTED)
-  aadhaarVerifiedAt    DateTime?
-  aadhaarReferenceId   String?
-  aadhaarProvider      String?
-  aadhaarFailureReason String?
-
-  // PAN verification
-  panNumberEncrypted String?
-  panLastFour        String?  @db.VarChar(4)
-  panName            String?
-  panCategory        String?
-  isPanNameMatched   Boolean?
-  isAadhaarLinked    Boolean?
-
-  panStatus        PartnerVerificationStatus @default(NOT_STARTED)
-  panVerifiedAt    DateTime?
-  panReferenceId   String?
-  panProvider      String?
-  panFailureReason String?
-
-  // Face verification
-  selfieKey      String?
-  faceMatchScore Decimal? @db.Decimal(5, 2)
-  isFaceMatched  Boolean?
-
-  faceStatus        PartnerVerificationStatus @default(NOT_STARTED)
-  faceVerifiedAt    DateTime?
-  faceReferenceId   String?
-  faceProvider      String?
-  faceFailureReason String?
-
-  // Liveness verification
-  livenessScore    Decimal? @db.Decimal(5, 2)
-  isLivenessPassed Boolean?
-
-  livenessStatus        PartnerVerificationStatus @default(NOT_STARTED)
-  livenessVerifiedAt    DateTime?
-  livenessReferenceId   String?
-  livenessProvider      String?
-  livenessFailureReason String?
-
-  // Overall verification
-  status        PartnerVerificationStatus @default(NOT_STARTED)
-  verifiedAt    DateTime?
-  expiresAt     DateTime?
-  failureReason String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status, expiresAt])
-  @@map("host_verify_ids")
-}
-
-model PartnerConsent {
-  id String @id @default(uuid()) @db.Uuid
-
-  partnerId String       @db.Uuid
-  partner   EventPartner @relation(fields: [partnerId], references: [id])
-
-  businessId String?          @db.Uuid
-  business   BusinessDetails? @relation(fields: [businessId], references: [id])
-
-  hostId String? @db.Uuid
-  host   Host?   @relation(fields: [hostId], references: [id])
-
-  consentType PartnerConsentType
-
-  isAccepted      Boolean
-  documentVersion String
-  documentHash    String
-  documentKey     String?
-
-  acceptedAt DateTime?
-  revokedAt  DateTime?
-
-  ipAddress String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-
-  @@index([partnerId, consentType])
-  @@index([businessId, consentType])
-  @@index([hostId, consentType])
-  @@map("partner_consents")
-}
-
-model PartnerAgreement {
-  id                    String                    @id @default(uuid()) @db.Uuid
-  businessId            String                    @db.Uuid
-  business              BusinessDetails           @relation(fields: [businessId], references: [id])
-  signerId              String                    @db.Uuid
-  signer                EventPartner              @relation(fields: [signerId], references: [id])
-  agreementNumber       String                    @unique
-  agreementVersion      String
-  businessLegalName     String
-  signerName            String
-  signerDesignation     RepresentativeDesignation
-  commissionPercentage  Decimal                   @db.Decimal(5, 2)
-  commissionGst         Decimal                   @db.Decimal(5, 2)
-  tdsPercentage         Decimal                   @db.Decimal(5, 2)
-  payoutCycle           PayoutCycle
-  payoutDelayDays       Int
-  terminationNoticeDays Int
-  signatureMethod       SignatureMethod?
-  esignProvider         String?
-  esignTransactionId    String?
-  esignReferenceId      String?
-  unsignedDocumentKey   String?
-  unsignedDocumentHash  String?
-  signedDocumentKey     String?
-  signedDocumentHash    String?
-  status                AgreementStatus           @default(PENDING)
-  signedAt              DateTime?
-  effectiveFrom         DateTime?
-  expiresAt             DateTime?
-  terminatedAt          DateTime?
-  failureReason         String?
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-
-  @@unique([esignProvider, esignTransactionId])
-  @@index([businessId, status])
-  @@index([signerId])
-  @@map("partner_agreements")
-}
-
-model BankDetails {
-  id                     String                    @id @default(uuid()) @db.Uuid
-  businessId             String                    @db.Uuid
-  business               BusinessDetails           @relation(fields: [businessId], references: [id])
-  accountHolderName      String
-  accountNumberEncrypted String
-  accountNumberLastFour  String                    @db.VarChar(4)
-  ifscCode               String
-  bankName               String?
-  branchName             String?
-  cancelledChequeKey     String?
-  bankStatementKey       String?
-  payoutCycle            PayoutCycle
-  verificationStatus     PartnerVerificationStatus @default(NOT_STARTED)
-  isNameMatched          Boolean?
-  providerReferenceId    String?
-  pennyDropVerifiedAt    DateTime?
-  verifiedAt             DateTime?
-  failureReason          String?
-  isPrimary              Boolean                   @default(false)
-  isActive               Boolean                   @default(true)
-  payoutHoldUntil        DateTime?
-  deactivatedAt          DateTime?
-  createdAt              DateTime                  @default(now())
-  updatedAt              DateTime                  @updatedAt
-
-  @@index([businessId, isActive])
-  @@map("bank_details")
-}
-
-model PartnerReview {
-  id                   String          @id @default(uuid()) @db.Uuid
-  businessId           String          @db.Uuid
-  business             BusinessDetails @relation(fields: [businessId], references: [id])
-  businessApproval     ApprovalStatus  @default(PENDING)
-  identityApproval     ApprovalStatus  @default(PENDING)
-  backgroundApproval   ApprovalStatus  @default(PENDING)
-  vipApproval          ApprovalStatus  @default(NOT_REQUESTED)
-  interviewStatus      InterviewStatus @default(NOT_REQUIRED)
-  interviewScheduledAt DateTime?
-  interviewMeetingUrl  String?
-  interviewCompletedAt DateTime?
-  interviewRemarks     String?
-  status               ApprovalStatus  @default(PENDING)
-  reviewedByAdminId    String?         @db.Uuid
-  remarks              String?
-  rejectionReason      String?
-  reviewedAt           DateTime?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-
-  @@index([businessId, status])
-  @@index([reviewedByAdminId])
-  @@index([interviewStatus, interviewScheduledAt])
-  @@map("partner_reviews")
-}
-
-model EventHost {
-  id          String          @id @default(uuid()) @db.Uuid
-  eventId     String          @db.Uuid
-  event       Event           @relation(fields: [eventId], references: [id])
-  hostId      String          @db.Uuid
-  host        Host            @relation(fields: [hostId], references: [id])
-  status      EventHostStatus @default(ACTIVE)
-  assignedAt  DateTime        @default(now())
-  removedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  @@unique([eventId, hostId])
-  @@index([hostId, status])
-  @@index([eventId, status])
-  @@map("event_hosts")
 }

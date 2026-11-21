@@ -7,154 +7,129 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   directUrl  = env("DIRECT_URL")
-  extensions = [postgis]
+  extensions = [postgis, uuid_ossp(map: "uuid-ossp", schema: "extensions")]
 }
 
 model User {
-  id                   String             @id @default(uuid()) @db.Uuid
-  full_name            String?            @db.VarChar(100)
-  email                String?            @unique @db.VarChar(255)
-  phone_number         String?            @db.VarChar(20)
-  is_phone_verified    Boolean            @default(false)
-  google_id            String?            @unique @db.VarChar(255)
-  birth_date           DateTime?          @db.Date
-  height               Int?
-  gender               Gender?
-  gender_option        GenderOption?
-  looking_for          LookingFor?
-  intentionId          String?            @db.Uuid
-  onboarding_step      String?            @db.VarChar(20)
-  next_step            String?            @db.VarChar(20)
-  onboarding_completed Boolean            @default(false)
-  last_active_at       DateTime?
-  device_token         String?
-  referralCode         String?            @unique @db.VarChar(20)
-  badge_count          Int                @default(0)
-  trust_score          Int                @default(0)
-  deleted_at           DateTime?
-  created_at           DateTime           @default(now())
-  updated_at           DateTime           @updatedAt
-  profile_completion   Int                @default(0)
-  looking_for_option   LookingForOption?
-  account_status       AccountStatus      @default(ACTIVE)
-  paused_at            DateTime?
-  pause_reason         String?            @db.VarChar(255)
-  answer               UserAnswer[]
-  matchesAsUser1       UserMatch[]        @relation("MatchUser1")
-  matchesAsUser2       UserMatch[]        @relation("MatchUser2")
-  swipesGiven          UserSwipe[]        @relation("Swiper")
-  swipesReceived       UserSwipe[]        @relation("TargetUser")
-  about                UserAbout?
-  bio                  UserBio?
-  eduWork              UserEduWork?       @relation("UserEduWork")
-  familyProfile        UserFamilyProfile? @relation("UserFamilyProfile")
-  skills               UserSkill[]
-  photos               UserPhoto[]
-  profile              UserProfile?
-  userBoosts           UserBoost[]
-  boostUsages          BoostUsage[]
-  userPackages         UserPackage[]
-  boostEvents          BoostEvent[]       @relation("BoostedUser")
-  actorEvents          BoostEvent[]       @relation("ActorUser")
-  boostStats           UserBoostStats?
-  boostPurchases       BoostPurchase[]
-  boostTransactions    BoostTransaction[]
-
-  //DATE PLAN 
-  datePlan                   DatePlan[]
-  datePlanRequests           DatePlanRequest[]
-  datePlanSkips              DatePlanSkip[]
-  hostedConfirmedDates       DateConfirmed[]       @relation("ConfirmedDateHost")
-  joinedConfirmedDates       DateConfirmed[]       @relation("ConfirmedDateParticipant")
-  wallet                     Wallet?
-  datePlanStats              DatePlanUserStats?
-  datePlanPurchases          DatePlanPurchase[]
-  datePlanTransactions       DatePlanTransaction[]
-  datePlanFeedbackAsReviewer DatePlanFeedback[]    @relation("DatePlanFeedbackReviewer")
-  datePlanFeedbackAsMetUser  DatePlanFeedback[]    @relation("DatePlanFeedbackMetUser")
-  datePlanReportsMade        DatePlanReport[]      @relation("DatePlanReportReporter")
-  datePlanReportsReceived    DatePlanReport[]      @relation("DatePlanReportedUser")
-
-  intention        IntentionOption?   @relation(fields: [intentionId], references: [id])
-  userPrompts      UserPrompt[]
-  UserPlanUsage    UserPlanUsage[]
-  waitlist         Waitlist?
-  referralsMade    UserReferral[]     @relation("Referrer")
-  referralStats    UserReferralStats?
-  receivedReferral UserReferral?      @relation("ReferredUser")
-  replyStats       UserReplyStats?
-  inAppPurchases   InAppPurchase[]
-
-  //FEED
-  dailyFeedViews       UserDailyFeedView[] @relation("DailyFeedViewer")
-  dailyFeedTargetViews UserDailyFeedView[] @relation("DailyFeedTarget")
-
-  //chat
-  conversationParticipants ConversationParticipant[]
-  sentChatMessages         ChatMessage[]             @relation("ChatMessageSender")
-
-  // Roses
-  rosesSent        UserRose[]        @relation("RoseSender")
-  rosesReceived    UserRose[]        @relation("RoseReceiver")
-  roseBalance      UserRoseBalance?
-  rosePurchases    RosePurchase[]
-  roseTransactions RoseTransaction[]
-
-  // Compliments
-  complimentsSent        UserCompliment[]        @relation("ComplimentSender")
-  complimentsReceived    UserCompliment[]        @relation("ComplimentReceiver")
-  complimentBalance      UserComplimentBalance?
-  complimentPurchases    ComplimentPurchase[]
-  complimentTransactions ComplimentTransaction[]
-
-  // Gifts
-  giftsSent           UserGift[]            @relation("GiftSender")
-  giftsReceived       UserGift[]            @relation("GiftReceiver")
-  ChatMessageDeletion ChatMessageDeletion[]
-  EventBooking        EventBooking[]
-
-  //Notification
-  receivedNotifications Notification[]           @relation("ReceivedNotifications")
-  sentNotifications     Notification[]           @relation("SentNotifications")
-  notificationSetting   UserNotificationSetting?
-  notificationMutes     UserNotificationMute[]   @relation("NotificationMuteOwner")
-  mutedByUsers          UserNotificationMute[]   @relation("NotificationMutedUser")
-
-  DatePlanUserBoost DatePlanUserBoost[]
-
-  //Relationship tag
-  relationshipTagProposalsSent     RelationshipTagProposal[] @relation("RelationshipTagProposalSender")
-  relationshipTagProposalsReceived RelationshipTagProposal[] @relation("RelationshipTagProposalReceiver")
-  relationshipsAsUser1             UserRelationship[]        @relation("RelationshipUser1")
-  relationshipsAsUser2             UserRelationship[]        @relation("RelationshipUser2")
-
-  // Reports
-  reportsCreated   UserReport[]         @relation("ReportsCreated")
-  reportsReceived  UserReport[]         @relation("ReportsReceived")
-  callbackRequests CallbackRequest[]
-  sessions         UserSession[]
-  payoutMethods    UserPayoutMethod[]
-  privacySettings  UserPrivacySettings?
-  blockedUsers     UserBlock[]          @relation("UserBlocker")
-  blockedBy        UserBlock[]          @relation("UserBlocked")
-  BoostReachUser   BoostReachUser[]
-
-  //verification
-  verifications                  UserVerification[]
-  governmentIdAttempts           GovernmentIdAttempt[]
-  employmentVerifications        EmploymentVerification?
-  educationVerifications         EducationVerification[]
-  manualGovernmentIdVerification ManualGovernmentIdVerification?
-  incomeVerification             IncomeVerification?
-
-  //user activity
-  activity_status ActivityStatus @default(RELAXED)
-  active_days_7   Int            @default(0)
-  show_activity   Boolean        @default(true)
-
-  activityDays     UserActivityDay[]
-  activityWatching ActivityWatch[]   @relation("ActivityWatcher")
-  activityWatchers ActivityWatch[]   @relation("ActivityTarget")
+  id                               String                          @id @default(uuid()) @db.Uuid
+  full_name                        String?                         @db.VarChar(100)
+  email                            String?                         @unique @db.VarChar(255)
+  phone_number                     String?                         @db.VarChar(20)
+  is_phone_verified                Boolean                         @default(false)
+  google_id                        String?                         @unique @db.VarChar(255)
+  birth_date                       DateTime?                       @db.Date
+  height                           Int?
+  gender                           Gender?
+  gender_option                    GenderOption?
+  looking_for                      LookingFor?
+  intentionId                      String?                         @db.Uuid
+  onboarding_step                  String?                         @db.VarChar(20)
+  next_step                        String?                         @db.VarChar(20)
+  onboarding_completed             Boolean                         @default(false)
+  last_active_at                   DateTime?
+  device_token                     String?
+  referralCode                     String?                         @unique @db.VarChar(20)
+  badge_count                      Int                             @default(0)
+  deleted_at                       DateTime?
+  created_at                       DateTime                        @default(now())
+  updated_at                       DateTime                        @updatedAt
+  profile_completion               Int                             @default(0)
+  looking_for_option               LookingForOption?
+  account_status                   AccountStatus                   @default(ACTIVE)
+  pause_reason                     String?                         @db.VarChar(255)
+  paused_at                        DateTime?
+  trust_score                      Int                             @default(0)
+  active_days_7                    Int                             @default(0)
+  activity_status                  ActivityStatus                  @default(RELAXED)
+  show_activity                    Boolean                         @default(true)
+  activityWatchers                 ActivityWatch[]                 @relation("ActivityTarget")
+  activityWatching                 ActivityWatch[]                 @relation("ActivityWatcher")
+  boostPurchases                   BoostPurchase[]
+  boostTransactions                BoostTransaction[]
+  callbackRequests                 CallbackRequest[]
+  sentChatMessages                 ChatMessage[]                   @relation("ChatMessageSender")
+  ChatMessageDeletion              ChatMessageDeletion[]
+  complimentPurchases              ComplimentPurchase[]
+  complimentTransactions           ComplimentTransaction[]
+  conversationParticipants         ConversationParticipant[]
+  hostedConfirmedDates             DateConfirmed[]                 @relation("ConfirmedDateHost")
+  joinedConfirmedDates             DateConfirmed[]                 @relation("ConfirmedDateParticipant")
+  datePlan                         DatePlan[]
+  datePlanFeedbackAsMetUser        DatePlanFeedback[]              @relation("DatePlanFeedbackMetUser")
+  datePlanFeedbackAsReviewer       DatePlanFeedback[]              @relation("DatePlanFeedbackReviewer")
+  datePlanReportsReceived          DatePlanReport[]                @relation("DatePlanReportedUser")
+  datePlanReportsMade              DatePlanReport[]                @relation("DatePlanReportReporter")
+  datePlanRequests                 DatePlanRequest[]
+  datePlanSkips                    DatePlanSkip[]
+  DatePlanUserBoost                DatePlanUserBoost[]
+  datePlanStats                    DatePlanUserStats?
+  educationVerifications           EducationVerification[]
+  employmentVerifications          EmploymentVerification?
+  EventBooking                     EventBooking[]
+  receivedNotifications            Notification[]                  @relation("ReceivedNotifications")
+  sentNotifications                Notification[]                  @relation("SentNotifications")
+  rosePurchases                    RosePurchase[]
+  roseTransactions                 RoseTransaction[]
+  activityDays                     UserActivityDay[]
+  answer                           UserAnswer[]
+  blockedBy                        UserBlock[]                     @relation("UserBlocked")
+  blockedUsers                     UserBlock[]                     @relation("UserBlocker")
+  complimentsReceived              UserCompliment[]                @relation("ComplimentReceiver")
+  complimentsSent                  UserCompliment[]                @relation("ComplimentSender")
+  dailyFeedTargetViews             UserDailyFeedView[]             @relation("DailyFeedTarget")
+  dailyFeedViews                   UserDailyFeedView[]             @relation("DailyFeedViewer")
+  giftsReceived                    UserGift[]                      @relation("GiftReceiver")
+  giftsSent                        UserGift[]                      @relation("GiftSender")
+  mutedByUsers                     UserNotificationMute[]          @relation("NotificationMutedUser")
+  notificationMutes                UserNotificationMute[]          @relation("NotificationMuteOwner")
+  notificationSetting              UserNotificationSetting?
+  payoutMethods                    UserPayoutMethod[]
+  privacySettings                  UserPrivacySettings?
+  receivedReferral                 UserReferral?                   @relation("ReferredUser")
+  referralsMade                    UserReferral[]                  @relation("Referrer")
+  referralStats                    UserReferralStats?
+  replyStats                       UserReplyStats?
+  reportsReceived                  UserReport[]                    @relation("ReportsReceived")
+  reportsCreated                   UserReport[]                    @relation("ReportsCreated")
+  rosesReceived                    UserRose[]                      @relation("RoseReceiver")
+  rosesSent                        UserRose[]                      @relation("RoseSender")
+  roseBalance                      UserRoseBalance?
+  sessions                         UserSession[]
+  wallet                           Wallet?
+  actorEvents                      BoostEvent[]                    @relation("ActorUser")
+  boostEvents                      BoostEvent[]                    @relation("BoostedUser")
+  BoostReachUser                   BoostReachUser[]
+  boostUsages                      BoostUsage[]
+  datePlanPurchases                DatePlanPurchase[]
+  datePlanTransactions             DatePlanTransaction[]
+  governmentIdAttempts             GovernmentIdAttempt[]
+  inAppPurchases                   InAppPurchase[]
+  incomeVerification               IncomeVerification?
+  manualGovernmentIdVerification   ManualGovernmentIdVerification?
+  matchesAsUser1                   UserMatch[]                     @relation("MatchUser1")
+  matchesAsUser2                   UserMatch[]                     @relation("MatchUser2")
+  relationshipTagProposalsReceived RelationshipTagProposal[]       @relation("RelationshipTagProposalReceiver")
+  relationshipTagProposalsSent     RelationshipTagProposal[]       @relation("RelationshipTagProposalSender")
+  swipesGiven                      UserSwipe[]                     @relation("Swiper")
+  swipesReceived                   UserSwipe[]                     @relation("TargetUser")
+  about                            UserAbout?
+  bio                              UserBio?
+  boostStats                       UserBoostStats?
+  userBoosts                       UserBoost[]
+  complimentBalance                UserComplimentBalance?
+  eduWork                          UserEduWork?                    @relation("UserEduWork")
+  familyProfile                    UserFamilyProfile?              @relation("UserFamilyProfile")
+  userPackages                     UserPackage[]
+  photos                           UserPhoto[]
+  UserPlanUsage                    UserPlanUsage[]
+  profile                          UserProfile?
+  userPrompts                      UserPrompt[]
+  relationshipsAsUser1             UserRelationship[]              @relation("RelationshipUser1")
+  relationshipsAsUser2             UserRelationship[]              @relation("RelationshipUser2")
+  skills                           UserSkill[]
+  verifications                    UserVerification[]
+  intention                        IntentionOption?                @relation(fields: [intentionId], references: [id])
+  waitlist                         Waitlist?
 
   @@index([phone_number])
   @@index([google_id])
@@ -163,12 +138,6 @@ model User {
   @@index([account_status])
   @@index([deleted_at])
   @@map("users")
-}
-
-enum AccountStatus {
-  ACTIVE
-  PAUSED
-  DELETED
 }
 
 model UserSession {
@@ -183,19 +152,10 @@ model UserSession {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   logoutAt   DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isActive])
-}
-
-enum ActivityStatus {
-  ACTIVE
-  FREQUENT
-  RELAXED
-  BUSY
-  NAPPING
 }
 
 model UserActivityDay {
@@ -222,33 +182,33 @@ model ActivityWatch {
   watcherId String   @db.Uuid
   targetId  String   @db.Uuid
   createdAt DateTime @default(now())
-  watcher   User     @relation("ActivityWatcher", fields: [watcherId], references: [id], onDelete: Cascade)
   target    User     @relation("ActivityTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  watcher   User     @relation("ActivityWatcher", fields: [watcherId], references: [id], onDelete: Cascade)
 
   @@id([watcherId, targetId])
   @@index([targetId])
 }
 
 model UserProfile {
-  user_id            String                                @id @db.Uuid
+  user_id            String                    @id @db.Uuid
   religionId         Int?
-  religion           Religion?                             @relation(fields: [religionId], references: [id])
   communityId        Int?
-  community          Community?                            @relation(fields: [communityId], references: [id])
-  languages          UserLanguage[]
   interested_in      Gender?
   sexual_orientation GenderOption?
-  country            String?                               @db.VarChar(30)
-  state              String?                               @db.VarChar(30)
-  city               String?                               @db.VarChar(30)
-  area               String?                               @db.VarChar(30)
+  country            String?                   @db.VarChar(30)
+  state              String?                   @db.VarChar(30)
+  city               String?                   @db.VarChar(30)
+  area               String?                   @db.VarChar(30)
   max_distance_km    Int?
-  latitude           Decimal?                              @db.Decimal(10, 8)
-  longitude          Decimal?                              @db.Decimal(11, 8)
-  location           Unsupported("geography(Point,4326)")?
-  created_at         DateTime                              @default(now())
-  updated_at         DateTime                              @updatedAt
-  user               User                                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  latitude           Decimal?                  @db.Decimal(10, 8)
+  longitude          Decimal?                  @db.Decimal(11, 8)
+  created_at         DateTime                  @default(now())
+  updated_at         DateTime                  @updatedAt
+  location           Unsupported("geography")?
+  languages          UserLanguage[]
+  community          Community?                @relation(fields: [communityId], references: [id])
+  religion           Religion?                 @relation(fields: [religionId], references: [id])
+  user               User                      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([religionId])
   @@index([communityId])
@@ -268,12 +228,10 @@ model UserReferral {
   purchaseReward Decimal        @default(0) @db.Decimal(10, 2)
   rewardedAt     DateTime?
   purchaseAt     DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  referrer     User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredUser User @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  referredUser   User           @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  referrer       User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([referrerId])
@@ -293,20 +251,12 @@ model UserReferralStats {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-enum ReferralStatus {
-  PENDING
-  SIGNUP_REWARDED
-  PACKAGE_REWARDED
-  WAITLIST_REWARDED
-  CANCELLED
-}
-
 model UserLanguage {
   userId     String      @db.Uuid
   languageId Int
-  user       UserProfile @relation(fields: [userId], references: [user_id], onDelete: Cascade)
-  language   Language    @relation(fields: [languageId], references: [id])
   createdAt  DateTime    @default(now())
+  language   Language    @relation(fields: [languageId], references: [id])
+  user       UserProfile @relation(fields: [userId], references: [user_id], onDelete: Cascade)
 
   @@id([userId, languageId])
   @@index([languageId])
@@ -319,9 +269,9 @@ model Religion {
   name        String        @unique @db.VarChar(100)
   priority    Int           @default(0)
   active      Boolean       @default(true)
-  communities Community[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  communities Community[]
   UserProfile UserProfile[]
 
   @@index([active])
@@ -331,12 +281,12 @@ model Religion {
 model Community {
   id           Int           @id @default(autoincrement())
   religionId   Int
-  religion     Religion      @relation(fields: [religionId], references: [id], onDelete: Cascade)
   name         String        @db.VarChar(100)
   priority     Int           @default(0)
   active       Boolean       @default(true)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  religion     Religion      @relation(fields: [religionId], references: [id], onDelete: Cascade)
   userProfiles UserProfile[]
 
   @@unique([religionId, name])
@@ -350,9 +300,9 @@ model Language {
   name      String         @unique @db.VarChar(50)
   priority  Int            @default(0)
   active    Boolean        @default(true)
-  users     UserLanguage[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+  users     UserLanguage[]
 
   @@index([active])
   @@map("languages")
@@ -377,65 +327,27 @@ model UserAbout {
   @@map("user_about")
 }
 
-enum Zodiac {
-  ARIES
-  TAURUS
-  GEMINI
-  CANCER
-  LEO
-  VIRGO
-  LIBRA
-  SCORPIO
-  SAGITTARIUS
-  CAPRICORN
-  AQUARIUS
-  PISCES
-}
-
-enum LoveLanguage {
-  WORDS_OF_AFFIRMATION
-  QUALITY_TIME
-  ACTS_OF_SERVICE
-  PHYSICAL_TOUCH
-  RECEIVING_GIFTS
-}
-
-enum CommunicationStyle {
-  PHONE_CALLS_OVER_TEXTS
-  TEXTS_OVER_CALLS
-  VIDEO_CALLS
-  VOICE_NOTES
-  IN_PERSON_ALWAYS
-  A_BIT_OF_EVERYTHING
-}
-
 model UserEduWork {
-  userId String @id @db.Uuid
-
-  // Education
-  highestEdu     EducationLevel?
-  degree         String?         @db.VarChar(100)
-  collegeName    String?         @db.VarChar(100)
-  graduationYear Int?
-
-  // Work
+  userId           String          @id @db.Uuid
+  highestEdu       EducationLevel?
+  degree           String?         @db.VarChar(100)
+  collegeName      String?         @db.VarChar(100)
+  graduationYear   Int?
   professionId     Int?
-  profession       Profession?     @relation(fields: [professionId], references: [id], onDelete: SetNull)
   companyName      String?         @db.VarChar(100)
   employmentTypeId Int?
-  employmentType   EmploymentType? @relation(fields: [employmentTypeId], references: [id], onDelete: SetNull)
   experienceId     Int?
-  experience       Experience?     @relation(fields: [experienceId], references: [id], onDelete: SetNull)
   ambitionId       Int?
-  ambition         Ambition?       @relation(fields: [ambitionId], references: [id], onDelete: SetNull)
   salaryRangeId    Int?
-  salaryRange      SalaryRange?    @relation(fields: [salaryRangeId], references: [id], onDelete: SetNull)
   bigDreams        String?         @db.VarChar(100)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation("UserEduWork", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  ambition         Ambition?       @relation(fields: [ambitionId], references: [id])
+  employmentType   EmploymentType? @relation(fields: [employmentTypeId], references: [id])
+  experience       Experience?     @relation(fields: [experienceId], references: [id])
+  profession       Profession?     @relation(fields: [professionId], references: [id])
+  salaryRange      SalaryRange?    @relation(fields: [salaryRangeId], references: [id])
+  user             User            @relation("UserEduWork", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([highestEdu])
   @@index([degree])
@@ -451,28 +363,28 @@ model UserEduWork {
 model UserFamilyProfile {
   id                   String        @id @default(uuid()) @db.Uuid
   userId               String        @unique @db.Uuid
-  user                 User          @relation("UserFamilyProfile", fields: [userId], references: [id], onDelete: Cascade)
   familyStatusId       Int?
-  familyStatus         MasterValue?  @relation("FamilyStatus", fields: [familyStatusId], references: [id])
   familyTypeId         Int?
-  familyType           MasterValue?  @relation("FamilyType", fields: [familyTypeId], references: [id])
   fatherOccupationId   Int?
-  fatherOccupation     MasterValue?  @relation("FatherOccupation", fields: [fatherOccupationId], references: [id])
   fatherOrganisationId Int?
-  fatherOrganisation   MasterValue?  @relation("FatherOrganisation", fields: [fatherOrganisationId], references: [id])
   motherOccupationId   Int?
-  motherOccupation     MasterValue?  @relation("MotherOccupation", fields: [motherOccupationId], references: [id])
   motherOrganisationId Int?
-  motherOrganisation   MasterValue?  @relation("MotherOrganisation", fields: [motherOrganisationId], references: [id])
   familyHomeId         Int?
-  familyHome           MasterValue?  @relation("FamilyHome", fields: [familyHomeId], references: [id])
   nativePlaceId        Int?
-  nativePlace          MasterValue?  @relation("NativePlace", fields: [nativePlaceId], references: [id])
   familyIncomeId       Int?
-  familyIncome         FamilyIncome? @relation(fields: [familyIncomeId], references: [id])
-  siblings             UserSibling[]
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+  familyHome           MasterValue?  @relation("FamilyHome", fields: [familyHomeId], references: [id])
+  familyIncome         FamilyIncome? @relation(fields: [familyIncomeId], references: [id])
+  familyStatus         MasterValue?  @relation("FamilyStatus", fields: [familyStatusId], references: [id])
+  familyType           MasterValue?  @relation("FamilyType", fields: [familyTypeId], references: [id])
+  fatherOccupation     MasterValue?  @relation("FatherOccupation", fields: [fatherOccupationId], references: [id])
+  fatherOrganisation   MasterValue?  @relation("FatherOrganisation", fields: [fatherOrganisationId], references: [id])
+  motherOccupation     MasterValue?  @relation("MotherOccupation", fields: [motherOccupationId], references: [id])
+  motherOrganisation   MasterValue?  @relation("MotherOrganisation", fields: [motherOrganisationId], references: [id])
+  nativePlace          MasterValue?  @relation("NativePlace", fields: [nativePlaceId], references: [id])
+  user                 User          @relation("UserFamilyProfile", fields: [userId], references: [id], onDelete: Cascade)
+  siblings             UserSibling[]
 
   @@index([familyStatusId])
   @@index([familyTypeId])
@@ -487,18 +399,15 @@ model UserFamilyProfile {
 model UserSibling {
   id              String            @id @default(uuid()) @db.Uuid
   familyProfileId String            @db.Uuid
-  familyProfile   UserFamilyProfile @relation(fields: [familyProfileId], references: [id], onDelete: Cascade)
   siblingTypeId   Int
+  maritalId       Int?
+  occupationId    Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  familyProfile   UserFamilyProfile @relation(fields: [familyProfileId], references: [id], onDelete: Cascade)
+  marital         MasterValue?      @relation("SiblingMarital", fields: [maritalId], references: [id])
+  occupation      MasterValue?      @relation("SiblingOccupation", fields: [occupationId], references: [id])
   siblingType     MasterValue       @relation("SiblingType", fields: [siblingTypeId], references: [id])
-
-  maritalId Int?
-  marital   MasterValue? @relation("SiblingMarital", fields: [maritalId], references: [id])
-
-  occupationId Int?
-  occupation   MasterValue? @relation("SiblingOccupation", fields: [occupationId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@map("user_siblings")
 }
@@ -507,49 +416,46 @@ model MasterCategory {
   id        Int           @id @default(autoincrement())
   code      String        @unique
   title     String
-  values    MasterValue[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+  values    MasterValue[]
 
   @@map("master_categories")
 }
 
 model MasterValue {
-  id         Int            @id @default(autoincrement())
-  categoryId Int
-  category   MasterCategory @relation(fields: [categoryId], references: [id])
-  value      String
-  priority   Int            @default(0)
-  active     Boolean        @default(true)
-  createdAt  DateTime       @default(now())
-
-  // UserFamilyProfile Relations
+  id                  Int                 @id @default(autoincrement())
+  categoryId          Int
+  value               String
+  priority            Int                 @default(0)
+  active              Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  category            MasterCategory      @relation(fields: [categoryId], references: [id])
+  familyHomes         UserFamilyProfile[] @relation("FamilyHome")
   familyStatuses      UserFamilyProfile[] @relation("FamilyStatus")
   familyTypes         UserFamilyProfile[] @relation("FamilyType")
   fatherOccupations   UserFamilyProfile[] @relation("FatherOccupation")
   fatherOrganisations UserFamilyProfile[] @relation("FatherOrganisation")
   motherOccupations   UserFamilyProfile[] @relation("MotherOccupation")
   motherOrganisations UserFamilyProfile[] @relation("MotherOrganisation")
-  siblingTypes        UserSibling[]       @relation("SiblingType")
-  siblingOccupations  UserSibling[]       @relation("SiblingOccupation")
-  siblingMaritals     UserSibling[]       @relation("SiblingMarital")
-  familyHomes         UserFamilyProfile[] @relation("FamilyHome")
   nativePlaces        UserFamilyProfile[] @relation("NativePlace")
+  siblingMaritals     UserSibling[]       @relation("SiblingMarital")
+  siblingOccupations  UserSibling[]       @relation("SiblingOccupation")
+  siblingTypes        UserSibling[]       @relation("SiblingType")
 
   @@index([categoryId])
   @@map("master_values")
 }
 
 model FamilyIncome {
-  id        Int      @id @default(autoincrement())
-  title     String   @db.VarChar(100)
-  minAmount Int?
-  maxAmount Int?
-  priority  Int      @default(0)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id           Int                 @id @default(autoincrement())
+  title        String              @db.VarChar(100)
+  minAmount    Int?
+  maxAmount    Int?
+  priority     Int                 @default(0)
+  active       Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   userProfiles UserFamilyProfile[]
 
   @@map("family_income")
@@ -559,9 +465,9 @@ model Profession {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   isActive     Boolean       @default(true)
-  userEduWorks UserEduWork[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  userEduWorks UserEduWork[]
 
   @@map("professions")
 }
@@ -570,21 +476,21 @@ model EmploymentType {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   isActive     Boolean       @default(true)
-  userEduWorks UserEduWork[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  userEduWorks UserEduWork[]
 
   @@map("employment_types")
 }
 
 model Experience {
   id           Int           @id @default(autoincrement())
-  title        String        @unique // Fresher, 1 yr exp, 3 yrs exp
+  title        String        @unique
   sortOrder    Int?
   isActive     Boolean       @default(true)
-  userEduWorks UserEduWork[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  userEduWorks UserEduWork[]
 
   @@map("experiences")
 }
@@ -593,63 +499,45 @@ model Ambition {
   id           Int           @id @default(autoincrement())
   title        String        @unique
   isActive     Boolean       @default(true)
-  userEduWorks UserEduWork[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  userEduWorks UserEduWork[]
 
   @@map("ambitions")
 }
 
 model SalaryRange {
   id           Int           @id @default(autoincrement())
-  title        String        @unique // ₹10–20 LPA
+  title        String        @unique
   minSalary    Int?
   maxSalary    Int?
   isActive     Boolean       @default(true)
-  userEduWorks UserEduWork[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  userEduWorks UserEduWork[]
 
   @@map("salary_ranges")
 }
 
-enum EducationLevel {
-  HIGH_SCHOOL
-  ITI
-  DIPLOMA
-  UNDERGRADUATE
-  BACHELOR
-  POSTGRADUATE
-  MASTER
-  MPHIL
-  PHD
-  POST_DOCTORATE
-}
-
 model Skill {
-  id   String @id @default(uuid()) @db.Uuid
-  name String @unique @db.VarChar(100)
-  slug String @unique @db.VarChar(100)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users UserSkill[]
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String      @unique @db.VarChar(100)
+  slug      String      @unique @db.VarChar(100)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  users     UserSkill[]
 
   @@index([name])
   @@map("skills")
 }
 
 model UserSkill {
-  id String @id @default(uuid()) @db.Uuid
-
-  userId  String @db.Uuid
-  skillId String @db.Uuid
-
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  skillId   String   @db.Uuid
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, skillId])
   @@index([userId])
@@ -687,7 +575,7 @@ model UserAnswer {
   user_id     String         @db.Uuid
   question_id String         @db.Uuid
   option_id   String
-  description String?        @db.Text
+  description String?
   created_at  DateTime       @default(now())
   option      QuestionOption @relation(fields: [option_id], references: [id], onDelete: Cascade)
   question    Question       @relation(fields: [question_id], references: [id], onDelete: Cascade)
@@ -713,11 +601,6 @@ model UserPhoto {
   @@map("user_photos")
 }
 
-enum MediaType {
-  IMAGE
-  VIDEO
-}
-
 model UserBio {
   user_id    String   @id @db.Uuid
   bio        String?  @db.VarChar(500)
@@ -734,22 +617,15 @@ model UserPrompt {
   promptId     String   @db.Uuid
   answer       String   @db.VarChar(300)
   displayOrder Int      @default(1)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, promptId])
   @@index([userId])
   @@index([promptId])
   @@map("user_prompts")
-}
-
-enum PromptVisibility {
-  EVERYONE
-  PREMIUM_AND_ABOVE
-  VIP_AND_ABOVE
-  ELITE_ONLY
 }
 
 model PromptCategory {
@@ -758,9 +634,9 @@ model PromptCategory {
   description String?  @db.VarChar(255)
   priority    Int      @default(0)
   active      Boolean  @default(true)
-  prompts     Prompt[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  prompts     Prompt[]
 
   @@map("prompt_categories")
 }
@@ -773,67 +649,40 @@ model Prompt {
   priority    Int              @default(0)
   maxLength   Int              @default(200)
   visibility  PromptVisibility @default(EVERYONE)
-  category    PromptCategory   @relation(fields: [categoryId], references: [id])
-  userPrompts UserPrompt[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+  category    PromptCategory   @relation(fields: [categoryId], references: [id])
+  userPrompts UserPrompt[]
 
   @@index([categoryId])
   @@index([active])
   @@map("prompts")
 }
 
-enum VerificationType {
-  GOVERNMENT_ID
-  FACE_VERIFICATION
-  VIDEO_VERIFICATION
-  EDUCATION_VERIFICATION
-  PROFESSIONAL_VERIFICATION
-  CRIMINAL_BACKGROUND_CHECK
-  EMERGENCY_CONTACT
-  INCOME_VERIFICATION
-}
-
-enum VerificationStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  VERIFIED
-  REJECTED
-  EXPIRED
-  LOCKED
-}
-
-enum GovernmentIdType {
-  AADHAAR
-  PAN
-  DRIVING_LICENSE
-}
-
 model UserVerification {
-  id                   String             @id @default(uuid()) @db.Uuid
-  userId               String             @db.Uuid
-  type                 VerificationType
-  status               VerificationStatus @default(NOT_STARTED)
-  points               Int                @default(0)
-  maxPoints            Int
-  verifiedName         String?
-  governmentIdType     GovernmentIdType?
-  governmentIdPhotoKey String?
-  startedAt            DateTime?
-  verifiedAt           DateTime?
-  expiresAt            DateTime?
-  provider             String?
-  providerRef          String?
-  rejectionReason      String?
-  metadata             Json?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-
-  attempts                       GovernmentIdAttempt[]
-  employmentVerifications        EmploymentVerification?
+  id                             String                          @id @default(uuid()) @db.Uuid
+  userId                         String                          @db.Uuid
+  type                           VerificationType
+  status                         VerificationStatus              @default(NOT_STARTED)
+  points                         Int                             @default(0)
+  maxPoints                      Int
+  governmentIdType               GovernmentIdType?
+  startedAt                      DateTime?
+  verifiedAt                     DateTime?
+  expiresAt                      DateTime?
+  provider                       String?
+  providerRef                    String?
+  rejectionReason                String?
+  metadata                       Json?
+  createdAt                      DateTime                        @default(now())
+  updatedAt                      DateTime                        @updatedAt
+  governmentIdPhotoKey           String?
+  verifiedName                   String?
   educationVerification          EducationVerification?
-  manualGovernmentIdVerification ManualGovernmentIdVerification?
+  employmentVerifications        EmploymentVerification?
+  attempts                       GovernmentIdAttempt[]
   incomeVerification             IncomeVerification?
+  manualGovernmentIdVerification ManualGovernmentIdVerification?
   user                           User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
@@ -841,16 +690,6 @@ model UserVerification {
   @@index([type])
   @@index([status])
   @@map("user_verifications")
-}
-
-enum GovernmentIdAttemptStatus {
-  INITIATING
-  PENDING
-  AUTHORIZED
-  DENIED
-  VERIFIED
-  FAILED
-  EXPIRED
 }
 
 model GovernmentIdAttempt {
@@ -870,9 +709,8 @@ model GovernmentIdAttempt {
   failureReason     String?
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
-
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification      UserVerification          @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([verificationId, status])
@@ -896,9 +734,8 @@ model ManualGovernmentIdVerification {
   rejectionReason String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
-
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification    UserVerification   @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([documentType])
@@ -922,22 +759,12 @@ model EmploymentVerification {
   rejectionReason    String?
   createdAt          DateTime                     @default(now())
   updatedAt          DateTime                     @updatedAt
-
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  user               User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification       UserVerification             @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([verificationId])
   @@index([status])
-}
-
-enum EmploymentVerificationStatus {
-  NOT_STARTED
-  PENDING
-  UNDER_REVIEW
-  VERIFIED
-  REJECTED
-  EXPIRED
 }
 
 model EducationVerification {
@@ -959,9 +786,8 @@ model EducationVerification {
   rejectionReason     String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
-
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification        UserVerification   @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -985,35 +811,21 @@ model IncomeVerification {
   rejectionReason      String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
-
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verification UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification         UserVerification   @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([proofType])
   @@map("income_verifications")
 }
 
-enum IncomeProofType {
-  SALARY_SLIP
-  FORM_16
-  ITR
-  BANK_STATEMENT
-  EMPLOYMENT_LETTER
-  BUSINESS_INCOME_PROOF
-  OTHER
-}
-
 model UserBlock {
   id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
   blockerId String   @db.Uuid
   blockedId String   @db.Uuid
-  createdAt DateTime @default(now())
-
-  // Relations
-  blocker User @relation("UserBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
-
-  blocked User @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker   User     @relation("UserBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
@@ -1021,21 +833,20 @@ model UserBlock {
 }
 
 model UserReport {
-  id          String       @id @default(uuid()) @db.Uuid
-  reporterId  String       @db.Uuid
-  reportedId  String       @db.Uuid
-  reason      String       @db.VarChar(100)
-  description String?      @db.VarChar(300)
-  status      ReportStatus @default(PENDING)
-  adminNote   String?      @db.Text
-  reviewedBy  String?      @db.Uuid
-  reviewedAt  DateTime?
-  actionTaken ReportAction @default(NONE)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  reporter     User @relation("ReportsCreated", fields: [reporterId], references: [id], onDelete: Cascade)
-  reportedUser User @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid()) @db.Uuid
+  createdAt    DateTime     @default(now())
+  actionTaken  ReportAction @default(NONE)
+  adminNote    String?
+  description  String?      @db.VarChar(300)
+  reason       String       @db.VarChar(100)
+  reviewedAt   DateTime?
+  reviewedBy   String?      @db.Uuid
+  status       ReportStatus @default(PENDING)
+  updatedAt    DateTime     @updatedAt
+  reporterId   String       @db.Uuid
+  reportedId   String       @db.Uuid
+  reportedUser User         @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+  reporter     User         @relation("ReportsCreated", fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@unique([reporterId, reportedId])
   @@index([reportedId])
@@ -1043,22 +854,6 @@ model UserReport {
   @@index([status])
   @@index([reason])
   @@index([createdAt])
-}
-
-enum ReportStatus {
-  PENDING
-  UNDER_REVIEW
-  RESOLVED
-  DISMISSED
-}
-
-enum ReportAction {
-  NONE
-  WARNING
-  CONTENT_REMOVED
-  ACCOUNT_RESTRICTED
-  ACCOUNT_SUSPENDED
-  ACCOUNT_BANNED
 }
 
 model UserSwipe {
@@ -1089,10 +884,10 @@ model UserMatch {
   last_message_at DateTime?
   is_active       Boolean   @default(true)
   is_deleted      Boolean   @default(false)
+  unmatch_note    String?
+  unmatch_reason  String?
   unmatched_at    DateTime?
   unmatched_by    String?   @db.Uuid
-  unmatch_reason  String?   @db.Text
-  unmatch_note    String?   @db.Text
   user1           User      @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
   user2           User      @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
 
@@ -1113,9 +908,9 @@ model Intention {
   description String?
   sortOrder   Int               @default(0)
   isActive    Boolean           @default(true)
-  options     IntentionOption[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+  options     IntentionOption[]
 }
 
 model IntentionOption {
@@ -1123,31 +918,28 @@ model IntentionOption {
   option         String
   optDescription String?
   intentionId    String    @db.Uuid
+  createdAt      DateTime  @default(now())
   intention      Intention @relation(fields: [intentionId], references: [id], onDelete: Cascade)
   users          User[]
-  createdAt      DateTime  @default(now())
 }
 
 model Boost {
-  id                     String    @id @default(uuid()) @db.Uuid
-  name                   BoostType @unique
+  id                     String        @id @default(uuid()) @db.Uuid
+  name                   BoostType     @unique
   title                  String
   description            String?
-  is_active              Boolean   @default(true)
-  // New fields - different for each BoostType
-  boostDuration          Int       @default(30)
-  singleBoostWalletPrice Decimal   @default(60) @db.Decimal(10, 2)
-  visibilityMultiplier   Int       @default(10)
-
-  // Existing fields
-  whyBoostWorks     Json?
-  boostVsSuperBoost Json?
-  benefits          Json?
-  created_at        DateTime      @default(now())
-  updated_at        DateTime      @updatedAt
-  options           BoostOption[]
-  userBoosts        UserBoost[]
-  usages            BoostUsage[]
+  is_active              Boolean       @default(true)
+  boostDuration          Int           @default(30)
+  singleBoostWalletPrice Decimal       @default(60) @db.Decimal(10, 2)
+  visibilityMultiplier   Int           @default(10)
+  whyBoostWorks          Json?
+  boostVsSuperBoost      Json?
+  created_at             DateTime      @default(now())
+  updated_at             DateTime      @updatedAt
+  benefits               Json?
+  options                BoostOption[]
+  usages                 BoostUsage[]
+  userBoosts             UserBoost[]
 
   @@map("boosts")
 }
@@ -1167,36 +959,33 @@ model BoostOption {
   is_active        Boolean         @default(true)
   created_at       DateTime        @default(now())
   updated_at       DateTime        @updatedAt
+  BoostPurchase    BoostPurchase[]
   boost            Boost           @relation(fields: [boost_id], references: [id], onDelete: Cascade)
   userBoosts       UserBoost[]
-  BoostPurchase    BoostPurchase[]
 
   @@index([boost_id])
   @@map("boost_options")
 }
 
 model UserBoost {
-  id String @id @default(uuid()) @db.Uuid
-
-  user_id          String    @db.Uuid
-  boostId          String?   @db.Uuid
-  boost_option_id  String?   @db.Uuid
-  total_boosts     Int       @default(0)
+  id               String       @id @default(uuid()) @db.Uuid
+  user_id          String       @db.Uuid
+  boostId          String?      @db.Uuid
+  boost_option_id  String?      @db.Uuid
+  total_boosts     Int          @default(0)
   remaining_boosts Int
-  weeklyLimit      Int       @default(0)
+  weeklyLimit      Int          @default(0)
   last_reset_at    DateTime
   next_reset_at    DateTime
-  start_at         DateTime  @default(now())
+  start_at         DateTime     @default(now())
   expires_at       DateTime?
-  is_active        Boolean   @default(true)
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
-
-  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  Boost       Boost?       @relation(fields: [boostId], references: [id])
-  boostOption BoostOption? @relation(fields: [boost_option_id], references: [id])
-
-  usages BoostUsage[]
+  is_active        Boolean      @default(true)
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+  usages           BoostUsage[]
+  Boost            Boost?       @relation(fields: [boostId], references: [id])
+  boostOption      BoostOption? @relation(fields: [boost_option_id], references: [id])
+  user             User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([boost_option_id])
@@ -1204,40 +993,39 @@ model UserBoost {
 }
 
 model BoostUsage {
-  id String @id @default(uuid()) @db.Uuid
-
+  id                 String                  @id @default(uuid()) @db.Uuid
   user_boost_id      String                  @db.Uuid
   user_id            String                  @db.Uuid
-  boost_id           String?                 @db.Uuid
-  boost_type         BoostType?
-  title              String?
-  display_name       String?
-  duration           Int // minutes
+  duration           Int
   started_at         DateTime                @default(now())
   ended_at           DateTime?
-  expected_end_at    DateTime
-  status             BoostUsageStatus        @default(ACTIVE)
   is_active          Boolean                 @default(true)
-  total_impressions  Int                     @default(0)
   total_views        Int                     @default(0)
   total_likes        Int                     @default(0)
-  total_superlikes   Int                     @default(0)
   total_interests    Int                     @default(0)
-  total_matches      Int                     @default(0)
   total_reach        Int                     @default(0)
+  created_at         DateTime                @default(now())
+  baseline_interests Int                     @default(0)
+  baseline_likes     Int                     @default(0)
   baseline_reach     Int                     @default(0)
   baseline_views     Int                     @default(0)
-  baseline_likes     Int                     @default(0)
-  baseline_interests Int                     @default(0)
-  created_at         DateTime                @default(now())
+  boost_id           String?                 @db.Uuid
+  boost_type         BoostType?
+  display_name       String?
+  expected_end_at    DateTime
+  status             BoostUsageStatus        @default(ACTIVE)
+  title              String?
+  total_impressions  Int                     @default(0)
+  total_matches      Int                     @default(0)
+  total_superlikes   Int                     @default(0)
   updated_at         DateTime                @updatedAt
-  userBoost          UserBoost               @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
-  user               User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  boost              Boost?                  @relation(fields: [boost_id], references: [id])
+  demographicStats   BoostDemographicStats[]
   boostEvents        BoostEvent[]
   hourlyStats        BoostHourlyStats[]
-  demographicStats   BoostDemographicStats[]
   reachUsers         BoostReachUser[]
+  boost              Boost?                  @relation(fields: [boost_id], references: [id])
+  userBoost          UserBoost               @relation(fields: [user_boost_id], references: [id], onDelete: Cascade)
+  user               User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([user_boost_id])
@@ -1251,24 +1039,23 @@ model BoostUsage {
 model UserBoostStats {
   id                  String    @id @default(uuid()) @db.Uuid
   user_id             String    @unique @db.Uuid
-  total_boosts        Int       @default(0)
-  total_impressions   Int       @default(0)
-  total_reach         Int       @default(0)
   total_views         Int       @default(0)
   total_likes         Int       @default(0)
-  total_superlikes    Int       @default(0)
   total_interests     Int       @default(0)
-  total_matches       Int       @default(0)
-  total_boost_minutes Int       @default(0)
+  total_reach         Int       @default(0)
   last_boost_at       DateTime?
+  total_boost_minutes Int       @default(0)
+  total_boosts        Int       @default(0)
+  total_impressions   Int       @default(0)
+  total_matches       Int       @default(0)
+  total_superlikes    Int       @default(0)
   user                User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("user_boost_stats")
 }
 
 model BoostHourlyStats {
-  id String @id @default(uuid()) @db.Uuid
-
+  id                   String     @id @default(uuid()) @db.Uuid
   boost_usage_id       String     @db.Uuid
   hour                 DateTime
   impressions          Int        @default(0)
@@ -1314,8 +1101,8 @@ model BoostReachUser {
   first_seen_at    DateTime   @default(now())
   last_seen_at     DateTime   @default(now())
   impression_count Int        @default(1)
-  boostUsage       BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
   actor            User       @relation(fields: [actor_id], references: [id], onDelete: Cascade)
+  boostUsage       BoostUsage @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
 
   @@unique([boost_usage_id, actor_id])
   @@index([boost_usage_id])
@@ -1323,45 +1110,18 @@ model BoostReachUser {
   @@map("boost_reach_users")
 }
 
-enum BoostDemographicType {
-  LOCATION
-  PROFESSION
-  RELIGION
-  COMMUNITY
-  AGE_GROUP
-  VERIFIED
-  GENDER
-}
-
-enum BoostUsageStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-  EXPIRED
-}
-
-enum BoostEventType {
-  IMPRESSION
-  PROFILE_VIEW
-  LIKE
-  SUPERLIKE
-  INTEREST
-  MATCH
-  PASS
-}
-
 model BoostEvent {
   id             String         @id @default(uuid()) @db.Uuid
   boost_usage_id String         @db.Uuid
-  user_id        String         @db.Uuid // boosted user
-  actor_id       String         @db.Uuid // who performed action
-  event_type     BoostEventType
-  source         String?
-  metadata       Json?
+  user_id        String         @db.Uuid
+  actor_id       String         @db.Uuid
   created_at     DateTime       @default(now())
+  metadata       Json?
+  source         String?
+  event_type     BoostEventType
+  actor          User           @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
   boostUsage     BoostUsage     @relation(fields: [boost_usage_id], references: [id], onDelete: Cascade)
   user           User           @relation("BoostedUser", fields: [user_id], references: [id], onDelete: Cascade)
-  actor          User           @relation("ActorUser", fields: [actor_id], references: [id], onDelete: Cascade)
 
   @@index([boost_usage_id])
   @@index([user_id])
@@ -1382,11 +1142,11 @@ model BoostPurchase {
   paymentMethod       PurchasePaymentMethod
   paymentId           String?
   walletTransactionId String?               @db.Uuid
-  payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
-  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
   createdAt           DateTime              @default(now())
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   boostOption         BoostOption           @relation(fields: [boostOptionId], references: [id])
+  payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
   BoostTransaction    BoostTransaction[]
 
   @@index([userId])
@@ -1401,77 +1161,51 @@ model BoostTransaction {
   boostBalanceAfter Int
   purchaseId        String?              @db.Uuid
   createdAt         DateTime             @default(now())
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   purchase          BoostPurchase?       @relation(fields: [purchaseId], references: [id])
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([type])
 }
 
-enum BoostTransactionType {
-  PACKAGE_CREDIT
-  PURCHASE
-  USE
-  REFUND
-  EXPIRE
-  ADMIN_ADD
-  ADMIN_REMOVE
-}
-
-enum EventType {
-  VIEW
-  LIKE
-  INTEREST
-  REACH
-}
-
 model Package {
-  id             String      @id @default(uuid()) @db.Uuid
-  name           PackageType @unique
-  slug           String      @unique
-  tagline        String?
-  badgeLabel     String?
-  discoveryPool  String?
-  visibilityRule String?
-  description    String?
-  isPopular      Boolean     @default(false)
-  active         Boolean     @default(true)
-  sortOrder      Int         @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  prices              PackagePrice[]
+  id                  String         @id @default(uuid()) @db.Uuid
+  name                PackageType    @unique
+  slug                String         @unique
+  tagline             String?
+  badgeLabel          String?
+  discoveryPool       String?
+  visibilityRule      String?
+  description         String?
+  isPopular           Boolean        @default(false)
+  active              Boolean        @default(true)
+  sortOrder           Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
   limits              PlanLimit[]
-  UserPackage         UserPackage[]  @relation("packageRelation")
+  prices              PackagePrice[]
   currentUserPackages UserPackage[]  @relation("currentPackageRelation")
+  UserPackage         UserPackage[]  @relation("packageRelation")
 
   @@map("package")
 }
 
-enum PackageType {
-  PREMIUM
-  VIP
-  VIP_ELITE
-}
-
 model PackagePrice {
-  id              String       @id @default(uuid()) @db.Uuid
-  packageId       String       @db.Uuid
-  package         Package      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  id              String          @id @default(uuid()) @db.Uuid
+  packageId       String          @db.Uuid
   billingCycle    BillingCycle
   months          Int?
-  price           Decimal      @db.Decimal(10, 2)
-  originalPrice   Decimal?     @db.Decimal(10, 2)
+  price           Decimal         @db.Decimal(10, 2)
+  originalPrice   Decimal?        @db.Decimal(10, 2)
   discountPercent Int?
-  isHighlighted   Boolean      @default(false)
-  active          Boolean      @default(true)
-
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  UserPackage    UserPackage[]
-  inAppProducts  InAppProduct[]
-  inAppPurchases InAppPurchase[]
+  isHighlighted   Boolean         @default(false)
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  inAppProducts   InAppProduct[]
+  inAppPurchases  InAppPurchase[]
+  package         Package         @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  UserPackage     UserPackage[]
 
   @@unique([packageId, billingCycle])
   @@index([packageId])
@@ -1483,14 +1217,14 @@ model PackagePrograms {
   packageType  PackageType
   title        String
   tagline      String?
-  description  String?                     @db.Text
+  description  String?
   tags         String[]                    @default([])
-  condition    String?                     @db.Text
-  destinations PackageProgramDestination[]
+  condition    String?
   isActive     Boolean                     @default(true)
   sortOrder    Int                         @default(0)
   createdAt    DateTime                    @default(now())
   updatedAt    DateTime                    @updatedAt
+  destinations PackageProgramDestination[]
 
   @@index([packageType, isActive])
   @@map("package_programs")
@@ -1510,47 +1244,6 @@ model PackageProgramDestination {
 
   @@index([programId])
   @@map("package_program_destinations")
-}
-
-enum BillingCycle {
-  MONTHLY
-  QUARTERLY
-  HALF_YEARLY
-  YEARLY
-  LIFETIME
-}
-
-enum FeatureCategory {
-  CHAT
-  TRUST
-  STATUS_BADGES
-  REAL_LIFE_EVENTS
-  PERKS
-  FOREVER_LOVE_PROGRAMME
-  PREMIUM_EXPERIENCES
-  NETWORKING_GROWTH
-  EVERYTHING_IN_VIP
-  MAXIMUM_PRIVACY
-  CURATED_ELITE_MATCHING
-  ELITE_STATUS
-  WHITE_GLOVE_EXPERIENCES
-  GLOBAL_EXPERIENCES
-  EXECUTIVE_NETWORK
-  MATCH_DISCOVERY
-  PRIVACY
-  STAND_OUT_INSTANTLY
-  MEET_IN_REAL_LIFE
-  REWARDS_FOR_SERIOUS_DATERS
-  ELITE_ACCESS
-  STATUS_PRIVACY
-  VIP_PERKS
-  EVERYTHING_IN_VIP_AND_MORE
-  ABSOLUTE_PRIVACY
-  SMARTER_CURATED_MATCHES
-  STATUS_THAT_SPEAKS_FIRST
-  WHITE_GLOVE_DATING
-  THE_WORLD_CURATED
-  AN_EXECUTIVE_CIRCLE
 }
 
 model PackageFeature {
@@ -1575,14 +1268,14 @@ model PlanLimit {
   id          String         @id @default(uuid()) @db.Uuid
   packageId   String         @db.Uuid
   featureId   String         @db.Uuid
-  package     Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  feature     PackageFeature @relation(fields: [featureId], references: [id])
   enabled     Boolean        @default(false)
   unlimited   Boolean        @default(false)
   limit       Int?
   resetPeriod ResetPeriod    @default(NONE)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  feature     PackageFeature @relation(fields: [featureId], references: [id])
+  package     Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
   @@unique([packageId, featureId])
   @@index([packageId])
@@ -1590,41 +1283,30 @@ model PlanLimit {
   @@map("plan_limits")
 }
 
-enum ResetPeriod {
-  NONE
-  DAILY
-  WEEKLY
-  MONTHLY
-  YEARLY
-}
-
 model UserPackage {
-  id                    String        @id @default(uuid()) @db.Uuid
-  user_id               String        @db.Uuid
-  packageId             String        @db.Uuid
-  priceId               String        @db.Uuid
+  id                    String          @id @default(uuid()) @db.Uuid
+  user_id               String          @db.Uuid
+  packageId             String          @db.Uuid
+  priceId               String          @db.Uuid
   purchasePrice         Decimal
   purchaseOriginalPrice Decimal?
   purchaseDiscount      Int?
   startDate             DateTime
   endDate               DateTime?
-  status                PackageStatus @default(ACTIVE)
-  autoRenew             Boolean       @default(false)
-  // Auto-renew cancellation
+  status                PackageStatus   @default(ACTIVE)
+  autoRenew             Boolean         @default(false)
+  paymentId             String?         @db.Uuid
+  currentPackageId      String?         @db.Uuid
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
   autoRenewCancelReason String?
   autoRenewCancelledAt  DateTime?
-  paymentId             String?       @db.Uuid
-  payment               Payment?      @relation(fields: [paymentId], references: [id])
-  currentPackageId      String?       @db.Uuid
-  currentPackage        Package?      @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user           User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  package        Package         @relation("packageRelation", fields: [packageId], references: [id])
-  price          PackagePrice    @relation(fields: [priceId], references: [id])
-  inAppPurchases InAppPurchase[]
+  inAppPurchases        InAppPurchase[]
+  currentPackage        Package?        @relation("currentPackageRelation", fields: [currentPackageId], references: [id])
+  package               Package         @relation("packageRelation", fields: [packageId], references: [id])
+  payment               Payment?        @relation(fields: [paymentId], references: [id])
+  price                 PackagePrice    @relation(fields: [priceId], references: [id])
+  user                  User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([packageId])
@@ -1642,8 +1324,8 @@ model UserPlanUsage {
   lastUsedAt DateTime?
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
-  user       User           @relation(fields: [userId], references: [id])
   feature    PackageFeature @relation(fields: [featureId], references: [id])
+  user       User           @relation(fields: [userId], references: [id])
 
   @@unique([userId, featureId])
   @@index([userId])
@@ -1663,9 +1345,9 @@ model UserRose {
   unlockedAt       DateTime?
   expiresAt        DateTime?
   createdAt        DateTime     @default(now())
-  sender           User         @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver         User         @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   chatMessage      ChatMessage?
+  receiver         User         @relation("RoseReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender           User         @relation("RoseSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([senderId])
   @@index([receiverId])
@@ -1696,10 +1378,10 @@ model RosePurchase {
   paymentMethod       PurchasePaymentMethod
   paymentId           String?
   walletTransactionId String?               @db.Uuid
-  payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
-  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
   createdAt           DateTime              @default(now())
+  payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
   user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
   RoseTransaction     RoseTransaction[]
 
   @@index([userId])
@@ -1714,21 +1396,11 @@ model RoseTransaction {
   roseBalanceAfter Int
   purchaseId       String?             @db.Uuid
   createdAt        DateTime            @default(now())
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   purchase         RosePurchase?       @relation(fields: [purchaseId], references: [id])
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([type])
-}
-
-enum RoseTransactionType {
-  PACKAGE_CREDIT
-  PURCHASE
-  PACKAGE_SEND
-  PURCHASE_SEND
-  REFUND
-  ADMIN_CREDIT
-  ADMIN_DEBIT
 }
 
 model UserCompliment {
@@ -1738,14 +1410,14 @@ model UserCompliment {
   targetType  TargetType?
   targetId    String?          @db.Uuid
   ideaId      String?
-  idea        ComplimentIdea?  @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   message     String?          @db.VarChar(140)
   status      ComplimentStatus @default(PENDING)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  sender      User             @relation("ComplimentSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver    User             @relation("ComplimentReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   chatMessage ChatMessage?
+  idea        ComplimentIdea?  @relation(fields: [ideaId], references: [id])
+  receiver    User             @relation("ComplimentReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender      User             @relation("ComplimentSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([senderId])
   @@index([receiverId, status])
@@ -1778,10 +1450,10 @@ model ComplimentPurchase {
   paymentMethod       PurchasePaymentMethod
   paymentId           String?
   walletTransactionId String?                 @db.Uuid
-  payment             Payment?                @relation(fields: [paymentId], references: [payment_id])
-  walletTransaction   WalletTransaction?      @relation(fields: [walletTransactionId], references: [id])
   createdAt           DateTime                @default(now())
+  payment             Payment?                @relation(fields: [paymentId], references: [payment_id])
   user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransaction   WalletTransaction?      @relation(fields: [walletTransactionId], references: [id])
   transactions        ComplimentTransaction[]
 
   @@index([userId])
@@ -1796,22 +1468,12 @@ model ComplimentTransaction {
   complimentBalanceAfter Int
   purchaseId             String?                   @db.Uuid
   createdAt              DateTime                  @default(now())
-  user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   purchase               ComplimentPurchase?       @relation(fields: [purchaseId], references: [id])
+  user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([type])
   @@index([userId, createdAt])
-}
-
-enum ComplimentTransactionType {
-  PACKAGE_CREDIT
-  PURCHASE
-  PACKAGE_SEND
-  PURCHASE_SEND
-  REFUND
-  ADMIN_CREDIT
-  ADMIN_DEBIT
 }
 
 model UserGift {
@@ -1825,22 +1487,1508 @@ model UserGift {
   targetType          TargetType?
   targetId            String?            @db.Uuid
   walletTransactionId String?            @unique @db.Uuid
-  walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
   requiredMessages    Int                @default(1)
   messagesSent        Int                @default(0)
   isUnlocked          Boolean            @default(false)
   unlockedAt          DateTime?
   expiresAt           DateTime
   createdAt           DateTime           @default(now())
-  sender              User               @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver            User               @relation("GiftReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  gift                Gift               @relation(fields: [giftId], references: [id])
   chatMessage         ChatMessage?
+  gift                Gift               @relation(fields: [giftId], references: [id])
+  receiver            User               @relation("GiftReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender              User               @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
+  walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id])
 
   @@index([receiverId])
   @@index([senderId])
   @@index([giftId])
   @@index([receiverId, senderId, isUnlocked, expiresAt])
+}
+
+model Payment {
+  id                 String               @id @default(uuid()) @db.Uuid
+  userId             String               @db.Uuid
+  amount             Decimal              @db.Decimal(10, 2)
+  currency           String               @default("INR")
+  payment_id         String?              @unique
+  transactionId      String?
+  status             PaymentStatus        @default(PENDING)
+  purpose            PaymentPurpose
+  referenceId        String?              @db.Uuid
+  packagePriceId     String?              @db.Uuid
+  gatewayResponse    Json?
+  paidAt             DateTime?
+  created_at         DateTime             @default(now())
+  BoostPurchase      BoostPurchase[]
+  ComplimentPurchase ComplimentPurchase[]
+  eventbooking       EventBooking?
+  RosePurchase       RosePurchase[]
+  DatePlanPurchase   DatePlanPurchase[]
+  inAppPurchase      InAppPurchase?
+  UserPackage        UserPackage[]
+  waitlist           Waitlist?
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  sender_id   String           @db.Uuid
+  receiver_id String           @db.Uuid
+  type        NotificationType
+  title       String
+  message     String
+  data        Json?
+  is_read     Boolean          @default(false)
+  created_at  DateTime         @default(now())
+  readAt      DateTime?
+  receiver    User             @relation("ReceivedNotifications", fields: [receiver_id], references: [id], onDelete: Cascade)
+  sender      User             @relation("SentNotifications", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([receiver_id])
+  @@index([sender_id])
+  @@index([receiver_id, is_read])
+}
+
+model UserNotificationSetting {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @unique @db.Uuid
+  isEnabled         Boolean   @default(true)
+  mutedUntil        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  eventsEnabled     Boolean   @default(true)
+  likesRosesEnabled Boolean   @default(true)
+  messagesEnabled   Boolean   @default(true)
+  newMatchesEnabled Boolean   @default(true)
+  promotionsEnabled Boolean   @default(true)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserNotificationMute {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  mutedUserId String    @db.Uuid
+  isMuted     Boolean   @default(true)
+  mutedUntil  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  mutedUser   User      @relation("NotificationMutedUser", fields: [mutedUserId], references: [id], onDelete: Cascade)
+  user        User      @relation("NotificationMuteOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mutedUserId])
+  @@index([mutedUserId])
+}
+
+model DatePlanPackage {
+  id           String   @id @default(uuid()) @db.Uuid
+  title        String
+  description  String?
+  planCount    Int
+  price        Decimal  @db.Decimal(10, 2)
+  pricePerPlan Decimal  @db.Decimal(10, 2)
+  discount     Int?
+  isPopular    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isBestValue  Boolean  @default(false)
+}
+
+model DatePlanPackageInfo {
+  id                String   @id @default(uuid()) @db.Uuid
+  howOnePlanWorks   Json?
+  whyPeopleBuyPlans Json?
+  goodToKnow        Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DatePlanPackageFeatures {
+  id                     String   @id @default(uuid()) @db.Uuid
+  costToPostPlan         Decimal  @default(100) @db.Decimal(10, 2)
+  costToPostPlanActive   Boolean  @default(true)
+  costToPostPlanPaidOnly Boolean  @default(false)
+  planBoostPrice         Decimal  @default(40) @db.Decimal(10, 2)
+  planBoostActive        Boolean  @default(true)
+  planBoostPaidOnly      Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model DatePlanOption {
+  id                     String            @id @default(uuid()) @db.Uuid
+  type                   OptionType
+  label                  String
+  value                  String?
+  icon                   String?
+  sortOrder              Int               @default(0)
+  isActive               Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  activityPlans          DatePlan[]        @relation("PlanActivity")
+  joinRequestGenderPlans DatePlan[]        @relation("PlanJoinRequestGender")
+  quickTitlePlans        DatePlan[]        @relation("PlanQuickTitle")
+  visibilityPlans        DatePlan[]        @relation("PlanVisibility")
+  whoPaysPlans           DatePlan[]        @relation("PlanWhoPays")
+  datePlanRequests       DatePlanRequest[] @relation("DatePlanRequestBillSuggestion")
+  vibePlans              DatePlanVibe[]
+
+  @@index([type, isActive])
+}
+
+model DatePlan {
+  id                  String              @id @default(uuid()) @db.Uuid
+  userId              String              @db.Uuid
+  activityId          String              @db.Uuid
+  title               String?
+  quickTitleId        String?             @db.Uuid
+  note                String?
+  photoUrl            String?
+  venueName           String?
+  venueAddress        String?
+  venueLat            Float?
+  venueLng            Float?
+  duration            Int?
+  whoPaysId           String?             @db.Uuid
+  participantLimit    Int?
+  joinRequestGenderId String?             @db.Uuid
+  visibilityId        String?             @db.Uuid
+  status              PlanStatus          @default(DRAFT)
+  eventDateTime       DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  verifiedMembersOnly Boolean             @default(false)
+  chatMessages        ChatMessage[]       @relation("DatePlanChatMessages")
+  DateConfirmed       DateConfirmed[]
+  activity            DatePlanOption      @relation("PlanActivity", fields: [activityId], references: [id])
+  joinRequestGender   DatePlanOption?     @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
+  quickTitle          DatePlanOption?     @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
+  user                User                @relation(fields: [userId], references: [id])
+  visibility          DatePlanOption?     @relation("PlanVisibility", fields: [visibilityId], references: [id])
+  whoPays             DatePlanOption?     @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
+  feedbacks           DatePlanFeedback[]
+  reports             DatePlanReport[]
+  requests            DatePlanRequest[]
+  skips               DatePlanSkip[]
+  userBoosts          DatePlanUserBoost[]
+  vibes               DatePlanVibe[]
+
+  @@index([userId])
+  @@index([activityId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DatePlanVibe {
+  id     String         @id @default(uuid())
+  planId String         @db.Uuid
+  vibeId String         @db.Uuid
+  plan   DatePlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  vibe   DatePlanOption @relation(fields: [vibeId], references: [id])
+
+  @@unique([planId, vibeId])
+  @@index([vibeId])
+}
+
+model DatePlanRequest {
+  id               String                @id @default(uuid())
+  planId           String                @db.Uuid
+  requesterId      String                @db.Uuid
+  status           DatePlanRequestStatus @default(PENDING)
+  message          String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  billSuggestionId String?               @db.Uuid
+  billSuggestion   DatePlanOption?       @relation("DatePlanRequestBillSuggestion", fields: [billSuggestionId], references: [id])
+  plan             DatePlan              @relation(fields: [planId], references: [id], onDelete: Cascade)
+  requester        User                  @relation(fields: [requesterId], references: [id])
+
+  @@unique([planId, requesterId])
+  @@index([planId])
+  @@index([requesterId])
+  @@index([status])
+}
+
+model DatePlanSkip {
+  id        String   @id @default(uuid())
+  userId    String   @db.Uuid
+  planId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  plan      DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, planId])
+  @@index([userId])
+  @@index([planId])
+}
+
+model DateConfirmed {
+  id            String              @id @default(uuid()) @db.Uuid
+  planId        String              @db.Uuid
+  hostUserId    String              @db.Uuid
+  participantId String              @db.Uuid
+  title         String?
+  venueName     String?
+  venueAddress  String?
+  eventDateTime DateTime
+  status        ConfirmedDateStatus
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  host          User                @relation("ConfirmedDateHost", fields: [hostUserId], references: [id])
+  participant   User                @relation("ConfirmedDateParticipant", fields: [participantId], references: [id])
+  plan          DatePlan            @relation(fields: [planId], references: [id])
+}
+
+model DatePlanFeedback {
+  id               String                   @id @default(uuid()) @db.Uuid
+  planId           String                   @db.Uuid
+  reviewerId       String                   @db.Uuid
+  attendanceStatus DatePlanAttendanceStatus
+  metUserId        String?                  @db.Uuid
+  overallRating    Int?
+  personRating     Int?
+  noShowReason     DatePlanNoShowReason?
+  comment          String?
+  status           DatePlanFeedbackStatus   @default(SUBMITTED)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  metUser          User?                    @relation("DatePlanFeedbackMetUser", fields: [metUserId], references: [id])
+  plan             DatePlan                 @relation(fields: [planId], references: [id], onDelete: Cascade)
+  reviewer         User                     @relation("DatePlanFeedbackReviewer", fields: [reviewerId], references: [id])
+  experienceTags   DatePlanFeedbackTag[]
+
+  @@unique([planId, reviewerId])
+  @@index([planId])
+  @@index([reviewerId])
+  @@index([metUserId])
+  @@index([attendanceStatus])
+  @@index([createdAt])
+}
+
+model DatePlanFeedbackTag {
+  id         String                @id @default(uuid()) @db.Uuid
+  feedbackId String                @db.Uuid
+  tag        DatePlanExperienceTag
+  feedback   DatePlanFeedback      @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@unique([feedbackId, tag])
+  @@index([tag])
+}
+
+model DatePlanReport {
+  id             String               @id @default(uuid()) @db.Uuid
+  planId         String               @db.Uuid
+  reporterId     String               @db.Uuid
+  reportedUserId String               @db.Uuid
+  reason         DatePlanReportReason
+  comment        String?
+  status         DatePlanReportStatus @default(PENDING)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  plan           DatePlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  reportedUser   User                 @relation("DatePlanReportedUser", fields: [reportedUserId], references: [id])
+  reporter       User                 @relation("DatePlanReportReporter", fields: [reporterId], references: [id])
+
+  @@index([planId])
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([reason])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DatePlanUserStats {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @db.Uuid
+  totalDatePlan     Int      @default(0)
+  balance           Int      @default(0)
+  purchasedDataPlan Int      @default(0)
+  weeklyLimit       Int      @default(0)
+  totalDetePlanUsed Int      @default(0)
+  lastResetAt       DateTime @default(now())
+  nextResetAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DatePlanPurchase {
+  id                  String                @id @default(uuid()) @db.Uuid
+  userId              String                @db.Uuid
+  quantity            Int
+  amount              Float                 @default(0.00)
+  paymentMethod       PurchasePaymentMethod
+  paymentId           String?
+  walletTransactionId String?               @db.Uuid
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
+  user                User                  @relation(fields: [userId], references: [id])
+  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
+  transactions        DatePlanTransaction[]
+
+  @@map("date_plan_purchases")
+}
+
+model DatePlanTransaction {
+  id           String                  @id @default(uuid()) @db.Uuid
+  userId       String                  @db.Uuid
+  type         DatePlanTransactionType
+  quantity     Int
+  balanceAfter Int
+  purchaseId   String?                 @db.Uuid
+  referenceId  String?
+  description  String?
+  createdAt    DateTime                @default(now())
+  purchase     DatePlanPurchase?       @relation(fields: [purchaseId], references: [id])
+  user         User                    @relation(fields: [userId], references: [id])
+
+  @@map("date_plan_transactions")
+}
+
+model DatePlanUserBoost {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  datePlanId           String                  @db.Uuid
+  userId               String                  @db.Uuid
+  boostOptionId        String                  @db.Uuid
+  status               DatePlanUserBoostStatus @default(ACTIVE)
+  startedAt            DateTime                @default(now())
+  expiresAt            DateTime
+  viewCount            Int                     @default(0)
+  requestCount         Int                     @default(0)
+  approvedRequestCount Int                     @default(0)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  boostOption          DatePlanBoostOption     @relation(fields: [boostOptionId], references: [id])
+  datePlan             DatePlan                @relation(fields: [datePlanId], references: [id], onDelete: Cascade)
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([datePlanId])
+  @@index([userId])
+  @@index([boostOptionId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([datePlanId, status])
+}
+
+model DatePlanBoost {
+  id          String                @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  options     DatePlanBoostOption[]
+}
+
+model DatePlanBoostOption {
+  id                String              @id @default(uuid()) @db.Uuid
+  boostId           String              @db.Uuid
+  title             String
+  durationHours     Int
+  price             Decimal             @db.Decimal(10, 2)
+  currency          String              @default("INR") @db.VarChar(10)
+  isPopular         Boolean             @default(false)
+  sortOrder         Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  boost             DatePlanBoost       @relation(fields: [boostId], references: [id], onDelete: Cascade)
+  DatePlanUserBoost DatePlanUserBoost[]
+
+  @@unique([boostId, durationHours])
+  @@index([boostId])
+  @@index([sortOrder])
+}
+
+model Conversation {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  match                 Boolean                   @default(false)
+  matchPendingForUserId String?                   @db.Uuid
+  messages              ChatMessage[]
+  participants          ConversationParticipant[]
+
+  @@index([updatedAt])
+  @@index([matchPendingForUserId])
+  @@index([match])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  userId         String       @db.Uuid
+  lastReadAt     DateTime?
+  joinedAt       DateTime     @default(now())
+  deletedAt      DateTime?
+  clearedAt      DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String                @id @default(uuid()) @db.Uuid
+  conversationId String                @db.Uuid
+  senderId       String                @db.Uuid
+  content        String?
+  messageType    MessageType           @default(TEXT)
+  mediaUrl       String?
+  metadata       Json?
+  createdAt      DateTime              @default(now())
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  deletedAt      DateTime?
+  roseId         String?               @unique @db.Uuid
+  complimentId   String?               @unique @db.Uuid
+  giftId         String?               @unique @db.Uuid
+  eventId        String?               @db.Uuid
+  datePlanId     String?               @db.Uuid
+  compliment     UserCompliment?       @relation(fields: [complimentId], references: [id])
+  conversation   Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  datePlan       DatePlan?             @relation("DatePlanChatMessages", fields: [datePlanId], references: [id])
+  event          Event?                @relation(fields: [eventId], references: [id])
+  gift           UserGift?             @relation(fields: [giftId], references: [id])
+  rose           UserRose?             @relation(fields: [roseId], references: [id])
+  sender         User                  @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  deletions      ChatMessageDeletion[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model ChatMessageDeletion {
+  id        String      @id @default(uuid()) @db.Uuid
+  messageId String      @db.Uuid
+  userId    String      @db.Uuid
+  deletedAt DateTime    @default(now())
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model UserReplyStats {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @db.Uuid
+  medianReplyMinutes Int?
+  sampleCount        Int      @default(0)
+  recentSamples      Json?
+  calculatedAt       DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Wallet {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String              @unique @db.Uuid
+  balance      Decimal             @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+}
+
+model WalletGooglePlayPurchase {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @db.Uuid
+  productId           String
+  orderId             String   @unique
+  purchaseTokenHash   String   @unique
+  amount              Decimal  @db.Decimal(10, 2)
+  status              String   @default("PROCESSING")
+  walletTransactionId String?  @unique @db.Uuid
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Event {
+  id                   String            @id @default(uuid()) @db.Uuid
+  eventType            Type?
+  title                String?
+  status               EventStatus       @default(DRAFT)
+  city                 String?
+  eventTag             EventTag?
+  eventDate            DateTime?
+  startTime            String?
+  endTime              String?
+  venueName            String?
+  fullAddress          String?
+  latitude             Float?
+  longitude            Float?
+  totalCapacity        Int?
+  menCapacity          Int?
+  womenCapacity        Int?
+  otherCapacity        Int?
+  menEntryPrice        Decimal?          @db.Decimal(10, 2)
+  womenEntryPrice      Decimal?          @db.Decimal(10, 2)
+  otherEntryPrice      Decimal?          @db.Decimal(10, 2)
+  discountPercentage   Decimal?          @db.Decimal(5, 2)
+  menDiscountedPrice   Decimal?          @db.Decimal(10, 2)
+  womenDiscountedPrice Decimal?          @db.Decimal(10, 2)
+  otherDiscountedPrice Decimal?          @db.Decimal(10, 2)
+  minAge               Int?
+  maxAge               Int?
+  eventIntent          EventIntent?
+  heroImage            String?
+  aboutEvent           String?
+  dressCode            DressCode?
+  refundWindow         Int?
+  termsConditions      String?
+  currentStep          Int               @default(1)
+  basicsDone           Boolean           @default(false)
+  hostDone             Boolean           @default(false)
+  venueDone            Boolean           @default(false)
+  ticketDone           Boolean           @default(false)
+  experienceDone       Boolean           @default(false)
+  safetyDone           Boolean           @default(false)
+  publishedAt          DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  businessDetailsId    String?           @db.Uuid
+  chatMessages         ChatMessage[]
+  BusinessDetails      BusinessDetails?  @relation(fields: [businessDetailsId], references: [id])
+  amenities            EventAmenity[]
+  EventBooking         EventBooking[]
+  faqs                 EventFAQ[]
+  featureTags          EventFeatureTag[]
+  galleryImages        EventGallery[]
+  itinerary            EventItinerary[]
+  safetyFeatures       EventSafety[]
+  whyShouldCome        EventWhyCome[]
+  EventHost            EventHost[]
+
+  @@index([status])
+  @@index([city])
+  @@index([eventDate])
+  @@index([currentStep])
+}
+
+model EventGallery {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  imageUrl  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventAmenity {
+  id        String  @id @default(uuid()) @db.Uuid
+  eventId   String  @db.Uuid
+  name      String
+  icon      String?
+  sortOrder Int     @default(0)
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventItinerary {
+  id            String  @id @default(uuid()) @db.Uuid
+  eventId       String  @db.Uuid
+  time          String
+  title         String
+  description   String?
+  icon          String?
+  sortOrder     Int     @default(0)
+  date          String?
+  dayNumber     Int?
+  location      String?
+  elevation     String?
+  distance      String?
+  accommodation String?
+  meals         String?
+  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventWhyCome {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  title       String
+  description String?
+  icon        String?
+  sortOrder   Int     @default(0)
+  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventSafety {
+  id      String @id @default(uuid()) @db.Uuid
+  eventId String @db.Uuid
+  title   String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventFAQ {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String   @db.Uuid
+  question     String
+  answer       String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model EventFeatureTag {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String   @db.Uuid
+  label        String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model EventBooking {
+  id                  String               @id @default(uuid()) @db.Uuid
+  userId              String               @db.Uuid
+  eventId             String               @db.Uuid
+  bookingNumber       String               @unique @db.VarChar(50)
+  ticketCount         Int                  @default(1)
+  ticketAmount        Decimal              @db.Decimal(10, 2)
+  platformFee         Decimal              @default(0) @db.Decimal(10, 2)
+  gstAmount           Decimal              @default(0) @db.Decimal(10, 2)
+  discountAmount      Decimal              @default(0) @db.Decimal(10, 2)
+  couponCode          String?              @db.VarChar(50)
+  totalAmount         Decimal              @db.Decimal(10, 2)
+  paidAmount          Decimal              @default(0) @db.Decimal(10, 2)
+  status              EventBookingStatus   @default(PENDING)
+  paymentId           String?              @unique @db.Uuid
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  cancellationComment String?              @db.VarChar(500)
+  cancellationReason  String?              @db.VarChar(100)
+  cancelledAt         DateTime?
+  refundAmount        Decimal?             @db.Decimal(10, 2)
+  refundEligible      Boolean?
+  refundReason        String?
+  refundReferenceId   String?              @db.VarChar(255)
+  refundRequestedAt   DateTime?
+  refundedAt          DateTime?
+  event               Event                @relation(fields: [eventId], references: [id])
+  payment             Payment?             @relation(fields: [paymentId], references: [id])
+  user                User                 @relation(fields: [userId], references: [id])
+  tickets             EventBookingTicket[]
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([status])
+  @@index([bookingNumber])
+}
+
+model EventBookingTicket {
+  id           String            @id @default(uuid()) @db.Uuid
+  bookingId    String            @db.Uuid
+  ticketId     String            @unique @db.VarChar(50)
+  ticketType   EventTicketType
+  ticketAmount Decimal           @db.Decimal(10, 2)
+  qrCodeUrl    String?
+  status       EventTicketStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  booking      EventBooking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([ticketType])
+  @@index([status])
+}
+
+model EventCancelFAQ {
+  id           String   @id @default(uuid()) @db.Uuid
+  question     String
+  answer       String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model WalletTransaction {
+  id                 String               @id @default(uuid()) @db.Uuid
+  walletId           String               @db.Uuid
+  amount             Decimal
+  type               TransactionType
+  status             TransactionStatus
+  source             TransactionSource?
+  referenceId        String?
+  description        String?
+  balanceBefore      Decimal
+  balanceAfter       Decimal
+  createdAt          DateTime             @default(now())
+  BoostPurchase      BoostPurchase[]
+  ComplimentPurchase ComplimentPurchase[]
+  RosePurchase       RosePurchase[]
+  gift               UserGift?
+  wallet             Wallet               @relation(fields: [walletId], references: [id])
+  DatePlanPurchase   DatePlanPurchase[]
+
+  @@index([walletId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Waitlist {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @unique @db.Uuid
+  waitlistNumber     Int             @unique
+  plan               WaitlistPlan    @default(FREE)
+  amountPaid         Decimal         @db.Decimal(10, 2)
+  paymentStatus      PaymentStatus   @default(PENDING)
+  paymentId          String?         @unique @db.Uuid
+  launchBenefit      LaunchBenefit   @default(ONE_MONTH_PREMIUM)
+  premiumActivated   Boolean         @default(false)
+  premiumActivatedAt DateTime?
+  source             WaitlistSource?
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  payment            Payment?        @relation(fields: [paymentId], references: [id])
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([paymentStatus])
+  @@map("waitlists")
+}
+
+model LaunchConfig {
+  id                 String    @id @default(uuid()) @db.Uuid
+  waitlistEnabled    Boolean   @default(true)
+  appLaunched        Boolean   @default(false)
+  launchDate         DateTime?
+  originalPrice      Decimal   @default(799) @db.Decimal(10, 2)
+  discountAmount     Decimal   @default(500) @db.Decimal(10, 2)
+  finalPrice         Decimal   @default(299) @db.Decimal(10, 2)
+  welcomeCoins       Int       @default(100)
+  perks              Json?
+  totalBenefitsValue Decimal?  @db.Decimal(10, 2)
+  description        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model RewardConfig {
+  id             String   @id @default(uuid()) @db.Uuid
+  signupReward   Decimal  @default(100.00) @db.Decimal(10, 2)
+  packageReward  Decimal  @default(500.00) @db.Decimal(10, 2)
+  waitlistReward Decimal  @default(300.00) @db.Decimal(10, 2)
+  title          String   @default("How Rewards Work") @db.VarChar(100)
+  descriptions   Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("reward_config")
+}
+
+model GiftCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  gifts     Gift[]
+
+  @@map("gift_categories")
+}
+
+model Gift {
+  id           Int          @id @default(autoincrement())
+  categoryId   Int
+  image        String
+  name         String
+  coinCost     Int
+  triggerLine  String?      @db.VarChar(90)
+  receiverLine String?      @db.VarChar(90)
+  isLive       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  UserGift     UserGift[]
+  category     GiftCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@index([name])
+  @@map("gifts")
+}
+
+model ComplimentCategory {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  sortOrder Int              @default(0)
+  ideas     ComplimentIdea[]
+
+  @@map("compliment_categories")
+}
+
+model ComplimentIdea {
+  id             String             @id @default(cuid())
+  categoryId     String
+  text           String
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  UserCompliment UserCompliment[]
+  category       ComplimentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, sortOrder])
+  @@map("compliment_ideas")
+}
+
+model Employee {
+  id             String        @id @default(uuid()) @db.Uuid
+  firstName      String        @db.VarChar(100)
+  lastName       String        @db.VarChar(100)
+  email          String        @unique @db.VarChar(255)
+  phone          String        @unique @db.VarChar(20)
+  password       String
+  image          String?
+  address        String?
+  identityType   IdentityType?
+  identityNumber String?       @db.VarChar(100)
+  identityImage  String?
+  roleId         String        @db.Uuid
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  role           EmployeeRole  @relation(fields: [roleId], references: [id])
+
+  @@index([roleId])
+  @@map("employees")
+}
+
+model EmployeeRole {
+  id          String           @id @default(uuid()) @db.Uuid
+  roleName    String           @unique @db.VarChar(100)
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  employees   Employee[]
+
+  @@map("employee_roles")
+}
+
+model RolePermission {
+  id        String           @id @default(uuid()) @db.Uuid
+  roleId    String           @db.Uuid
+  module    PermissionModule
+  all       Boolean          @default(false)
+  add       Boolean          @default(false)
+  view      Boolean          @default(false)
+  update    Boolean          @default(false)
+  delete    Boolean          @default(false)
+  export    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  role      EmployeeRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, module])
+  @@index([roleId])
+}
+
+model StoreInfo {
+  id          String        @id @default(uuid()) @db.Uuid
+  itemType    StoreItemType
+  title       String
+  description String
+  tag         String?
+  sortOrder   Int           @default(0)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([itemType, isActive])
+  @@map("store_info")
+}
+
+model StoreFeature {
+  id           String           @id @default(uuid()) @db.Uuid
+  itemType     StoreItemType
+  feature      StoreFeatureType @unique
+  title        String
+  description  String?
+  intValue     Int?
+  decimalValue Decimal?         @db.Decimal(10, 2)
+  boolValue    Boolean?
+  unit         String?
+  enabled      Boolean          @default(true)
+  premiumFree  Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([feature])
+  @@map("store_features")
+}
+
+model StorePack {
+  id           String         @id @default(uuid()) @db.Uuid
+  itemType     StoreItemType
+  title        String
+  quantity     Int
+  pricePerUnit Decimal        @db.Decimal(10, 2)
+  totalPrice   Decimal        @db.Decimal(10, 2)
+  badge        StorePackBadge @default(NONE)
+  sortOrder    Int            @default(0)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([itemType, isActive])
+  @@map("store_packs")
+}
+
+model UserCompatibility {
+  id           String   @id @default(uuid())
+  userId       String
+  targetUserId String
+  score        Int
+  percentage   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, targetUserId])
+  @@index([userId, score])
+  @@index([userId, targetUserId])
+}
+
+model LegalPage {
+  id            String        @id @default(uuid()) @db.Uuid
+  pageType      LegalPageType @unique
+  title         String        @db.VarChar(255)
+  version       String        @db.VarChar(50)
+  content       Json
+  schemaVersion Int           @default(1)
+  effectiveFrom DateTime?
+  publishedAt   DateTime?
+  createdBy     String?       @db.Uuid
+  publishedBy   String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([pageType])
+  @@index([publishedAt])
+}
+
+model RelationshipTagProposal {
+  id           String                        @id @default(uuid()) @db.Uuid
+  senderId     String                        @db.Uuid
+  receiverId   String                        @db.Uuid
+  tag          RelationshipTag
+  status       RelationshipTagProposalStatus @default(PENDING)
+  message      String?
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @updatedAt
+  respondedAt  DateTime?
+  receiver     User                          @relation("RelationshipTagProposalReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender       User                          @relation("RelationshipTagProposalSender", fields: [senderId], references: [id], onDelete: Cascade)
+  relationship UserRelationship?
+
+  @@index([senderId, status])
+  @@index([receiverId, status])
+  @@index([receiverId, createdAt])
+  @@map("relationship_tag_proposals")
+}
+
+model UserRelationship {
+  id         String                   @id @default(uuid()) @db.Uuid
+  user1Id    String                   @db.Uuid
+  user2Id    String                   @db.Uuid
+  tag        RelationshipTag
+  status     UserRelationshipStatus   @default(ACTIVE)
+  startedAt  DateTime                 @default(now())
+  endedAt    DateTime?
+  proposalId String?                  @unique @db.Uuid
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  proposal   RelationshipTagProposal? @relation(fields: [proposalId], references: [id])
+  user1      User                     @relation("RelationshipUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2      User                     @relation("RelationshipUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  @@index([user1Id, status])
+  @@index([user2Id, status])
+  @@map("user_relationships")
+}
+
+model CallbackRequest {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @db.Uuid
+  callbackNumber String         @unique @db.VarChar(20)
+  callbackDate   DateTime       @db.Date
+  timeWindow     String         @db.VarChar(50)
+  topic          String?        @db.VarChar(100)
+  status         CallbackStatus @default(REQUESTED)
+  agentName      String?        @db.VarChar(100)
+  callDuration   Int?
+  resolutionNote String?
+  resolvedAt     DateTime?
+  missedAt       DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([callbackDate, status])
+}
+
+model SupportFaq {
+  id        String   @id @default(uuid()) @db.Uuid
+  question  String   @db.VarChar(255)
+  answer    String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model GlobalAmount {
+  id                   String   @id @default(uuid()) @db.Uuid
+  gst                  Decimal  @default(18) @db.Decimal(5, 2)
+  eventPlatformFee     Decimal  @default(2) @db.Decimal(10, 2)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  freeProfileLimit     Int      @default(0)
+  premiumProfileLimit  Int      @default(25)
+  vipEliteProfileLimit Int      @default(100)
+  vipProfileLimit      Int      @default(50)
+
+  @@map("global_amount")
+}
+
+model UserPayoutMethod {
+  id                     String           @id @default(uuid()) @db.Uuid
+  userId                 String           @db.Uuid
+  type                   PayoutMethodType
+  accountHolderName      String?          @db.VarChar(150)
+  accountNumberEncrypted String?
+  accountNumberLast4     String?          @db.VarChar(4)
+  ifscCode               String?          @db.VarChar(20)
+  bankName               String?          @db.VarChar(150)
+  bankIsPrimary          Boolean          @default(false)
+  bankIsVerified         Boolean          @default(false)
+  bankIsActive           Boolean          @default(true)
+  upiId                  String?          @db.VarChar(150)
+  upiIsPrimary           Boolean          @default(false)
+  upiIsVerified          Boolean          @default(false)
+  upiIsActive            Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  deletedAt              DateTime?
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, type])
+  @@index([userId, bankIsPrimary])
+  @@index([userId, upiIsPrimary])
+}
+
+model UserPrivacySettings {
+  id                String              @id @default(uuid()) @db.Uuid
+  userId            String              @unique @db.Uuid
+  messagePermission MessagePermission[] @default([MATCHES_ONLY])
+  hideFromContacts  Boolean             @default(false)
+  ghostMode         Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([messagePermission])
+  @@index([hideFromContacts])
+  @@index([ghostMode])
+}
+
+model LocationMaster {
+  id               Int      @id @default(autoincrement())
+  city             String
+  state            String?
+  country          String
+  countryCode      String
+  latitude         Float
+  longitude        Float
+  capital          String?
+  population       BigInt?
+  populationProper BigInt?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  @@unique([city, state, countryCode])
+  @@index([city])
+  @@index([state])
+  @@index([countryCode])
+  @@map("location_master")
+}
+
+model UserDailyFeedView {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  targetUserId String   @db.Uuid
+  viewDate     DateTime @db.Date
+  createdAt    DateTime @default(now())
+  targetUser   User     @relation("DailyFeedTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  user         User     @relation("DailyFeedViewer", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetUserId, viewDate])
+  @@index([userId, viewDate])
+  @@index([targetUserId])
+}
+
+model ConversationPromptCategory {
+  id          String               @id @default(uuid()) @db.Uuid
+  name        String               @db.VarChar(100)
+  slug        String               @unique @db.VarChar(100)
+  description String?
+  sortOrder   Int                  @default(0)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  prompts     ConversationPrompt[]
+
+  @@index([isActive, sortOrder])
+  @@map("conversation_prompt_categories")
+}
+
+model ConversationPrompt {
+  id         String                     @id @default(uuid()) @db.Uuid
+  categoryId String                     @db.Uuid
+  message    String
+  label      String?                    @db.VarChar(100)
+  sortOrder  Int                        @default(0)
+  isActive   Boolean                    @default(true)
+  usageCount Int                        @default(0)
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
+  category   ConversationPromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, isActive, sortOrder])
+  @@map("conversation_prompts")
+}
+
+model InAppProduct {
+  id        String        @id @default(uuid()) @db.Uuid
+  priceId   String        @db.Uuid
+  platform  InAppPlatform
+  productId String
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  price     PackagePrice  @relation(fields: [priceId], references: [id])
+
+  @@unique([platform, productId])
+  @@unique([priceId, platform])
+  @@map("in_app_products")
+}
+
+model InAppPurchase {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @db.Uuid
+  paymentId             String        @unique @db.Uuid
+  userPackageId         String?       @db.Uuid
+  platform              InAppPlatform
+  productId             String
+  priceId               String        @db.Uuid
+  purchaseTokenHash     String?       @unique @db.VarChar(64)
+  transactionId         String?
+  originalTransactionId String?
+  environment           String?
+  storeStatus           String
+  purchaseDate          DateTime?
+  expiryDate            DateTime?
+  autoRenew             Boolean       @default(false)
+  rawResponse           Json?
+  verifiedAt            DateTime      @default(now())
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  payment               Payment       @relation(fields: [paymentId], references: [id])
+  packagePrice          PackagePrice  @relation(fields: [priceId], references: [id])
+  user                  User          @relation(fields: [userId], references: [id])
+  userPackage           UserPackage?  @relation(fields: [userPackageId], references: [id])
+
+  @@unique([platform, transactionId])
+  @@index([userId])
+  @@index([platform, originalTransactionId])
+  @@map("in_app_purchases")
+}
+
+enum AccountStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+enum ActivityStatus {
+  ACTIVE
+  FREQUENT
+  RELAXED
+  BUSY
+  NAPPING
+}
+
+enum ReferralStatus {
+  PENDING
+  SIGNUP_REWARDED
+  PACKAGE_REWARDED
+  WAITLIST_REWARDED
+  CANCELLED
+}
+
+enum Zodiac {
+  ARIES
+  TAURUS
+  GEMINI
+  CANCER
+  LEO
+  VIRGO
+  LIBRA
+  SCORPIO
+  SAGITTARIUS
+  CAPRICORN
+  AQUARIUS
+  PISCES
+}
+
+enum LoveLanguage {
+  WORDS_OF_AFFIRMATION
+  QUALITY_TIME
+  ACTS_OF_SERVICE
+  PHYSICAL_TOUCH
+  RECEIVING_GIFTS
+}
+
+enum CommunicationStyle {
+  PHONE_CALLS_OVER_TEXTS
+  TEXTS_OVER_CALLS
+  VIDEO_CALLS
+  VOICE_NOTES
+  IN_PERSON_ALWAYS
+  A_BIT_OF_EVERYTHING
+}
+
+enum EducationLevel {
+  HIGH_SCHOOL
+  ITI
+  DIPLOMA
+  UNDERGRADUATE
+  BACHELOR
+  POSTGRADUATE
+  MASTER
+  MPHIL
+  PHD
+  POST_DOCTORATE
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum PromptVisibility {
+  EVERYONE
+  PREMIUM_AND_ABOVE
+  VIP_AND_ABOVE
+  ELITE_ONLY
+}
+
+enum VerificationType {
+  GOVERNMENT_ID
+  FACE_VERIFICATION
+  VIDEO_VERIFICATION
+  EDUCATION_VERIFICATION
+  PROFESSIONAL_VERIFICATION
+  CRIMINAL_BACKGROUND_CHECK
+  EMERGENCY_CONTACT
+  INCOME_VERIFICATION
+}
+
+enum VerificationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  VERIFIED
+  REJECTED
+  EXPIRED
+  LOCKED
+}
+
+enum GovernmentIdType {
+  AADHAAR
+  PAN
+  DRIVING_LICENSE
+}
+
+enum GovernmentIdAttemptStatus {
+  INITIATING
+  PENDING
+  AUTHORIZED
+  DENIED
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+
+enum EmploymentVerificationStatus {
+  NOT_STARTED
+  PENDING
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum IncomeProofType {
+  SALARY_SLIP
+  FORM_16
+  ITR
+  BANK_STATEMENT
+  EMPLOYMENT_LETTER
+  BUSINESS_INCOME_PROOF
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportAction {
+  NONE
+  WARNING
+  CONTENT_REMOVED
+  ACCOUNT_RESTRICTED
+  ACCOUNT_SUSPENDED
+  ACCOUNT_BANNED
+}
+
+enum BoostDemographicType {
+  LOCATION
+  PROFESSION
+  RELIGION
+  COMMUNITY
+  AGE_GROUP
+  VERIFIED
+  GENDER
+}
+
+enum BoostUsageStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum BoostEventType {
+  IMPRESSION
+  PROFILE_VIEW
+  LIKE
+  SUPERLIKE
+  INTEREST
+  MATCH
+  PASS
+}
+
+enum BoostTransactionType {
+  PACKAGE_CREDIT
+  PURCHASE
+  USE
+  REFUND
+  EXPIRE
+  ADMIN_ADD
+  ADMIN_REMOVE
+}
+
+enum EventType {
+  VIEW
+  LIKE
+  INTEREST
+  REACH
+}
+
+enum PackageType {
+  PREMIUM
+  VIP
+  VIP_ELITE
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+  LIFETIME
+}
+
+enum FeatureCategory {
+  MATCH_DISCOVERY
+  CHAT
+  TRUST
+  PRIVACY
+  STATUS_BADGES
+  REAL_LIFE_EVENTS
+  PERKS
+  FOREVER_LOVE_PROGRAMME
+  ELITE_ACCESS
+  STATUS_PRIVACY
+  PREMIUM_EXPERIENCES
+  NETWORKING_GROWTH
+  EVERYTHING_IN_VIP
+  MAXIMUM_PRIVACY
+  CURATED_ELITE_MATCHING
+  ELITE_STATUS
+  WHITE_GLOVE_EXPERIENCES
+  GLOBAL_EXPERIENCES
+  EXECUTIVE_NETWORK
+  STAND_OUT_INSTANTLY
+  MEET_IN_REAL_LIFE
+  REWARDS_FOR_SERIOUS_DATERS
+  VIP_PERKS
+  EVERYTHING_IN_VIP_AND_MORE
+  ABSOLUTE_PRIVACY
+  SMARTER_CURATED_MATCHES
+  STATUS_THAT_SPEAKS_FIRST
+  WHITE_GLOVE_DATING
+  THE_WORLD_CURATED
+  AN_EXECUTIVE_CIRCLE
+}
+
+enum ResetPeriod {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum RoseTransactionType {
+  PACKAGE_CREDIT
+  PURCHASE
+  PACKAGE_SEND
+  PURCHASE_SEND
+  REFUND
+  ADMIN_CREDIT
+  ADMIN_DEBIT
+}
+
+enum ComplimentTransactionType {
+  PACKAGE_CREDIT
+  PURCHASE
+  PACKAGE_SEND
+  PURCHASE_SEND
+  REFUND
+  ADMIN_CREDIT
+  ADMIN_DEBIT
 }
 
 enum ComplimentStatus {
@@ -1862,124 +3010,6 @@ enum TargetType {
   FAMILY
 }
 
-model Payment {
-  id                 String               @id @default(uuid()) @db.Uuid
-  userId             String               @db.Uuid
-  amount             Decimal              @db.Decimal(10, 2)
-  currency           String               @default("INR")
-  payment_id         String?              @unique
-  transactionId      String?
-  status             PaymentStatus        @default(PENDING)
-  purpose            PaymentPurpose
-  referenceId        String?              @db.Uuid
-  packagePriceId     String?              @db.Uuid
-  gatewayResponse    Json?
-  paidAt             DateTime?
-  created_at         DateTime             @default(now())
-  waitlist           Waitlist?
-  UserPackage        UserPackage[]
-  BoostPurchase      BoostPurchase[]
-  RosePurchase       RosePurchase[]
-  ComplimentPurchase ComplimentPurchase[]
-  DatePlanPurchase   DatePlanPurchase[]
-  eventbooking       EventBooking?
-  inAppPurchase      InAppPurchase?
-}
-
-model Notification {
-  id          String           @id @default(uuid()) @db.Uuid
-  sender_id   String           @db.Uuid
-  receiver_id String           @db.Uuid
-  type        NotificationType
-  title       String
-  message     String
-  data        Json?
-  is_read     Boolean          @default(false)
-  created_at  DateTime         @default(now())
-  readAt      DateTime?
-
-  receiver User @relation("ReceivedNotifications", fields: [receiver_id], references: [id], onDelete: Cascade)
-  sender   User @relation("SentNotifications", fields: [sender_id], references: [id], onDelete: Cascade)
-
-  @@index([receiver_id])
-  @@index([sender_id])
-  @@index([receiver_id, is_read])
-}
-
-model UserNotificationSetting {
-  id                String    @id @default(uuid()) @db.Uuid
-  userId            String    @unique @db.Uuid
-  isEnabled         Boolean   @default(true)
-  mutedUntil        DateTime?
-  newMatchesEnabled Boolean   @default(true)
-  messagesEnabled   Boolean   @default(true)
-  likesRosesEnabled Boolean   @default(true)
-  eventsEnabled     Boolean   @default(true)
-  promotionsEnabled Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model UserNotificationMute {
-  id String @id @default(uuid()) @db.Uuid
-
-  userId      String    @db.Uuid
-  mutedUserId String    @db.Uuid
-  isMuted     Boolean   @default(true)
-  mutedUntil  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user      User @relation("NotificationMuteOwner", fields: [userId], references: [id], onDelete: Cascade)
-  mutedUser User @relation("NotificationMutedUser", fields: [mutedUserId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, mutedUserId])
-  @@index([mutedUserId])
-}
-
-model DatePlanPackage {
-  id           String  @id @default(uuid()) @db.Uuid
-  title        String
-  description  String?
-  planCount    Int
-  price        Decimal @db.Decimal(10, 2)
-  pricePerPlan Decimal @db.Decimal(10, 2)
-  discount     Int?
-  isPopular    Boolean @default(false)
-  isBestValue  Boolean @default(false)
-  isActive     Boolean @default(true)
-  sortOrder    Int     @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model DatePlanPackageInfo {
-  id                String   @id @default(uuid()) @db.Uuid
-  howOnePlanWorks   Json?
-  whyPeopleBuyPlans Json?
-  goodToKnow        Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
-
-model DatePlanPackageFeatures {
-  id                     String   @id @default(uuid()) @db.Uuid
-  // Cost to post a plan
-  costToPostPlan         Decimal  @default(100) @db.Decimal(10, 2)
-  costToPostPlanActive   Boolean  @default(true)
-  costToPostPlanPaidOnly Boolean  @default(false)
-  // Plan boost
-  planBoostPrice         Decimal  @default(40) @db.Decimal(10, 2)
-  planBoostActive        Boolean  @default(true)
-  planBoostPaidOnly      Boolean  @default(true)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-}
-
 enum OptionType {
   ACTIVITY
   QUICK_TITLE
@@ -1998,159 +3028,11 @@ enum PlanStatus {
   EXPIRED
 }
 
-model DatePlanOption {
-  id        String     @id @default(uuid()) @db.Uuid
-  type      OptionType
-  label     String // Coffee
-  value     String? // coffee
-  icon      String? // image url
-  sortOrder Int        @default(0)
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  // Back Relations
-
-  activityPlans          DatePlan[]        @relation("PlanActivity")
-  quickTitlePlans        DatePlan[]        @relation("PlanQuickTitle")
-  whoPaysPlans           DatePlan[]        @relation("PlanWhoPays")
-  joinRequestGenderPlans DatePlan[]        @relation("PlanJoinRequestGender")
-  visibilityPlans        DatePlan[]        @relation("PlanVisibility")
-  vibePlans              DatePlanVibe[]
-  datePlanRequests       DatePlanRequest[] @relation("DatePlanRequestBillSuggestion")
-
-  @@index([type, isActive])
-}
-
-model DatePlan {
-  id           String  @id @default(uuid()) @db.Uuid
-  userId       String  @db.Uuid
-  // Step 1
-  activityId   String  @db.Uuid
-  title        String?
-  quickTitleId String? @db.Uuid
-  note         String?
-  photoUrl     String?
-
-  // Step 2
-  venueName    String?
-  venueAddress String?
-  venueLat     Float?
-  venueLng     Float?
-
-  // Step 3
-  duration            Int?
-  whoPaysId           String?    @db.Uuid
-  participantLimit    Int?
-  joinRequestGenderId String?    @db.Uuid
-  visibilityId        String?    @db.Uuid
-  status              PlanStatus @default(DRAFT)
-  verifiedMembersOnly Boolean    @default(false)
-  eventDateTime       DateTime?
-  expiresAt           DateTime?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relations
-
-  user              User                @relation(fields: [userId], references: [id])
-  activity          DatePlanOption      @relation("PlanActivity", fields: [activityId], references: [id])
-  quickTitle        DatePlanOption?     @relation("PlanQuickTitle", fields: [quickTitleId], references: [id])
-  whoPays           DatePlanOption?     @relation("PlanWhoPays", fields: [whoPaysId], references: [id])
-  joinRequestGender DatePlanOption?     @relation("PlanJoinRequestGender", fields: [joinRequestGenderId], references: [id])
-  visibility        DatePlanOption?     @relation("PlanVisibility", fields: [visibilityId], references: [id])
-  feedbacks         DatePlanFeedback[]
-  reports           DatePlanReport[]
-  userBoosts        DatePlanUserBoost[]
-
-  vibes         DatePlanVibe[]
-  requests      DatePlanRequest[]
-  skips         DatePlanSkip[]
-  DateConfirmed DateConfirmed[]
-  chatMessages  ChatMessage[]     @relation("DatePlanChatMessages")
-
-  @@index([userId])
-  @@index([activityId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model DatePlanVibe {
-  id     String @id @default(uuid())
-  planId String @db.Uuid
-  vibeId String @db.Uuid
-
-  plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  vibe DatePlanOption @relation(fields: [vibeId], references: [id])
-
-  @@unique([planId, vibeId])
-  @@index([vibeId])
-}
-
 enum DatePlanRequestStatus {
   PENDING
   APPROVED
   DECLINED
   CANCELLED
-}
-
-model DatePlanRequest {
-  id     String @id @default(uuid())
-  // Which plan
-  planId String @db.Uuid
-
-  // Who sent request
-  requesterId      String                @db.Uuid
-  status           DatePlanRequestStatus @default(PENDING)
-  message          String?
-  billSuggestionId String?               @db.Uuid
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-
-  plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  requester      User            @relation(fields: [requesterId], references: [id])
-  billSuggestion DatePlanOption? @relation("DatePlanRequestBillSuggestion", fields: [billSuggestionId], references: [id])
-
-  @@unique([planId, requesterId])
-  @@index([planId])
-  @@index([requesterId])
-  @@index([status])
-}
-
-model DatePlanSkip {
-  id        String   @id @default(uuid())
-  userId    String   @db.Uuid
-  planId    String   @db.Uuid
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  plan DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, planId])
-  @@index([userId])
-  @@index([planId])
-}
-
-model DateConfirmed {
-  id            String              @id @default(uuid()) @db.Uuid
-  planId        String              @db.Uuid
-  hostUserId    String              @db.Uuid
-  participantId String              @db.Uuid
-  title         String?
-  venueName     String?
-  venueAddress  String?
-  eventDateTime DateTime
-  status        ConfirmedDateStatus
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-
-  plan DatePlan @relation(fields: [planId], references: [id])
-
-  host        User @relation("ConfirmedDateHost", fields: [hostUserId], references: [id])
-  participant User @relation("ConfirmedDateParticipant", fields: [participantId], references: [id])
 }
 
 enum ConfirmedDateStatus {
@@ -2187,44 +3069,6 @@ enum DatePlanExperienceTag {
   WOULD_MEET_AGAIN
 }
 
-model DatePlanFeedback {
-  id               String                   @id @default(uuid()) @db.Uuid
-  planId           String                   @db.Uuid
-  reviewerId       String                   @db.Uuid
-  attendanceStatus DatePlanAttendanceStatus
-  metUserId        String?                  @db.Uuid
-  overallRating    Int?
-  personRating     Int?
-  noShowReason     DatePlanNoShowReason?
-  experienceTags   DatePlanFeedbackTag[]
-  comment          String?
-  status           DatePlanFeedbackStatus   @default(SUBMITTED)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-
-  // Relations
-  plan     DatePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  reviewer User     @relation("DatePlanFeedbackReviewer", fields: [reviewerId], references: [id])
-  metUser  User?    @relation("DatePlanFeedbackMetUser", fields: [metUserId], references: [id])
-
-  @@unique([planId, reviewerId])
-  @@index([planId])
-  @@index([reviewerId])
-  @@index([metUserId])
-  @@index([attendanceStatus])
-  @@index([createdAt])
-}
-
-model DatePlanFeedbackTag {
-  id         String                @id @default(uuid()) @db.Uuid
-  feedbackId String                @db.Uuid
-  tag        DatePlanExperienceTag
-  feedback   DatePlanFeedback      @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
-
-  @@unique([feedbackId, tag])
-  @@index([tag])
-}
-
 enum DatePlanReportReason {
   DID_NOT_SHOW_AS_DESCRIBED
   MADE_ME_UNCOMFORTABLE
@@ -2240,143 +3084,10 @@ enum DatePlanReportStatus {
   DISMISSED
 }
 
-model DatePlanReport {
-  id             String               @id @default(uuid()) @db.Uuid
-  planId         String               @db.Uuid
-  reporterId     String               @db.Uuid
-  reportedUserId String               @db.Uuid
-  reason         DatePlanReportReason
-  comment        String?
-  status         DatePlanReportStatus @default(PENDING)
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  // Relations
-  plan           DatePlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
-  reporter       User                 @relation("DatePlanReportReporter", fields: [reporterId], references: [id])
-  reportedUser   User                 @relation("DatePlanReportedUser", fields: [reportedUserId], references: [id])
-
-  @@index([planId])
-  @@index([reporterId])
-  @@index([reportedUserId])
-  @@index([reason])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model DatePlanUserStats {
-  id                String   @id @default(uuid()) @db.Uuid
-  userId            String   @unique @db.Uuid
-  totalDatePlan     Int      @default(0)
-  balance           Int      @default(0)
-  purchasedDataPlan Int      @default(0)
-  weeklyLimit       Int      @default(0)
-  totalDetePlanUsed Int      @default(0)
-  lastResetAt       DateTime @default(now())
-  nextResetAt       DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model DatePlanPurchase {
-  id                  String                @id @default(uuid()) @db.Uuid
-  userId              String                @db.Uuid
-  quantity            Int
-  amount              Float                 @default(0.00)
-  paymentMethod       PurchasePaymentMethod
-  paymentId           String?
-  walletTransactionId String?               @db.Uuid
-  payment             Payment?              @relation(fields: [paymentId], references: [payment_id])
-  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id])
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-
-  user         User                  @relation(fields: [userId], references: [id])
-  transactions DatePlanTransaction[]
-
-  @@map("date_plan_purchases")
-}
-
-model DatePlanTransaction {
-  id           String                  @id @default(uuid()) @db.Uuid
-  userId       String                  @db.Uuid
-  type         DatePlanTransactionType
-  quantity     Int // Positive for credits, negative for debits
-  balanceAfter Int
-  purchaseId   String?                 @db.Uuid // Optional for non-purchase transactions
-  referenceId  String? // For linking to date plan usage
-  description  String?
-  createdAt    DateTime                @default(now())
-
-  user     User              @relation(fields: [userId], references: [id])
-  purchase DatePlanPurchase? @relation(fields: [purchaseId], references: [id])
-
-  @@map("date_plan_transactions")
-}
-
 enum DatePlanUserBoostStatus {
   ACTIVE
   EXPIRED
   CANCELLED
-}
-
-model DatePlanUserBoost {
-  id                   String                  @id @default(uuid()) @db.Uuid
-  datePlanId           String                  @db.Uuid
-  datePlan             DatePlan                @relation(fields: [datePlanId], references: [id], onDelete: Cascade)
-  userId               String                  @db.Uuid
-  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  boostOptionId        String                  @db.Uuid
-  boostOption          DatePlanBoostOption     @relation(fields: [boostOptionId], references: [id])
-  status               DatePlanUserBoostStatus @default(ACTIVE)
-  startedAt            DateTime                @default(now())
-  expiresAt            DateTime
-  viewCount            Int                     @default(0)
-  requestCount         Int                     @default(0)
-  approvedRequestCount Int                     @default(0)
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-
-  @@index([datePlanId])
-  @@index([userId])
-  @@index([boostOptionId])
-  @@index([status])
-  @@index([expiresAt])
-  @@index([datePlanId, status])
-}
-
-model DatePlanBoost {
-  id String @id @default(uuid()) @db.Uuid
-
-  title       String
-  description String?
-  isActive    Boolean @default(true)
-
-  options DatePlanBoostOption[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model DatePlanBoostOption {
-  id            String        @id @default(uuid()) @db.Uuid
-  boostId       String        @db.Uuid
-  title         String
-  durationHours Int
-  price         Decimal       @db.Decimal(10, 2)
-  currency      String        @default("INR") @db.VarChar(10)
-  isPopular     Boolean       @default(false)
-  sortOrder     Int           @default(0)
-  boost         DatePlanBoost @relation(fields: [boostId], references: [id], onDelete: Cascade)
-
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  DatePlanUserBoost DatePlanUserBoost[]
-
-  @@unique([boostId, durationHours])
-  @@index([boostId])
-  @@index([sortOrder])
 }
 
 enum DatePlanTransactionType {
@@ -2387,370 +3098,10 @@ enum DatePlanTransactionType {
   REFUND
 }
 
-model Conversation {
-  id                    String                    @id @default(uuid()) @db.Uuid
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  participants          ConversationParticipant[]
-  messages              ChatMessage[]
-  matchPendingForUserId String?                   @db.Uuid
-  match                 Boolean                   @default(false)
-
-  @@index([updatedAt])
-  @@index([matchPendingForUserId])
-  @@index([match])
-}
-
-model ConversationParticipant {
-  id             String       @id @default(uuid()) @db.Uuid
-  conversationId String       @db.Uuid
-  userId         String       @db.Uuid
-  lastReadAt     DateTime?
-  joinedAt       DateTime     @default(now())
-  deletedAt      DateTime?
-  clearedAt      DateTime?
-  user           User         @relation(fields: [userId], references: [id])
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@unique([conversationId, userId])
-  @@index([userId])
-}
-
-model ChatMessage {
-  id             String          @id @default(uuid()) @db.Uuid
-  conversationId String          @db.Uuid
-  senderId       String          @db.Uuid
-  content        String?
-  messageType    MessageType     @default(TEXT)
-  mediaUrl       String?
-  metadata       Json?
-  createdAt      DateTime        @default(now())
-  deliveredAt    DateTime?
-  readAt         DateTime?
-  deletedAt      DateTime?
-  roseId         String?         @unique @db.Uuid
-  rose           UserRose?       @relation(fields: [roseId], references: [id], onDelete: SetNull)
-  complimentId   String?         @unique @db.Uuid
-  compliment     UserCompliment? @relation(fields: [complimentId], references: [id], onDelete: SetNull)
-  giftId         String?         @unique @db.Uuid
-  gift           UserGift?       @relation(fields: [giftId], references: [id], onDelete: SetNull)
-  eventId        String?         @db.Uuid
-  event          Event?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  datePlanId     String?         @db.Uuid
-  datePlan       DatePlan?       @relation("DatePlanChatMessages", fields: [datePlanId], references: [id], onDelete: SetNull)
-
-  conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User                  @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  deletions    ChatMessageDeletion[]
-
-  @@index([conversationId, createdAt])
-  @@index([senderId])
-}
-
-model ChatMessageDeletion {
-  id        String   @id @default(uuid()) @db.Uuid
-  messageId String   @db.Uuid
-  userId    String   @db.Uuid
-  deletedAt DateTime @default(now())
-
-  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId])
-  @@index([userId])
-}
-
-model UserReplyStats {
-  id                 String   @id @default(uuid()) @db.Uuid
-  userId             String   @unique @db.Uuid
-  medianReplyMinutes Int?
-  sampleCount        Int      @default(0)
-  recentSamples      Json?
-  calculatedAt       DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model Wallet {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @unique @db.Uuid
-  balance   Decimal  @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions WalletTransaction[]
-}
-
-model WalletGooglePlayPurchase {
-  id                  String   @id @default(uuid()) @db.Uuid
-  userId              String   @db.Uuid
-  productId           String
-  orderId             String   @unique
-  purchaseTokenHash   String   @unique
-  amount              Decimal  @db.Decimal(10, 2)
-  status              String   @default("PROCESSING")
-  walletTransactionId String?  @unique @db.Uuid
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model Event {
-  id String @id @default(uuid()) @db.Uuid
-
-  //---------------------------------
-  // Step 1
-  //---------------------------------
-  eventType Type?
-  title     String?
-  status    EventStatus @default(DRAFT)
-
-  // New event-specific tags
-  featureTags EventFeatureTag[]
-
-  //---------------------------------
-  // Step 2
-  //---------------------------------
-  city String?
-
-  // Existing EventTag - KEEP THIS
-  eventTag EventTag?
-
-  //---------------------------------
-  // Step 3
-  //---------------------------------
-  eventDate   DateTime?
-  startTime   String?
-  endTime     String?
-  venueName   String?
-  fullAddress String?   @db.Text
-  latitude    Float?
-  longitude   Float?
-
-  //---------------------------------
-  // Step 4 - Tickets & Capacity
-  //---------------------------------
-
-  totalCapacity Int?
-
-  menCapacity   Int?
-  womenCapacity Int?
-  otherCapacity Int?
-
-  menEntryPrice   Decimal? @db.Decimal(10, 2)
-  womenEntryPrice Decimal? @db.Decimal(10, 2)
-  otherEntryPrice Decimal? @db.Decimal(10, 2)
-
-  discountPercentage Decimal? @db.Decimal(5, 2)
-
-  menDiscountedPrice   Decimal? @db.Decimal(10, 2)
-  womenDiscountedPrice Decimal? @db.Decimal(10, 2)
-  otherDiscountedPrice Decimal? @db.Decimal(10, 2)
-
-  minAge        Int?
-  maxAge        Int?
-  eventIntent   EventIntent?
-  //---------------------------------
-  // Step 5
-  //---------------------------------
-  heroImage     String?
-  galleryImages EventGallery[]
-  aboutEvent    String?          @db.Text
-  amenities     EventAmenity[]
-  itinerary     EventItinerary[]
-  whyShouldCome EventWhyCome[]
-
-  //---------------------------------
-  // Step 6
-  //---------------------------------
-  safetyFeatures  EventSafety[]
-  dressCode       DressCode?
-  refundWindow    Int?
-  termsConditions String?       @db.Text
-
-  faqs         EventFAQ[]
-  chatMessages ChatMessage[]
-
-  //---------------------------------
-  // Progress
-  //---------------------------------
-  currentStep    Int     @default(1)
-  basicsDone     Boolean @default(false)
-  hostDone       Boolean @default(false)
-  venueDone      Boolean @default(false)
-  ticketDone     Boolean @default(false)
-  experienceDone Boolean @default(false)
-  safetyDone     Boolean @default(false)
-
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  EventBooking      EventBooking[]
-  BusinessDetails   BusinessDetails? @relation(fields: [businessDetailsId], references: [id])
-  businessDetailsId String?          @db.Uuid
-  EventHost         EventHost[]
-
-  @@index([status])
-  @@index([city])
-  @@index([eventDate])
-  @@index([currentStep])
-}
-
 enum EventTag {
   BRAND
   PROMOTED
   FEATURED
-}
-
-model EventGallery {
-  id        String   @id @default(uuid()) @db.Uuid
-  eventId   String   @db.Uuid
-  imageUrl  String
-  sortOrder Int      @default(0)
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-}
-
-model EventAmenity {
-  id        String  @id @default(uuid()) @db.Uuid
-  eventId   String  @db.Uuid
-  name      String
-  icon      String?
-  sortOrder Int     @default(0)
-  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventItinerary {
-  id            String  @id @default(uuid()) @db.Uuid
-  eventId       String  @db.Uuid
-  // Existing fields - DO NOT CHANGE
-  time          String
-  title         String
-  description   String?
-  icon          String?
-  sortOrder     Int     @default(0)
-  // New fields
-  date          String?
-  dayNumber     Int?
-  location      String?
-  elevation     String?
-  distance      String?
-  accommodation String?
-  meals         String?
-  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventWhyCome {
-  id          String  @id @default(uuid()) @db.Uuid
-  eventId     String  @db.Uuid
-  title       String
-  description String?
-  icon        String?
-  sortOrder   Int     @default(0)
-  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventSafety {
-  id      String @id @default(uuid()) @db.Uuid
-  eventId String @db.Uuid
-  title   String
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventFAQ {
-  id           String   @id @default(uuid()) @db.Uuid
-  eventId      String   @db.Uuid
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  question     String   @db.Text
-  answer       String   @db.Text
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([eventId])
-}
-
-model EventFeatureTag {
-  id           String   @id @default(uuid()) @db.Uuid
-  eventId      String   @db.Uuid
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  label        String
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([eventId])
-}
-
-model EventBooking {
-  id                  String             @id @default(uuid()) @db.Uuid
-  userId              String             @db.Uuid
-  user                User               @relation(fields: [userId], references: [id])
-  eventId             String             @db.Uuid
-  event               Event              @relation(fields: [eventId], references: [id])
-  bookingNumber       String             @unique @db.VarChar(50)
-  ticketCount         Int                @default(1)
-  ticketAmount        Decimal            @db.Decimal(10, 2)
-  platformFee         Decimal            @default(0) @db.Decimal(10, 2)
-  gstAmount           Decimal            @default(0) @db.Decimal(10, 2)
-  discountAmount      Decimal            @default(0) @db.Decimal(10, 2)
-  couponCode          String?            @db.VarChar(50)
-  totalAmount         Decimal            @db.Decimal(10, 2)
-  paidAmount          Decimal            @default(0) @db.Decimal(10, 2)
-  status              EventBookingStatus @default(PENDING)
-  paymentId           String?            @unique @db.Uuid
-  payment             Payment?           @relation(fields: [paymentId], references: [id])
-  // Cancellation
-  cancellationReason  String?            @db.VarChar(100)
-  cancellationComment String?            @db.VarChar(500)
-  cancelledAt         DateTime?
-
-  // Refund
-  refundEligible    Boolean?
-  refundAmount      Decimal?             @db.Decimal(10, 2)
-  refundReason      String?              @db.Text
-  refundRequestedAt DateTime?
-  refundedAt        DateTime?
-  refundReferenceId String?              @db.VarChar(255)
-  tickets           EventBookingTicket[]
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-
-  @@index([userId])
-  @@index([eventId])
-  @@index([status])
-  @@index([bookingNumber])
-}
-
-model EventBookingTicket {
-  id           String            @id @default(uuid()) @db.Uuid
-  bookingId    String            @db.Uuid
-  booking      EventBooking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  ticketId     String            @unique @db.VarChar(50)
-  ticketType   EventTicketType
-  ticketAmount Decimal           @db.Decimal(10, 2)
-  qrCodeUrl    String?           @db.Text
-  status       EventTicketStatus @default(PENDING)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-
-  @@index([bookingId])
-  @@index([ticketType])
-  @@index([status])
-}
-
-model EventCancelFAQ {
-  id           String   @id @default(uuid()) @db.Uuid
-  question     String   @db.Text
-  answer       String   @db.Text
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 }
 
 enum EventBookingStatus {
@@ -2820,31 +3171,6 @@ enum DressCode {
   TRADITIONAL
 }
 
-model WalletTransaction {
-  id            String             @id @default(uuid()) @db.Uuid
-  walletId      String             @db.Uuid
-  amount        Decimal
-  type          TransactionType
-  status        TransactionStatus
-  source        TransactionSource?
-  referenceId   String?
-  description   String?
-  balanceBefore Decimal
-  balanceAfter  Decimal
-  createdAt     DateTime           @default(now())
-
-  wallet             Wallet               @relation(fields: [walletId], references: [id])
-  gift               UserGift?
-  BoostPurchase      BoostPurchase[]
-  RosePurchase       RosePurchase[]
-  ComplimentPurchase ComplimentPurchase[]
-  DatePlanPurchase   DatePlanPurchase[]
-
-  @@index([walletId])
-  @@index([type])
-  @@index([createdAt])
-}
-
 enum TransactionType {
   DEPOSIT
   WITHDRAW
@@ -2887,8 +3213,6 @@ enum MessageType {
   VIDEO
   AUDIO
   FILE
-  CONTACT
-  LOCATION
   DATE_INVITE
   DATE_CONFIRMED
   DATE_CANCELLED
@@ -2900,6 +3224,8 @@ enum MessageType {
   EVENT_INVITE
   EVENT_CONFIRM
   EVENT_CANCEL
+  CONTACT
+  LOCATION
   RELATIONSHIP_TAG_PROPOSAL
   RELATIONSHIP_TAG_ACCEPTED
   RELATIONSHIP_TAG_REJECTED
@@ -2917,8 +3243,6 @@ enum NotificationType {
   NEW_COMPLIMENT
   EVENT_INVITE
   EVENT_RESPONSE
-  EVENT_CONFIRM
-  EVENT_CANCEL
   PROFILE_VIEW
   SUPER_LIKE
   SUBSCRIPTION_EXPIRING
@@ -2926,6 +3250,8 @@ enum NotificationType {
   BOOST_EXPIRING
   DATE_CONFIRMED
   DATE_INVITE
+  EVENT_CONFIRM
+  EVENT_CANCEL
   DATE_CANCELLED
   RELATIONSHIP_TAG_PROPOSAL
   RELATIONSHIP_TAG_ACCEPTED
@@ -3077,60 +3403,9 @@ enum SwipeAction {
   SUPERLIKE
 }
 
-model Waitlist {
-  id                 String          @id @default(uuid()) @db.Uuid
-  userId             String          @unique @db.Uuid
-  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  waitlistNumber     Int             @unique
-  plan               WaitlistPlan    @default(FREE)
-  amountPaid         Decimal         @db.Decimal(10, 2)
-  paymentStatus      PaymentStatus   @default(PENDING)
-  paymentId          String?         @unique @db.Uuid
-  payment            Payment?        @relation(fields: [paymentId], references: [id])
-  launchBenefit      LaunchBenefit   @default(ONE_MONTH_PREMIUM)
-  premiumActivated   Boolean         @default(false)
-  premiumActivatedAt DateTime?
-  source             WaitlistSource?
-  notes              String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-
-  @@index([paymentStatus])
-  @@map("waitlists")
-}
-
 enum WaitlistPlan {
   FREE
   PAID
-}
-
-model LaunchConfig {
-  id                 String    @id @default(uuid()) @db.Uuid
-  waitlistEnabled    Boolean   @default(true)
-  appLaunched        Boolean   @default(false)
-  launchDate         DateTime?
-  originalPrice      Decimal   @default(799) @db.Decimal(10, 2)
-  discountAmount     Decimal   @default(500) @db.Decimal(10, 2)
-  finalPrice         Decimal   @default(299) @db.Decimal(10, 2)
-  welcomeCoins       Int       @default(100)
-  perks              Json?
-  totalBenefitsValue Decimal?  @db.Decimal(10, 2)
-  description        String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-}
-
-model RewardConfig {
-  id             String   @id @default(uuid()) @db.Uuid
-  signupReward   Decimal  @default(100.00) @db.Decimal(10, 2)
-  packageReward  Decimal  @default(500.00) @db.Decimal(10, 2)
-  waitlistReward Decimal  @default(300.00) @db.Decimal(10, 2)
-  title          String   @default("How Rewards Work") @db.VarChar(100)
-  descriptions   Json
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@map("reward_config")
 }
 
 enum PaymentStatus {
@@ -3170,111 +3445,6 @@ enum LaunchBenefit {
   LIFETIME_DISCOUNT
 }
 
-model GiftCategory {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  gifts     Gift[]
-
-  @@map("gift_categories")
-}
-
-model Gift {
-  id           Int          @id @default(autoincrement())
-  categoryId   Int
-  category     GiftCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  image        String
-  name         String
-  coinCost     Int
-  triggerLine  String?      @db.VarChar(90)
-  receiverLine String?      @db.VarChar(90)
-  isLive       Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  UserGift     UserGift[]
-
-  @@index([categoryId])
-  @@index([name])
-  @@map("gifts")
-}
-
-model ComplimentCategory {
-  id        String           @id @default(cuid())
-  name      String           @unique
-  sortOrder Int              @default(0)
-  ideas     ComplimentIdea[]
-
-  @@map("compliment_categories")
-}
-
-model ComplimentIdea {
-  id             String             @id @default(cuid())
-  categoryId     String
-  category       ComplimentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  text           String
-  sortOrder      Int                @default(0)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  UserCompliment UserCompliment[]
-
-  @@index([categoryId, sortOrder])
-  @@map("compliment_ideas")
-}
-
-model Employee {
-  id             String        @id @default(uuid()) @db.Uuid
-  firstName      String        @db.VarChar(100)
-  lastName       String        @db.VarChar(100)
-  email          String        @unique @db.VarChar(255)
-  phone          String        @unique @db.VarChar(20)
-  password       String
-  image          String?
-  address        String?       @db.Text
-  identityType   IdentityType?
-  identityNumber String?       @db.VarChar(100)
-  identityImage  String?
-  roleId         String        @db.Uuid
-  role           EmployeeRole  @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  @@index([roleId])
-  @@map("employees")
-}
-
-model EmployeeRole {
-  id          String           @id @default(uuid()) @db.Uuid
-  roleName    String           @unique @db.VarChar(100)
-  description String?
-  isActive    Boolean          @default(true)
-  employees   Employee[]
-  permissions RolePermission[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  @@map("employee_roles")
-}
-
-model RolePermission {
-  id        String           @id @default(uuid()) @db.Uuid
-  roleId    String           @db.Uuid
-  module    PermissionModule
-  all       Boolean          @default(false)
-  add       Boolean          @default(false)
-  view      Boolean          @default(false)
-  update    Boolean          @default(false)
-  delete    Boolean          @default(false)
-  export    Boolean          @default(false)
-  role      EmployeeRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  @@unique([roleId, module])
-  @@index([roleId])
-}
-
 enum IdentityType {
   AADHAR
   PAN
@@ -3300,83 +3470,21 @@ enum PurchasePaymentMethod {
 }
 
 enum StoreFeatureType {
-  // Roses
   ROSE_SEND_COST
   REVEAL_ROSE_SENDER
-
   WHO_LIKED_YOU_REVEAL_COST
-  // Compliments
   COMPLIMENT_SEND_COST
   REVEAL_COMPLIMENT_SENDER
-
-  // Likes
   REVEAL_LIKED_YOU
-
-  // Boost
   BOOST_DURATION
   BOOST_SINGLE_PRICE
   BOOST_VISIBILITY_MULTIPLIER
-
-  // Super Boost
   SUPER_BOOST_DURATION
   SUPER_BOOST_SINGLE_PRICE
   SUPER_BOOST_VISIBILITY_MULTIPLIER
-
-  // Date Plan
   DATE_PLAN_POST_COST
   DATE_PLAN_BOOST_COST
   DATE_PLAN_FREE_FOR_VIP
-}
-
-model StoreInfo {
-  id          String        @id @default(uuid()) @db.Uuid
-  itemType    StoreItemType
-  title       String
-  description String
-  tag         String? // e.g. PRIORITY, NEW
-  sortOrder   Int           @default(0)
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  @@index([itemType, isActive])
-  @@map("store_info")
-}
-
-model StoreFeature {
-  id           String           @id @default(uuid()) @db.Uuid
-  itemType     StoreItemType
-  feature      StoreFeatureType @unique
-  title        String
-  description  String?
-  intValue     Int?
-  decimalValue Decimal?         @db.Decimal(10, 2)
-  boolValue    Boolean?
-  unit         String?
-  enabled      Boolean          @default(true)
-  premiumFree  Boolean          @default(false)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-
-  @@index([feature])
-  @@map("store_features")
-}
-
-model StorePack {
-  id           String         @id @default(uuid()) @db.Uuid
-  itemType     StoreItemType
-  title        String
-  quantity     Int
-  pricePerUnit Decimal        @db.Decimal(10, 2)
-  totalPrice   Decimal        @db.Decimal(10, 2)
-  badge        StorePackBadge @default(NONE)
-  sortOrder    Int            @default(0)
-  isActive     Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  @@index([itemType, isActive])
-  @@map("store_packs")
 }
 
 enum StoreItemType {
@@ -3392,20 +3500,6 @@ enum StorePackBadge {
   NONE
   MOST_POPULAR
   BEST_VALUE
-}
-
-model UserCompatibility {
-  id           String   @id @default(uuid())
-  userId       String
-  targetUserId String
-  score        Int
-  percentage   Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([userId, targetUserId])
-  @@index([userId, score])
-  @@index([userId, targetUserId])
 }
 
 enum LegalPageType {
@@ -3427,24 +3521,6 @@ enum LegalPageType {
   GRIEVANCE_OFFICER_REDRESSAL
 }
 
-model LegalPage {
-  id            String        @id @default(uuid()) @db.Uuid
-  pageType      LegalPageType @unique
-  title         String        @db.VarChar(255)
-  version       String        @db.VarChar(50)
-  content       Json
-  schemaVersion Int           @default(1)
-  effectiveFrom DateTime?
-  publishedAt   DateTime?
-  createdBy     String?       @db.Uuid
-  publishedBy   String?       @db.Uuid
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  @@index([pageType])
-  @@index([publishedAt])
-}
-
 enum RelationshipTag {
   IN_RELATIONSHIP
   OPEN_RELATIONSHIP
@@ -3464,48 +3540,6 @@ enum UserRelationshipStatus {
   ENDED
 }
 
-model RelationshipTagProposal {
-  id          String                        @id @default(uuid()) @db.Uuid
-  senderId    String                        @db.Uuid
-  receiverId  String                        @db.Uuid
-  tag         RelationshipTag
-  status      RelationshipTagProposalStatus @default(PENDING)
-  message     String?
-  createdAt   DateTime                      @default(now())
-  updatedAt   DateTime                      @updatedAt
-  respondedAt DateTime?
-
-  sender       User              @relation("RelationshipTagProposalSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver     User              @relation("RelationshipTagProposalReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  relationship UserRelationship?
-
-  @@index([senderId, status])
-  @@index([receiverId, status])
-  @@index([receiverId, createdAt])
-  @@map("relationship_tag_proposals")
-}
-
-model UserRelationship {
-  id         String                 @id @default(uuid()) @db.Uuid
-  user1Id    String                 @db.Uuid
-  user2Id    String                 @db.Uuid
-  tag        RelationshipTag
-  status     UserRelationshipStatus @default(ACTIVE)
-  startedAt  DateTime               @default(now())
-  endedAt    DateTime?
-  proposalId String?                @unique @db.Uuid
-  createdAt  DateTime               @default(now())
-  updatedAt  DateTime               @updatedAt
-
-  user1    User                     @relation("RelationshipUser1", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2    User                     @relation("RelationshipUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-  proposal RelationshipTagProposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
-
-  @@index([user1Id, status])
-  @@index([user2Id, status])
-  @@map("user_relationships")
-}
-
 enum CallbackStatus {
   REQUESTED
   SCHEDULED
@@ -3514,112 +3548,10 @@ enum CallbackStatus {
   CANCELLED
 }
 
-model CallbackRequest {
-  id             String         @id @default(uuid()) @db.Uuid
-  userId         String         @db.Uuid
-  callbackNumber String         @unique @db.VarChar(20)
-  callbackDate   DateTime       @db.Date
-  timeWindow     String         @db.VarChar(50)
-  topic          String?        @db.VarChar(100)
-  status         CallbackStatus @default(REQUESTED)
-  agentName      String?        @db.VarChar(100)
-  callDuration   Int?
-  resolutionNote String?        @db.Text
-  resolvedAt     DateTime?
-  missedAt       DateTime?
-  cancelledAt    DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([userId, status])
-  @@index([callbackDate, status])
-}
-
-model SupportFaq {
-  id        String   @id @default(uuid()) @db.Uuid
-  question  String   @db.VarChar(255)
-  answer    String   @db.Text
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive, sortOrder])
-}
-
-model GlobalAmount {
-  id               String  @id @default(uuid()) @db.Uuid
-  gst              Decimal @default(18) @db.Decimal(5, 2)
-  eventPlatformFee Decimal @default(2) @db.Decimal(10, 2)
-
-  // Home Page Profile Display Limits
-  freeProfileLimit     Int @default(0)
-  premiumProfileLimit  Int @default(25)
-  vipProfileLimit      Int @default(50)
-  vipEliteProfileLimit Int @default(100)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("global_amount")
-}
-
 enum PayoutMethodType {
   BANK_ACCOUNT
   UPI
 }
-
-model UserPayoutMethod {
-  id     String           @id @default(uuid()) @db.Uuid
-  userId String           @db.Uuid
-  type   PayoutMethodType
-
-  // =====================================================
-  // BANK ACCOUNT DETAILS
-  // =====================================================
-
-  accountHolderName      String? @db.VarChar(150)
-  accountNumberEncrypted String? @db.Text
-  accountNumberLast4     String? @db.VarChar(4)
-  ifscCode               String? @db.VarChar(20)
-  bankName               String? @db.VarChar(150)
-
-  bankIsPrimary  Boolean @default(false)
-  bankIsVerified Boolean @default(false)
-  bankIsActive   Boolean @default(true)
-
-  // =====================================================
-  // UPI DETAILS
-  // =====================================================
-
-  upiId String? @db.VarChar(150)
-
-  upiIsPrimary  Boolean @default(false)
-  upiIsVerified Boolean @default(false)
-  upiIsActive   Boolean @default(true)
-
-  // =====================================================
-  // COMMON
-  // =====================================================
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([userId, type])
-  @@index([userId, bankIsPrimary])
-  @@index([userId, upiIsPrimary])
-}
-
-// =========================================================
-// PRIVACY CONTROLS
-// =========================================================
 
 enum MessagePermission {
   MATCHES_ONLY
@@ -3627,138 +3559,7 @@ enum MessagePermission {
   PAID_ONLY
 }
 
-model UserPrivacySettings {
-  id String @id @default(uuid()) @db.Uuid
-
-  userId            String              @unique @db.Uuid
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messagePermission MessagePermission[] @default([MATCHES_ONLY])
-  hideFromContacts  Boolean             @default(false)
-  ghostMode         Boolean             @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([messagePermission])
-  @@index([hideFromContacts])
-  @@index([ghostMode])
-}
-
-model LocationMaster {
-  id               Int      @id @default(autoincrement())
-  city             String
-  state            String?
-  country          String
-  countryCode      String
-  latitude         Float
-  longitude        Float
-  capital          String?
-  population       BigInt?
-  populationProper BigInt?
-  active           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @default(now()) @updatedAt
-
-  @@unique([city, state, countryCode])
-  @@index([city])
-  @@index([state])
-  @@index([countryCode])
-  @@map("location_master")
-}
-
-model UserDailyFeedView {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @db.Uuid
-  targetUserId String   @db.Uuid
-  viewDate     DateTime @db.Date
-  createdAt    DateTime @default(now())
-
-  user       User @relation("DailyFeedViewer", fields: [userId], references: [id], onDelete: Cascade)
-  targetUser User @relation("DailyFeedTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, targetUserId, viewDate])
-  @@index([userId, viewDate])
-  @@index([targetUserId])
-}
-
-model ConversationPromptCategory {
-  id          String               @id @default(uuid()) @db.Uuid
-  name        String               @db.VarChar(100)
-  slug        String               @unique @db.VarChar(100)
-  description String?
-  sortOrder   Int                  @default(0)
-  isActive    Boolean              @default(true)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  prompts     ConversationPrompt[]
-
-  @@index([isActive, sortOrder])
-  @@map("conversation_prompt_categories")
-}
-
-model ConversationPrompt {
-  id         String                     @id @default(uuid()) @db.Uuid
-  categoryId String                     @db.Uuid
-  message    String                     @db.Text
-  label      String?                    @db.VarChar(100)
-  sortOrder  Int                        @default(0)
-  isActive   Boolean                    @default(true)
-  usageCount Int                        @default(0)
-  createdAt  DateTime                   @default(now())
-  updatedAt  DateTime                   @updatedAt
-  category   ConversationPromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@index([categoryId, isActive, sortOrder])
-  @@map("conversation_prompts")
-}
-
 enum InAppPlatform {
   ANDROID
   IOS
-}
-
-model InAppProduct {
-  id        String        @id @default(uuid()) @db.Uuid
-  priceId   String        @db.Uuid
-  platform  InAppPlatform
-  productId String
-  active    Boolean       @default(true)
-  price     PackagePrice  @relation(fields: [priceId], references: [id])
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  @@unique([platform, productId])
-  @@unique([priceId, platform])
-  @@map("in_app_products")
-}
-
-model InAppPurchase {
-  id                    String        @id @default(uuid()) @db.Uuid
-  userId                String        @db.Uuid
-  paymentId             String        @unique @db.Uuid
-  userPackageId         String?       @db.Uuid
-  platform              InAppPlatform
-  productId             String
-  priceId               String        @db.Uuid
-  purchaseTokenHash     String?       @unique @db.VarChar(64)
-  transactionId         String?
-  originalTransactionId String?
-  environment           String?
-  storeStatus           String
-  purchaseDate          DateTime?
-  expiryDate            DateTime?
-  autoRenew             Boolean       @default(false)
-  rawResponse           Json?
-  verifiedAt            DateTime      @default(now())
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
-  user                  User          @relation(fields: [userId], references: [id])
-  payment               Payment       @relation(fields: [paymentId], references: [id])
-  packagePrice          PackagePrice  @relation(fields: [priceId], references: [id])
-  userPackage           UserPackage?  @relation(fields: [userPackageId], references: [id])
-
-  @@unique([platform, transactionId])
-  @@index([userId])
-  @@index([platform, originalTransactionId])
-  @@map("in_app_purchases")
 }

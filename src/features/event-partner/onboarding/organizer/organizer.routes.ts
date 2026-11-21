@@ -7,8 +7,11 @@ import {
 import {
   completePartnerGovernmentIdController,
   getOrganizerAboutYouController,
+  getYourEventsController,
   initPartnerGovernmentIdController,
+  partnerGovernmentIdCallbackController,
   saveOrganizerAboutYouController,
+  saveYourEventsController,
   verifyEventPartnerPanController,
 } from "./organizer.controller";
 
@@ -34,12 +37,15 @@ router.patch(
   saveOrganizerAboutYouController,
 );
 
+router.get("/organizer/your-events", partnerAuthMiddleware, getYourEventsController);
+router.patch("/organizer/your-events", partnerAuthMiddleware, saveYourEventsController);
+
 
 // ======================================================
 // PAN VERIFY
 // ======================================================
 router.post(
-  "/pan",
+  "/pan/submit",
   partnerAuthMiddleware,
   verifyEventPartnerPanController,
 );
@@ -63,4 +69,6 @@ router.post(
   partnerAuthMiddleware,
   completePartnerGovernmentIdController,
 );
+router.get("/government-id/callback", partnerGovernmentIdCallbackController);
+
 export default router;
