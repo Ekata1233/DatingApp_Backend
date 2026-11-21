@@ -397,14 +397,14 @@ model YourEvents {
   businessId String          @unique @db.Uuid
   business   BusinessDetails @relation(fields: [businessId], references: [id])
 
-  eventDurationType EventDurationType
+  eventDurationType EventDurationType?
 
   categories EventCategory[] @relation("YourEventCategories")
 
-  baseCity      String
+  baseCity      String?
   hostingCities String[] @default([])
 
-  targetAudience EventAudience
+  targetAudience EventAudience?
 
   emergencyContactName  String?
   emergencyContactPhone String?

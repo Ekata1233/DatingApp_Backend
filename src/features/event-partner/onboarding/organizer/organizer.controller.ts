@@ -1,19 +1,26 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 
 import {
   PartnerRequest,
 } from "../../../../types/partnerAuth.types";
 
 import {
+  completePartnerGovernmentIdService,
   getOrganizerAboutYouService,
+  initPartnerGovernmentIdService,
   saveOrganizerAboutYouService,
   verifyEventPartnerPanService,
 } from "./organizer.service";
 
 import {
   OrganizerOnboardingError,
+  PartnerGovernmentIdError,
 } from "./organizer.types";
-import { PanVerificationError } from "./organizer.helper";
+import {
+  authorizePartnerGovernmentIdService,
+  PanVerificationError,
+} from "./organizer.helper";
+import { getYourEvents, saveYourEvents, yourEventsInputSchema } from "./your-events.service";
 
 // ======================================================
 // VALIDATE UUID
@@ -28,6 +35,55 @@ const isValidUUID = (
       value,
     )
   );
+};
+
+const requireOrganizerForBusiness = (req: Request, businessId: string) => {
+  const partner = (req as PartnerRequest).partner;
+  if (!partner) {
+    throw new OrganizerOnboardingError(401, "Unauthorized");
+  }
+  if (partner.role === "HOST" || (partner.businessId && partner.businessId !== businessId)) {
+    throw new OrganizerOnboardingError(403, "Organizer access is required for this business");
+  }
+  return partner;
+};
+
+export const getYourEventsController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { businessId } = req.query;
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    const data = await getYourEvents(partner.id, businessId);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError) {
+      return handleOrganizerError(error, res);
+    }
+    return next(error);
+  }
+};
+
+export const saveYourEventsController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = yourEventsInputSchema.safeParse(req.body);
+    if (!input.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Your Events data",
+        errors: input.error.flatten(),
+      });
+    }
+    const partner = requireOrganizerForBusiness(req, input.data.businessId);
+    const data = await saveYourEvents(partner.id, input.data);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError) {
+      return handleOrganizerError(error, res);
+    }
+    return next(error);
+  }
 };
 
 // ======================================================
@@ -307,9 +363,9 @@ export const initPartnerGovernmentIdController = async (
   next: NextFunction,
 ) => {
   try {
-    const partnerId = (req as any).user?.id;
+    const partner = (req as PartnerRequest).partner;
 
-    if (!partnerId) {
+    if (!partner) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
@@ -349,8 +405,12 @@ export const initPartnerGovernmentIdController = async (
       });
     }
 
+    if (partner.role === "HOST" || (partner.businessId && partner.businessId !== businessId)) {
+      throw new PartnerGovernmentIdError(403, "Organizer access is required for this business");
+    }
+
     const result = await initPartnerGovernmentIdService({
-      partnerId,
+      partnerId: partner.id,
       businessId,
       documentType,
       consent,
@@ -383,9 +443,9 @@ export const completePartnerGovernmentIdController = async (
   next: NextFunction,
 ) => {
   try {
-    const partnerId = (req as any).user?.id;
+    const partner = (req as PartnerRequest).partner;
 
-    if (!partnerId) {
+    if (!partner) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
@@ -420,8 +480,12 @@ export const completePartnerGovernmentIdController = async (
       });
     }
 
+    if (partner.role === "HOST" || (partner.businessId && partner.businessId !== businessId)) {
+      throw new PartnerGovernmentIdError(403, "Organizer access is required for this business");
+    }
+
     const result = await completePartnerGovernmentIdService({
-      partnerId,
+      partnerId: partner.id,
       businessId,
       attemptId,
     });
@@ -439,6 +503,27 @@ export const completePartnerGovernmentIdController = async (
       });
     }
 
+    return next(error);
+  }
+};
+
+export const partnerGovernmentIdCallbackController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { state, transaction_id, code } = req.query;
+    if (typeof state !== "string" || typeof transaction_id !== "string" || typeof code !== "string") {
+      throw new PartnerGovernmentIdError(400, "Invalid DigiLocker callback parameters");
+    }
+
+    const result = await authorizePartnerGovernmentIdService(state, transaction_id, code);
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof PartnerGovernmentIdError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
     return next(error);
   }
 };

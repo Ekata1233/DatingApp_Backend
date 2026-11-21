@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+import { PartnerGovernmentIdAttemptStatus as AttemptStatus } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import { PartnerGovernmentIdError } from "./organizer.types";
 
@@ -31,6 +33,7 @@ export const normalizeName = (name: string): string => {
 export const authorizePartnerGovernmentIdService = async (
   state: string,
   transactionId: string,
+  code: string,
 ) => {
   if (!state || !transactionId) {
     throw new PartnerGovernmentIdError(
@@ -72,10 +75,15 @@ export const authorizePartnerGovernmentIdService = async (
     );
   }
 
-  if (attempt.status === AttemptStatus.AUTHORIZED) {
+  if (
+    attempt.status === AttemptStatus.AUTHORIZED ||
+    attempt.status === AttemptStatus.VERIFIED ||
+    attempt.status === AttemptStatus.REJECTED
+  ) {
     return {
       attemptId: attempt.id,
-      status: "AUTHORIZED",
+      businessId: attempt.businessId,
+      status: attempt.status,
     };
   }
 
@@ -86,16 +94,26 @@ export const authorizePartnerGovernmentIdService = async (
     );
   }
 
+  if (code !== "1003" && code !== "1004") {
+    throw new PartnerGovernmentIdError(400, "Invalid DigiLocker authorization code");
+  }
+
+  const now = new Date();
+  const denied = code === "1003";
+  const status = denied ? AttemptStatus.REJECTED : AttemptStatus.AUTHORIZED;
   const updated =
     await prisma.partnerGovernmentIdAttempt.updateMany({
       where: {
         id: attempt.id,
         status: AttemptStatus.PENDING,
         transactionId,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       data: {
-        status: AttemptStatus.AUTHORIZED,
-        authorizedAt: new Date(),
+        status,
+        ...(denied
+          ? { completedAt: now, failureReason: "ACCESS_DENIED" }
+          : { authorizedAt: now }),
       },
     });
 
@@ -109,14 +127,13 @@ export const authorizePartnerGovernmentIdService = async (
   return {
     attemptId: attempt.id,
     businessId: attempt.businessId,
-    status: "AUTHORIZED",
+    status,
   };
 };
 
 
 
-/* -------------------------------------------------------------------------- */
-/*                     DIGILOCKER CALLBACK SERVICE                            */
-/* -------------------------------------------------------------------------- */
+export const hashState = (state: string) =>
+  createHash("sha256").update(state).digest("hex");
 
 
