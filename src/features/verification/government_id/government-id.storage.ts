@@ -39,7 +39,7 @@ const detectImageType = (
   throw new Error("INVALID_GOVERNMENT_ID_IMAGE");
 };
 
-const validateImage = (
+export const validateImage = (
   buffer: Buffer
 ): GovernmentIdPhoto["mimeType"] => {
   if (

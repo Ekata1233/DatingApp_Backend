@@ -111,10 +111,13 @@ import partnerAuthRoutes from "../features/event-partner/auth/partnerAuth.routes
 import emailVerificationRoutes from "../features/email-verification/email-verification.routes"
 
 import organizerRoutes from "../features/event-partner/onboarding/organizer/organizer.routes"
+import organizerBankAccountRoutes from "../features/event-partner/organizer-management/bank-account.routes";
+import organizerBrandPageRoutes from "../features/event-partner/organizer-management/brand-page.routes";
 import createHostRoutes from "../features/event-partner/host-management/host.routes"
 import hostOnboardingRoutes from "../features/event-partner/onboarding/host-invitation/host-invitation.routes"
 import orgnizerPanVerificationRoutes from "../features/event-partner/verification/orgnizer/pan/pan-verification.routes"
 import orgnizerGSTVerificationRoutes from "../features/event-partner/verification/orgnizer/gst/gst-verification.routes"
+import bankDetailsRoutes from "../features/event-partner/organizer-management/bank-account.routes"
 
 const router = Router();
 
@@ -246,10 +249,12 @@ router.use("/user", matchAnalysisRoutes)
 router.use("/user", inAppPurchaseRoutes)
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
+router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
+router.use("/event-partner/organizer-management/brand-page", organizerBrandPageRoutes);
 router.use("/event-partner/hosts", createHostRoutes)
 router.use("/event/hosts", hostOnboardingRoutes)
 router.use("/event-partner", orgnizerPanVerificationRoutes , orgnizerGSTVerificationRoutes)
-
+router.use("/event-partner", bankDetailsRoutes)
 
 
 
