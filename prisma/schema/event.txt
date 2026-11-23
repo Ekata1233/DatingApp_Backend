@@ -71,10 +71,18 @@ model Event {
   notIncluded          String[]           @default([])
   whatToBring          String[]           @default([])
   dressCode            EventDressCode     @default(NONE)
+// Group Chat
+groupChatTitle       String?
+groupChatDescription String?
+groupChatOpensAt     DateTime?
 
+// Reminders
+reminderTitle       String?
+reminderDescription String?
+reminderTimes       DateTime[] @default([])
   // Host / Trip Captain
   hostId          String?       @db.Uuid
-host            EventPartner? @relation("EventTripCaptain", fields: [hostId], references: [id])
+  host            EventPartner? @relation("EventTripCaptain", fields: [hostId], references: [id])
   hostPhotoUrl         String?
   hostTitle            String?
   hostSpeciality       String?
@@ -82,10 +90,26 @@ host            EventPartner? @relation("EventTripCaptain", fields: [hostId], re
   hostMessage          String?
   afterEventLine       String?
 
-  // FAQs & Policies
-  cancellationPolicy   EventCancellationPolicy?
-  rules                String[]           @default([])
-  safetyOptions        EventSafetyOption[] @default([])
+
+  
+ 
+ 
+  // Cancellation
+  cancellationPolicy      EventCancellationPolicy?
+  cancellationDescription String?
+
+  // Refund
+  refundPolicy            String?
+
+  // Rescheduling
+  reschedulingPolicy      String?
+
+  // Event Rules
+  rules                   String[] @default([])
+
+  // Safety
+  safetyOptions           EventSafetyOption[] @default([])
+
 
   // Draft & Submission
   status               EventStatus        @default(DRAFT)
@@ -147,6 +171,7 @@ model EventDate {
 
   status           EventDateStatus  @default(SCHEDULED)
   isPrimary        Boolean          @default(false)
+  isMoreDate Boolean @default(false)
   cancelledAt      DateTime?
   cancellationReason String?
 
