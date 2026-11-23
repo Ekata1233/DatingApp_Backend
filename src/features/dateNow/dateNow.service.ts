@@ -2399,7 +2399,33 @@ export const getDatePlanHistory = async (
   ]);
 
  
+// ============================================
+// DATE PLAN BOOST VIEW COUNTS
+// ============================================
 
+const planIds = plans.map((plan) => plan.id);
+
+const boostViewCounts = planIds.length
+  ? await prisma.datePlanUserBoost.groupBy({
+      by: ["datePlanId"],
+      where: {
+        datePlanId: {
+          in: planIds,
+        },
+        userId,
+      },
+      _sum: {
+        viewCount: true,
+      },
+    })
+  : [];
+
+const viewCountMap = new Map(
+  boostViewCounts.map((item) => [
+    item.datePlanId,
+    item._sum.viewCount ?? 0,
+  ]),
+);
   /*
    * Map plans to frontend response.
    */
@@ -2487,6 +2513,7 @@ export const getDatePlanHistory = async (
     return {
       id: plan.id,
       status: historyStatus,
+       viewCount: viewCountMap.get(plan.id) ?? 0,
       statusLabel,
       planStatus: plan.status,
       attendance: feedback
@@ -2749,7 +2776,21 @@ export const getDatePlanHistoryDetails = async (
       },
     }),
   ]);
+// ============================================
+// TOTAL DATE PLAN BOOST VIEWS
+// ============================================
 
+const boostViewStats = await prisma.datePlanUserBoost.aggregate({
+  where: {
+    datePlanId: planId,
+    userId,
+  },
+  _sum: {
+    viewCount: true,
+  },
+});
+
+const viewCount = boostViewStats._sum.viewCount ?? 0;
   const confirmed = plan.DateConfirmed?.[0] ?? null;
   const feedback = plan.feedbacks?.[0] ?? null;
 
@@ -2799,7 +2840,7 @@ export const getDatePlanHistoryDetails = async (
 
   return {
     id: plan.id,
-
+viewCount,
     /**
      * Status
      */
