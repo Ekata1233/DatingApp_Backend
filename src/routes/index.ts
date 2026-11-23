@@ -107,14 +107,6 @@ import usersRoutes from "../features/admin/onboarding/users/users.route"
 
 import activityRoutes from "../features/user/activity/activity.routes"
 
-import partnerAuthRoutes from "../features/event-partner/auth/partnerAuth.routes"
-import emailVerificationRoutes from "../features/email-verification/email-verification.routes"
-
-import organizerRoutes from "../features/event-partner/onboarding/organizer/organizer.routes"
-import createHostRoutes from "../features/event-partner/host-management/host.routes"
-import hostOnboardingRoutes from "../features/event-partner/onboarding/host-invitation/host-invitation.routes"
-import orgnizerPanVerificationRoutes from "../features/event-partner/verification/orgnizer/pan/pan-verification.routes"
-import orgnizerGSTVerificationRoutes from "../features/event-partner/verification/orgnizer/gst/gst-verification.routes"
 
 const router = Router();
 
@@ -245,10 +237,35 @@ router.use("/user", matchAnalysisRoutes)
 //IN APP PURCHASE
 router.use("/user", inAppPurchaseRoutes)
 
+// -------------------------
+
+
+
+
+
+
+
+
+
+
+//EVENT-PARTNER 
+
+import partnerAuthRoutes from "../features/event-partner/auth/partnerAuth.routes"
+import emailVerificationRoutes from "../features/email-verification/email-verification.routes"
+
+import organizerRoutes from "../features/event-partner/onboarding/organizer/organizer.routes"
+import createHostRoutes from "../features/event-partner/host-management/host.routes"
+import hostOnboardingRoutes from "../features/event-partner/onboarding/host-invitation/host-invitation.routes"
+import orgnizerPanVerificationRoutes from "../features/event-partner/verification/orgnizer/pan/pan-verification.routes"
+import orgnizerGSTVerificationRoutes from "../features/event-partner/verification/orgnizer/gst/gst-verification.routes"
+import eventCategoryRoutes from "../features/event-partner/event-category/event-category.routes"
+
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 router.use("/event-partner/hosts", createHostRoutes)
 router.use("/event/hosts", hostOnboardingRoutes)
 router.use("/event-partner", orgnizerPanVerificationRoutes , orgnizerGSTVerificationRoutes)
+
+router.use("/event-partner",eventCategoryRoutes)
 
 
 
