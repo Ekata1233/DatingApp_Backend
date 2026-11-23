@@ -43,10 +43,15 @@ export interface LpFintechConfig {
   gstUrl: string;
   clientId: string;
   clientSecret: string;
-  // "Basic base64(clientId:clientSecret)" - sent as the Authorization header
-  // on the token API and on every verification API.
+  // TOKEN API only: "Basic base64(clientId:clientSecret)"
   basicAuthorization: string;
+  // VERIFICATION APIs (GST etc.): plain base64 value, NO "Basic " prefix.
+  // LP Fintech docs: "Authorization: Base64 Encoded(clientId)"
+  apiAuthorization: string;
 }
+
+const b64 = (value: string): string =>
+  Buffer.from(value, "utf8").toString("base64");
 
 export const getLpFintechConfig = (): LpFintechConfig => {
   const baseUrl = secureUrl(required("LPFINTECH_BASE_URL"), "LPFINTECH_BASE_URL");
@@ -71,10 +76,24 @@ export const getLpFintechConfig = (): LpFintechConfig => {
   const clientId = required("LPFINTECH_CLIENT_ID");
   const clientSecret = required("LPFINTECH_CLIENT_SECRET");
 
-  // Built from ID + secret. LPFINTECH_GST_AUTHORIZATION is now OPTIONAL.
-  const basicAuthorization =
-    process.env.LPFINTECH_GST_AUTHORIZATION?.trim() ||
-    `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`;
+  // Token API header (already working). Built from ID + secret, so nothing
+  // goes out of sync when the secret is rotated.
+  // NOTE: LPFINTECH_GST_AUTHORIZATION is no longer used - remove it from .env.
+  const basicAuthorization = `Basic ${b64(`${clientId}:${clientSecret}`)}`;
+
+  // Verification API header. Docs say Base64(clientId), without "Basic ".
+  // If LP Fintech still rejects it, set LPFINTECH_API_AUTH_MODE=clientIdSecret
+  // in .env to send Base64(clientId:clientSecret) instead.
+  const mode = (process.env.LPFINTECH_API_AUTH_MODE?.trim() || "clientId").toLowerCase();
+
+  if (mode !== "clientid" && mode !== "clientidsecret") {
+    throw new LpFintechConfigError(
+      "LPFINTECH_API_AUTH_MODE must be 'clientId' or 'clientIdSecret'"
+    );
+  }
+
+  const apiAuthorization =
+    mode === "clientidsecret" ? b64(`${clientId}:${clientSecret}`) : b64(clientId);
 
   return {
     baseUrl,
@@ -83,5 +102,6 @@ export const getLpFintechConfig = (): LpFintechConfig => {
     clientId,
     clientSecret,
     basicAuthorization,
+    apiAuthorization,
   };
 };

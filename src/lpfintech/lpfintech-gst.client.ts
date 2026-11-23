@@ -4,13 +4,12 @@ import {
   getLpFintechAccessToken,
   invalidateLpFintechToken,
 } from "./lpfintech-auth.service";
-
+import { LpFintechError, describeProviderBody } from "./lpfintech.errors";
 import { LpFintechGstResponse } from "../features/event-partner/verification/orgnizer/gst/gst-verification.types";
 import { getLpFintechConfig } from "../config/lpfintech.config";
-import { describeProviderBody, LpFintechError } from "./lpfintech.errors";
 
 // Re-exported so existing imports from this file keep working.
-
+export { LpFintechError } from "./lpfintech.errors";
 
 const callGstApi = async (
   gstin: string,
@@ -27,7 +26,9 @@ const callGstApi = async (
         timeout: 30000,
         headers: {
           "Content-Type": "application/json",
-          Authorization: config.basicAuthorization,
+          // Verification APIs: plain Base64 value, NOT "Basic ..."
+          // (sending "Basic xxx" here caused VAL_EXT_001 Invalid Base64 encoding)
+          Authorization: config.apiAuthorization,
           "X-Access-Token": `Bearer ${accessToken}`,
         },
         validateStatus: () => true,
@@ -54,9 +55,14 @@ export const requestLpFintechGstVerification = async (
   let response = await callGstApi(gstin, clientTransactionId, accessToken);
 
   // Token may have expired early - get a fresh one and retry ONCE.
-  if (response.status === 401 || response.status === 403) {
+  // Don't retry when the problem is the Authorization header format
+  // (VAL_EXT_001) - a new token can't fix that.
+  const firstInfo = describeProviderBody(response.data);
+  const isHeaderFormatError = /VAL_EXT_001|base64/i.test(firstInfo);
+
+  if ((response.status === 401 || response.status === 403) && !isHeaderFormatError) {
     console.warn(
-      `[LPFINTECH][gst] HTTP ${response.status}, retrying with a fresh token :: ${describeProviderBody(response.data)}`
+      `[LPFINTECH][gst] HTTP ${response.status}, retrying with a fresh token :: ${firstInfo}`
     );
     invalidateLpFintechToken();
     accessToken = await getLpFintechAccessToken();
