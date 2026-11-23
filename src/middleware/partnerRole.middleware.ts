@@ -184,6 +184,7 @@ import {
 
 export const requirePartnerRole = (
   requiredRole: PartnerRole,
+  { inferOrganizerBusiness = false } = {},
 ) => {
   return async (
     req: Request,
@@ -192,6 +193,8 @@ export const requirePartnerRole = (
   ) => {
     try {
       const partner = (req as PartnerRequest).partner;
+
+      console.log("partner : ", partner)
 
       // ========================================
       // AUTHENTICATION VALIDATION
@@ -238,8 +241,37 @@ export const requirePartnerRole = (
         });
       }
 
-      const businessId =
+      let businessId =
         partner.businessId ?? requestedBusinessId;
+
+      if (
+        businessId === undefined &&
+        inferOrganizerBusiness &&
+        requiredRole === "ORGANIZER" &&
+        !partner.role
+      ) {
+        const businesses = await prisma.businessDetails.findMany({
+          where: {
+            partnerId: partner.id,
+            status: "ACTIVE",
+            onboardingCompleted: true,
+            partner: { accountStatus: "ACTIVE" },
+          },
+          take: 2,
+          select: { id: true },
+        });
+
+        if (businesses.length === 0) {
+          return res.status(403).json({
+            success: false,
+            message: "An active business with completed onboarding is required",
+          });
+        }
+
+        if (businesses.length === 1) {
+          businessId = businesses[0].id;
+        }
+      }
 
       if (!businessId) {
         return res.status(400).json({

@@ -26,6 +26,59 @@ import {
   validateGovernmentIdentity,
 } from "../../../verification/government_id/government-id.helper";
 import axios from "axios";
+import imagekit from "../../../../utils/imagekit";
+import { verifyFaceWithGridlines } from "../../../verification/face_match/face-match.provider";
+import { validateImage } from "../../../verification/government_id/government-id.storage";
+import { verifyEventPartnerGstService } from "../../verification/orgnizer/gst/gst-verification.service";
+import type { VerifyGstInput } from "../../verification/orgnizer/gst/gst-verification.types";
+
+export const saveOrganizerGstService = async (input: VerifyGstInput) => {
+  const verification = await verifyEventPartnerGstService(input);
+  if (!verification.isGstActive) {
+    throw new OrganizerOnboardingError(422, verification.verificationMessage);
+  }
+
+  const details = verification.gstDetails;
+  return prisma.businessDetails.update({
+    where: {
+      id: input.businessId,
+      partnerId: input.partnerId,
+      partner: { accountStatus: "ACTIVE", deletedAt: null },
+    },
+    data: {
+      hasGst: true,
+      gstNumber: verification.gstNumber,
+      gstStatus: details.registrationStatus,
+      gstVerificationStatus: PartnerVerificationStatus.VERIFIED,
+      gstVerifiedAt: verification.verifiedAt,
+      legalName: details.legalName,
+      tradeName: details.tradeName,
+      constitution: details.constitution,
+      registeredSince: details.registrationDate,
+      principalPlace: details.address,
+      registeredPincode: details.registeredPincode,
+    },
+    select: {
+      id: true,
+      hasGst: true,
+      gstNumber: true,
+      gstStatus: true,
+      gstVerificationStatus: true,
+      gstVerifiedAt: true,
+      legalName: true,
+      tradeName: true,
+      constitution: true,
+      registeredSince: true,
+      principalPlace: true,
+      registeredPincode: true,
+    },
+  }).catch((error: unknown) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new OrganizerOnboardingError(404, "Business not found or access denied");
+    }
+    throw error;
+  });
+};
 
 // ======================================================
 // CONSENT DOCUMENT CONFIGURATION
@@ -991,6 +1044,134 @@ const getPartnerBusiness = async (partnerId: string, businessId: string) => {
   }
 
   return business;
+};
+
+const organizerFaceSelect = {
+  id: true,
+  businessId: true,
+  faceStatus: true,
+  faceMatchScore: true,
+  isFaceMatched: true,
+  faceProvider: true,
+  faceReferenceId: true,
+  faceVerifiedAt: true,
+  faceFailureReason: true,
+} as const;
+
+export const verifyOrganizerFaceService = async (
+  partnerId: string,
+  businessId: string,
+  selfie: Buffer,
+) => {
+  let mimeType: ReturnType<typeof validateImage>;
+  try {
+    mimeType = validateImage(selfie);
+  } catch {
+    throw new PartnerGovernmentIdError(400, "Selfie must be a JPEG or PNG up to 5 MB");
+  }
+
+  await getPartnerBusiness(partnerId, businessId);
+  const verification = await prisma.verifyId.findUnique({
+    where: { businessId },
+    select: {
+      ...organizerFaceSelect,
+      aadhaarStatus: true,
+      aadhaarReferenceId: true,
+      selfieKey: true,
+    },
+  });
+
+  if (
+    verification?.aadhaarStatus !== PartnerVerificationStatus.VERIFIED ||
+    !verification.aadhaarReferenceId
+  ) {
+    throw new PartnerGovernmentIdError(409, "Complete Aadhaar verification first");
+  }
+
+  if (verification.faceStatus === PartnerVerificationStatus.VERIFIED) {
+    return prisma.verifyId.findUniqueOrThrow({
+      where: { businessId },
+      select: organizerFaceSelect,
+    });
+  }
+
+  const attempt = await prisma.partnerGovernmentIdAttempt.findUnique({
+    where: {
+      transactionId: verification.aadhaarReferenceId,
+      businessId,
+      partnerId,
+      documentType: GovernmentIdType.AADHAAR,
+      status: AttemptStatus.VERIFIED,
+    },
+    select: { referenceId: true },
+  });
+  if (!attempt) {
+    throw new PartnerGovernmentIdError(409, "Verified Aadhaar transaction is unavailable");
+  }
+
+  const document = await getVerifiedGovernmentDocument({
+    transactionId: verification.aadhaarReferenceId,
+    referenceId: attempt.referenceId,
+    documentType: GovernmentIdType.AADHAAR,
+  }).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Unable to retrieve the verified Aadhaar portrait");
+  });
+  if (!document.portraitBuffer?.length) {
+    throw new PartnerGovernmentIdError(422, "The verified Aadhaar document has no usable portrait");
+  }
+
+  const match = await verifyFaceWithGridlines(document.portraitBuffer, selfie).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Face match provider is unavailable");
+  });
+
+  const extension = mimeType === "image/png" ? "png" : "jpg";
+  const { fileId } = await imagekit.upload({
+    file: selfie,
+    fileName: `${randomUUID()}.${extension}`,
+    folder: `/event-partner/selfies/${businessId}`,
+    isPrivateFile: true,
+  }).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Unable to store the selfie");
+  });
+
+  const saved = await prisma.verifyId.update({
+    where: {
+      businessId,
+      aadhaarStatus: PartnerVerificationStatus.VERIFIED,
+      aadhaarReferenceId: verification.aadhaarReferenceId,
+      faceStatus: verification.faceStatus,
+      selfieKey: verification.selfieKey,
+    },
+    data: {
+      selfieKey: fileId,
+      faceMatchScore: match.confidence,
+      isFaceMatched: match.isMatch,
+      faceStatus: match.isMatch
+        ? PartnerVerificationStatus.VERIFIED
+        : PartnerVerificationStatus.REJECTED,
+      faceVerifiedAt: match.isMatch ? new Date() : null,
+      faceReferenceId: match.providerRequestId ?? null,
+      faceProvider: "GRIDLINES",
+      faceFailureReason: match.isMatch ? null : "FACE_NOT_MATCHED",
+    },
+    select: organizerFaceSelect,
+  }).catch(async (error: unknown) => {
+    await imagekit.deleteFile(fileId).catch(() => {
+      console.error("Unable to delete an unsaved organizer selfie");
+    });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new PartnerGovernmentIdError(409, "Face verification changed. Please retry.");
+    }
+    throw error;
+  });
+
+  if (verification.selfieKey) {
+    await imagekit.deleteFile(verification.selfieKey).catch(() => {
+      console.error("Unable to delete a replaced organizer selfie");
+    });
+  }
+
+  return saved;
 };
 
 /* -------------------------------------------------------------------------- */

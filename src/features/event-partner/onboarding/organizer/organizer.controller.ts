@@ -9,8 +9,9 @@ import {
   getOrganizerAboutYouService,
   initPartnerGovernmentIdService,
   saveOrganizerAboutYouService,
+  saveOrganizerGstService,
   submitEventPartnerPanService,
-  
+  verifyOrganizerFaceService,
 } from "./organizer.service";
 
 import {
@@ -22,6 +23,7 @@ import {
   PanVerificationError,
 } from "./organizer.helper";
 import { getYourEvents, saveYourEvents, yourEventsInputSchema } from "./your-events.service";
+import { GstVerificationError } from "../../verification/orgnizer/gst/gst-verification.service";
 
 // ======================================================
 // VALIDATE UUID
@@ -47,6 +49,64 @@ const requireOrganizerForBusiness = (req: Request, businessId: string) => {
     throw new OrganizerOnboardingError(403, "Organizer access is required for this business");
   }
   return partner;
+};
+
+export const saveOrganizerGstController = async (
+  req: PartnerRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { businessId = req.partner?.businessId, gstNumber } = req.body ?? {};
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    if (typeof gstNumber !== "string" || !gstNumber.trim()) {
+      throw new OrganizerOnboardingError(400, "GST number is required");
+    }
+
+    const data = await saveOrganizerGstService({ partnerId: partner.id, businessId, gstNumber });
+    return res.status(200).json({ success: true, message: "GST details saved", data });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError || error instanceof GstVerificationError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    return next(error);
+  }
+};
+
+export const verifyOrganizerFaceController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { businessId, consent } = req.body ?? {};
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    if (consent !== "true") {
+      throw new OrganizerOnboardingError(400, "Face verification consent is required");
+    }
+
+    const selfie = req.files?.selfie;
+    if (!selfie || Array.isArray(selfie) || selfie.truncated) {
+      throw new OrganizerOnboardingError(400, "Upload one JPEG or PNG selfie up to 5 MB");
+    }
+
+    const data = await verifyOrganizerFaceService(partner.id, businessId, selfie.data);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError) {
+      return handleOrganizerError(error, res);
+    }
+    if (error instanceof PartnerGovernmentIdError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    return next(error);
+  }
 };
 
 export const getYourEventsController = async (req: Request, res: Response, next: NextFunction) => {
