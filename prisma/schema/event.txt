@@ -23,26 +23,66 @@ model Event {
   // Experience
   experienceSubtitle   String?
 
+  
   // Tickets & Crowd
-  price                Decimal?           @db.Decimal(12, 2)
-  originalPrice        Decimal?           @db.Decimal(12, 2)
-  priceType            EventPriceType      @default(PER_PERSON)
-  totalSeats           Int?
-  maxTicketsPerPerson  Int                @default(1)
-  crowdMix             CrowdMix?
-  minAge               Int?
-  maxAge               Int?
-  groupSize            Int?
-  intent               EventIntent?
-  waitlistEnabled      Boolean            @default(true)
+
+  priceType                 EventPriceType @default(PER_PERSON)
+
+  // Total guest capacity
+  totalCapacity             Int?
+
+  // Singles pricing
+  menCapacity               Int?
+  womenCapacity             Int?
+  otherCapacity             Int?
+
+  menEntryPrice             Decimal? @db.Decimal(10, 2)
+  womenEntryPrice           Decimal? @db.Decimal(10, 2)
+  otherEntryPrice           Decimal? @db.Decimal(10, 2)
+
+  menDiscountPercentage     Decimal? @db.Decimal(5, 2)
+  womenDiscountPercentage   Decimal? @db.Decimal(5, 2)
+  otherDiscountPercentage   Decimal? @db.Decimal(5, 2)
+
+  menDiscountedPrice        Decimal? @db.Decimal(10, 2)
+  womenDiscountedPrice      Decimal? @db.Decimal(10, 2)
+  otherDiscountedPrice      Decimal? @db.Decimal(10, 2)
+
+  // Couples pricing
+  coupleCapacity            Int?
+  coupleEntryPrice          Decimal? @db.Decimal(10, 2)
+  coupleDiscountPercentage  Decimal? @db.Decimal(5, 2)
+  coupleDiscountedPrice     Decimal? @db.Decimal(10, 2)
+
+  // Booking restrictions
+  maxTicketsPerPerson       Int      @default(1)
+  waitlistEnabled           Boolean  @default(true)
+
+  // Crowd details
+  crowdMix                  CrowdMix?
+  minAge                    Int?
+  maxAge                    Int?
+  groupSize                 Int?
+  intent                    EventIntent?
+
 
   // Included & Packing
   included             String[]           @default([])
   notIncluded          String[]           @default([])
   whatToBring          String[]           @default([])
   dressCode            EventDressCode     @default(NONE)
+// Group Chat
+groupChatTitle       String?
+groupChatDescription String?
+groupChatOpensAt     DateTime?
 
+// Reminders
+reminderTitle       String?
+reminderDescription String?
+reminderTimes       DateTime[] @default([])
   // Host / Trip Captain
+  hostId          String?       @db.Uuid
+  host            EventPartner? @relation("EventTripCaptain", fields: [hostId], references: [id])
   hostPhotoUrl         String?
   hostTitle            String?
   hostSpeciality       String?
@@ -50,10 +90,26 @@ model Event {
   hostMessage          String?
   afterEventLine       String?
 
-  // FAQs & Policies
-  cancellationPolicy   EventCancellationPolicy?
-  rules                String[]           @default([])
-  safetyOptions        EventSafetyOption[] @default([])
+
+  
+ 
+ 
+  // Cancellation
+  cancellationPolicy      EventCancellationPolicy?
+  cancellationDescription String?
+
+  // Refund
+  refundPolicy            String?
+
+  // Rescheduling
+  reschedulingPolicy      String?
+
+  // Event Rules
+  rules                   String[] @default([])
+
+  // Safety
+  safetyOptions           EventSafetyOption[] @default([])
+
 
   // Draft & Submission
   status               EventStatus        @default(DRAFT)
@@ -70,12 +126,13 @@ model Event {
   venue                EventVenue?
   experience           EventExperience[]
   tripDetails          TripDetails?
-  faqs                 EventFAQ[]
+  faqs                 EventFAQ[] 
   hosts                EventHost[]
 
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
+@@index([hostId])
   @@index([businessDetailsId])
   @@index([categoryId])
   @@index([status])
@@ -111,11 +168,10 @@ model EventDate {
   endDateTime      DateTime?
   gateOpensAt      DateTime?
   timezone         String           @default("Asia/Kolkata")
-  totalSeats       Int?
-  womenSeats       Int?
-  menSeats         Int?
+
   status           EventDateStatus  @default(SCHEDULED)
   isPrimary        Boolean          @default(false)
+  isMoreDate Boolean @default(false)
   cancelledAt      DateTime?
   cancellationReason String?
 
@@ -203,7 +259,9 @@ model TripDetails {
   stayTile             String?
   mealsTile            String?
   // Ride Ops - Host Only
+  
   vehiclePhotos        String[]     @default([])
+  vehicle              String 
   vehicleOperator      String?
   vehicleModel         String?
   vehicleCapacity      Int?
@@ -333,6 +391,7 @@ model TripRoomOption {
   tripDetailsId   String       @db.Uuid
   tripDetails     TripDetails  @relation(fields: [tripDetailsId], references: [id], onDelete: Cascade)
   name            String?
+  shortNote       String?
   upgradePrice    Decimal      @default(0) @db.Decimal(12, 2)
   isIncluded      Boolean      @default(false)
   sortOrder       Int

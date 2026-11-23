@@ -10,7 +10,7 @@ import {
   initPartnerGovernmentIdService,
   saveOrganizerAboutYouService,
   saveOrganizerGstService,
-  verifyEventPartnerPanService,
+  submitEventPartnerPanService,
   verifyOrganizerFaceService,
 } from "./organizer.service";
 
@@ -372,27 +372,28 @@ export const saveOrganizerAboutYouController = async (
 };
 
 
-// ======================================================
-// PAN VERIFY
-// ======================================================
 export const verifyEventPartnerPanController = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    const partnerId = (req as any).partner.id;
+    const partnerId = (req as any).partner?.id;
 
-    const {
-      businessId,
-      panNumber,
-      consent,
-    } = req.body;
+    if (!partnerId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized partner",
+      });
+      return;
+    }
 
-    const result = await verifyEventPartnerPanService({
+    const { businessId, consent, panDetails } = req.body;
+
+    const result = await submitEventPartnerPanService({
       partnerId,
       businessId,
-      panNumber,
       consent,
+      panDetails,
     });
 
     res.status(200).json({
@@ -401,7 +402,7 @@ export const verifyEventPartnerPanController = async (
       data: result,
     });
   } catch (error: unknown) {
-    console.error("PAN Verification Error:", error);
+    console.error("PAN Submit Error:", error);
 
     if (error instanceof PanVerificationError) {
       res.status(error.statusCode).json({

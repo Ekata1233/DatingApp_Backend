@@ -20,7 +20,7 @@ import {
   PartnerVerificationStatus,
   Prisma,
 } from "@prisma/client";
-import { hashState, normalizeName, PanVerificationError } from "./organizer.helper";
+import { hashState,  PanVerificationError } from "./organizer.helper";
 import {
   getVerifiedGovernmentDocument,
   validateGovernmentIdentity,
@@ -759,31 +759,101 @@ export const saveOrganizerAboutYouService = async (
 /*                            VERIFY PAN SERVICE                              */
 /* -------------------------------------------------------------------------- */
 
-export const verifyEventPartnerPanService = async ({
+interface PanDetailsInput {
+  panNumber: string;
+  documentType: string;
+  documentId: string;
+  fullName: string;
+
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
+
+  category?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+
+  maskedAadhaarNumber?: string | null;
+  isAadhaarLinked?: boolean | null;
+  taxpayerProfile?: boolean | null;
+
+  isPanNameMatched?: boolean;
+  expectedName?: string;
+
+  address?: {
+    line1?: string | null;
+    line2?: string | null;
+    street?: string | null;
+    city?: string | null;
+    line5?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+}
+
+interface SubmitPanInput {
+  partnerId: string;
+  businessId: string;
+  consent: boolean;
+  panDetails: PanDetailsInput;
+}
+
+const normalizeName = (name: string): string => {
+  return name
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+};
+
+export const submitEventPartnerPanService = async ({
   partnerId,
   businessId,
-  panNumber,
   consent,
-}: VerifyPanInput) => {
-  /* ------------------------------------------------------------------------ */
-  /*                            1. VALIDATE INPUT                             */
-  /* ------------------------------------------------------------------------ */
-
-  const normalizedPan = panNumber?.trim().toUpperCase();
-
-  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-
-  if (!normalizedPan || !panRegex.test(normalizedPan)) {
-    throw new PanVerificationError(400, "Invalid PAN number format");
-  }
+  panDetails,
+}: SubmitPanInput) => {
+  // 1. Validate consent
 
   if (consent !== true) {
-    throw new PanVerificationError(400, "PAN verification consent is required");
+    throw new PanVerificationError(
+      400,
+      "PAN verification consent is required",
+    );
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                       2. VALIDATE BUSINESS OWNER                         */
-  /* ------------------------------------------------------------------------ */
+  if (!panDetails || typeof panDetails !== "object") {
+    throw new PanVerificationError(
+      400,
+      "PAN details are required",
+    );
+  }
+
+  // 2. Validate PAN format
+
+  const normalizedPan =
+    typeof panDetails.panNumber === "string"
+      ? panDetails.panNumber.trim().toUpperCase()
+      : "";
+
+  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(normalizedPan)) {
+    throw new PanVerificationError(
+      400,
+      "Invalid PAN number format",
+    );
+  }
+
+  if (
+    panDetails.documentType?.toUpperCase() !== "PAN" ||
+    panDetails.documentId?.toUpperCase() !== normalizedPan
+  ) {
+    throw new PanVerificationError(
+      400,
+      "PAN document details do not match",
+    );
+  }
+
+  // 3. Validate business ownership
 
   const business = await prisma.businessDetails.findFirst({
     where: {
@@ -792,11 +862,8 @@ export const verifyEventPartnerPanService = async ({
     },
     select: {
       id: true,
-      partnerId: true,
-
       partner: {
         select: {
-          id: true,
           fullName: true,
           accountStatus: true,
         },
@@ -805,150 +872,72 @@ export const verifyEventPartnerPanService = async ({
   });
 
   if (!business) {
-    throw new PanVerificationError(404, "Business not found or access denied");
+    throw new PanVerificationError(
+      404,
+      "Business not found or access denied",
+    );
   }
 
   if (business.partner.accountStatus !== "ACTIVE") {
-    throw new PanVerificationError(403, "Partner account is not active");
+    throw new PanVerificationError(
+      403,
+      "Partner account is not active",
+    );
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                        3. VALIDATE PARTNER NAME                          */
-  /* ------------------------------------------------------------------------ */
+  // 4. Compare PAN name
 
   const partnerName = business.partner.fullName?.trim();
 
   if (!partnerName) {
     throw new PanVerificationError(
       400,
-      "Partner full name is required before PAN verification",
+      "Partner full name is required",
     );
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                        4. GRIDLINES CONFIGURATION                        */
-  /* ------------------------------------------------------------------------ */
+  const panName =
+    typeof panDetails.fullName === "string"
+      ? panDetails.fullName.trim()
+      : "";
 
-  const apiKey = process.env.GRIDLINES_API_KEY?.trim();
-
-  const apiUrl =
-    process.env.GRIDLINES_PAN_URL ||
-    "https://api.gridlines.io/pan-api/fetch-detailed";
-
-  if (!apiKey) {
-    throw new Error("GRIDLINES_API_KEY is missing");
-  }
-
-  /* ------------------------------------------------------------------------ */
-  /*                           5. CALL GRIDLINES                              */
-  /* ------------------------------------------------------------------------ */
-
-  let panData: GridlinesPanData;
-  let panReferenceId: string | null = null;
-
-  try {
-    const response = await axios.post<GridlinesPanResponse>(
-      apiUrl,
-      {
-        pan_number: normalizedPan,
-        consent: "Y",
-      },
-      {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "X-API-Key": apiKey,
-          "X-Auth-Type": "API-Key",
-        },
-        timeout: 30000,
-      },
+  if (!panName) {
+    throw new PanVerificationError(
+      400,
+      "PAN holder name is required",
     );
-
-    const result = response.data;
-
-    const providerData = result.data ?? result;
-
-    const verifiedPan = providerData.pan_data;
-
-    /* ---------------------------------------------------------------------- */
-    /*                       6. VALIDATE PAN RESPONSE                         */
-    /* ---------------------------------------------------------------------- */
-
-    const isValidPan =
-      verifiedPan?.document_type?.toUpperCase() === "PAN" &&
-      verifiedPan?.document_id?.toUpperCase() === normalizedPan &&
-      providerData.message?.trim().toLowerCase() === "valid pan.";
-
-    if (!verifiedPan || !isValidPan) {
-      throw new PanVerificationError(
-        422,
-        "PAN verification was not successful",
-      );
-    }
-
-    panData = verifiedPan;
-
-    panReferenceId = providerData.reference_id ?? result.reference_id ?? null;
-  } catch (error: unknown) {
-    if (error instanceof PanVerificationError) {
-      throw error;
-    }
-
-    if (axios.isAxiosError(error)) {
-      console.error("Gridlines PAN Verification Error:", {
-        status: error.response?.status,
-        code: error.code,
-        message: error.message,
-      });
-
-      throw new PanVerificationError(
-        502,
-        error.response
-          ? "Unable to verify PAN with Gridlines"
-          : "PAN verification provider is unavailable",
-      );
-    }
-
-    throw error;
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                         7. EXTRACT PAN DETAILS                           */
-  /* ------------------------------------------------------------------------ */
+  const isPanNameMatched =
+    normalizeName(panName) === normalizeName(partnerName);
 
-  const panName = panData.name?.trim() || null;
-
-  const address = panData.address_data ?? {};
-
-  /* ------------------------------------------------------------------------ */
-  /*                          8. COMPARE NAMES                                */
-  /* ------------------------------------------------------------------------ */
-
-  const isPanNameMatched = Boolean(
-    panName && normalizeName(panName) === normalizeName(partnerName),
-  );
-
-  const nameMatchMessage = !panName
-    ? "PAN name is missing from provider response"
-    : isPanNameMatched
-      ? "PAN name matches the registered partner name"
-      : "PAN name does not match the registered partner name";
-
-  /* ------------------------------------------------------------------------ */
-  /*                      9. DETERMINE VERIFICATION STATUS                    */
-  /* ------------------------------------------------------------------------ */
-
-  const verificationStatus: PartnerVerificationStatus = isPanNameMatched
+  const verificationStatus = isPanNameMatched
     ? PartnerVerificationStatus.VERIFIED
     : PartnerVerificationStatus.REJECTED;
 
-  const verifiedAt = isPanNameMatched ? new Date() : null;
+  const verifiedAt = isPanNameMatched
+    ? new Date()
+    : null;
 
-  const failureReason = isPanNameMatched ? null : nameMatchMessage;
+  const failureReason = isPanNameMatched
+    ? null
+    : "PAN name does not match registered partner name";
 
-  /* ------------------------------------------------------------------------ */
-  /*                       10. SAVE DETAILS IN VERIFY ID                      */
-  /* ------------------------------------------------------------------------ */
+  // 5. Save to VerifyId
+
+  const panSaveData = {
+    panLastFour: normalizedPan.slice(-4),
+    panName,
+    isPanNameMatched,
+    panStatus: verificationStatus,
+    panVerifiedAt: verifiedAt,
+    panProvider: "GRIDLINES",
+    panFailureReason: failureReason,
+    isAadhaarLinked:
+      typeof panDetails.isAadhaarLinked === "boolean"
+        ? panDetails.isAadhaarLinked
+        : null,
+  };
 
   const savedVerification = await prisma.verifyId.upsert({
     where: {
@@ -957,134 +946,46 @@ export const verifyEventPartnerPanService = async ({
 
     create: {
       businessId: business.id,
-
-      panLastFour: normalizedPan.slice(-4),
-
-      panName: panName,
-
-      isPanNameMatched,
-
-      panStatus: verificationStatus,
-
-      panVerifiedAt: verifiedAt,
-
-      panReferenceId,
-
-      panProvider: "GRIDLINES",
-
-      panFailureReason: failureReason,
-
-      isAadhaarLinked: address.aadhaar_linked ?? null,
+      ...panSaveData,
     },
 
     update: {
-      panLastFour: normalizedPan.slice(-4),
-
-      panName: panName,
-
-      isPanNameMatched,
-
-      panStatus: verificationStatus,
-
-      panVerifiedAt: verifiedAt,
-
-      panReferenceId,
-
-      panProvider: "GRIDLINES",
-
-      panFailureReason: failureReason,
-
-      isAadhaarLinked: address.aadhaar_linked ?? null,
+      ...panSaveData,
     },
+
     select: {
       id: true,
       businessId: true,
-
-      panName: true,
       panLastFour: true,
+      panName: true,
       isPanNameMatched: true,
-
       panStatus: true,
       panVerifiedAt: true,
-
       panProvider: true,
-      panReferenceId: true,
       panFailureReason: true,
+      isAadhaarLinked: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
-  /* ------------------------------------------------------------------------ */
-  /*                           11. FINAL MESSAGE                              */
-  /* ------------------------------------------------------------------------ */
+  // 6. Return response
 
   const message = isPanNameMatched
-    ? "PAN verified successfully. Name matched."
-    : "PAN is valid, but the name does not match the registered partner name.";
-
-  /* ------------------------------------------------------------------------ */
-  /*                           12. RETURN RESPONSE                            */
-  /* ------------------------------------------------------------------------ */
+    ? "PAN details saved successfully"
+    : "PAN details saved, but name does not match";
 
   return {
     isVerified: isPanNameMatched,
-
     verificationStatus,
-
     isSaved: true,
-
     message,
-
     businessId: business.id,
-
     verificationId: savedVerification.id,
 
-    // TOP-LEVEL NAME DETAILS
     panName,
     partnerName,
-
     isPanNameMatched,
-
-    nameMatchMessage,
-
-    panDetails: {
-      panNumber: normalizedPan,
-
-      documentType: panData.document_type ?? null,
-      documentId: panData.document_id ?? null,
-
-      fullName: panName,
-
-      firstName: panData.first_name ?? null,
-      middleName: panData.middle_name ?? null,
-      lastName: panData.last_name ?? null,
-
-      category: panData.category ?? null,
-      dateOfBirth: panData.date_of_birth ?? null,
-
-      gender: address.gender ?? null,
-
-      maskedAadhaarNumber: panData.masked_aadhaar_number ?? null,
-
-      isAadhaarLinked: address.aadhaar_linked ?? null,
-
-      taxpayerProfile: panData.taxpayer_profile ?? null,
-
-      isPanNameMatched,
-
-      expectedName: partnerName,
-
-      address: {
-        line1: address.line_1 ?? null,
-        line2: address.line_2 ?? null,
-        street: address.street ?? null,
-        city: address.city ?? null,
-        line5: address.line_5 ?? null,
-        state: address.state ?? null,
-        pincode: address.pincode ?? null,
-        email: address.email ?? null,
-        phone: address.phone ?? null,
-      },
-    },
 
     savedVerification,
   };
