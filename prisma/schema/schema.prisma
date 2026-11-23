@@ -66,6 +66,7 @@ model User {
   educationVerifications           EducationVerification[]
   employmentVerifications          EmploymentVerification?
   EventBooking                     EventBooking[]
+  eventReviews                     EventReview[]
   receivedNotifications            Notification[]                  @relation("ReceivedNotifications")
   sentNotifications                Notification[]                  @relation("SentNotifications")
   rosePurchases                    RosePurchase[]
@@ -2012,209 +2013,6 @@ model WalletGooglePlayPurchase {
   @@index([userId])
 }
 
-model Event {
-  id                   String            @id @default(uuid()) @db.Uuid
-  eventType            Type?
-  title                String?
-  status               EventStatus       @default(DRAFT)
-  city                 String?
-  eventTag             EventTag?
-  eventDate            DateTime?
-  startTime            String?
-  endTime              String?
-  venueName            String?
-  fullAddress          String?
-  latitude             Float?
-  longitude            Float?
-  totalCapacity        Int?
-  menCapacity          Int?
-  womenCapacity        Int?
-  otherCapacity        Int?
-  menEntryPrice        Decimal?          @db.Decimal(10, 2)
-  womenEntryPrice      Decimal?          @db.Decimal(10, 2)
-  otherEntryPrice      Decimal?          @db.Decimal(10, 2)
-  discountPercentage   Decimal?          @db.Decimal(5, 2)
-  menDiscountedPrice   Decimal?          @db.Decimal(10, 2)
-  womenDiscountedPrice Decimal?          @db.Decimal(10, 2)
-  otherDiscountedPrice Decimal?          @db.Decimal(10, 2)
-  minAge               Int?
-  maxAge               Int?
-  eventIntent          EventIntent?
-  heroImage            String?
-  aboutEvent           String?
-  dressCode            DressCode?
-  refundWindow         Int?
-  termsConditions      String?
-  currentStep          Int               @default(1)
-  basicsDone           Boolean           @default(false)
-  hostDone             Boolean           @default(false)
-  venueDone            Boolean           @default(false)
-  ticketDone           Boolean           @default(false)
-  experienceDone       Boolean           @default(false)
-  safetyDone           Boolean           @default(false)
-  publishedAt          DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  businessDetailsId    String?           @db.Uuid
-  chatMessages         ChatMessage[]
-  BusinessDetails      BusinessDetails?  @relation(fields: [businessDetailsId], references: [id])
-  amenities            EventAmenity[]
-  EventBooking         EventBooking[]
-  faqs                 EventFAQ[]
-  featureTags          EventFeatureTag[]
-  galleryImages        EventGallery[]
-  itinerary            EventItinerary[]
-  safetyFeatures       EventSafety[]
-  whyShouldCome        EventWhyCome[]
-  EventHost            EventHost[]
-
-  @@index([status])
-  @@index([city])
-  @@index([eventDate])
-  @@index([currentStep])
-}
-
-model EventGallery {
-  id        String   @id @default(uuid()) @db.Uuid
-  eventId   String   @db.Uuid
-  imageUrl  String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventAmenity {
-  id        String  @id @default(uuid()) @db.Uuid
-  eventId   String  @db.Uuid
-  name      String
-  icon      String?
-  sortOrder Int     @default(0)
-  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventItinerary {
-  id            String  @id @default(uuid()) @db.Uuid
-  eventId       String  @db.Uuid
-  time          String
-  title         String
-  description   String?
-  icon          String?
-  sortOrder     Int     @default(0)
-  date          String?
-  dayNumber     Int?
-  location      String?
-  elevation     String?
-  distance      String?
-  accommodation String?
-  meals         String?
-  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventWhyCome {
-  id          String  @id @default(uuid()) @db.Uuid
-  eventId     String  @db.Uuid
-  title       String
-  description String?
-  icon        String?
-  sortOrder   Int     @default(0)
-  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventSafety {
-  id      String @id @default(uuid()) @db.Uuid
-  eventId String @db.Uuid
-  title   String
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventFAQ {
-  id           String   @id @default(uuid()) @db.Uuid
-  eventId      String   @db.Uuid
-  question     String
-  answer       String
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([eventId])
-}
-
-model EventFeatureTag {
-  id           String   @id @default(uuid()) @db.Uuid
-  eventId      String   @db.Uuid
-  label        String
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([eventId])
-}
-
-model EventBooking {
-  id                  String               @id @default(uuid()) @db.Uuid
-  userId              String               @db.Uuid
-  eventId             String               @db.Uuid
-  bookingNumber       String               @unique @db.VarChar(50)
-  ticketCount         Int                  @default(1)
-  ticketAmount        Decimal              @db.Decimal(10, 2)
-  platformFee         Decimal              @default(0) @db.Decimal(10, 2)
-  gstAmount           Decimal              @default(0) @db.Decimal(10, 2)
-  discountAmount      Decimal              @default(0) @db.Decimal(10, 2)
-  couponCode          String?              @db.VarChar(50)
-  totalAmount         Decimal              @db.Decimal(10, 2)
-  paidAmount          Decimal              @default(0) @db.Decimal(10, 2)
-  status              EventBookingStatus   @default(PENDING)
-  paymentId           String?              @unique @db.Uuid
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  cancellationComment String?              @db.VarChar(500)
-  cancellationReason  String?              @db.VarChar(100)
-  cancelledAt         DateTime?
-  refundAmount        Decimal?             @db.Decimal(10, 2)
-  refundEligible      Boolean?
-  refundReason        String?
-  refundReferenceId   String?              @db.VarChar(255)
-  refundRequestedAt   DateTime?
-  refundedAt          DateTime?
-  event               Event                @relation(fields: [eventId], references: [id])
-  payment             Payment?             @relation(fields: [paymentId], references: [id])
-  user                User                 @relation(fields: [userId], references: [id])
-  tickets             EventBookingTicket[]
-
-  @@index([userId])
-  @@index([eventId])
-  @@index([status])
-  @@index([bookingNumber])
-}
-
-model EventBookingTicket {
-  id           String            @id @default(uuid()) @db.Uuid
-  bookingId    String            @db.Uuid
-  ticketId     String            @unique @db.VarChar(50)
-  ticketType   EventTicketType
-  ticketAmount Decimal           @db.Decimal(10, 2)
-  qrCodeUrl    String?
-  status       EventTicketStatus @default(PENDING)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  booking      EventBooking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@index([ticketType])
-  @@index([status])
-}
-
-model EventCancelFAQ {
-  id           String   @id @default(uuid()) @db.Uuid
-  question     String
-  answer       String
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
 model WalletTransaction {
   id                 String               @id @default(uuid()) @db.Uuid
   walletId           String               @db.Uuid
@@ -2909,13 +2707,6 @@ enum BoostTransactionType {
   ADMIN_REMOVE
 }
 
-enum EventType {
-  VIEW
-  LIKE
-  INTEREST
-  REACH
-}
-
 enum PackageType {
   PREMIUM
   VIP
@@ -3098,43 +2889,6 @@ enum DatePlanTransactionType {
   REFUND
 }
 
-enum EventTag {
-  BRAND
-  PROMOTED
-  FEATURED
-}
-
-enum EventBookingStatus {
-  PENDING
-  PAYMENT_PENDING
-  CONFIRMED
-  CANCELLED
-  REFUND_PENDING
-  REFUNDED
-  ATTENDED
-  EXPIRED
-}
-
-enum EventTicketType {
-  MEN
-  WOMEN
-  OTHER
-}
-
-enum EventTicketStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  ATTENDED
-}
-
-enum EventStatus {
-  DRAFT
-  LIVE
-  SOLD_OUT
-  CANCELLED
-}
-
 enum Type {
   SINGLES_MIXER
   SPEED_DATES
@@ -3154,12 +2908,6 @@ enum GenderMix {
   WOMEN_LED
   MEN_LED
   OPEN
-}
-
-enum EventIntent {
-  MIXED
-  SERIOUS
-  CASUAL
 }
 
 enum DressCode {

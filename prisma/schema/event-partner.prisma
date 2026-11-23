@@ -193,16 +193,19 @@ model YourEvents {
 }
 
 model EventCategory {
-  id         String       @id @default(uuid()) @db.Uuid
-  label      String
-  value      String       @unique
-  icon       String?
-  sortOrder  Int          @default(0)
-  isActive   Boolean      @default(true)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  yourEvents YourEvents[] @relation("YourEventCategories")
+  id                String            @id @default(uuid()) @db.Uuid
+  label             String
+  value             String
+  eventDurationType EventDurationType
+  icon              String?
+  sortOrder         Int               @default(0)
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  yourEvents        YourEvents[]      @relation("YourEventCategories")
+  Event             Event[]
 
+  @@unique([value, eventDurationType])
   @@index([isActive, sortOrder])
   @@map("partner_event_categories")
 }
@@ -247,6 +250,7 @@ model Host {
   business                  BusinessDetails  @relation(fields: [businessId], references: [id])
   partner                   EventPartner?    @relation(fields: [partnerId], references: [id])
   consents                  PartnerConsent[]
+  primaryHostedEvents       Event[]          @relation("EventPrimaryHost")
 
   @@unique([businessId, phoneNumber])
   @@unique([businessId, partnerId])
