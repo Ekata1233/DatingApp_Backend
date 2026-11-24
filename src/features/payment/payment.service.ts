@@ -1003,7 +1003,7 @@ export const createEventBookingForPayment =
 
     if (
       event.status !==
-      EventStatus.LIVE
+      EventStatus.APPROVED
     ) {
       throw new Error(
         "Event is not live",

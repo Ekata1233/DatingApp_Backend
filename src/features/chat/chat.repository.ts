@@ -5,6 +5,38 @@ import { prisma } from "../../prisma/prismaClient";
 import { ConversationFilter, MessageFilterType } from "./chat.types";
 import { presenceService } from "./presence/presence.service";
 
+const formatEventSchedule = (date: {
+  startDateTime: Date;
+  endDateTime: Date | null;
+  timezone: string;
+}) => {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone: date.timezone });
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" });
+  }
+  const parts = (value: Date) => Object.fromEntries(
+    formatter.formatToParts(value).map(({ type, value }) => [type, value]),
+  );
+  const start = parts(date.startDateTime);
+  const end = date.endDateTime ? parts(date.endDateTime) : null;
+  return {
+    eventDate: `${start.year}-${start.month}-${start.day}T00:00:00.000Z`,
+    startTime: `${start.hour}:${start.minute}`,
+    endTime: end ? `${end.hour}:${end.minute}` : null,
+  };
+};
+
 export const calculateAge = (birthDate: Date | null): number | null => {
   if (!birthDate) {
     return null;
@@ -1512,17 +1544,16 @@ export const chatRepository = {
           select: {
             id: true,
 
-            eventType: true,
+            eventDurationType: true,
             title: true,
-            city: true,
-            eventTag: true,
-
-            eventDate: true,
-            startTime: true,
-            endTime: true,
-
-            venueName: true,
-            fullAddress: true,
+            category: { select: { label: true } },
+            dates: {
+              where: { status: { not: "CANCELLED" } },
+              orderBy: [{ isPrimary: "desc" }, { startDateTime: "asc" }],
+              take: 1,
+              select: { startDateTime: true, endDateTime: true, timezone: true },
+            },
+            venue: { select: { venueName: true, fullAddress: true, tags: true } },
 
             menEntryPrice: true,
             womenEntryPrice: true,
@@ -1532,13 +1563,16 @@ export const chatRepository = {
             womenDiscountedPrice: true,
             otherDiscountedPrice: true,
 
-            heroImage: true,
-
-            featureTags: true,
+            photos: {
+              where: { photoType: "EVENT" },
+              orderBy: { sortOrder: "asc" },
+              take: 1,
+              select: { photoUrl: true },
+            },
             // =========================================
             // CURRENT USER EVENT BOOKING
             // =========================================
-            EventBooking: {
+            bookings: {
               where: {
                 userId: userId,
 
@@ -1723,13 +1757,23 @@ export const chatRepository = {
       let formattedEvent = null;
 
       if (message.event) {
-        const { EventBooking, ...eventData } = message.event;
-
-        const is_event_book = EventBooking.length > 0;
+        const { bookings, category, dates, venue, photos, eventDurationType, ...eventData } = message.event;
+        const date = dates[0];
+        const schedule = date ? formatEventSchedule(date) : null;
 
         formattedEvent = {
           ...eventData,
-          is_event_book,
+          eventType: eventDurationType,
+          city: null,
+          eventTag: category?.label ?? null,
+          eventDate: schedule?.eventDate ?? null,
+          startTime: schedule?.startTime ?? null,
+          endTime: schedule?.endTime ?? null,
+          venueName: venue?.venueName ?? null,
+          fullAddress: venue?.fullAddress ?? null,
+          heroImage: photos[0]?.photoUrl ?? null,
+          featureTags: venue?.tags ?? [],
+          is_event_book: bookings.length > 0,
         };
       }
 
@@ -2262,6 +2306,13 @@ export const chatRepository = {
     return prisma.event.findUnique({
       where: {
         id: eventId,
+      },
+      select: {
+        id: true,
+        dates: {
+          where: { status: { not: "CANCELLED" }, endDateTime: { not: null } },
+          select: { status: true, endDateTime: true },
+        },
       },
     });
   },
