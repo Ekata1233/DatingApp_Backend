@@ -215,11 +215,15 @@ export const deleteEventCategoryService = async (
   await getEventCategoryByIdService(categoryId);
 
   // Prevent deleting categories assigned to existing events.
-  const usedCount = await prisma.yourEvents.count({
-    where: {
-      categoryId,
+const usedCount = await prisma.yourEvents.count({
+  where: {
+    categories: {
+      some: {
+        id: categoryId,
+      },
     },
-  });
+  },
+});
 
   if (usedCount > 0) {
     throw new CategoryServiceError(
