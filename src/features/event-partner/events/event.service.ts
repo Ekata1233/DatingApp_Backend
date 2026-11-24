@@ -1,7 +1,7 @@
 
 import { Prisma } from "@prisma/client";
 
-import prisma from "../../../config/prisma";
+
 
 import {
   SaveEventInput,
@@ -19,6 +19,7 @@ import {
   findOwnedEvent,
   saveEventRelations,
 } from "./event.repository";
+import { prisma } from "../../../prisma/prismaClient";
 
 // Identify event format
 const getEventFormat = (
