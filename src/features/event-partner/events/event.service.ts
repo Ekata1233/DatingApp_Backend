@@ -96,12 +96,8 @@ const validateHost = async (
   const host = await tx.host.findFirst({
     where: {
       id: hostId,
-
-      // Assumes your Host model uses businessDetailsId.
-      // Match this field with your actual Host schema.
-      businessDetailsId: businessId,
+      businessId: businessId,
     },
-
     select: {
       id: true,
     },
