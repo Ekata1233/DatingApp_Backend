@@ -5,6 +5,7 @@ import {
 } from "crypto";
 
 import { prisma } from "../../prisma/prismaClient";
+import type { Prisma } from "@prisma/client";
 import { redis } from "../../lib/redis";
 import { sendMSG91EmailOtp } from "../../config/msg91Email";
 
@@ -361,6 +362,7 @@ export const sendEmailOtpService = async (
 export const verifyEmailOtpService = async (
   partnerId: string,
   payload: VerifyEmailOtpInput,
+  db: Pick<Prisma.TransactionClient, "eventPartner"> = prisma,
 ): Promise<VerifyEmailOtpResponse> => {
 
   const email = normalizeEmail(payload.email);
@@ -369,7 +371,7 @@ export const verifyEmailOtpService = async (
   /*                         1. VALIDATE EVENT PARTNER                        */
   /* ------------------------------------------------------------------------ */
 
-  const partner = await prisma.eventPartner.findUnique({
+  const partner = await db.eventPartner.findUnique({
     where: {
       id: partnerId,
     },
@@ -527,7 +529,7 @@ export const verifyEmailOtpService = async (
   /* ------------------------------------------------------------------------ */
 
   const updatedPartner =
-    await prisma.eventPartner.update({
+    await db.eventPartner.update({
       where: {
         id: partnerId,
         accountStatus: "ACTIVE",

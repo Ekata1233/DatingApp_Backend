@@ -4,6 +4,7 @@ export interface OrganizerAboutYouInput {
   fullName?: string;
 
   email?: string;
+  otp?: string;
 
   verificationConsent?: boolean;
 

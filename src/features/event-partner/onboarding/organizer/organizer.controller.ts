@@ -29,6 +29,7 @@ import { PanVerificationError } from "../../verification/orgnizer/pan/pan-verifi
 import { getYourEvents, saveYourEvents, yourEventsInputSchema } from "./your-events.service";
 import { GstVerificationError } from "../../verification/orgnizer/gst/gst-verification.service";
 import { getOrganizerStepProgress } from "./organizer-progress";
+import { EmailVerificationError } from "../../../email-verification/email-verification.types";
 
 // ======================================================
 // VALIDATE UUID
@@ -161,16 +162,16 @@ export const saveOrganizerGstController = async (
   next: NextFunction,
 ) => {
   try {
-    const { businessId = req.partner?.businessId, gstNumber } = req.body ?? {};
+    const { businessId = req.partner?.businessId, verificationId } = req.body ?? {};
     if (!isValidUUID(businessId)) {
       throw new OrganizerOnboardingError(400, "Valid businessId is required");
     }
     const partner = requireOrganizerForBusiness(req, businessId);
-    if (typeof gstNumber !== "string" || !gstNumber.trim()) {
-      throw new OrganizerOnboardingError(400, "GST number is required");
+    if (typeof verificationId !== "string" || !verificationId.trim()) {
+      throw new OrganizerOnboardingError(400, "verificationId from GST fetch is required");
     }
 
-    const data = await saveOrganizerGstService({ partnerId: partner.id, businessId, gstNumber });
+    const data = await saveOrganizerGstService(partner.id, businessId, verificationId.trim());
     return res.status(200).json({ success: true, message: "GST details saved", data });
   } catch (error) {
     if (error instanceof OrganizerOnboardingError || error instanceof GstVerificationError) {
@@ -269,7 +270,7 @@ const handleOrganizerError = (
   error: unknown,
   res: Response,
 ) => {
-  if (error instanceof OrganizerOnboardingError) {
+  if (error instanceof OrganizerOnboardingError || error instanceof EmailVerificationError) {
     return res.status(error.statusCode).json({
       success: false,
 
@@ -398,6 +399,7 @@ export const saveOrganizerAboutYouController = async (
       fullName,
 
       email,
+      otp,
 
       verificationConsent,
 
@@ -449,6 +451,7 @@ export const saveOrganizerAboutYouController = async (
           fullName,
 
           email,
+          otp,
 
           verificationConsent,
 

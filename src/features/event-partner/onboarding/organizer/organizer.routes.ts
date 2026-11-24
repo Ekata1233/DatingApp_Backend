@@ -45,7 +45,7 @@ router.patch(
 // ======================================================
 // STEP -2
 // ======================================================
-router.post("/organizer/gst/save", partnerAuthMiddleware, saveOrganizerGstController);
+router.post("/organizer/business-gst/save", partnerAuthMiddleware, saveOrganizerGstController);
 
 router.post("/organizer/business-pan/save", partnerAuthMiddleware, saveOrganizerBusinessPanController);
 

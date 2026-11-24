@@ -6,9 +6,12 @@ const businessPanKey = (id: string) => `event-partner:business-pan:${id}`;
 interface BusinessPanVerification {
   partnerId: string;
   businessId: string;
+  panNumberEncrypted: string;
   panLastFour: string;
   panName: string;
   panCategory: string;
+  panStatus: string;
+  isAadhaarLinked: boolean | null;
   verifiedAt: string;
 }
 

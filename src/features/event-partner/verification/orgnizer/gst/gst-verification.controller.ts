@@ -6,6 +6,7 @@ import {
   GstVerificationError,
 } from "./gst-verification.service";
 import { LpFintechConfigError } from "../../../../../config/lpfintech.config";
+import { signGstVerification } from "./gst-verification-proof";
 
 export const verifyEventPartnerGstController = async (
   req: PartnerRequest,
@@ -44,11 +45,12 @@ export const verifyEventPartnerGstController = async (
       businessId: selectedBusinessId,
       gstNumber: gstNumber.trim(),
     });
+    const verificationId = signGstVerification(partner.id, result);
 
     res.status(200).json({
       success: true,
       message: result.verificationMessage,
-      data: result,
+      data: { ...result, verificationId },
     });
   } catch (error: unknown) {
     if (error instanceof GstVerificationError) {

@@ -40,6 +40,7 @@ interface GridlinesPanData {
   date_of_birth?: string | null;
 
   masked_aadhaar_number?: string | null;
+  aadhaar_linked?: boolean | null;
   taxpayer_profile?: boolean | null;
 
   address_data?: GridlinesPanAddress | null;
@@ -299,7 +300,9 @@ export const verifyEventPartnerPanService = async ({
         panData.masked_aadhaar_number ?? null,
 
       isAadhaarLinked:
-        address.aadhaar_linked ?? null,
+        typeof address.aadhaar_linked === "boolean"
+          ? address.aadhaar_linked
+          : typeof panData.aadhaar_linked === "boolean" ? panData.aadhaar_linked : null,
 
       taxpayerProfile:
         panData.taxpayer_profile ?? null,

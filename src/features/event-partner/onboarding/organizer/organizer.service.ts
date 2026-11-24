@@ -1,6 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "crypto";
 
 import { prisma } from "../../../../prisma/prismaClient";
+import { encryptText } from "../../../../utils/encryption";
+import { verifyEmailOtpService } from "../../../email-verification/email-verification.service";
 
 import {
   OrganizerAboutYouInput,
@@ -35,8 +37,7 @@ import imagekit from "../../../../utils/imagekit";
 import { verifyFaceWithGridlines } from "../../../verification/face_match/face-match.provider";
 import { verifyLivenessWithGridlines } from "../../../verification/liveness/liveness.provider";
 import { validateImage } from "../../../verification/government_id/government-id.storage";
-import { verifyEventPartnerGstService } from "../../verification/orgnizer/gst/gst-verification.service";
-import type { VerifyGstInput } from "../../verification/orgnizer/gst/gst-verification.types";
+import { readGstVerification } from "../../verification/orgnizer/gst/gst-verification-proof";
 import { eventsInclude } from "./your-events.service";
 
 const organizerGstSelect = {
@@ -54,10 +55,14 @@ const organizerGstSelect = {
   registeredPincode: true,
 } satisfies Prisma.BusinessDetailsSelect;
 
-export const saveOrganizerGstService = async (input: VerifyGstInput) => {
-  const verification = await verifyEventPartnerGstService(input);
-  if (!verification.verified) {
-    throw new OrganizerOnboardingError(422, verification.verificationMessage);
+export const saveOrganizerGstService = async (
+  partnerId: string,
+  businessId: string,
+  verificationId: string,
+) => {
+  const verification = readGstVerification(verificationId);
+  if (verification?.partnerId !== partnerId || verification.businessId !== businessId.toLowerCase()) {
+    throw new OrganizerOnboardingError(409, "Fetch and verify this GSTIN before saving");
   }
 
   const details = verification.gstDetails;
@@ -74,8 +79,8 @@ export const saveOrganizerGstService = async (input: VerifyGstInput) => {
   const registeredSince = registrationDate ? new Date(registrationDate) : null;
   return prisma.businessDetails.update({
     where: {
-      id: input.businessId,
-      partnerId: input.partnerId,
+      id: businessId,
+      partnerId,
       partner: { accountStatus: "ACTIVE", deletedAt: null },
     },
     data: {
@@ -83,7 +88,7 @@ export const saveOrganizerGstService = async (input: VerifyGstInput) => {
       gstNumber: verification.gstNumber,
       gstStatus: verification.gstStatus,
       gstVerificationStatus: PartnerVerificationStatus.VERIFIED,
-      gstVerifiedAt: new Date(),
+      gstVerifiedAt: new Date(verification.verifiedAt),
       legalName: details.legalName,
       tradeName: details.tradeName,
       constitution,
@@ -393,6 +398,8 @@ export const getOrganizerOnboardingService = async (
         panLastFour: true,
         panName: true,
         panCategory: true,
+        panStatus: true,
+        isAadhaarLinked: true,
         panVerificationStatus: true,
         panVerifiedAt: true,
         status: true,
@@ -474,6 +481,7 @@ export const saveOrganizerAboutYouService = async (
     fullName,
 
     email,
+    otp,
 
     verificationConsent,
 
@@ -514,6 +522,15 @@ export const saveOrganizerAboutYouService = async (
 
   if (email !== undefined && typeof email !== "string") {
     throw new OrganizerOnboardingError(400, "Invalid email address");
+  }
+  const requestedEmail = email?.trim().toLowerCase();
+  if (otp !== undefined) {
+    if (!requestedEmail || requestedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestedEmail)) {
+      throw new OrganizerOnboardingError(400, "Valid email address is required with OTP");
+    }
+    if (typeof otp !== "string" || !/^\d{6}$/.test(otp)) {
+      throw new OrganizerOnboardingError(400, "Valid 6-digit OTP is required");
+    }
   }
 
   // ==========================================
@@ -610,10 +627,13 @@ export const saveOrganizerAboutYouService = async (
     // CHECK EMAIL MATCH
     // ========================================
 
-    if (email !== undefined && email.trim().toLowerCase() !== partner.email) {
+    if (otp === undefined && (
+      !partner.email || !partner.isEmailVerified || !partner.emailVerifiedAt ||
+      (requestedEmail !== undefined && requestedEmail !== partner.email)
+    )) {
       throw new OrganizerOnboardingError(
         400,
-        "Please verify the entered email address",
+        "Verify your work email with OTP before saving About You",
       );
     }
 
@@ -694,19 +714,6 @@ export const saveOrganizerAboutYouService = async (
         );
       }
 
-      // Email must already be verified.
-
-      if (
-        !partner.email ||
-        !partner.isEmailVerified ||
-        !partner.emailVerifiedAt
-      ) {
-        throw new OrganizerOnboardingError(
-          400,
-          "Please verify your work email",
-        );
-      }
-
       // Verification consent is mandatory.
 
       if (!finalVerificationConsent) {
@@ -724,6 +731,15 @@ export const saveOrganizerAboutYouService = async (
     // UPDATE EVENT PARTNER
     // ========================================
 
+    const verifiedEmail = otp !== undefined && requestedEmail
+      ? await verifyEmailOtpService(partnerId, { email: requestedEmail, otp }, tx).catch((error: unknown) => {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            throw new OrganizerOnboardingError(409, "Email address is already in use");
+          }
+          throw error;
+        })
+      : partner;
+
     const updated = await tx.eventPartner.updateMany({
       where: {
         id: partnerId,
@@ -736,13 +752,9 @@ export const saveOrganizerAboutYouService = async (
 
         isPhoneVerified: true,
 
-        ...(action === "CONTINUE" && {
-          email: partner.email,
-
-          isEmailVerified: true,
-
-          emailVerifiedAt: partner.emailVerifiedAt,
-        }),
+        email: verifiedEmail.email,
+        isEmailVerified: true,
+        emailVerifiedAt: verifiedEmail.emailVerifiedAt,
       },
 
       data: {
@@ -1060,7 +1072,7 @@ export const saveOrganizerIdentityDetails = async (
 
 export const fetchOrganizerBusinessPan = async (input: VerifyPanInput) => {
   const result = await verifyEventPartnerPanService(input);
-  const { panNumber, fullName } = result.panDetails;
+  const { panNumber, fullName, isAadhaarLinked } = result.panDetails;
   if (!fullName) {
     throw new PanVerificationError(422, "PAN holder name is unavailable");
   }
@@ -1068,9 +1080,12 @@ export const fetchOrganizerBusinessPan = async (input: VerifyPanInput) => {
   const verificationId = await cacheBusinessPan({
     partnerId: input.partnerId,
     businessId: input.businessId,
+    panNumberEncrypted: encryptText(panNumber),
     panLastFour: panNumber.slice(-4),
     panName: fullName,
     panCategory: panNumber.charAt(3),
+    panStatus: "VALID",
+    isAadhaarLinked,
     verifiedAt: new Date().toISOString(),
   });
   return { ...result, verificationId };
@@ -1082,11 +1097,11 @@ export const saveOrganizerBusinessPan = async (
   verificationId: string,
 ) => {
   const verification = await getCachedBusinessPan(verificationId);
-  if (verification?.partnerId !== partnerId || verification.businessId !== businessId) {
+  if (verification?.partnerId !== partnerId || verification.businessId !== businessId || !verification.panNumberEncrypted) {
     throw new PanVerificationError(409, "Fetch business PAN details again before saving");
   }
 
-  const { panLastFour, panName, panCategory, verifiedAt } = verification;
+  const { panNumberEncrypted, panLastFour, panName, panCategory, panStatus, isAadhaarLinked, verifiedAt } = verification;
   const panVerifiedAt = new Date(verifiedAt);
   return prisma.businessDetails.update({
     where: {
@@ -1097,9 +1112,12 @@ export const saveOrganizerBusinessPan = async (
       OR: [{ panVerifiedAt: null }, { panVerifiedAt: { lte: panVerifiedAt } }],
     },
     data: {
+      panNumberEncrypted,
       panLastFour,
       panName,
       panCategory,
+      panStatus,
+      isAadhaarLinked,
       panVerificationStatus: PartnerVerificationStatus.VERIFIED,
       panVerifiedAt,
     },
@@ -1108,6 +1126,8 @@ export const saveOrganizerBusinessPan = async (
       panLastFour: true,
       panName: true,
       panCategory: true,
+      panStatus: true,
+      isAadhaarLinked: true,
       panVerificationStatus: true,
       panVerifiedAt: true,
     },
@@ -1143,6 +1163,7 @@ export const verifyOrganizerIdentityPan = async (input: VerifyPanInput) => {
   // }
 
   const data = {
+    panNumberEncrypted: encryptText(panNumber),
     panLastFour: panNumber.slice(-4),
     panName: fullName,
     isPanNameMatched: true,
