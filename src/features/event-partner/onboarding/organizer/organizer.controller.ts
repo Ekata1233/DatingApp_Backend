@@ -7,10 +7,14 @@ import {
 import {
   completePartnerGovernmentIdService,
   getOrganizerAboutYouService,
+  getOrganizerOnboardingService,
   initPartnerGovernmentIdService,
   saveOrganizerAboutYouService,
+  saveOrganizerBusinessDetailsService,
   saveOrganizerGstService,
-  submitEventPartnerPanService,
+  saveOrganizerIdentityDetails,
+  saveOrganizerBusinessPan,
+  verifyOrganizerIdentityPan,
   verifyOrganizerFaceService,
 } from "./organizer.service";
 
@@ -20,10 +24,11 @@ import {
 } from "./organizer.types";
 import {
   authorizePartnerGovernmentIdService,
-  PanVerificationError,
 } from "./organizer.helper";
+import { PanVerificationError } from "../../verification/orgnizer/pan/pan-verification.service";
 import { getYourEvents, saveYourEvents, yourEventsInputSchema } from "./your-events.service";
 import { GstVerificationError } from "../../verification/orgnizer/gst/gst-verification.service";
+import { getOrganizerStepProgress } from "./organizer-progress";
 
 // ======================================================
 // VALIDATE UUID
@@ -49,6 +54,105 @@ const requireOrganizerForBusiness = (req: Request, businessId: string) => {
     throw new OrganizerOnboardingError(403, "Organizer access is required for this business");
   }
   return partner;
+};
+
+export const getOrganizerOnboardingController = async (
+  req: PartnerRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const businessId = req.query.businessId ?? req.partner?.businessId;
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+
+    const partner = requireOrganizerForBusiness(req, businessId);
+    const data = await getOrganizerOnboardingService(partner.id, partner.sessionId, businessId);
+    return res.set("Cache-Control", "no-store").status(200).json({
+      success: true,
+      data: { ...data, ...getOrganizerStepProgress(data.business.onboardingStep) },
+    });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError) {
+      return handleOrganizerError(error, res);
+    }
+    return next(error);
+  }
+};
+
+export const saveOrganizerBusinessDetailsController = async (
+  req: PartnerRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      businessId = req.partner?.businessId,
+      brandName,
+      gstNonRegistrationConsent,
+      gstNonRegistrationDocumentHash,
+    } = req.body ?? {};
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    if (typeof brandName !== "string" || !brandName.trim()) {
+      throw new OrganizerOnboardingError(400, "Brand name is required");
+    }
+    const data = await saveOrganizerBusinessDetailsService({
+      partnerId: partner.id,
+      businessId,
+      brandName: brandName.trim(),
+      gstNonRegistrationConsent,
+      gstNonRegistrationDocumentHash,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Business details confirmed",
+      data: { ...data, ...getOrganizerStepProgress("BUSINESS_DETAILS") },
+    });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError) {
+      return handleOrganizerError(error, res);
+    }
+    return next(error);
+  }
+};
+
+export const saveOrganizerIdentityDetailsController = async (
+  req: PartnerRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { businessId = req.partner?.businessId, fullName, designation, action = "SAVE" } = req.body ?? {};
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    if (typeof fullName !== "string" || fullName.trim().length < 2) {
+      throw new OrganizerOnboardingError(400, "Full name is required");
+    }
+    if (designation !== "DESIGNATED_PARTNER" && designation !== "AUTHORISED_PERSON") {
+      throw new OrganizerOnboardingError(400, "Select DESIGNATED_PARTNER or AUTHORISED_PERSON");
+    }
+    if (action !== "SAVE" && action !== "CONTINUE") {
+      throw new OrganizerOnboardingError(400, "Select SAVE or CONTINUE");
+    }
+    const data = await saveOrganizerIdentityDetails(partner.id, businessId, fullName.trim(), designation, action);
+    return res.status(200).json({
+      success: true,
+      data: { ...data, ...getOrganizerStepProgress("VERIFY_ID") },
+    });
+  } catch (error) {
+    if (error instanceof OrganizerOnboardingError) {
+      return handleOrganizerError(error, res);
+    }
+    return next(error);
+  }
 };
 
 export const saveOrganizerGstController = async (
@@ -77,12 +181,12 @@ export const saveOrganizerGstController = async (
 };
 
 export const verifyOrganizerFaceController = async (
-  req: Request,
+  req: PartnerRequest,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const { businessId, consent } = req.body ?? {};
+    const { businessId = req.partner?.businessId, consent } = req.body ?? {};
     if (!isValidUUID(businessId)) {
       throw new OrganizerOnboardingError(400, "Valid businessId is required");
     }
@@ -109,15 +213,18 @@ export const verifyOrganizerFaceController = async (
   }
 };
 
-export const getYourEventsController = async (req: Request, res: Response, next: NextFunction) => {
+export const getYourEventsController = async (req: PartnerRequest, res: Response, next: NextFunction) => {
   try {
-    const { businessId } = req.query;
+    const businessId = req.query.businessId ?? req.partner?.businessId;
     if (!isValidUUID(businessId)) {
       throw new OrganizerOnboardingError(400, "Valid businessId is required");
     }
     const partner = requireOrganizerForBusiness(req, businessId);
     const data = await getYourEvents(partner.id, businessId);
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({
+      success: true,
+      data: { ...data, ...getOrganizerStepProgress("YOUR_EVENTS") },
+    });
   } catch (error) {
     if (error instanceof OrganizerOnboardingError) {
       return handleOrganizerError(error, res);
@@ -126,7 +233,7 @@ export const getYourEventsController = async (req: Request, res: Response, next:
   }
 };
 
-export const saveYourEventsController = async (req: Request, res: Response, next: NextFunction) => {
+export const saveYourEventsController = async (req: PartnerRequest, res: Response, next: NextFunction) => {
   try {
     const input = yourEventsInputSchema.safeParse(req.body);
     if (!input.success) {
@@ -136,9 +243,16 @@ export const saveYourEventsController = async (req: Request, res: Response, next
         errors: input.error.flatten(),
       });
     }
-    const partner = requireOrganizerForBusiness(req, input.data.businessId);
-    const data = await saveYourEvents(partner.id, input.data);
-    return res.status(200).json({ success: true, data });
+    const businessId = input.data.businessId ?? req.partner?.businessId;
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    const data = await saveYourEvents(partner.id, { ...input.data, businessId });
+    return res.status(200).json({
+      success: true,
+      data: { ...data, ...getOrganizerStepProgress("YOUR_EVENTS") },
+    });
   } catch (error) {
     if (error instanceof OrganizerOnboardingError) {
       return handleOrganizerError(error, res);
@@ -204,7 +318,7 @@ export const getOrganizerAboutYouController = async (
       });
     }
 
-    const { businessId } = req.query;
+    const businessId = req.query.businessId ?? partner.businessId;
 
     // Validate business ID.
 
@@ -247,7 +361,7 @@ export const getOrganizerAboutYouController = async (
 
       message: "Organizer details fetched successfully",
 
-      data: result,
+      data: { ...result, ...getOrganizerStepProgress("PERSONAL_DETAILS") },
     });
 
   } catch (error) {
@@ -279,7 +393,7 @@ export const saveOrganizerAboutYouController = async (
     }
 
     const {
-      businessId,
+      businessId = partner.businessId,
 
       fullName,
 
@@ -360,7 +474,7 @@ export const saveOrganizerAboutYouController = async (
           ? "Step 1 completed successfully"
           : "Organizer details saved successfully",
 
-      data: result,
+      data: { ...result, ...getOrganizerStepProgress("PERSONAL_DETAILS") },
     });
 
   } catch (error) {
@@ -372,39 +486,24 @@ export const saveOrganizerAboutYouController = async (
 };
 
 
-export const verifyEventPartnerPanController = async (
-  req: Request,
+export const saveOrganizerBusinessPanController = async (
+  req: PartnerRequest,
   res: Response,
+  next: NextFunction,
 ): Promise<void> => {
   try {
-    const partnerId = (req as any).partner?.id;
-
-    if (!partnerId) {
-      res.status(401).json({
-        success: false,
-        message: "Unauthorized partner",
-      });
-      return;
+    const { businessId = req.partner?.businessId, verificationId } = req.body ?? {};
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
     }
-
-    const { businessId, consent, panDetails } = req.body;
-
-    const result = await submitEventPartnerPanService({
-      partnerId,
-      businessId,
-      consent,
-      panDetails,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: result.message,
-      data: result,
-    });
+    const partner = requireOrganizerForBusiness(req, businessId);
+    if (!isValidUUID(verificationId)) {
+      throw new OrganizerOnboardingError(400, "Valid verificationId from business PAN fetch is required");
+    }
+    const data = await saveOrganizerBusinessPan(partner.id, businessId, verificationId);
+    res.status(200).json({ success: true, message: "Business PAN saved", data });
   } catch (error: unknown) {
-    console.error("PAN Submit Error:", error);
-
-    if (error instanceof PanVerificationError) {
+    if (error instanceof PanVerificationError || error instanceof OrganizerOnboardingError) {
       res.status(error.statusCode).json({
         success: false,
         message: error.message,
@@ -412,10 +511,31 @@ export const verifyEventPartnerPanController = async (
       return;
     }
 
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    next(error);
+  }
+};
+
+export const verifyOrganizerIdentityPanController = async (
+  req: PartnerRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { businessId = req.partner?.businessId, panNumber, consent } = req.body ?? {};
+    if (!isValidUUID(businessId)) {
+      throw new OrganizerOnboardingError(400, "Valid businessId is required");
+    }
+    const partner = requireOrganizerForBusiness(req, businessId);
+    if (typeof panNumber !== "string") {
+      throw new OrganizerOnboardingError(400, "PAN number is required");
+    }
+    const data = await verifyOrganizerIdentityPan({ partnerId: partner.id, businessId, panNumber, consent });
+    return res.status(200).json({ success: true, message: "Identity PAN verified and saved", data });
+  } catch (error) {
+    if (error instanceof PanVerificationError || error instanceof OrganizerOnboardingError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    return next(error);
   }
 };
 
@@ -435,7 +555,7 @@ export const initPartnerGovernmentIdController = async (
     }
 
     const {
-      businessId,
+      businessId = partner.businessId,
       documentType,
       consent,
     } = req.body ?? {};
@@ -515,7 +635,7 @@ export const completePartnerGovernmentIdController = async (
     }
 
     const {
-      businessId,
+      businessId = partner.businessId,
       attemptId,
     } = req.body ?? {};
 

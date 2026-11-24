@@ -110,6 +110,7 @@ model Event {
   approvedAt      DateTime?
   publishedAt     DateTime?
   rejectionReason String?
+  isDeleted       Boolean     @default(false)
 
   // Relations
   photos      EventPhoto[]
@@ -130,6 +131,7 @@ model Event {
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
   ChatMessage ChatMessage[]
 
   @@index([hostId])
@@ -139,6 +141,7 @@ model Event {
   @@index([visibility, status])
   @@index([eventDurationType, status])
   @@index([businessDetailsId, status, updatedAt])
+  @@index([businessDetailsId, deletedAt, status])
   @@map("events")
 }
 

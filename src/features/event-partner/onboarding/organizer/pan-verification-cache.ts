@@ -1,27 +1,22 @@
 import { randomUUID } from "node:crypto";
+import { redis } from "../../../../lib/redis";
 
-export interface CachedPanDetails {
-  panNumber: string;
-  documentType: string;
-  documentId: string;
-  fullName: string;
-  firstName?: string | null;
-  middleName?: string | null;
-  lastName?: string | null;
-  category?: string | null;
-  dateOfBirth?: string | null;
-  maskedAadhaarNumber?: string | null;
-  isAadhaarLinked?: boolean | null;
-  referenceId?: string | null;
-}
+const businessPanKey = (id: string) => `event-partner:business-pan:${id}`;
 
-export interface CachedPanVerification {
+interface BusinessPanVerification {
   partnerId: string;
   businessId: string;
-  panDetails: CachedPanDetails;
+  panLastFour: string;
+  panName: string;
+  panCategory: string;
+  verifiedAt: string;
 }
 
-export const createPanFetchToken = () => randomUUID();
+export const cacheBusinessPan = async (verification: BusinessPanVerification) => {
+  const verificationId = randomUUID();
+  await redis.set(businessPanKey(verificationId), verification, { ex: 600 });
+  return verificationId;
+};
 
-export const panCacheKey = (token: string) =>
-  `event-partner:pan:${token}`;
+export const getCachedBusinessPan = (verificationId: string) =>
+  redis.get<BusinessPanVerification>(businessPanKey(verificationId));

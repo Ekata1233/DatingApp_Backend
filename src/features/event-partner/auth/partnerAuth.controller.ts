@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { getOrganizerStepName } from "../onboarding/organizer/organizer-progress";
 
 import {
   sendPartnerOtp,
@@ -23,11 +24,13 @@ export const sendOtp = async (
     const {
       phoneNumber,
       type,
+      businessId,
     } = req.body;
 
     const result = await sendPartnerOtp({
       phoneNumber,
       type,
+      businessId,
     });
 
     return res.status(200).json({
@@ -62,6 +65,7 @@ export const verifyOtp = async (
       otp,
       type,
       deviceToken,
+      businessId,
     } = req.body;
 
     const result = await verifyPartnerOtp({
@@ -69,19 +73,52 @@ export const verifyOtp = async (
       otp,
       type,
       deviceToken,
+      businessId,
     });
 
-    return res
-      .status(result.is_register ? 201 : 200)
-      .json({
+    const status = result.is_register ? 201 : 200;
+    const message = result.is_register ? "Registration successful" : "Login successful";
+
+    if (result.type === "HOST") {
+      const { token, partner, pendingInvitations, hostData, ...data } = result;
+      const Host_Data = (hostData ?? pendingInvitations ?? []).map(({ business, ...host }) => ({
+        ...host,
+        business: {
+          id: business.id,
+          legalName: business.legalName,
+          brandName: business.brandName,
+        },
+      }));
+      return res.status(status).json({
         success: true,
-
-        message: result.is_register
-          ? "Registration successful"
-          : "Login successful",
-
-        data: result,
+        message,
+        token,
+        Host_Data,
+        data: { Organizer_Data: partner, ...data },
       });
+    }
+
+    const { token, partner, role, onboardingStep, onboardingCompleted, is_register, isOrganizer, isHost, nextScreen } = result;
+    const { businesses, hosts, ...profile } = partner;
+
+    return res.status(status).json({
+      success: true,
+      message,
+      token,
+      data: {
+        partner: profile,
+        role,
+        onboardingStep,
+        onboardingCompleted,
+        is_register,
+        isOrganizer,
+        isHost,
+        nextScreen,
+        nextStep: result.role === "ORGANIZER" && !result.onboardingCompleted
+          ? getOrganizerStepName(result.onboardingStep)
+          : null,
+      },
+    });
 
   } catch (error) {
     return res.status(400).json({

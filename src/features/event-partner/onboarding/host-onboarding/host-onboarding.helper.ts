@@ -84,6 +84,7 @@ export const getValidHost = async (
               fullName: true,
             },
           },
+          yourEvents: { select: { baseCity: true } },
         },
       },
 
