@@ -259,7 +259,7 @@ import hostOnboardingRoutes from "../features/event-partner/onboarding/host-invi
 import orgnizerPanVerificationRoutes from "../features/event-partner/verification/orgnizer/pan/pan-verification.routes"
 import orgnizerGSTVerificationRoutes from "../features/event-partner/verification/orgnizer/gst/gst-verification.routes"
 import eventCategoryRoutes from "../features/event-partner/event-category/event-category.routes"
-
+import eventsRoutes from "../features/event-partner/events/event.routes"
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 // router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
 // router.use("/event-partner/organizer-management/brand-page", organizerBrandPageRoutes);
@@ -267,7 +267,8 @@ router.use("/event-partner/hosts", createHostRoutes)
 router.use("/event/hosts", hostOnboardingRoutes)
 router.use("/event-partner", orgnizerPanVerificationRoutes , orgnizerGSTVerificationRoutes)
 
-router.use("/event-partner",eventCategoryRoutes)
+router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
+
 
 
 
