@@ -1,7 +1,7 @@
 
 import { Prisma } from "@prisma/client";
 
-import prisma from "../../../config/prisma";
+
 
 import {
   SaveEventInput,
@@ -19,6 +19,7 @@ import {
   findOwnedEvent,
   saveEventRelations,
 } from "./event.repository";
+import { prisma } from "../../../prisma/prismaClient";
 
 // Identify event format
 const getEventFormat = (
@@ -95,12 +96,8 @@ const validateHost = async (
   const host = await tx.host.findFirst({
     where: {
       id: hostId,
-
-      // Assumes your Host model uses businessDetailsId.
-      // Match this field with your actual Host schema.
-      businessDetailsId: businessId,
+      businessId: businessId,
     },
-
     select: {
       id: true,
     },
