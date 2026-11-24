@@ -5,6 +5,7 @@ import { Router } from "express";
 import {
   getHostInvitationController,
   acceptHostInvitationController,
+  declineHostInvitationController,
   getHostPersonalDetailsController,
   updateHostPersonalDetailsController,
   getHostCodeOfConductController,
@@ -42,6 +43,8 @@ router.post(
   "/accept-invitation",
   acceptHostInvitationController,
 );
+
+router.post("/decline-invitation", declineHostInvitationController);
 
 /* -------------------------------------------------------------------------- */
 /*                        STEP 2 - PERSONAL DETAILS                           */

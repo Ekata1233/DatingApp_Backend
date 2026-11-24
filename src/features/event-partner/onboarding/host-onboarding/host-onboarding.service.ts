@@ -2,7 +2,7 @@
 /*                           GET INVITATION DETAILS                           */
 /* -------------------------------------------------------------------------- */
 
-import { HostStatus, HostStep, Prisma } from "@prisma/client";
+import { HostStatus, HostStep, PartnerConsentType, Prisma } from "@prisma/client";
 import { prisma } from "../../../../prisma/prismaClient";
 import { formatOnboardingStep, getValidHost, HostContext, validateAcceptedInvitation, validateHostVerification } from "./host-onboarding.helper";
 import { CodeOfConductInput, HOST_CODE_OF_CONDUCT_DECLARATIONS, HOST_CODE_OF_CONDUCT_RULES, HOST_CODE_OF_CONDUCT_VERSION, HOST_PERMISSION_OPTIONS, HostOnboardingError, PersonalDetailsInput } from "./host-onboarding.types";
@@ -80,7 +80,7 @@ export const getHostInvitationService = async (
 
       organizerName,
 
-      city: business.baseCity ?? null,
+      city: business.yourEvents?.baseCity ?? null,
 
       initial: organizationName
         .charAt(0)
@@ -227,6 +227,47 @@ export const acceptHostInvitationService = async (
   );
 };
 
+export const declineHostInvitationService = async (context: HostContext) => {
+  return prisma.$transaction(async (tx) => {
+    const host = await getValidHost(tx, context);
+    if (
+      host.status !== HostStatus.INVITED ||
+      host.onboardingStep !== HostStep.INVITE_ACCEPTANCE ||
+      host.acceptedAt
+    ) {
+      throw new HostOnboardingError(409, "Only a pending invitation can be declined");
+    }
+
+    const declinedAt = new Date();
+    const declined = await tx.host.updateMany({
+      where: {
+        id: context.hostId,
+        partnerId: context.partnerId,
+        businessId: context.businessId,
+        status: HostStatus.INVITED,
+        onboardingStep: HostStep.INVITE_ACCEPTANCE,
+        acceptedAt: null,
+        declinedAt: null,
+        removedAt: null,
+        invitationExpiresAt: { gt: declinedAt },
+      },
+      data: {
+        status: HostStatus.DECLINED,
+        declinedAt,
+        invitationTokenHash: null,
+      },
+    });
+
+    if (declined.count !== 1) {
+      throw new HostOnboardingError(409, "Invitation has changed or expired");
+    }
+
+    return { hostId: host.id, status: HostStatus.DECLINED, declinedAt };
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  });
+};
+
 /* -------------------------------------------------------------------------- */
 /*                           GET PERSONAL DETAILS                             */
 /* -------------------------------------------------------------------------- */
@@ -240,15 +281,10 @@ export const getHostPersonalDetailsService = async (
 
   return {
     ...formatOnboardingStep(host.onboardingStep),
-
     screenStep: 2,
-
     hostId: host.id,
-
     fullName: host.fullName,
-
-    firstName:
-      host.fullName.trim().split(/\s+/)[0],
+    firstName: host.fullName.trim().split(/\s+/)[0],
 
     phoneNumber: host.phoneNumber,
 
@@ -391,6 +427,7 @@ export const getHostCodeOfConductService = async (
   if (
     host.onboardingStep !==
       HostStep.CODE_OF_CONDUCT &&
+    host.onboardingStep !== HostStep.VERIFICATION &&
     host.onboardingStep !== HostStep.COMPLETED
   ) {
     throw new HostOnboardingError(
@@ -402,7 +439,9 @@ export const getHostCodeOfConductService = async (
   validateHostVerification(host);
 
   return {
-    ...formatOnboardingStep(host.onboardingStep),
+    ...formatOnboardingStep(
+      host.onboardingCompleted ? HostStep.COMPLETED : HostStep.CODE_OF_CONDUCT,
+    ),
 
     screenStep: 5,
 
@@ -493,8 +532,8 @@ export const acceptHostCodeOfConductService = async (
 
       if (
         host.status !== HostStatus.ONBOARDING ||
-        host.onboardingStep !==
-          HostStep.CODE_OF_CONDUCT
+        (host.onboardingStep !== HostStep.CODE_OF_CONDUCT &&
+          host.onboardingStep !== HostStep.VERIFICATION)
       ) {
         throw new HostOnboardingError(
           409,
@@ -574,8 +613,7 @@ export const acceptHostCodeOfConductService = async (
 
           status: HostStatus.ONBOARDING,
 
-          onboardingStep:
-            HostStep.CODE_OF_CONDUCT,
+          onboardingStep: host.onboardingStep,
 
           onboardingCompleted: false,
 
@@ -590,6 +628,8 @@ export const acceptHostCodeOfConductService = async (
           onboardingStep: HostStep.COMPLETED,
 
           onboardingCompleted: true,
+
+          joinedAt: host.joinedAt ?? now,
         },
       });
 
@@ -606,9 +646,9 @@ export const acceptHostCodeOfConductService = async (
 
       await tx.partnerConsent.createMany({
         data: [
-          "HOST_CODE_OF_CONDUCT",
-          "HOST_GUEST_PRIVACY",
-          "HOST_SAFETY_RULES",
+          PartnerConsentType.HOST_CODE_OF_CONDUCT,
+          PartnerConsentType.GUEST_DATA_PRIVACY,
+          PartnerConsentType.SAFETY_AND_POSH_RULES,
         ].map((consentType) => ({
           partnerId: context.partnerId,
 
@@ -618,7 +658,7 @@ export const acceptHostCodeOfConductService = async (
 
           consentType,
 
-          accepted: true,
+          isAccepted: true,
 
           documentVersion: payload.version,
 

@@ -256,6 +256,7 @@ import emailVerificationRoutes from "../features/email-verification/email-verifi
 import organizerRoutes from "../features/event-partner/onboarding/organizer/organizer.routes"
 import createHostRoutes from "../features/event-partner/host-management/host.routes"
 import hostOnboardingRoutes from "../features/event-partner/onboarding/host-invitation/host-invitation.routes"
+import scopedHostOnboardingRoutes from "../features/event-partner/onboarding/host-onboarding/host-onboarding.routes";
 import orgnizerPanVerificationRoutes from "../features/event-partner/verification/orgnizer/pan/pan-verification.routes"
 import orgnizerGSTVerificationRoutes from "../features/event-partner/verification/orgnizer/gst/gst-verification.routes"
 import eventCategoryRoutes from "../features/event-partner/event-category/event-category.routes"
@@ -265,6 +266,7 @@ router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerR
 // router.use("/event-partner/organizer-management/brand-page", organizerBrandPageRoutes);
 router.use("/event-partner/hosts", createHostRoutes)
 router.use("/event/hosts", hostOnboardingRoutes)
+router.use("/event/hosts/onboarding", scopedHostOnboardingRoutes);
 router.use("/event-partner", orgnizerPanVerificationRoutes , orgnizerGSTVerificationRoutes)
 
 router.use("/event-partner",eventCategoryRoutes)

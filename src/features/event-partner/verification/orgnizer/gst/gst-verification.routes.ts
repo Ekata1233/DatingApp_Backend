@@ -12,7 +12,7 @@ import { partnerAuthMiddleware } from "../../../../../middleware/partnerAuth.mid
 const router = Router();
 
 router.post(
-  "/verify/gst",
+  "/gst/fetch-details",
   partnerAuthMiddleware,
   verifyEventPartnerGstController
 );

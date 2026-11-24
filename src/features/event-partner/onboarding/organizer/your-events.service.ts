@@ -14,7 +14,7 @@ import { normalizeIndianMobile, OrganizerOnboardingError } from "./organizer.typ
 const city = z.string().trim().min(1).max(100);
 
 export const yourEventsInputSchema = z.object({
-  businessId: z.string().uuid(),
+  businessId: z.string().uuid().optional(),
   action: z.enum(["SAVE", "SUBMIT"]),
   eventDurationType: z.nativeEnum(EventDurationType).nullable().optional(),
   categoryValues: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
@@ -32,7 +32,7 @@ const categorySelect = {
   icon: true,
 } satisfies Prisma.EventCategorySelect;
 
-const eventsInclude = {
+export const eventsInclude = {
   categories: { select: categorySelect, orderBy: [{ sortOrder: "asc" }, { value: "asc" }] },
 } satisfies Prisma.YourEventsInclude;
 
@@ -72,7 +72,7 @@ const normalizeContactPhone = (phone: string) => {
 
 export const saveYourEvents = async (
   partnerId: string,
-  input: z.infer<typeof yourEventsInputSchema>,
+  input: z.infer<typeof yourEventsInputSchema> & { businessId: string },
 ) => {
   const { businessId, action, categoryValues, ...fields } = input;
   const submitting = action === "SUBMIT";

@@ -207,6 +207,7 @@ model EventCategory {
 
   @@unique([value, eventDurationType])
   @@index([isActive, sortOrder])
+  @@index([eventDurationType, isActive, sortOrder])
   @@map("partner_event_categories")
 }
 
@@ -315,23 +316,24 @@ model HostVerifyId {
 }
 
 model PartnerConsent {
-  id              String             @id @default(uuid()) @db.Uuid
-  partnerId       String             @db.Uuid
-  businessId      String?            @db.Uuid
-  hostId          String?            @db.Uuid
-  consentType     PartnerConsentType
-  isAccepted      Boolean
-  documentVersion String
-  documentHash    String
-  documentKey     String?
-  acceptedAt      DateTime?
-  revokedAt       DateTime?
-  ipAddress       String?
-  userAgent       String?
-  createdAt       DateTime           @default(now())
-  business        BusinessDetails?   @relation(fields: [businessId], references: [id])
-  host            Host?              @relation(fields: [hostId], references: [id])
-  partner         EventPartner       @relation(fields: [partnerId], references: [id])
+  id                  String             @id @default(uuid()) @db.Uuid
+  partnerId           String             @db.Uuid
+  businessId          String?            @db.Uuid
+  hostId              String?            @db.Uuid
+  consentType         PartnerConsentType
+  isAccepted          Boolean
+  documentVersion     String
+  documentHash        String
+  documentKey         String?
+  acceptedAt          DateTime?
+  acceptedPhoneNumber String?
+  revokedAt           DateTime?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime           @default(now())
+  business            BusinessDetails?   @relation(fields: [businessId], references: [id])
+  host                Host?              @relation(fields: [hostId], references: [id])
+  partner             EventPartner       @relation(fields: [partnerId], references: [id])
 
   @@index([partnerId, consentType])
   @@index([businessId, consentType])

@@ -5,20 +5,29 @@ import { partnerAuthMiddleware } from "../../../../middleware/partnerAuth.middle
 import {
   completePartnerGovernmentIdController,
   getOrganizerAboutYouController,
+  getOrganizerOnboardingController,
   getYourEventsController,
   initPartnerGovernmentIdController,
   partnerGovernmentIdCallbackController,
   saveOrganizerAboutYouController,
+  saveOrganizerBusinessDetailsController,
   saveOrganizerGstController,
+  saveOrganizerIdentityDetailsController,
   saveYourEventsController,
-  verifyEventPartnerPanController,
+  saveOrganizerBusinessPanController,
+  verifyOrganizerIdentityPanController,
   verifyOrganizerFaceController,
 } from "./organizer.controller";
+import { verifyEventPartnerPanController } from "../../verification/orgnizer/pan/pan-verification.controller";
 
 const router = Router();
 
+router.get("/organizer/onboarding-details", partnerAuthMiddleware, getOrganizerOnboardingController);
+
+
+
 // ======================================================
-// 1. GET ORGANIZER ABOUT YOU
+// STEP -1
 // ======================================================
 router.get(
   "/organizer/about-you",
@@ -26,9 +35,6 @@ router.get(
   getOrganizerAboutYouController,
 );
 
-// ======================================================
-// 2. SAVE OR CONTINUE ABOUT YOU
-// ======================================================
 router.patch(
   "/organizer/about-you",
   partnerAuthMiddleware,
@@ -36,60 +42,73 @@ router.patch(
 );
 
 
-/* -------------------------------------------------------------------------- */
-/*                           GOVERNMENT ID INIT                               */
-/* -------------------------------------------------------------------------- */
+// ======================================================
+// STEP -2
+// ======================================================
+router.post("/organizer/gst/save", partnerAuthMiddleware, saveOrganizerGstController);
+
+router.post("/organizer/business-pan/save", partnerAuthMiddleware, saveOrganizerBusinessPanController);
+
+router.patch("/organizer/business-details/save", partnerAuthMiddleware, saveOrganizerBusinessDetailsController);
+
+
+// ======================================================
+// STEP -3
+// ======================================================
 router.post(
-  "/government-id/init",
+  "/organizer/government-id/init",
   partnerAuthMiddleware,
   initPartnerGovernmentIdController,
 );
 
-/* -------------------------------------------------------------------------- */
-/*                         GOVERNMENT ID COMPLETE                             */
-/* -------------------------------------------------------------------------- */
 router.post(
-  "/government-id/complete",
+  "/organizer/government-id/complete",
   partnerAuthMiddleware,
   completePartnerGovernmentIdController,
 );
 
-router.get("/government-id/callback", partnerGovernmentIdCallbackController);
+router.get("/organizer/government-id/callback", partnerGovernmentIdCallbackController);
 
-// ======================================================
-// PAN VERIFY & SAVE
-// ======================================================
-router.post("/organizer/pan/save", partnerAuthMiddleware, verifyEventPartnerPanController);
+router.post("/organizer/identity-pan/verify", partnerAuthMiddleware, verifyOrganizerIdentityPanController);
 
-// ======================================================
-// GST VERIFY & SAVE
-// ======================================================
-router.post("/organizer/gst/save", partnerAuthMiddleware, saveOrganizerGstController);
-
-// ======================================================
-// FACE VERIFY
-// ======================================================
 router.post(
   "/organizer/face/verify",
   partnerAuthMiddleware,
   verifyOrganizerFaceController,
 );
 
+router.patch("/organizer/verified-details/save", partnerAuthMiddleware, saveOrganizerIdentityDetailsController);
 
 // ======================================================
-// EVENTS - NEXT STEP
+// STEP -4
 // ======================================================
+router.patch(
+  "/organizer/your-events",
+  partnerAuthMiddleware,
+  saveYourEventsController,
+);
+
+// ======================================================
+// STEP -5
+// ======================================================
+
+router.post("/organizer/business-pan/fetch-details", partnerAuthMiddleware, verifyEventPartnerPanController);
+
+
+
+// router.post("/organizer/pan/save", partnerAuthMiddleware, saveOrganizerBusinessPanController);
+
+
+
+
+
 router.get(
   "/organizer/your-events",
   partnerAuthMiddleware,
   getYourEventsController,
 );
 
-router.patch(
-  "/organizer/your-events",
-  partnerAuthMiddleware,
-  saveYourEventsController,
-);
+
 
 
 

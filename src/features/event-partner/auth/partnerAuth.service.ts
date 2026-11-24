@@ -1,6 +1,7 @@
 import https from "https";
 import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import {
   MSG91_AUTH_KEY,
@@ -15,12 +16,14 @@ import {
 interface SendOtpInput {
   phoneNumber: string;
   type: PartnerRole;
+  businessId?: unknown;
 }
 interface VerifyOtpInput {
   phoneNumber: string;
   otp: string;
   type: PartnerRole;
   deviceToken?: string;
+  businessId?: unknown;
 }
 interface SelectRoleInput {
   partnerId: string;
@@ -103,6 +106,41 @@ const isValidUUID = (value: unknown): value is string => {
       value,
     )
   );
+};
+
+const getSelectedHostBusiness = (type: PartnerRole, businessId: unknown) => {
+  if (type !== "HOST" || businessId === undefined) return undefined;
+  if (!isValidUUID(businessId)) throw new Error("Invalid business ID");
+  return businessId;
+};
+
+const selectedHostWhere = (businessId: string, phoneNumber: string, now: Date) => {
+  const linkedPartner = { phoneNumber, accountStatus: "ACTIVE", deletedAt: null } as const;
+  return {
+    businessId,
+    phoneNumber,
+    removedAt: null,
+    declinedAt: null,
+    business: {
+      status: "ACTIVE",
+      onboardingCompleted: true,
+      partner: { accountStatus: "ACTIVE", deletedAt: null },
+    },
+    OR: [
+      {
+        status: "INVITED",
+        onboardingStep: "INVITE_ACCEPTANCE",
+        acceptedAt: null,
+        invitationExpiresAt: { gt: now },
+        OR: [{ partnerId: null }, { partner: linkedPartner }],
+      },
+      {
+        status: { in: ["ONBOARDING", "ACTIVE", "PAUSED"] },
+        acceptedAt: { not: null },
+        partner: linkedPartner,
+      },
+    ],
+  } satisfies Prisma.HostWhereInput;
 };
 // ======================================================
 // JWT SECRET
@@ -227,10 +265,19 @@ const msg91Request = (
 export const sendPartnerOtp = async ({
   phoneNumber,
   type,
+  businessId,
 }: SendOtpInput) => {
   const formattedNumber =
     normalizePhoneNumber(phoneNumber);
   const partnerType = validatePartnerType(type);
+  const selectedBusinessId = getSelectedHostBusiness(partnerType, businessId);
+  if (selectedBusinessId) {
+    const host = await prisma.host.findFirst({
+      where: selectedHostWhere(selectedBusinessId, formattedNumber, new Date()),
+      select: { id: true },
+    });
+    if (!host) throw new Error("No valid host invitation or account for the selected business");
+  }
   // ============================================
   // MSG91 OTP - TEMPORARILY DISABLED
   // ============================================
@@ -267,6 +314,7 @@ export const sendPartnerOtp = async ({
   return {
     phoneNumber: formattedNumber,
     type: partnerType,
+    ...(selectedBusinessId && { businessId: selectedBusinessId }),
     otpSent: true,
     resendAfter: 30,
     expiresIn: 600,
@@ -275,7 +323,7 @@ export const sendPartnerOtp = async ({
 // ======================================================
 // PARTNER SELECT
 // ======================================================
-const partnerSelect = {
+const partnerProfileSelect = {
   id: true,
   fullName: true,
   phoneNumber: true,
@@ -293,6 +341,10 @@ const partnerSelect = {
   lastActiveAt: true,
   createdAt: true,
   updatedAt: true,
+} as const;
+
+const partnerSelect = {
+  ...partnerProfileSelect,
   businesses: {
     select: {
       id: true,
@@ -338,10 +390,15 @@ export const verifyPartnerOtp = async ({
   otp,
   type,
   deviceToken,
+  businessId,
 }: VerifyOtpInput) => {
   const formattedNumber =
     normalizePhoneNumber(phoneNumber);
   const partnerType = validatePartnerType(type);
+  if (businessId !== undefined && !isValidUUID(businessId)) {
+    throw new Error("Invalid business ID");
+  }
+  const selectedBusinessId = typeof businessId === "string" ? businessId.toLowerCase() : undefined;
   if (typeof otp !== "string") {
     throw new Error("OTP must be a string");
   }
@@ -384,6 +441,7 @@ export const verifyPartnerOtp = async ({
     phoneNumber: formattedNumber,
     deviceToken,
     type: partnerType,
+    selectedBusinessId,
   });
 };
 // ======================================================
@@ -393,10 +451,12 @@ const handleVerifiedPartner = async ({
   phoneNumber,
   deviceToken,
     type,
+  selectedBusinessId,
 }: {
   phoneNumber: string;
   deviceToken?: string;
    type: PartnerRole;
+  selectedBusinessId?: string;
 }) => {
   const sessionId = randomUUID();
   const result = await prisma.$transaction(
@@ -423,7 +483,7 @@ const handleVerifiedPartner = async ({
 // HOST VALIDATION
 // ==========================================
 
-if (type === "HOST") {
+if (type === "HOST" && !selectedBusinessId) {
   console.log("========== HOST VALIDATION START ==========");
 
   console.log("Selected Type:", type);
@@ -587,7 +647,7 @@ if (type === "HOST") {
         partnerId = newPartner.id;
       }
       // Create an Organizer draft only when no business exists.
-      if (type === "ORGANIZER") {
+      if (type === "ORGANIZER" && !selectedBusinessId) {
         const existingBusiness = await tx.businessDetails.findFirst({
           where: { partnerId },
           select: { id: true },
@@ -605,13 +665,51 @@ if (type === "HOST") {
       // ==========================================
       // GET COMPLETE PARTNER
       // ==========================================
-      const partner =
-        await tx.eventPartner.findUniqueOrThrow({
-          where: {
-            id: partnerId,
+      if (type === "HOST" && selectedBusinessId) {
+        const where = selectedHostWhere(selectedBusinessId, phoneNumber, new Date());
+        const host = await tx.host.findFirst({
+          where,
+          select: {
+            id: true,
+            fullName: true,
+            businessId: true,
+            partnerId: true,
+            status: true,
+            acceptedAt: true,
+            invitedAt: true,
+            invitationExpiresAt: true,
+            onboardingStep: true,
+            onboardingCompleted: true,
+            business: { select: { id: true, brandName: true, tradeName: true, legalName: true } },
           },
-          select: partnerSelect,
         });
+        if (!host || (host.partnerId && host.partnerId !== partnerId)) {
+          throw new Error("No valid host invitation or account for the selected business");
+        }
+        if (!host.partnerId) {
+          const linked = await tx.host.updateMany({
+            where: { ...where, id: host.id, partnerId: null, status: "INVITED" },
+            data: { partnerId },
+          });
+          if (linked.count !== 1) throw new Error("Host invitation changed. Select the business again");
+        }
+        const partner = await tx.eventPartner.findUniqueOrThrow({
+          where: { id: partnerId },
+          select: {
+            ...partnerSelect,
+            businesses: { ...partnerSelect.businesses, where: { id: selectedBusinessId } },
+            hosts: {
+              ...partnerSelect.hosts,
+              where: { ...partnerSelect.hosts.where, businessId: selectedBusinessId },
+            },
+          },
+        });
+        return { partner, isRegister, selectedHost: host } as const;
+      }
+      const partner = await tx.eventPartner.findUniqueOrThrow({
+        where: { id: partnerId },
+        select: partnerSelect,
+      });
       // ==========================================
       // FIND PENDING HOST INVITATIONS
       // ==========================================
@@ -701,6 +799,14 @@ if (type === "HOST") {
       const availableAccounts = type === "ORGANIZER"
         ? organizerAccounts
         : hostAccounts;
+      const selectedOrganizer = type === "ORGANIZER"
+        ? selectedBusinessId
+          ? organizerAccounts.find((account) => account.businessId === selectedBusinessId)
+          : organizerAccounts.length === 1 ? organizerAccounts[0] : undefined
+        : undefined;
+      if (type === "ORGANIZER" && selectedBusinessId && !selectedOrganizer) {
+        throw new Error("You are not the organizer of this business");
+      }
       const roles = [
         ...new Set(
           [...organizerAccounts, ...hostAccounts].map(
@@ -719,8 +825,8 @@ if (type === "HOST") {
       // ==========================================
       let nextScreen: string;
       if (type === "ORGANIZER") {
-        if (availableAccounts.length === 1 && !availableAccounts[0].onboardingCompleted) {
-          nextScreen = "ORGANIZER_ONBOARDING";
+        if (selectedOrganizer) {
+          nextScreen = getOrganizerNextScreen(selectedOrganizer);
         } else if (availableAccounts.length > 0) {
           nextScreen = "SELECT_ACCOUNT";
         } else {
@@ -743,15 +849,76 @@ if (type === "HOST") {
         pendingInvitations,
         hasPendingInvitation,
         nextScreen,
+        selectedOrganizer,
       };
     },
   );
   // ============================================
   // GENERATE COMMON JWT
   // ============================================
+  if (result.selectedHost) {
+    const host = result.selectedHost;
+    const businessName = host.business.brandName || host.business.tradeName || host.business.legalName;
+    const isHost = host.acceptedAt !== null;
+    const isOrganizer = result.partner.businesses.length > 0;
+    let nextScreen = "HOST_INVITATION";
+    if (isHost) {
+      if (host.status === "PAUSED") nextScreen = "HOST_STATUS";
+      else nextScreen = host.onboardingCompleted ? "HOST_DASHBOARD" : "HOST_ONBOARDING";
+    }
+    return {
+      partner: result.partner,
+      token: generatePartnerToken({
+        partnerId: result.partner.id,
+        sessionId,
+        role: "HOST",
+        businessId: host.businessId,
+      }),
+      type,
+      role: "HOST" as const,
+      businessId: host.businessId,
+      businessName,
+      is_register: result.isRegister,
+      roles: [
+        ...(isOrganizer ? ["ORGANIZER" as const] : []),
+        ...(isHost ? ["HOST" as const] : []),
+      ],
+      isOrganizer,
+      isHost,
+      availableAccounts: isHost ? [{
+        role: "HOST" as const,
+        hostId: host.id,
+        businessId: host.businessId,
+        businessName,
+        status: host.status,
+        onboardingStep: host.onboardingStep,
+        onboardingCompleted: host.onboardingCompleted,
+        canAccessDashboard: host.status === "ACTIVE" && host.onboardingCompleted,
+      }] : [],
+      hasPendingInvitation: !isHost,
+      pendingInvitations: [],
+      hostData: [{
+        id: host.id,
+        fullName: host.fullName,
+        businessId: host.businessId,
+        status: host.status,
+        onboardingStep: host.onboardingStep,
+        invitedAt: host.invitedAt,
+        invitationExpiresAt: host.invitationExpiresAt,
+        business: host.business,
+      }],
+      onboardingStep: host.onboardingStep,
+      onboardingCompleted: host.onboardingCompleted,
+      nextScreen,
+    };
+  }
+
+  const organizer = result.selectedOrganizer;
   const token = generatePartnerToken({
     partnerId: result.partner.id,
     sessionId,
+    role: organizer?.role,
+    businessId: organizer?.businessId,
   });
   // ============================================
   // FINAL RESPONSE
@@ -760,6 +927,12 @@ if (type === "HOST") {
     partner: result.partner,
     token,
     type,
+    ...(organizer && {
+      role: organizer.role,
+      businessId: organizer.businessId,
+      onboardingStep: organizer.onboardingStep,
+      onboardingCompleted: organizer.onboardingCompleted,
+    }),
     is_register: result.isRegister,
     roles: result.roles,
     isOrganizer: result.isOrganizer,
@@ -776,6 +949,11 @@ if (type === "HOST") {
 // ======================================================
 // 4. SELECT ORGANIZER OR HOST ROLE
 // ======================================================
+const getOrganizerNextScreen = (business: { onboardingCompleted: boolean; status: string }) => {
+  if (!business.onboardingCompleted) return "ORGANIZER_ONBOARDING";
+  return business.status === "ACTIVE" ? "ORGANIZER_DASHBOARD" : "BUSINESS_STATUS";
+};
+
 export const selectPartnerRole = async ({
   partnerId,
   sessionId,
@@ -840,16 +1018,7 @@ export const selectPartnerRole = async ({
     // ==========================================
     // DETERMINE NEXT SCREEN
     // ==========================================
-    let nextScreen: string;
-    if (!business.onboardingCompleted) {
-      nextScreen = "ORGANIZER_ONBOARDING";
-    }
-    else if (business.status !== "ACTIVE") {
-      nextScreen = "BUSINESS_STATUS";
-    }
-    else {
-      nextScreen = "ORGANIZER_DASHBOARD";
-    }
+    const nextScreen = getOrganizerNextScreen(business);
     // ==========================================
     // ORGANIZER JWT
     // ==========================================

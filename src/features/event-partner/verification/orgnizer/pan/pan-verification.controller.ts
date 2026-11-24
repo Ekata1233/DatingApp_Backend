@@ -1,20 +1,19 @@
 
-import { Request, Response } from "express";
+import { Response } from "express";
+import type { PartnerRequest } from "../../../../../types/partnerAuth.types";
 
 import {
-  verifyEventPartnerPanService,
   PanVerificationError,
 } from "./pan-verification.service";
+import { fetchOrganizerBusinessPan } from "../../../onboarding/organizer/organizer.service";
 
 export const verifyEventPartnerPanController = async (
-  req: Request,
+  req: PartnerRequest,
   res: Response,
 ): Promise<void> => {
   try {
-const partnerId = (req as any).partner?.id;
-    const { businessId, panNumber, consent } = req.body;
-
-    if (!partnerId) {
+    const partner = req.partner;
+    if (!partner) {
       res.status(401).json({
         success: false,
         message: "Unauthorized partner",
@@ -22,6 +21,7 @@ const partnerId = (req as any).partner?.id;
       return;
     }
 
+    const { businessId = partner.businessId, panNumber, consent } = req.body ?? {};
     if (
       typeof businessId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -35,6 +35,14 @@ const partnerId = (req as any).partner?.id;
       return;
     }
 
+    if (partner.role === "HOST" || (partner.businessId && partner.businessId !== businessId)) {
+      res.status(403).json({
+        success: false,
+        message: "Organizer access is required for this business",
+      });
+      return;
+    }
+
     if (typeof panNumber !== "string") {
       res.status(400).json({
         success: false,
@@ -43,8 +51,8 @@ const partnerId = (req as any).partner?.id;
       return;
     }
 
-    const result = await verifyEventPartnerPanService({
-      partnerId,
+    const result = await fetchOrganizerBusinessPan({
+      partnerId: partner.id,
       businessId,
       panNumber,
       consent,

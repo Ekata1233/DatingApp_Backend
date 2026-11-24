@@ -6,21 +6,26 @@ import {
   OrganizerAboutYouInput,
   OrganizerOnboardingError,
   ConsentDocument,
-  VerifyPanInput,
-  GridlinesPanResponse,
-  GridlinesPanData,
   PartnerGovernmentIdError,
   InitPartnerGovernmentIdInput,
   CompletePartnerGovernmentIdInput,
   normalizeIndianMobile,
 } from "./organizer.types";
 import {
+  BusinessConstitution,
   GovernmentIdType,
   PartnerGovernmentIdAttemptStatus as AttemptStatus,
   PartnerVerificationStatus,
   Prisma,
+  RepresentativeDesignation,
 } from "@prisma/client";
-import { hashState,  PanVerificationError } from "./organizer.helper";
+import { hashState } from "./organizer.helper";
+import { cacheBusinessPan, getCachedBusinessPan } from "./pan-verification-cache";
+import {
+  PanVerificationError,
+  verifyEventPartnerPanService,
+  type VerifyPanInput,
+} from "../../verification/orgnizer/pan/pan-verification.service";
 import {
   getVerifiedGovernmentDocument,
   validateGovernmentIdentity,
@@ -28,17 +33,45 @@ import {
 import axios from "axios";
 import imagekit from "../../../../utils/imagekit";
 import { verifyFaceWithGridlines } from "../../../verification/face_match/face-match.provider";
+import { verifyLivenessWithGridlines } from "../../../verification/liveness/liveness.provider";
 import { validateImage } from "../../../verification/government_id/government-id.storage";
 import { verifyEventPartnerGstService } from "../../verification/orgnizer/gst/gst-verification.service";
 import type { VerifyGstInput } from "../../verification/orgnizer/gst/gst-verification.types";
+import { eventsInclude } from "./your-events.service";
+
+const organizerGstSelect = {
+  id: true,
+  hasGst: true,
+  gstNumber: true,
+  gstStatus: true,
+  gstVerificationStatus: true,
+  gstVerifiedAt: true,
+  legalName: true,
+  tradeName: true,
+  constitution: true,
+  registeredSince: true,
+  principalPlace: true,
+  registeredPincode: true,
+} satisfies Prisma.BusinessDetailsSelect;
 
 export const saveOrganizerGstService = async (input: VerifyGstInput) => {
   const verification = await verifyEventPartnerGstService(input);
-  if (!verification.isGstActive) {
+  if (!verification.verified) {
     throw new OrganizerOnboardingError(422, verification.verificationMessage);
   }
 
   const details = verification.gstDetails;
+  const constitutionKey = details.constitution?.trim().toUpperCase().replace(/\W+/g, "_");
+  const constitution = constitutionKey === "PROPRIETORSHIP"
+    ? BusinessConstitution.SOLE_PROPRIETORSHIP
+    : constitutionKey && Object.prototype.hasOwnProperty.call(BusinessConstitution, constitutionKey)
+      ? BusinessConstitution[constitutionKey as keyof typeof BusinessConstitution]
+      : null;
+  const registrationDate = details.registrationDate?.replace(
+    /^(\d{2})[/-](\d{2})[/-](\d{4})$/,
+    "$3-$2-$1",
+  );
+  const registeredSince = registrationDate ? new Date(registrationDate) : null;
   return prisma.businessDetails.update({
     where: {
       id: input.businessId,
@@ -48,30 +81,17 @@ export const saveOrganizerGstService = async (input: VerifyGstInput) => {
     data: {
       hasGst: true,
       gstNumber: verification.gstNumber,
-      gstStatus: details.registrationStatus,
+      gstStatus: verification.gstStatus,
       gstVerificationStatus: PartnerVerificationStatus.VERIFIED,
-      gstVerifiedAt: verification.verifiedAt,
+      gstVerifiedAt: new Date(),
       legalName: details.legalName,
       tradeName: details.tradeName,
-      constitution: details.constitution,
-      registeredSince: details.registrationDate,
-      principalPlace: details.address,
-      registeredPincode: details.registeredPincode,
+      constitution,
+      registeredSince: registeredSince && Number.isFinite(registeredSince.getTime()) ? registeredSince : null,
+      principalPlace: details.principalAddress,
+      registeredPincode: details.principalAddress?.match(/\b\d{6}\s*$/)?.[0].trim() ?? null,
     },
-    select: {
-      id: true,
-      hasGst: true,
-      gstNumber: true,
-      gstStatus: true,
-      gstVerificationStatus: true,
-      gstVerifiedAt: true,
-      legalName: true,
-      tradeName: true,
-      constitution: true,
-      registeredSince: true,
-      principalPlace: true,
-      registeredPincode: true,
-    },
+    select: organizerGstSelect,
   }).catch((error: unknown) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
       throw new OrganizerOnboardingError(404, "Business not found or access denied");
@@ -111,6 +131,115 @@ const getConsentDocuments = () => {
   };
 };
 
+const gstNonRegistrationDocument = createConsentDocument(
+  "I'm not required to register for GST. My yearly turnover from services is below ₹20 lakh (₹10 lakh in special-category states). I'll register and tell Welvors within 30 days if I cross it.",
+  "1.0",
+);
+
+export const saveOrganizerBusinessDetailsService = async (input: {
+  partnerId: string;
+  businessId: string;
+  brandName: string;
+  gstNonRegistrationConsent?: boolean;
+  gstNonRegistrationDocumentHash?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) => {
+  const { partnerId, businessId, brandName } = input;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const business = await tx.businessDetails.findFirst({
+        where: { id: businessId, partnerId, partner: { accountStatus: "ACTIVE", deletedAt: null } },
+        select: {
+          status: true,
+          onboardingStep: true,
+          gstVerificationStatus: true,
+          panVerificationStatus: true,
+        },
+      });
+      if (!business) {
+        throw new OrganizerOnboardingError(404, "Organizer business not found");
+        
+      }
+      if (
+        (business.status !== "DRAFT" && business.status !== "CHANGES_REQUIRED") ||
+        business.onboardingStep === "PERSONAL_DETAILS"
+
+      ) {
+                console.log(business.status , business.onboardingStep);
+
+        throw new OrganizerOnboardingError(409, "Business details cannot be confirmed at the current onboarding step");
+      }
+
+      const hasGst = business.gstVerificationStatus === PartnerVerificationStatus.VERIFIED;
+      const now = new Date();
+      if (!hasGst) {
+        if (business.panVerificationStatus !== PartnerVerificationStatus.VERIFIED) {
+          throw new OrganizerOnboardingError(409, "Verify GST or business PAN before confirming business details");
+        }
+        if (input.gstNonRegistrationConsent !== true) {
+          throw new OrganizerOnboardingError(400, "Accept the GST non-registration declaration");
+        }
+        if (input.gstNonRegistrationDocumentHash !== gstNonRegistrationDocument.hash) {
+          throw new OrganizerOnboardingError(400, "Please read the latest GST non-registration declaration");
+        }
+      }
+
+      const declarationWhere = {
+        partnerId,
+        businessId,
+        hostId: null,
+        consentType: "GST_NON_REGISTRATION_DECLARATION",
+        revokedAt: null,
+        isAccepted: true,
+      } satisfies Prisma.PartnerConsentWhereInput;
+      const currentDocument = {
+        documentVersion: gstNonRegistrationDocument.version,
+        documentHash: gstNonRegistrationDocument.hash,
+      };
+      await tx.partnerConsent.updateMany({
+        where: { ...declarationWhere, ...(hasGst ? {} : { NOT: currentDocument }) },
+        data: { revokedAt: now },
+      });
+      if (!hasGst && !(await tx.partnerConsent.findFirst({
+        where: { ...declarationWhere, ...currentDocument },
+        select: { id: true },
+      }))) {
+        await tx.partnerConsent.create({
+          data: {
+            partnerId,
+            businessId,
+            consentType: declarationWhere.consentType,
+            isAccepted: true,
+            ...currentDocument,
+            acceptedAt: now,
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+          },
+          select: { id: true },
+        });
+      }
+
+      const saved = await tx.businessDetails.update({
+        where: { id: businessId },
+        data: {
+          brandName,
+          hasGst,
+          businessConfirmedAt: now,
+          onboardingStep: business.onboardingStep === "BUSINESS_DETAILS" ? "VERIFY_ID" : undefined,
+        },
+        select: { id: true, brandName: true, hasGst: true, businessConfirmedAt: true, onboardingStep: true },
+      });
+      return { ...saved, gstNonRegistrationConsent: !hasGst };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      throw new OrganizerOnboardingError(409, "Business details changed. Please retry.");
+    }
+    throw error;
+  }
+};
+
 // ======================================================
 // EVENT PARTNER SELECT
 // ======================================================
@@ -130,6 +259,13 @@ const organizerSelect = {
 
   whatsappUpdates: true,
 } as const;
+
+const organizerConsentSelect = {
+  isAccepted: true,
+  revokedAt: true,
+  documentVersion: true,
+  documentHash: true,
+} satisfies Prisma.PartnerConsentSelect;
 
 // ======================================================
 // 1. GET ORGANIZER ABOUT YOU DETAILS
@@ -199,6 +335,7 @@ export const getOrganizerAboutYouService = async (
   // ==========================================
 
   const verificationConsent = await prisma.partnerConsent.findFirst({
+    select: organizerConsentSelect,
     where: {
       partnerId,
 
@@ -234,6 +371,89 @@ export const getOrganizerAboutYouService = async (
     onboardingStep: business.onboardingStep,
 
     onboardingCompleted: business.onboardingCompleted,
+  };
+};
+
+export const getOrganizerOnboardingService = async (
+  partnerId: string,
+  sessionId: string,
+  businessId: string,
+) => {
+  const aboutYou = await getOrganizerAboutYouService(partnerId, sessionId, businessId);
+  const [onboarding, aadhaarAttempt, categories] = await Promise.all([
+    prisma.businessDetails.findFirst({
+      where: { id: businessId, partnerId },
+      select: {
+        ...organizerGstSelect,
+        brandName: true,
+        businessConfirmedAt: true,
+        representativeName: true,
+        designation: true,
+        isMcaNameMatched: true,
+        panLastFour: true,
+        panName: true,
+        panCategory: true,
+        panVerificationStatus: true,
+        panVerifiedAt: true,
+        status: true,
+        onboardingStep: true,
+        onboardingCompleted: true,
+        submittedAt: true,
+        rejectionReason: true,
+        verifyId: {
+          select: {
+            aadhaarStatus: true,
+            aadhaarVerifiedAt: true,
+            aadhaarFailureReason: true,
+            aadhaarLastFour: true,
+            isNameMatched: true,
+            panStatus: true,
+            panLastFour: true,
+            panName: true,
+            isPanNameMatched: true,
+            isAadhaarLinked: true,
+            panVerifiedAt: true,
+            panFailureReason: true,
+            faceStatus: true,
+            faceMatchScore: true,
+            isFaceMatched: true,
+            faceVerifiedAt: true,
+            faceFailureReason: true,
+            livenessStatus: true,
+            livenessFailureReason: true,
+          },
+        },
+        yourEvents: { include: eventsInclude },
+      },
+    }),
+    prisma.partnerGovernmentIdAttempt.findFirst({
+      where: { partnerId, businessId, documentType: GovernmentIdType.AADHAAR },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true, status: true, expiresAt: true },
+    }),
+    prisma.eventCategory.findMany({
+      where: { isActive: true },
+      ...eventsInclude.categories,
+    }),
+  ]);
+
+  if (!onboarding) {
+    throw new OrganizerOnboardingError(404, "Organizer business not found");
+  }
+
+  const { verifyId, yourEvents, ...business } = onboarding;
+  return {
+    aboutYou: {
+      ...aboutYou,
+      onboardingStep: business.onboardingStep,
+      onboardingCompleted: business.onboardingCompleted,
+    },
+    business,
+    gstNonRegistrationDocument,
+    verification: verifyId,
+    aadhaarAttempt,
+    yourEvents,
+    categories,
   };
 };
 
@@ -402,6 +622,7 @@ export const saveOrganizerAboutYouService = async (
     // ========================================
 
     const existingVerificationConsent = await tx.partnerConsent.findFirst({
+      select: organizerConsentSelect,
       where: {
         partnerId,
 
@@ -581,6 +802,7 @@ export const saveOrganizerAboutYouService = async (
       // Create new consent history record.
 
       await tx.partnerConsent.create({
+        select: { id: true },
         data: {
           partnerId,
 
@@ -609,6 +831,7 @@ export const saveOrganizerAboutYouService = async (
 
     if (whatsappUpdates !== undefined) {
       const existingWhatsappConsent = await tx.partnerConsent.findFirst({
+        select: organizerConsentSelect,
         where: {
           partnerId,
 
@@ -655,6 +878,7 @@ export const saveOrganizerAboutYouService = async (
         // Create new WhatsApp consent.
 
         await tx.partnerConsent.create({
+          select: { id: true },
           data: {
             partnerId,
 
@@ -759,236 +983,189 @@ export const saveOrganizerAboutYouService = async (
 /*                            VERIFY PAN SERVICE                              */
 /* -------------------------------------------------------------------------- */
 
-interface PanDetailsInput {
-  panNumber: string;
-  documentType: string;
-  documentId: string;
-  fullName: string;
+const normalizeName = (name: string) =>
+  name.trim().toUpperCase().replace(/\s+/g, " ");
 
-  firstName?: string | null;
-  middleName?: string | null;
-  lastName?: string | null;
-
-  category?: string | null;
-  dateOfBirth?: string | null;
-  gender?: string | null;
-
-  maskedAadhaarNumber?: string | null;
-  isAadhaarLinked?: boolean | null;
-  taxpayerProfile?: boolean | null;
-
-  isPanNameMatched?: boolean;
-  expectedName?: string;
-
-  address?: {
-    line1?: string | null;
-    line2?: string | null;
-    street?: string | null;
-    city?: string | null;
-    line5?: string | null;
-    state?: string | null;
-    pincode?: string | null;
-    email?: string | null;
-    phone?: string | null;
-  };
-}
-
-interface SubmitPanInput {
-  partnerId: string;
-  businessId: string;
-  consent: boolean;
-  panDetails: PanDetailsInput;
-}
-
-const normalizeName = (name: string): string => {
-  return name
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, " ");
-};
-
-export const submitEventPartnerPanService = async ({
-  partnerId,
-  businessId,
-  consent,
-  panDetails,
-}: SubmitPanInput) => {
-  // 1. Validate consent
-
-  if (consent !== true) {
-    throw new PanVerificationError(
-      400,
-      "PAN verification consent is required",
-    );
-  }
-
-  if (!panDetails || typeof panDetails !== "object") {
-    throw new PanVerificationError(
-      400,
-      "PAN details are required",
-    );
-  }
-
-  // 2. Validate PAN format
-
-  const normalizedPan =
-    typeof panDetails.panNumber === "string"
-      ? panDetails.panNumber.trim().toUpperCase()
-      : "";
-
-  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(normalizedPan)) {
-    throw new PanVerificationError(
-      400,
-      "Invalid PAN number format",
-    );
-  }
-
-  if (
-    panDetails.documentType?.toUpperCase() !== "PAN" ||
-    panDetails.documentId?.toUpperCase() !== normalizedPan
-  ) {
-    throw new PanVerificationError(
-      400,
-      "PAN document details do not match",
-    );
-  }
-
-  // 3. Validate business ownership
-
-  const business = await prisma.businessDetails.findFirst({
-    where: {
-      id: businessId,
-      partnerId,
-    },
+export const saveOrganizerIdentityDetails = async (
+  partnerId: string,
+  businessId: string,
+  fullName: string,
+  designation: RepresentativeDesignation,
+  action: "SAVE" | "CONTINUE",
+) => prisma.$transaction(async (tx) => {
+  const business = await tx.businessDetails.findFirst({
+    where: { id: businessId, partnerId, partner: { accountStatus: "ACTIVE", deletedAt: null } },
     select: {
-      id: true,
-      partner: {
+      status: true,
+      onboardingStep: true,
+      representativeName: true,
+      designation: true,
+      partner: { select: { fullName: true } },
+      verifyId: {
         select: {
-          fullName: true,
-          accountStatus: true,
+          aadhaarStatus: true,
+          aadhaarName: true,
+          panStatus: true,
+          panName: true,
+          faceStatus: true,
+          livenessStatus: true,
         },
       },
     },
   });
-
   if (!business) {
-    throw new PanVerificationError(
-      404,
-      "Business not found or access denied",
-    );
+    throw new OrganizerOnboardingError(404, "Organizer business not found");
+  }
+  if (
+    (business.status !== "DRAFT" && business.status !== "CHANGES_REQUIRED") ||
+    (business.onboardingStep !== "VERIFY_ID" && business.onboardingStep !== "YOUR_EVENTS")
+  ) {
+    throw new OrganizerOnboardingError(409, "Complete business details before saving identity details");
+  }
+  const name = normalizeName(fullName);
+  if (name !== normalizeName(business.partner.fullName ?? "")) {
+    throw new OrganizerOnboardingError(400, "Full name must match the organizer's About You details");
+  }
+  if (action === "CONTINUE") {
+    const verification = business.verifyId;
+    if (verification?.aadhaarStatus !== "VERIFIED" || normalizeName(verification.aadhaarName ?? "") !== name) {
+      throw new OrganizerOnboardingError(409, "Complete Aadhaar verification for this name");
+    }
+    if (verification.panStatus !== "VERIFIED" || normalizeName(verification.panName ?? "") !== name) {
+      throw new OrganizerOnboardingError(409, "Complete personal PAN verification for this name");
+    }
+    if (verification.faceStatus !== "VERIFIED" || verification.livenessStatus !== "VERIFIED") {
+      throw new OrganizerOnboardingError(409, "Complete live selfie verification");
+    }
   }
 
-  if (business.partner.accountStatus !== "ACTIVE") {
-    throw new PanVerificationError(
-      403,
-      "Partner account is not active",
-    );
+  const representativeChanged = normalizeName(business.representativeName ?? "") !== name ||
+    business.designation !== designation;
+  return tx.businessDetails.update({
+    where: { id: businessId },
+    data: {
+      representativeName: fullName,
+      designation,
+      isMcaNameMatched: representativeChanged ? null : undefined,
+      onboardingStep: action === "CONTINUE" ? "YOUR_EVENTS" : undefined,
+    },
+    select: { id: true, representativeName: true, designation: true, isMcaNameMatched: true, onboardingStep: true },
+  });
+}, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }).catch((error: unknown) => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+    throw new OrganizerOnboardingError(409, "Identity details changed. Please retry.");
+  }
+  throw error;
+});
+
+export const fetchOrganizerBusinessPan = async (input: VerifyPanInput) => {
+  const result = await verifyEventPartnerPanService(input);
+  const { panNumber, fullName } = result.panDetails;
+  if (!fullName) {
+    throw new PanVerificationError(422, "PAN holder name is unavailable");
   }
 
-  // 4. Compare PAN name
+  const verificationId = await cacheBusinessPan({
+    partnerId: input.partnerId,
+    businessId: input.businessId,
+    panLastFour: panNumber.slice(-4),
+    panName: fullName,
+    panCategory: panNumber.charAt(3),
+    verifiedAt: new Date().toISOString(),
+  });
+  return { ...result, verificationId };
+};
 
-  const partnerName = business.partner.fullName?.trim();
-
-  if (!partnerName) {
-    throw new PanVerificationError(
-      400,
-      "Partner full name is required",
-    );
+export const saveOrganizerBusinessPan = async (
+  partnerId: string,
+  businessId: string,
+  verificationId: string,
+) => {
+  const verification = await getCachedBusinessPan(verificationId);
+  if (verification?.partnerId !== partnerId || verification.businessId !== businessId) {
+    throw new PanVerificationError(409, "Fetch business PAN details again before saving");
   }
 
-  const panName =
-    typeof panDetails.fullName === "string"
-      ? panDetails.fullName.trim()
-      : "";
-
-  if (!panName) {
-    throw new PanVerificationError(
-      400,
-      "PAN holder name is required",
-    );
-  }
-
-  const isPanNameMatched =
-    normalizeName(panName) === normalizeName(partnerName);
-
-  const verificationStatus = isPanNameMatched
-    ? PartnerVerificationStatus.VERIFIED
-    : PartnerVerificationStatus.REJECTED;
-
-  const verifiedAt = isPanNameMatched
-    ? new Date()
-    : null;
-
-  const failureReason = isPanNameMatched
-    ? null
-    : "PAN name does not match registered partner name";
-
-  // 5. Save to VerifyId
-
-  const panSaveData = {
-    panLastFour: normalizedPan.slice(-4),
-    panName,
-    isPanNameMatched,
-    panStatus: verificationStatus,
-    panVerifiedAt: verifiedAt,
-    panProvider: "GRIDLINES",
-    panFailureReason: failureReason,
-    isAadhaarLinked:
-      typeof panDetails.isAadhaarLinked === "boolean"
-        ? panDetails.isAadhaarLinked
-        : null,
-  };
-
-  const savedVerification = await prisma.verifyId.upsert({
+  const { panLastFour, panName, panCategory, verifiedAt } = verification;
+  const panVerifiedAt = new Date(verifiedAt);
+  return prisma.businessDetails.update({
     where: {
-      businessId: business.id,
+      id: businessId,
+      partnerId,
+      partner: { accountStatus: "ACTIVE", deletedAt: null },
+      status: { in: ["DRAFT", "CHANGES_REQUIRED"] },
+      OR: [{ panVerifiedAt: null }, { panVerifiedAt: { lte: panVerifiedAt } }],
     },
-
-    create: {
-      businessId: business.id,
-      ...panSaveData,
+    data: {
+      panLastFour,
+      panName,
+      panCategory,
+      panVerificationStatus: PartnerVerificationStatus.VERIFIED,
+      panVerifiedAt,
     },
-
-    update: {
-      ...panSaveData,
-    },
-
     select: {
       id: true,
+      panLastFour: true,
+      panName: true,
+      panCategory: true,
+      panVerificationStatus: true,
+      panVerifiedAt: true,
+    },
+  }).catch((error: unknown) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new PanVerificationError(409, "Business PAN cannot be saved. Refresh onboarding details.");
+    }
+    throw error;
+  });
+};
+
+export const verifyOrganizerIdentityPan = async (input: VerifyPanInput) => {
+  const result = await verifyEventPartnerPanService(input);
+  const { panNumber, fullName, isAadhaarLinked } = result.panDetails;
+  if (panNumber.charAt(3) !== "P" || !fullName) {
+    throw new PanVerificationError(422, "A valid individual PAN is required");
+  }
+
+  const business = await prisma.businessDetails.findFirst({
+    where: {
+      id: input.businessId,
+      partnerId: input.partnerId,
+      status: { in: ["DRAFT", "CHANGES_REQUIRED"] },
+      partner: { accountStatus: "ACTIVE", deletedAt: null },
+    },
+    select: { partner: { select: { fullName: true } } },
+  });
+  if (!business?.partner.fullName) {
+    throw new PanVerificationError(409, "Complete organizer personal details before verifying identity PAN");
+  }
+  // if (normalizeName(fullName) !== normalizeName(business.partner.fullName)) {
+  //   throw new PanVerificationError(422, "PAN name does not match the organizer name");
+  // }
+
+  const data = {
+    panLastFour: panNumber.slice(-4),
+    panName: fullName,
+    isPanNameMatched: true,
+    panStatus: PartnerVerificationStatus.VERIFIED,
+    panVerifiedAt: new Date(),
+    panProvider: "GRIDLINES",
+    panFailureReason: null,
+    isAadhaarLinked,
+  };
+  return prisma.verifyId.upsert({
+    where: { businessId: input.businessId },
+    create: { businessId: input.businessId, ...data },
+    update: data,
+    select: {
       businessId: true,
       panLastFour: true,
       panName: true,
       isPanNameMatched: true,
       panStatus: true,
       panVerifiedAt: true,
-      panProvider: true,
-      panFailureReason: true,
       isAadhaarLinked: true,
-      createdAt: true,
-      updatedAt: true,
     },
   });
-
-  // 6. Return response
-
-  const message = isPanNameMatched
-    ? "PAN details saved successfully"
-    : "PAN details saved, but name does not match";
-
-  return {
-    isVerified: isPanNameMatched,
-    verificationStatus,
-    isSaved: true,
-    message,
-    businessId: business.id,
-    verificationId: savedVerification.id,
-
-    panName,
-    partnerName,
-    isPanNameMatched,
-
-    savedVerification,
-  };
 };
 
 const gridlinesClient = axios.create({
@@ -1056,6 +1233,8 @@ const organizerFaceSelect = {
   faceReferenceId: true,
   faceVerifiedAt: true,
   faceFailureReason: true,
+  livenessStatus: true,
+  livenessFailureReason: true,
 } as const;
 
 export const verifyOrganizerFaceService = async (
@@ -1088,7 +1267,8 @@ export const verifyOrganizerFaceService = async (
     throw new PartnerGovernmentIdError(409, "Complete Aadhaar verification first");
   }
 
-  if (verification.faceStatus === PartnerVerificationStatus.VERIFIED) {
+  if (verification.faceStatus === PartnerVerificationStatus.VERIFIED &&
+      verification.livenessStatus === PartnerVerificationStatus.VERIFIED) {
     return prisma.verifyId.findUniqueOrThrow({
       where: { businessId },
       select: organizerFaceSelect,
@@ -1120,6 +1300,12 @@ export const verifyOrganizerFaceService = async (
     throw new PartnerGovernmentIdError(422, "The verified Aadhaar document has no usable portrait");
   }
 
+  const liveness = await verifyLivenessWithGridlines(selfie).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Liveness provider is unavailable");
+  });
+  if (!liveness.isLive) {
+    throw new PartnerGovernmentIdError(422, "Live selfie check failed. Take a new selfie.");
+  }
   const match = await verifyFaceWithGridlines(document.portraitBuffer, selfie).catch(() => {
     throw new PartnerGovernmentIdError(502, "Face match provider is unavailable");
   });
@@ -1140,6 +1326,7 @@ export const verifyOrganizerFaceService = async (
       aadhaarStatus: PartnerVerificationStatus.VERIFIED,
       aadhaarReferenceId: verification.aadhaarReferenceId,
       faceStatus: verification.faceStatus,
+      livenessStatus: verification.livenessStatus,
       selfieKey: verification.selfieKey,
     },
     data: {
@@ -1153,6 +1340,13 @@ export const verifyOrganizerFaceService = async (
       faceReferenceId: match.providerRequestId ?? null,
       faceProvider: "GRIDLINES",
       faceFailureReason: match.isMatch ? null : "FACE_NOT_MATCHED",
+      isLivenessPassed: true,
+      livenessScore: liveness.confidence,
+      livenessStatus: PartnerVerificationStatus.VERIFIED,
+      livenessVerifiedAt: new Date(),
+      livenessReferenceId: liveness.referenceId,
+      livenessProvider: "GRIDLINES",
+      livenessFailureReason: null,
     },
     select: organizerFaceSelect,
   }).catch(async (error: unknown) => {

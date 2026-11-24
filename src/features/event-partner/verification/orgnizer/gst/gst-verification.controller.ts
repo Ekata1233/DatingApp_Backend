@@ -1,4 +1,5 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+import type { PartnerRequest } from "../../../../../types/partnerAuth.types";
 
 import {
   verifyEventPartnerGstService,
@@ -6,41 +7,30 @@ import {
 } from "./gst-verification.service";
 import { LpFintechConfigError } from "../../../../../config/lpfintech.config";
 
-type AuthenticatedPartnerRequest = Request & {
-  partnerId?: string;
-  partner?: {
-    id?: string;
-    partnerId?: string;
-  };
-  user?: {
-    id?: string;
-    partnerId?: string;
-  };
-};
-
 export const verifyEventPartnerGstController = async (
-  req: Request,
+  req: PartnerRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedPartnerRequest;
-
-    const partnerId =
-      authReq.user?.id ??
-      authReq.user?.partnerId ??
-      authReq.partner?.id ??
-      authReq.partner?.partnerId ??
-      authReq.partnerId;
-
-    if (!partnerId) {
+    const partner = req.partner;
+    if (!partner) {
       res.status(401).json({ success: false, message: "Unauthorized organizer" });
       return;
     }
 
-    const { businessId, gstNumber } = req.body ?? {};
+    const { businessId = partner.businessId, gstNumber } = req.body ?? {};
 
     if (typeof businessId !== "string" || !businessId.trim()) {
       res.status(400).json({ success: false, message: "businessId is required" });
+      return;
+    }
+
+    const selectedBusinessId = businessId.trim();
+    if (
+      partner.role === "HOST" ||
+      (partner.businessId && partner.businessId !== selectedBusinessId)
+    ) {
+      res.status(403).json({ success: false, message: "Organizer access is required for this business" });
       return;
     }
 
@@ -50,8 +40,8 @@ export const verifyEventPartnerGstController = async (
     }
 
     const result = await verifyEventPartnerGstService({
-      partnerId,
-      businessId: businessId.trim(),
+      partnerId: partner.id,
+      businessId: selectedBusinessId,
       gstNumber: gstNumber.trim(),
     });
 

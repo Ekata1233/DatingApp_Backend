@@ -18,6 +18,7 @@ import {
 import {
   getHostInvitationService,
   acceptHostInvitationService,
+  declineHostInvitationService,
   getHostPersonalDetailsService,
   updateHostPersonalDetailsService,
   getHostCodeOfConductService,
@@ -162,6 +163,22 @@ export const acceptHostInvitationController =
       handleError(error, res);
     }
   };
+
+export const declineHostInvitationController = async (
+  req: HostOnboardingRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const data = await declineHostInvitationService(getHostContext(req));
+    res.status(200).json({
+      success: true,
+      message: "Invitation declined successfully",
+      data,
+    });
+  } catch (error) {
+    handleError(error, res);
+  }
+};
 
 /* -------------------------------------------------------------------------- */
 /*                           GET PERSONAL DETAILS                             */
