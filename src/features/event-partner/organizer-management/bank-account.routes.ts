@@ -23,7 +23,7 @@ const requireBankAccountOrganizer = requirePartnerRole("ORGANIZER", {
   inferOrganizerBusiness: true,
 });
 
-router.get("/bank-details", requireBankAccountOrganizer, getBankAccountController);
-router.post("/bank-details/add", requireBankAccountOrganizer, addBankAccountController);
+router.get("/details", requireBankAccountOrganizer, getBankAccountController);
+router.post("/add", requireBankAccountOrganizer, addBankAccountController);
 
 export default router;

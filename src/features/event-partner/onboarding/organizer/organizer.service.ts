@@ -40,6 +40,29 @@ import { validateImage } from "../../../verification/government_id/government-id
 import { readGstVerification } from "../../verification/orgnizer/gst/gst-verification-proof";
 import { eventsInclude } from "./your-events.service";
 
+const gstConstitutionAliases: Readonly<Record<string, BusinessConstitution>> = {
+  PROPRIETORSHIP: BusinessConstitution.SOLE_PROPRIETORSHIP,
+  PARTNERSHIP_FIRM: BusinessConstitution.PARTNERSHIP,
+  LIMITED_LIABILITY_PARTNERSHIP: BusinessConstitution.LLP,
+  LIMITED_LIABILITY_PARTNERSHIP_LLP: BusinessConstitution.LLP,
+  PRIVATE_LIMITED_COMPANY: BusinessConstitution.PRIVATE_LIMITED,
+  PUBLIC_LIMITED_COMPANY: BusinessConstitution.PUBLIC_LIMITED,
+  ONE_PERSON_COMPANY_OPC: BusinessConstitution.ONE_PERSON_COMPANY,
+  HINDU_UNDIVIDED_FAMILY: BusinessConstitution.HUF,
+  HINDU_UNDIVIDED_FAMILY_HUF: BusinessConstitution.HUF,
+};
+
+const mapGstConstitution = (value: string | null): BusinessConstitution | null => {
+  const key = value?.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!key) {
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(BusinessConstitution, key)) {
+    return BusinessConstitution[key as keyof typeof BusinessConstitution];
+  }
+  return gstConstitutionAliases[key] ?? BusinessConstitution.OTHER;
+};
+
 const organizerGstSelect = {
   id: true,
   hasGst: true,
@@ -66,12 +89,6 @@ export const saveOrganizerGstService = async (
   }
 
   const details = verification.gstDetails;
-  const constitutionKey = details.constitution?.trim().toUpperCase().replace(/\W+/g, "_");
-  const constitution = constitutionKey === "PROPRIETORSHIP"
-    ? BusinessConstitution.SOLE_PROPRIETORSHIP
-    : constitutionKey && Object.prototype.hasOwnProperty.call(BusinessConstitution, constitutionKey)
-      ? BusinessConstitution[constitutionKey as keyof typeof BusinessConstitution]
-      : null;
   const registrationDate = details.registrationDate?.replace(
     /^(\d{2})[/-](\d{2})[/-](\d{4})$/,
     "$3-$2-$1",
@@ -91,7 +108,7 @@ export const saveOrganizerGstService = async (
       gstVerifiedAt: new Date(verification.verifiedAt),
       legalName: details.legalName,
       tradeName: details.tradeName,
-      constitution,
+      constitution: mapGstConstitution(details.constitution),
       registeredSince: registeredSince && Number.isFinite(registeredSince.getTime()) ? registeredSince : null,
       principalPlace: details.principalAddress,
       registeredPincode: details.principalAddress?.match(/\b\d{6}\s*$/)?.[0].trim() ?? null,
@@ -413,6 +430,8 @@ export const getOrganizerOnboardingService = async (
             aadhaarVerifiedAt: true,
             aadhaarFailureReason: true,
             aadhaarLastFour: true,
+            city: true,
+            state: true,
             isNameMatched: true,
             panStatus: true,
             panLastFour: true,
@@ -998,6 +1017,21 @@ export const saveOrganizerAboutYouService = async (
 const normalizeName = (name: string) =>
   name.trim().toUpperCase().replace(/\s+/g, " ");
 
+export const organizerNamesMatch = (actual: string, expected: string) => {
+  const actualName = normalizeName(actual);
+  const expectedName = normalizeName(expected);
+  if (actualName === expectedName) {
+    return actualName.length > 0;
+  }
+
+  const actualParts = actualName.split(" ");
+  const expectedParts = expectedName.split(" ");
+  return actualParts.length >= 2 &&
+    expectedParts.length >= 2 &&
+    actualParts[0] === expectedParts[0] &&
+    actualParts[actualParts.length - 1] === expectedParts[expectedParts.length - 1];
+};
+
 export const saveOrganizerIdentityDetails = async (
   partnerId: string,
   businessId: string,
@@ -1036,16 +1070,12 @@ export const saveOrganizerIdentityDetails = async (
   }
   
   const name = normalizeName(fullName);
-  // if (name !== normalizeName(business.partner.fullName ?? "")) {
-  //   throw new OrganizerOnboardingError(400, "Full name must match the organizer's About You details");
-  // }
-
   if (action === "CONTINUE") {
     const verification = business.verifyId;
-    if (verification?.aadhaarStatus !== "VERIFIED" || normalizeName(verification.aadhaarName ?? "") !== name) {
+    if (verification?.aadhaarStatus !== "VERIFIED" || !organizerNamesMatch(verification.aadhaarName ?? "", fullName)) {
       throw new OrganizerOnboardingError(409, "Complete Aadhaar verification for this name");
     }
-    if (verification.panStatus !== "VERIFIED" || normalizeName(verification.panName ?? "") !== name) {
+    if (verification.panStatus !== "VERIFIED" || !organizerNamesMatch(verification.panName ?? "", fullName)) {
       throw new OrganizerOnboardingError(409, "Complete personal PAN verification for this name");
     }
     if (verification.faceStatus !== "VERIFIED" || verification.livenessStatus !== "VERIFIED") {
@@ -1119,6 +1149,8 @@ export const saveOrganizerBusinessPan = async (
       panName,
       panCategory,
       panStatus,
+      legalName: panName,
+      tradeName: panName,
       isAadhaarLinked,
       panVerificationStatus: PartnerVerificationStatus.VERIFIED,
       panVerifiedAt,
@@ -1129,6 +1161,8 @@ export const saveOrganizerBusinessPan = async (
       panName: true,
       panCategory: true,
       panStatus: true,
+      legalName: true,
+      tradeName: true,
       isAadhaarLinked: true,
       panVerificationStatus: true,
       panVerifiedAt: true,
@@ -1160,9 +1194,9 @@ export const verifyOrganizerIdentityPan = async (input: VerifyPanInput) => {
   if (!business?.partner.fullName) {
     throw new PanVerificationError(409, "Complete organizer personal details before verifying identity PAN");
   }
-  // if (normalizeName(fullName) !== normalizeName(business.partner.fullName)) {
-  //   throw new PanVerificationError(422, "PAN name does not match the organizer name");
-  // }
+  if (!organizerNamesMatch(fullName, business.partner.fullName)) {
+    throw new PanVerificationError(422, "PAN name does not match the organizer name");
+  }
 
   const data = {
     panNumberEncrypted: encryptText(panNumber),
@@ -1260,6 +1294,34 @@ const organizerFaceSelect = {
   livenessFailureReason: true,
 } as const;
 
+export const checkOnboardingSelfie = async (
+  transactionId: string,
+  referenceId: string,
+  selfie: Buffer,
+) => {
+  const document = await getVerifiedGovernmentDocument({
+    transactionId,
+    referenceId,
+    documentType: GovernmentIdType.AADHAAR,
+  }).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Unable to retrieve the verified Aadhaar portrait");
+  });
+  if (!document.portraitBuffer?.length) {
+    throw new PartnerGovernmentIdError(422, "The verified Aadhaar document has no usable portrait");
+  }
+
+  const liveness = await verifyLivenessWithGridlines(selfie).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Liveness provider is unavailable");
+  });
+  if (!liveness.isLive) {
+    throw new PartnerGovernmentIdError(422, "Live selfie check failed. Take a new selfie.");
+  }
+  const match = await verifyFaceWithGridlines(document.portraitBuffer, selfie).catch(() => {
+    throw new PartnerGovernmentIdError(502, "Face match provider is unavailable");
+  });
+  return { liveness, match };
+};
+
 export const verifyOrganizerFaceService = async (
   partnerId: string,
   businessId: string,
@@ -1303,6 +1365,7 @@ export const verifyOrganizerFaceService = async (
       transactionId: verification.aadhaarReferenceId,
       businessId,
       partnerId,
+      hostId: null,
       documentType: GovernmentIdType.AADHAAR,
       status: AttemptStatus.VERIFIED,
     },
@@ -1312,26 +1375,11 @@ export const verifyOrganizerFaceService = async (
     throw new PartnerGovernmentIdError(409, "Verified Aadhaar transaction is unavailable");
   }
 
-  const document = await getVerifiedGovernmentDocument({
-    transactionId: verification.aadhaarReferenceId,
-    referenceId: attempt.referenceId,
-    documentType: GovernmentIdType.AADHAAR,
-  }).catch(() => {
-    throw new PartnerGovernmentIdError(502, "Unable to retrieve the verified Aadhaar portrait");
-  });
-  if (!document.portraitBuffer?.length) {
-    throw new PartnerGovernmentIdError(422, "The verified Aadhaar document has no usable portrait");
-  }
-
-  const liveness = await verifyLivenessWithGridlines(selfie).catch(() => {
-    throw new PartnerGovernmentIdError(502, "Liveness provider is unavailable");
-  });
-  if (!liveness.isLive) {
-    throw new PartnerGovernmentIdError(422, "Live selfie check failed. Take a new selfie.");
-  }
-  const match = await verifyFaceWithGridlines(document.portraitBuffer, selfie).catch(() => {
-    throw new PartnerGovernmentIdError(502, "Face match provider is unavailable");
-  });
+  const { liveness, match } = await checkOnboardingSelfie(
+    verification.aadhaarReferenceId,
+    attempt.referenceId,
+    selfie,
+  );
 
   const extension = mimeType === "image/png" ? "png" : "jpg";
   const { fileId } = await imagekit.upload({
@@ -1440,46 +1488,24 @@ export const initPartnerGovernmentIdService = async ({
     throw new PartnerGovernmentIdError(409, "Aadhaar is already verified");
   }
 
-  /* ------------------------------------------------------------------------ */
-  /*                      CHECK ACTIVE ATTEMPT                                */
-  /* ------------------------------------------------------------------------ */
+  return createOnboardingGovernmentIdAttempt(partnerId, businessId, mobileNumber, null);
+};
 
-  const now = new Date();
-
-  const activeAttempt = await prisma.partnerGovernmentIdAttempt.findFirst({
-    where: {
-      partnerId,
-      businessId,
-      status: {
-        in: [
-          AttemptStatus.INITIATING,
-          AttemptStatus.PENDING,
-          AttemptStatus.AUTHORIZED,
-        ],
-      },
-      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-    },
-  });
-
-  if (activeAttempt) {
-    throw new PartnerGovernmentIdError(
-      409,
-      "Aadhaar verification is already in progress",
-    );
-  }
-
-  /* ------------------------------------------------------------------------ */
-  /*                       GENERATE SECURE REFERENCES                         */
-  /* ------------------------------------------------------------------------ */
-
+export const createOnboardingGovernmentIdAttempt = async (
+  partnerId: string,
+  businessId: string,
+  mobileNumber: string,
+  hostId: string | null,
+) => {
+  const documentType = GovernmentIdType.AADHAAR;
   const referenceId = randomUUID();
   const callbackState = randomBytes(32).toString("hex");
   const callbackStateHash = hashState(callbackState);
 
-  const callbackBase = process.env.GRIDLINES_PARTNER_CALLBACK_URL;
+  const callbackBase = hostId ? process.env.GRIDLINES_HOST_CALLBACK_URL : process.env.GRIDLINES_PARTNER_CALLBACK_URL;
 
   if (!callbackBase) {
-    throw new Error("GRIDLINES_PARTNER_CALLBACK_URL is missing");
+    throw new Error("DigiLocker callback URL is missing");
   }
 
   const callbackUrl = new URL(callbackBase);
@@ -1496,6 +1522,7 @@ export const initPartnerGovernmentIdService = async ({
     data: {
       partnerId,
       businessId,
+      hostId,
       referenceId,
       callbackStateHash,
       documentType,
@@ -1604,7 +1631,7 @@ export const completePartnerGovernmentIdService = async ({
   attemptId,
 }: CompletePartnerGovernmentIdInput) => {
   const business = await getPartnerBusiness(partnerId, businessId);
-  const attemptWhere = { id: attemptId, partnerId, businessId };
+  const attemptWhere = { id: attemptId, partnerId, businessId, hostId: null };
   const attempt = await prisma.partnerGovernmentIdAttempt.findUnique({
     where: attemptWhere,
   });
@@ -1652,10 +1679,9 @@ export const completePartnerGovernmentIdService = async ({
     throw new PartnerGovernmentIdError(422, "Aadhaar identity validation failed");
   }
 
-  // const verifiedName = normalizeName(identity.verifiedName);
-  // if (!verifiedName || verifiedName !== normalizeName(business.partner.fullName ?? "")) {
-  //   throw new PartnerGovernmentIdError(422, "Aadhaar name does not match the partner name");
-  // }
+  if (!organizerNamesMatch(identity.verifiedName, business.partner.fullName ?? "")) {
+    throw new PartnerGovernmentIdError(422, "Aadhaar name does not match the partner name");
+  }
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -1688,6 +1714,9 @@ export const completePartnerGovernmentIdService = async ({
       }
 
       const aadhaar = {
+        aadhaarLastFour: document.aadhaarLastFour ?? null,
+        city: document.address?.city ?? null,
+        state: document.address?.state ?? null,
         aadhaarName: identity.verifiedName,
         dateOfBirth: identity.birthDate,
         isAdult: true,

@@ -35,8 +35,6 @@ export const hostPersonalDetailsSchema = z
 
 export const acceptCodeOfConductSchema = z
   .object({
-    version: z.string().trim().min(1),
-
     codeOfConductAccepted: z.literal(true),
 
     guestPrivacyAccepted: z.literal(true),

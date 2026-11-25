@@ -68,7 +68,7 @@ const formatBankAccountStatus = (
 
 export const getBankAccount = async (businessId: string) => {
   const account = await prisma.bankDetails.findFirst({
-    where: { businessId, isActive: true },
+    where: { businessId },
     orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     select: bankAccountSelect,
   });
@@ -80,7 +80,7 @@ export const addBankAccount = async (
   input: BankAccountInput,
   document?: BankDocument,
 ) => {
-  const where = { businessId, isActive: true };
+  const where = { businessId };
   const existing = await prisma.bankDetails.findFirst({ where, select: { id: true } });
   if (existing) {
     throw new BankAccountError(409, "This business already has an active bank account");

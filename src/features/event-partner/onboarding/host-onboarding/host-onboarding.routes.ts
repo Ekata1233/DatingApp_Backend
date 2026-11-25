@@ -4,6 +4,7 @@ import { Router } from "express";
 
 import {
   getHostInvitationController,
+  getHostDetailsController,
   acceptHostInvitationController,
   declineHostInvitationController,
   getHostPersonalDetailsController,
@@ -13,8 +14,16 @@ import {
 } from "./host-onboarding.controller";
 import { partnerAuthMiddleware } from "../../../../middleware/partnerAuth.middleware";
 import { hostOnboardingMiddleware } from "../../../../middleware/hostOnboarding.middleware";
+import {
+  completeHostGovernmentIdController,
+  hostGovernmentIdCallbackController,
+  initHostGovernmentIdController,
+  verifyHostFaceController,
+} from "./host-verification.controller";
 
 const router = Router();
+
+router.get("/government-id/callback", hostGovernmentIdCallbackController);
 
 /* -------------------------------------------------------------------------- */
 /*                           AUTHENTICATION MIDDLEWARE                        */
@@ -30,6 +39,8 @@ router.use(
   },
 );
 
+router.get("/host-details", getHostDetailsController);
+
 /* -------------------------------------------------------------------------- */
 /*                              STEP 1 - INVITE                               */
 /* -------------------------------------------------------------------------- */
@@ -40,11 +51,11 @@ router.get(
 );
 
 router.post(
-  "/accept-invitation",
+  "/agree",
   acceptHostInvitationController,
 );
 
-router.post("/decline-invitation", declineHostInvitationController);
+router.post("/decline", declineHostInvitationController);
 
 /* -------------------------------------------------------------------------- */
 /*                        STEP 2 - PERSONAL DETAILS                           */
@@ -59,6 +70,18 @@ router.patch(
   "/personal-details",
   updateHostPersonalDetailsController,
 );
+
+/* -------------------------------------------------------------------------- */
+/*                        STEP 3 - AADHAAR VERIFICATION                       */
+/* -------------------------------------------------------------------------- */
+
+router.post("/government-id/init", initHostGovernmentIdController);
+router.post("/government-id/complete", completeHostGovernmentIdController);
+
+/* -------------------------------------------------------------------------- */
+/*                        STEP 4 - FACE VERIFICATION                          */
+/* -------------------------------------------------------------------------- */
+router.post("/face/verify", verifyHostFaceController);
 
 /* -------------------------------------------------------------------------- */
 /*                         STEP 5 - CODE OF CONDUCT                           */

@@ -153,6 +153,7 @@ model PartnerGovernmentIdAttempt {
   id                String                           @id @default(uuid()) @db.Uuid
   partnerId         String                           @db.Uuid
   businessId        String                           @db.Uuid
+  hostId            String?                          @db.Uuid
   referenceId       String                           @unique
   transactionId     String?                          @unique
   providerRequestId String?
@@ -166,8 +167,10 @@ model PartnerGovernmentIdAttempt {
   failureReason     String?
   createdAt         DateTime                         @default(now())
   updatedAt         DateTime                         @updatedAt
+  host              Host?                            @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
   @@index([partnerId, businessId, status])
+  @@index([hostId])
   @@map("partner_government_id_attempts")
 }
 
@@ -212,46 +215,47 @@ model EventCategory {
 }
 
 model Host {
-  id                        String           @id @default(uuid()) @db.Uuid
-  businessId                String           @db.Uuid
-  partnerId                 String?          @db.Uuid
+  id                        String                       @id @default(uuid()) @db.Uuid
+  businessId                String                       @db.Uuid
+  partnerId                 String?                      @db.Uuid
   fullName                  String
   phoneNumber               String
   email                     String?
   gender                    HostGender?
-  languages                 String[]         @default([])
-  invitationTokenHash       String?          @unique
-  invitedAt                 DateTime         @default(now())
+  languages                 String[]                     @default([])
+  invitationTokenHash       String?                      @unique
+  invitedAt                 DateTime                     @default(now())
   invitationExpiresAt       DateTime
   acceptedAt                DateTime?
   declinedAt                DateTime?
-  canViewGuestList          Boolean          @default(true)
-  canCheckInGuests          Boolean          @default(true)
-  canUpdateRunSheetProgress Boolean          @default(true)
-  canViewRoomList           Boolean          @default(true)
-  canReportIncidentSOS      Boolean          @default(true)
-  canMessageGuests          Boolean          @default(true)
-  canReplyToReviews         Boolean          @default(false)
-  canCreateSubmitEvent      Boolean          @default(false)
-  canEditEvent              Boolean          @default(false)
-  canCancelEventRefund      Boolean          @default(false)
-  canManagePayouts          Boolean          @default(false)
-  onboardingStep            HostStep         @default(INVITE_ACCEPTANCE)
-  onboardingCompleted       Boolean          @default(false)
-  status                    HostStatus       @default(INVITED)
+  canViewGuestList          Boolean                      @default(true)
+  canCheckInGuests          Boolean                      @default(true)
+  canUpdateRunSheetProgress Boolean                      @default(true)
+  canViewRoomList           Boolean                      @default(true)
+  canReportIncidentSOS      Boolean                      @default(true)
+  canMessageGuests          Boolean                      @default(true)
+  canReplyToReviews         Boolean                      @default(false)
+  canCreateSubmitEvent      Boolean                      @default(false)
+  canEditEvent              Boolean                      @default(false)
+  canCancelEventRefund      Boolean                      @default(false)
+  canManagePayouts          Boolean                      @default(false)
+  onboardingStep            HostStep                     @default(INVITE_ACCEPTANCE)
+  onboardingCompleted       Boolean                      @default(false)
+  status                    HostStatus                   @default(INVITED)
   emergencyContactName      String?
   emergencyContactPhone     String?
   joinedAt                  DateTime?
   pausedAt                  DateTime?
   removedAt                 DateTime?
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
   assignedEvents            EventHost[]
   verifyId                  HostVerifyId?
-  business                  BusinessDetails  @relation(fields: [businessId], references: [id])
-  partner                   EventPartner?    @relation(fields: [partnerId], references: [id])
+  governmentIdAttempts      PartnerGovernmentIdAttempt[]
+  business                  BusinessDetails              @relation(fields: [businessId], references: [id])
+  partner                   EventPartner?                @relation(fields: [partnerId], references: [id])
   consents                  PartnerConsent[]
-  primaryHostedEvents       Event[]          @relation("EventPrimaryHost")
+  primaryHostedEvents       Event[]                      @relation("EventPrimaryHost")
 
   @@unique([businessId, phoneNumber])
   @@unique([businessId, partnerId])

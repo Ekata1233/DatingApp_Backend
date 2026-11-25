@@ -321,16 +321,16 @@ export const requirePartnerRole = (
           });
         }
 
-        if (
-          business.status !== "ACTIVE" ||
-          !business.onboardingCompleted
-        ) {
-          return res.status(403).json({
-            success: false,
-            message:
-              "Business onboarding or approval is pending",
-          });
-        }
+        // if (
+        //   business.status !== "ACTIVE" ||
+        //   !business.onboardingCompleted
+        // ) {
+        //   return res.status(403).json({
+        //     success: false,
+        //     message:
+        //       "Business onboarding or approval is pending",
+        //   });
+        // }
 
         // Attach verified organizer context
 

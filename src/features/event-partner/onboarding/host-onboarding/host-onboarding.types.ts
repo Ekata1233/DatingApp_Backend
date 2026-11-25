@@ -35,7 +35,6 @@ export interface PersonalDetailsInput {
 }
 
 export interface CodeOfConductInput {
-  version: string;
   codeOfConductAccepted: true;
   guestPrivacyAccepted: true;
   safetyRulesAccepted: true;

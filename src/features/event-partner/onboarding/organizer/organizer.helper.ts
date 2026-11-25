@@ -34,6 +34,7 @@ export const authorizePartnerGovernmentIdService = async (
   state: string,
   transactionId: string,
   code: string,
+  forHost = false,
 ) => {
   if (!state || !transactionId) {
     throw new PartnerGovernmentIdError(
@@ -51,7 +52,7 @@ export const authorizePartnerGovernmentIdService = async (
       },
     });
 
-  if (!attempt) {
+  if (!attempt || (attempt.hostId !== null) !== forHost) {
     throw new PartnerGovernmentIdError(
       404,
       "Verification attempt not found",

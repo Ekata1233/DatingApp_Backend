@@ -279,5 +279,10 @@ router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
 
 
 
+//===================================================
+//-----------------HOST ONBOARDING-------------------
+//====================================================
+
+
 
 export default router;
