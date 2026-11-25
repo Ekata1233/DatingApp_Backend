@@ -1034,10 +1034,12 @@ export const saveOrganizerIdentityDetails = async (
   ) {
     throw new OrganizerOnboardingError(409, "Complete business details before saving identity details");
   }
+  
   const name = normalizeName(fullName);
-  if (name !== normalizeName(business.partner.fullName ?? "")) {
-    throw new OrganizerOnboardingError(400, "Full name must match the organizer's About You details");
-  }
+  // if (name !== normalizeName(business.partner.fullName ?? "")) {
+  //   throw new OrganizerOnboardingError(400, "Full name must match the organizer's About You details");
+  // }
+
   if (action === "CONTINUE") {
     const verification = business.verifyId;
     if (verification?.aadhaarStatus !== "VERIFIED" || normalizeName(verification.aadhaarName ?? "") !== name) {
@@ -1650,10 +1652,10 @@ export const completePartnerGovernmentIdService = async ({
     throw new PartnerGovernmentIdError(422, "Aadhaar identity validation failed");
   }
 
-  const verifiedName = normalizeName(identity.verifiedName);
-  if (!verifiedName || verifiedName !== normalizeName(business.partner.fullName ?? "")) {
-    throw new PartnerGovernmentIdError(422, "Aadhaar name does not match the partner name");
-  }
+  // const verifiedName = normalizeName(identity.verifiedName);
+  // if (!verifiedName || verifiedName !== normalizeName(business.partner.fullName ?? "")) {
+  //   throw new PartnerGovernmentIdError(422, "Aadhaar name does not match the partner name");
+  // }
 
   try {
     return await prisma.$transaction(async (tx) => {

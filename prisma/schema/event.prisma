@@ -320,6 +320,7 @@ model TripStop {
   description String?
   timeLabel   String?
   icon        String?
+  location    String?
   tag         TripStopTag @default(NONE)
   photoUrl    String?
   sortOrder   Int
