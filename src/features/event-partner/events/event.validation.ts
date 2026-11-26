@@ -18,6 +18,7 @@ import {
   TripStopTag,
   TripType,
   EventStatus,
+  EventReactiveStatus,
 } from "@prisma/client";
 
 // Common validators

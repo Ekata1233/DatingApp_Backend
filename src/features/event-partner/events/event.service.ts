@@ -792,7 +792,7 @@ export const submitEventService = async (
 
           isDeleted: false,
           deletedAt: null,
-          isDeleted: false,
+          
         },
       });
 
@@ -829,7 +829,7 @@ export const submitEventService = async (
 
           isDeleted: false,
           deletedAt: null,
-          isDeleted: false,
+        
 
           status: {
             in: ["DRAFT", "REJECTED"],
@@ -888,7 +888,7 @@ export const publishEventService = async (
           businessDetailsId: businessId,
           isDeleted: false,
 
-          isDeleted: false,
+         
           deletedAt: null,
         },
 
@@ -961,7 +961,7 @@ export const publishEventService = async (
           businessDetailsId: businessId,
           isDeleted: false,
 
-          isDeleted: false,
+         
           deletedAt: null,
           status: "APPROVED",
         },
@@ -1031,7 +1031,7 @@ export const pauseEventService = async (
           businessDetailsId: businessId,
           isDeleted: false,
 
-          isDeleted: false,
+        
           deletedAt: null,
         },
         select: {
@@ -1065,7 +1065,7 @@ export const pauseEventService = async (
           businessDetailsId: businessId,
           isDeleted: false,
 
-          isDeleted: false,
+          
           deletedAt: null,
           status: "PUBLISHED",
         },
@@ -1129,7 +1129,7 @@ export const completeEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
-          isDeleted: false,
+        
 
           isDeleted: false,
           deletedAt: null,
@@ -1235,7 +1235,7 @@ export const completeEventService = async (
             businessDetailsId: businessId,
             isDeleted: false,
 
-            isDeleted: false,
+            
             deletedAt: null,
             status: {
               in: ["PUBLISHED", "PAUSED"],
@@ -1308,7 +1308,7 @@ export const expireEventsService = async () => {
         is: {
           isDeleted: false,
 
-          isDeleted: false,
+          
           deletedAt: null,
           status: {
             in: ["PUBLISHED", "PAUSED"],
@@ -1351,7 +1351,7 @@ export const expireEventsService = async () => {
               id: eventId,
               isDeleted: false,
 
-              isDeleted: false,
+            
               deletedAt: null,
               status: {
                 in: ["PUBLISHED", "PAUSED"],
@@ -1413,7 +1413,7 @@ export const expireEventsService = async () => {
                 id: eventId,
                 isDeleted: false,
 
-                isDeleted: false,
+                
                 deletedAt: null,
                 status: {
                   in: ["PUBLISHED", "PAUSED"],
