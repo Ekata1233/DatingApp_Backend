@@ -43,6 +43,7 @@ import { initializeSocket } from "./config/socket";
 import { startBoostExpiryJob } from "./jobs/boostExpiry.job";
 import { startWeeklyPackageRenewalCron } from "./features/package/package-renew/weekly-package-renewal.cron";
 import { startActivityCron } from "./features/user/activity/activity.cron";
+import { startEventExpiryCron } from "./features/event-partner/events/event.expiry.cron";
 
 const PORT = process.env.PORT || 4000;
 
@@ -65,6 +66,7 @@ const startServer = async () => {
     startBoostExpiryJob();
     startWeeklyPackageRenewalCron();
     startActivityCron();
+    startEventExpiryCron();
 
     server.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);

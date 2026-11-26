@@ -46,23 +46,189 @@ export const parseEventPayload = (
   let payload: unknown;
 
   if (req.is("multipart/form-data")) {
-    if (typeof req.body?.data !== "string") {
-      throw new EventServiceError(
-        "Event data is required in the data field"
-      );
-    }
+    const body = req.body ?? {};
 
-    try {
-      payload = JSON.parse(req.body.data);
-    } catch {
-      throw new EventServiceError(
-        "Invalid event JSON data"
+    console.log(
+      "[EVENT PARSER] Multipart form-data detected"
+    );
+
+    // FORMAT 1: Single data JSON field
+    if (body.data !== undefined) {
+      if (typeof body.data !== "string") {
+        throw new EventServiceError(
+          "Event data must be a JSON string"
+        );
+      }
+
+      if (
+        Object.keys(body).some(
+          (key) => key !== "data"
+        )
+      ) {
+        throw new EventServiceError(
+          "Do not mix data field with individual form-data fields"
+        );
+      }
+
+      try {
+        payload = JSON.parse(body.data);
+      } catch {
+        throw new EventServiceError(
+          "Invalid event JSON data"
+        );
+      }
+    } else {
+      // FORMAT 2: Individual form-data fields
+
+      console.log(
+        "[EVENT PARSER] Individual form-data detected"
       );
+
+      const parsedBody: Record<string, any> =
+        Object.create(null);
+
+      // JSON arrays and objects
+      const jsonFields = new Set([
+        "photos",
+        "dates",
+        "venue",
+        "experience",
+        "tripDetails",
+        "included",
+        "notIncluded",
+        "whatToBring",
+        "reminderTimes",
+        "hostLanguages",
+        "rules",
+        "safetyOptions",
+        "faqs",
+        "completedSteps",
+      ]);
+
+      // Numeric fields
+      const numberFields = new Set([
+        "totalCapacity",
+
+        "menCapacity",
+        "womenCapacity",
+        "otherCapacity",
+
+        "menEntryPrice",
+        "womenEntryPrice",
+        "otherEntryPrice",
+
+        "menDiscountPercentage",
+        "womenDiscountPercentage",
+        "otherDiscountPercentage",
+
+        "coupleCapacity",
+        "coupleEntryPrice",
+        "coupleDiscountPercentage",
+
+        "maxTicketsPerPerson",
+        "minAge",
+        "maxAge",
+        "groupSize",
+        "currentStep",
+      ]);
+
+      // Boolean fields
+      const booleanFields = new Set([
+        "waitlistEnabled",
+      ]);
+
+      for (const [key, rawValue] of Object.entries(body)) {
+        // Prevent unsafe property names
+        if (
+          key === "__proto__" ||
+          key === "constructor" ||
+          key === "prototype"
+        ) {
+          throw new EventServiceError(
+            `Invalid form-data field: ${key}`
+          );
+        }
+
+        // Reject duplicate or invalid text fields
+        if (typeof rawValue !== "string") {
+          throw new EventServiceError(
+            `Field '${key}' must contain a single text value`
+          );
+        }
+
+        const value = rawValue.trim();
+
+        // Parse JSON fields
+        if (jsonFields.has(key)) {
+          try {
+            parsedBody[key] = JSON.parse(value);
+
+            console.log(
+              `[EVENT PARSER] JSON parsed: ${key}`
+            );
+          } catch {
+            throw new EventServiceError(
+              `Invalid JSON in field '${key}'`
+            );
+          }
+
+          continue;
+        }
+
+        // Parse numeric fields
+        if (numberFields.has(key)) {
+          if (value === "null") {
+            parsedBody[key] = null;
+            continue;
+          }
+
+          if (!/^-?\d+(\.\d+)?$/.test(value)) {
+            throw new EventServiceError(
+              `Field '${key}' must be a valid number`
+            );
+          }
+
+          const numericValue = Number(value);
+
+          if (!Number.isFinite(numericValue)) {
+            throw new EventServiceError(
+              `Invalid number in field '${key}'`
+            );
+          }
+
+          parsedBody[key] = numericValue;
+
+          continue;
+        }
+
+        // Parse boolean fields
+        if (booleanFields.has(key)) {
+          if (value === "true") {
+            parsedBody[key] = true;
+          } else if (value === "false") {
+            parsedBody[key] = false;
+          } else {
+            throw new EventServiceError(
+              `Field '${key}' must be true or false`
+            );
+          }
+
+          continue;
+        }
+
+        // Parse string and nullable fields
+        parsedBody[key] =
+          value === "null" ? null : value;
+      }
+
+      payload = parsedBody;
     }
   } else {
+    // FORMAT 3: Raw JSON
     payload = req.body;
   }
 
+  // Final payload check
   if (
     !payload ||
     typeof payload !== "object" ||
@@ -72,6 +238,15 @@ export const parseEventPayload = (
       "Invalid event request body"
     );
   }
+
+  console.log(
+    "[EVENT PARSER] Payload parsed successfully"
+  );
+
+  console.log(
+    "[EVENT PARSER] Total fields:",
+    Object.keys(payload).length
+  );
 
   return payload as Record<string, any>;
 };
@@ -395,7 +570,25 @@ export const prepareEventImages = async (
   const fileKeys = new Set(
     references.map((reference) => reference.fileKey)
   );
+console.log("[IMAGEKIT] Received file keys:", 
+  Object.keys(req.files ?? {})
+);
 
+console.log("[IMAGEKIT] Expected file keys:", 
+  [...fileKeys]
+);
+
+console.log("[IMAGEKIT] Unexpected file keys:",
+  Object.keys(req.files ?? {}).filter(
+    (key) => !fileKeys.has(key)
+  )
+);
+
+console.log("[IMAGEKIT] Missing file keys:",
+  [...fileKeys].filter(
+    (key) => !req.files?.[key]
+  )
+);
   if (fileKeys.size > MAX_IMAGES) {
     throw new EventServiceError(
       `Maximum ${MAX_IMAGES} images are allowed per request`
