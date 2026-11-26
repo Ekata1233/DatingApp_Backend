@@ -103,24 +103,26 @@ model Event {
   safetyOptions EventSafetyOption[] @default([])
 
   // Draft & Submission
-  status          EventStatus @default(DRAFT)
-  currentStep     Int         @default(1)
-  completedSteps  Int[]       @default([])
-  submittedAt     DateTime?
-  approvedAt      DateTime?
-  publishedAt     DateTime?
-  rejectionReason String?
-  isDeleted       Boolean     @default(false)
+  status              EventStatus          @default(DRAFT)
+  currentStep         Int                  @default(1)
+  completedSteps      Int[]                @default([])
+  submittedAt         DateTime?
+  approvedAt          DateTime?
+  publishedAt         DateTime?
+  rejectionReason     String?
+  eventReactiveStatus EventReactiveStatus?
+  isDeleted           Boolean              @default(false)
 
   // Relations
-  photos      EventPhoto[]
-  dates       EventDate[]
-  venue       EventVenue?
-  experience  EventExperience[]
-  tripDetails TripDetails?
-  faqs        EventFAQ[]
-  hosts       EventHost[]
-  bookings    EventBooking[]
+  photos        EventPhoto[]
+  dates         EventDate[]
+  venue         EventVenue?
+  experience    EventExperience[]
+  tripDetails   TripDetails?
+  faqs          EventFAQ[]
+  hosts         EventHost[]
+  bookings      EventBooking[]
+  reactivations EventReactivation[]
 
   // Ratings Summary
   averageRating Decimal @default(0) @db.Decimal(3, 2)
@@ -129,10 +131,15 @@ model Event {
   // Relation
   reviews EventReview[]
 
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  deletedAt   DateTime?
-  ChatMessage ChatMessage[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+  pausedAt      DateTime?
+  pauseReason   String?
+  expiredAt     DateTime?
+  reactivatedAt DateTime?
+  completedAt   DateTime?
+  ChatMessage   ChatMessage[]
 
   @@index([hostId])
   @@index([businessDetailsId])
@@ -142,6 +149,7 @@ model Event {
   @@index([eventDurationType, status])
   @@index([businessDetailsId, status, updatedAt])
   @@index([businessDetailsId, deletedAt, status])
+  @@index([eventReactiveStatus])
   @@map("events")
 }
 
@@ -175,16 +183,76 @@ model EventDate {
   isMoreDate         Boolean         @default(false)
   cancelledAt        DateTime?
   cancellationReason String?
+  reactivationId     String?         @db.Uuid
 
-  reviews EventReview[]
+  reviews      EventReview[]
+  bookings     EventBooking[]
+  reactivation EventReactivation? @relation(fields: [reactivationId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiredAt   DateTime?
+  completedAt DateTime?
 
   @@unique([eventId, startDateTime])
   @@index([eventId, status])
   @@index([status, startDateTime])
+  @@index([status, endDateTime])
+  @@index([reactivationId, status])
   @@map("event_dates")
+}
+
+model EventReactivation {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  eventId             String                  @db.Uuid
+  event               Event                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  status              EventReactiveStatus     @default(DRAFT)
+  previousEventStatus EventStatus
+  // Proposed dates
+  dates               EventReactivationDate[]
+  // Actual published dates
+  publishedDates      EventDate[]
+  // Submission and review
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+  // Publication
+  publishedAt         DateTime?
+  // Lifecycle
+  pausedAt            DateTime?
+  pauseReason         String?
+  expiredAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, status])
+  @@index([status, createdAt])
+  @@index([eventId, createdAt])
+  @@map("event_reactivations")
+}
+
+model EventReactivationDate {
+  id             String            @id @default(uuid()) @db.Uuid
+  reactivationId String            @db.Uuid
+  reactivation   EventReactivation @relation(fields: [reactivationId], references: [id], onDelete: Cascade)
+  startDateTime  DateTime
+  endDateTime    DateTime
+  gateOpensAt    DateTime?
+  timezone       String            @default("Asia/Kolkata")
+  isPrimary      Boolean           @default(false)
+  isMoreDate     Boolean           @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([reactivationId, startDateTime])
+  @@index([reactivationId])
+  @@map("event_reactivation_dates")
 }
 
 model EventVenue {
@@ -266,7 +334,7 @@ model TripDetails {
   // Ride Ops - Host Only
 
   vehiclePhotos   String[]         @default([])
-  vehicle         String
+  vehicle         String?
   vehicleOperator String?
   vehicleModel    String?
   vehicleCapacity Int?
@@ -481,12 +549,14 @@ model EventBooking {
   event               Event                @relation(fields: [eventId], references: [id])
   payment             Payment?             @relation(fields: [paymentId], references: [id])
   user                User                 @relation(fields: [userId], references: [id])
+  eventDateId         String               @db.Uuid
+  eventDate           EventDate            @relation(fields: [eventDateId], references: [id], onDelete: Restrict)
   tickets             EventBookingTicket[]
 
   @@index([userId])
   @@index([eventId])
   @@index([status])
-  @@index([bookingNumber])
+  @@index([eventDateId, status])
 }
 
 model EventBookingTicket {
@@ -537,12 +607,15 @@ enum EventStatus {
   REJECTED
   CANCELLED
   COMPLETED
+  PAUSED
+  EXPIRED
 }
 
 enum EventDateStatus {
   SCHEDULED
   CANCELLED
   COMPLETED
+  EXPIRED
 }
 
 enum VenueType {
@@ -662,6 +735,7 @@ enum EventTicketType {
   MEN
   WOMEN
   OTHER
+  COUPLE
 }
 
 enum EventTicketStatus {
@@ -676,4 +750,17 @@ enum EventAvailabilityStatus {
   LIVE
   SOLD_OUT
   CANCELLED
+}
+
+enum EventReactiveStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+  PAUSED
+  EXPIRED
+  CANCELLED
+  COMPLETED
 }

@@ -97,6 +97,7 @@ const validateHost = async (
     where: {
       id: hostId,
       businessId: businessId,
+      status: { not: "REMOVED" },
     },
     select: {
       id: true,
@@ -105,7 +106,7 @@ const validateHost = async (
 
   if (!host) {
     throw new EventServiceError(
-      "Host does not belong to your business",
+      "Host is not available for this business",
       400
     );
   }
