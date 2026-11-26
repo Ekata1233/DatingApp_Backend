@@ -265,6 +265,7 @@ import eventsRoutes from "../features/event-partner/events/event.routes"
 import organizerBankAccountRoutes from "../features/event-partner/organizer-management/bank-account.routes"
 import organizerBrandPageRoutes from "../features/event-partner/organizer-management/brand-page.routes"
 import { admin } from "googleapis/build/src/apis/admin";
+import organizerTeamRoutes from "../features/event-partner/organizer-management/team.routes"
 
 import adminEventRoutes from "../features/admin/events/adminEvent.routes"
 import adminEventReactivationRoutes from "../features/admin/events/adminEventReactivation.routes"
@@ -273,6 +274,7 @@ import adminEventReactivationRoutes from "../features/admin/events/adminEventRea
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
 router.use("/event-partner/organizer-management/brand-page", organizerBrandPageRoutes);
+router.use("/event-partner/organizer-management/team", organizerTeamRoutes);
 router.use("/event-partner/hosts", createHostRoutes)
 router.use("/event/hosts", hostOnboardingRoutes)
 router.use("/event/hosts/onboarding", scopedHostOnboardingRoutes);
@@ -282,6 +284,11 @@ router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
 
 router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
 
+
+
+//===================================================
+//-----------------HOST ONBOARDING-------------------
+//====================================================
 
 
 

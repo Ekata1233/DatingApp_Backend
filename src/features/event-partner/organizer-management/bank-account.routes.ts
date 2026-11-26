@@ -4,6 +4,7 @@ import { requirePartnerRole } from "../../../middleware/partnerRole.middleware";
 import { PartnerRequest } from "../../../types/partnerAuth.types";
 import {
   addBankAccountController,
+  editBankAccountController,
   findBankBranchController,
   getBankAccountController,
 } from "./bank-account.controller";
@@ -23,7 +24,8 @@ const requireBankAccountOrganizer = requirePartnerRole("ORGANIZER", {
   inferOrganizerBusiness: true,
 });
 
-router.get("/bank-details", requireBankAccountOrganizer, getBankAccountController);
-router.post("/bank-details/add", requireBankAccountOrganizer, addBankAccountController);
+router.get("/details", requireBankAccountOrganizer, getBankAccountController);
+router.post("/add", requireBankAccountOrganizer, addBankAccountController);
+router.patch("/edit", requireBankAccountOrganizer, editBankAccountController);
 
 export default router;

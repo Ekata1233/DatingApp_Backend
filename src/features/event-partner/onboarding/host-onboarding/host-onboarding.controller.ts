@@ -17,6 +17,7 @@ import {
 
 import {
   getHostInvitationService,
+  getHostDetailsService,
   acceptHostInvitationService,
   declineHostInvitationService,
   getHostPersonalDetailsService,
@@ -24,6 +25,18 @@ import {
   getHostCodeOfConductService,
   acceptHostCodeOfConductService,
 } from "./host-onboarding.service";
+
+export const getHostDetailsController = async (
+  req: HostOnboardingRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const data = await getHostDetailsService(getHostContext(req));
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    handleError(error, res);
+  }
+};
 
 /* -------------------------------------------------------------------------- */
 /*                              GET HOST CONTEXT                              */

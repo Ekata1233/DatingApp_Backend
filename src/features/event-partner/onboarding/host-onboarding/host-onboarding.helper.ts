@@ -145,7 +145,7 @@ export const formatOnboardingStep = (
   return {
     onboardingStep,
 
-    currentStep:
+    nextStep:
       HOST_STEP_NUMBER[onboardingStep],
 
     totalSteps: HOST_TOTAL_STEPS,

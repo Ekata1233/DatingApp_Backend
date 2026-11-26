@@ -892,6 +892,7 @@ export const getFeedService = async ({
   const matchConditions = Prisma.sql`
         u.deleted_at IS NULL
         AND u.account_status = 'ACTIVE'::"AccountStatus"
+        AND u.onboarding_completed = TRUE
         AND u.id <> ${userId}::uuid
       
 AND (

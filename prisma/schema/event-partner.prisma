@@ -1,28 +1,29 @@
 model EventPartner {
-  id               String             @id @default(uuid()) @db.Uuid
-  fullName         String?
-  phoneNumber      String             @unique
-  isPhoneVerified  Boolean            @default(false)
-  phoneVerifiedAt  DateTime?
-  email            String?            @unique
-  isEmailVerified  Boolean            @default(false)
-  emailVerifiedAt  DateTime?
-  gender           HostGender?
-  languages        String[]           @default([])
-  profilePhoto     String?
-  whatsappUpdates  Boolean            @default(false)
-  accountStatus    PartnerStatus      @default(ACTIVE)
-  sessionId        String?
-  deviceToken      String?
-  lastLoginAt      DateTime?
-  lastActiveAt     DateTime?
-  deletedAt        DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  businesses       BusinessDetails[]
-  hosts            Host[]
-  signedAgreements PartnerAgreement[]
-  consents         PartnerConsent[]
+  id                   String             @id @default(uuid()) @db.Uuid
+  fullName             String?
+  phoneNumber          String             @unique
+  isPhoneVerified      Boolean            @default(false)
+  phoneVerifiedAt      DateTime?
+  email                String?            @unique
+  isEmailVerified      Boolean            @default(false)
+  emailVerifiedAt      DateTime?
+  gender               HostGender?
+  languages            String[]           @default([])
+  profilePhoto         String?
+  whatsappUpdates      Boolean            @default(false)
+  accountStatus        PartnerStatus      @default(ACTIVE)
+  sessionId            String?
+  deviceToken          String?
+  lastLoginAt          DateTime?
+  lastActiveAt         DateTime?
+  deletedAt            DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  businesses           BusinessDetails[]
+  hosts                Host[]
+  signedAgreements     PartnerAgreement[]
+  consents             PartnerConsent[]
+  performedHostActions HostActivityLog[]
 
   @@map("event_partners")
 }
@@ -70,6 +71,8 @@ model BusinessDetails {
   tagline                  String?
   description              String?
   instagramUrl             String?
+  website                  String?
+  hostingSince             String?
   onboardingStep           OrganizerStep              @default(PERSONAL_DETAILS)
   onboardingCompleted      Boolean                    @default(false)
   status                   BusinessStatus             @default(DRAFT)
@@ -87,6 +90,7 @@ model BusinessDetails {
   agreements               PartnerAgreement[]
   consents                 PartnerConsent[]
   reviews                  PartnerReview[]
+  hostActivityLogs         HostActivityLog[]
   verifyId                 VerifyId?
   yourEvents               YourEvents?
 
@@ -153,6 +157,7 @@ model PartnerGovernmentIdAttempt {
   id                String                           @id @default(uuid()) @db.Uuid
   partnerId         String                           @db.Uuid
   businessId        String                           @db.Uuid
+  hostId            String?                          @db.Uuid
   referenceId       String                           @unique
   transactionId     String?                          @unique
   providerRequestId String?
@@ -166,8 +171,10 @@ model PartnerGovernmentIdAttempt {
   failureReason     String?
   createdAt         DateTime                         @default(now())
   updatedAt         DateTime                         @updatedAt
+  host              Host?                            @relation(fields: [hostId], references: [id], onDelete: Cascade)
 
   @@index([partnerId, businessId, status])
+  @@index([hostId])
   @@map("partner_government_id_attempts")
 }
 
@@ -212,46 +219,52 @@ model EventCategory {
 }
 
 model Host {
-  id                        String           @id @default(uuid()) @db.Uuid
-  businessId                String           @db.Uuid
-  partnerId                 String?          @db.Uuid
+  id                        String                       @id @default(uuid()) @db.Uuid
+  businessId                String                       @db.Uuid
+  partnerId                 String?                      @db.Uuid
   fullName                  String
   phoneNumber               String
   email                     String?
   gender                    HostGender?
-  languages                 String[]         @default([])
-  invitationTokenHash       String?          @unique
-  invitedAt                 DateTime         @default(now())
+  languages                 String[]                     @default([])
+  invitationTokenHash       String?                      @unique
+  invitedAt                 DateTime                     @default(now())
   invitationExpiresAt       DateTime
   acceptedAt                DateTime?
   declinedAt                DateTime?
-  canViewGuestList          Boolean          @default(true)
-  canCheckInGuests          Boolean          @default(true)
-  canUpdateRunSheetProgress Boolean          @default(true)
-  canViewRoomList           Boolean          @default(true)
-  canReportIncidentSOS      Boolean          @default(true)
-  canMessageGuests          Boolean          @default(true)
-  canReplyToReviews         Boolean          @default(false)
-  canCreateSubmitEvent      Boolean          @default(false)
-  canEditEvent              Boolean          @default(false)
-  canCancelEventRefund      Boolean          @default(false)
-  canManagePayouts          Boolean          @default(false)
-  onboardingStep            HostStep         @default(INVITE_ACCEPTANCE)
-  onboardingCompleted       Boolean          @default(false)
-  status                    HostStatus       @default(INVITED)
+  canViewGuestList          Boolean                      @default(true)
+  canCheckInGuests          Boolean                      @default(true)
+  canUpdateRunSheetProgress Boolean                      @default(true)
+  canViewRoomList           Boolean                      @default(true)
+  canReportIncidentSOS      Boolean                      @default(true)
+  canMessageGuests          Boolean                      @default(true)
+  canReplyToReviews         Boolean                      @default(false)
+  canCreateSubmitEvent      Boolean                      @default(false)
+  canEditEvent              Boolean                      @default(false)
+  canCancelEventRefund      Boolean                      @default(false)
+  canManagePayouts          Boolean                      @default(false)
+  onboardingStep            HostStep                     @default(INVITE_ACCEPTANCE)
+  onboardingCompleted       Boolean                      @default(false)
+  status                    HostStatus                   @default(INVITED)
   emergencyContactName      String?
   emergencyContactPhone     String?
   joinedAt                  DateTime?
   pausedAt                  DateTime?
+  resumedAt                 DateTime?
   removedAt                 DateTime?
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
+  removalReason             HostRemovalReason?
+  removalNote               String?
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
   assignedEvents            EventHost[]
   verifyId                  HostVerifyId?
-  business                  BusinessDetails  @relation(fields: [businessId], references: [id])
-  partner                   EventPartner?    @relation(fields: [partnerId], references: [id])
+  governmentIdAttempts      PartnerGovernmentIdAttempt[]
+  business                  BusinessDetails              @relation(fields: [businessId], references: [id])
+  partner                   EventPartner?                @relation(fields: [partnerId], references: [id])
   consents                  PartnerConsent[]
-  primaryHostedEvents       Event[]          @relation("EventPrimaryHost")
+  primaryHostedEvents       Event[]                      @relation("EventPrimaryHost")
+  replacedAssignments       EventHost[]                  @relation("EventHostReplacement")
+  activityLogs              HostActivityLog[]
 
   @@unique([businessId, phoneNumber])
   @@unique([businessId, partnerId])
@@ -439,22 +452,57 @@ model PartnerReview {
 }
 
 model EventHost {
-  id          String          @id @default(uuid()) @db.Uuid
-  eventId     String          @db.Uuid
-  hostId      String          @db.Uuid
-  status      EventHostStatus @default(ACTIVE)
-  assignedAt  DateTime        @default(now())
-  removedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  event       Event           @relation(fields: [eventId], references: [id])
-  host        Host            @relation(fields: [hostId], references: [id])
+  id                String             @id @default(uuid()) @db.Uuid
+  eventId           String             @db.Uuid
+  hostId            String             @db.Uuid
+  status            EventHostStatus    @default(ACTIVE)
+  assignedAt        DateTime           @default(now())
+  removedAt         DateTime?
+  completedAt       DateTime?
+  // Host replacement tracking
+  replacedByHostId  String?            @db.Uuid
+  replacementReason HostRemovalReason?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  event             Event              @relation(fields: [eventId], references: [id])
+  host              Host               @relation(fields: [hostId], references: [id])
+  replacementHost   Host?              @relation("EventHostReplacement", fields: [replacedByHostId], references: [id])
 
   @@unique([eventId, hostId])
   @@index([hostId, status])
   @@index([eventId, status])
+  @@index([replacedByHostId])
   @@map("event_hosts")
+}
+
+model HostActivityLog {
+  id             String             @id @default(uuid()) @db.Uuid
+  hostId         String             @db.Uuid
+  businessId     String             @db.Uuid
+  performedById  String             @db.Uuid
+  action         HostActivityAction
+  previousStatus HostStatus?
+  newStatus      HostStatus
+  removalReason  HostRemovalReason?
+  note           String?
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+
+  host        Host            @relation(fields: [hostId], references: [id])
+  business    BusinessDetails @relation(fields: [businessId], references: [id])
+  performedBy EventPartner    @relation(fields: [performedById], references: [id])
+
+  @@index([hostId, createdAt])
+  @@index([businessId, createdAt])
+  @@index([performedById])
+  @@map("host_activity_logs")
+}
+
+enum HostActivityAction {
+  PAUSED
+  RESUMED
+  REMOVED
 }
 
 enum PartnerStatus {
@@ -501,6 +549,13 @@ enum HostStatus {
   DECLINED
   EXPIRED
   REMOVED
+}
+
+enum HostRemovalReason {
+  LEFT_THE_TEAM
+  SEASONAL_NOT_NEEDED
+  CONDUCT_ISSUE
+  OTHER
 }
 
 enum PartnerVerificationStatus {

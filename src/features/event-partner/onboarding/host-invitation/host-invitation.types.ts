@@ -4,6 +4,7 @@ export interface HostInvitationLookupInput {
 
 export interface HostInvitationCard {
   hostId: string;
+  isInvitationAccepted: boolean;
   businessId: string;
 
   organizationName: string;

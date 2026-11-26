@@ -8,6 +8,102 @@ import { formatOnboardingStep, getValidHost, HostContext, validateAcceptedInvita
 import { CodeOfConductInput, HOST_CODE_OF_CONDUCT_DECLARATIONS, HOST_CODE_OF_CONDUCT_RULES, HOST_CODE_OF_CONDUCT_VERSION, HOST_PERMISSION_OPTIONS, HostOnboardingError, PersonalDetailsInput } from "./host-onboarding.types";
 import { createHash } from "node:crypto";
 
+const isHostPermissionEnabled = (
+  host: Awaited<ReturnType<typeof getValidHost>>,
+  permission: (typeof HOST_PERMISSION_OPTIONS)[number],
+) => !permission.ownerOnly &&
+  (permission.key === "canReportIncidentSOS" || host[permission.key]);
+
+export const getHostDetailsService = async (context: HostContext) =>
+  prisma.$transaction(async (tx) => {
+    const host = await getValidHost(tx, context);
+    const governmentIdAttempts = await tx.partnerGovernmentIdAttempt.findMany({
+      where: context,
+      orderBy: { createdAt: "desc" },
+      select: {
+        documentType: true,
+        status: true,
+        consentGivenAt: true,
+        authorizedAt: true,
+        completedAt: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    const consents = await tx.partnerConsent.findMany({
+      where: context,
+      orderBy: { createdAt: "desc" },
+      select: {
+        consentType: true,
+        isAccepted: true,
+        documentVersion: true,
+        acceptedAt: true,
+        revokedAt: true,
+      },
+    });
+    const verification = host.verifyId;
+
+    return {
+      hostId: host.id,
+      businessId: host.businessId,
+      status: host.status,
+      ...formatOnboardingStep(host.onboardingStep),
+      onboardingCompleted: host.onboardingCompleted,
+      joinedAt: host.joinedAt,
+      permissions: Object.fromEntries(
+        HOST_PERMISSION_OPTIONS.map((permission) => [
+          permission.key,
+          isHostPermissionEnabled(host, permission),
+        ]),
+      ),
+      invitation: {
+        invitedAt: host.invitedAt,
+        expiresAt: host.invitationExpiresAt,
+        acceptedAt: host.acceptedAt,
+      },
+      personalDetails: {
+        fullName: host.fullName,
+        phoneNumber: host.phoneNumber,
+        isPhoneVerified: host.partner?.isPhoneVerified ?? false,
+        email: host.email,
+        gender: host.gender,
+        languages: host.languages,
+        emergencyContactName: host.emergencyContactName,
+        emergencyContactPhone: host.emergencyContactPhone,
+      },
+      governmentId: {
+        attempts: governmentIdAttempts,
+        aadhaar: verification && {
+          lastFour: verification.aadhaarLastFour,
+          name: verification.aadhaarName,
+          dateOfBirth: verification.dateOfBirth,
+          city: verification.city,
+          state: verification.state,
+          isAdult: verification.isAdult,
+          isNameMatched: verification.isNameMatched,
+          status: verification.aadhaarStatus,
+          verifiedAt: verification.aadhaarVerifiedAt,
+          failureReason: verification.aadhaarFailureReason,
+        },
+      },
+      faceVerification: verification && {
+        hasSelfie: Boolean(verification.selfieKey),
+        status: verification.faceStatus,
+        isFaceMatched: verification.isFaceMatched,
+        faceMatchScore: verification.faceMatchScore,
+        verifiedAt: verification.faceVerifiedAt,
+        failureReason: verification.faceFailureReason,
+        livenessStatus: verification.livenessStatus,
+        isLivenessPassed: verification.isLivenessPassed,
+        livenessScore: verification.livenessScore,
+        livenessVerifiedAt: verification.livenessVerifiedAt,
+        livenessFailureReason: verification.livenessFailureReason,
+      },
+      consents,
+    };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+
 export const getHostInvitationService = async (
   context: HostContext,
 ) => {
@@ -32,24 +128,10 @@ export const getHostInvitationService = async (
 
   const permissions = HOST_PERMISSION_OPTIONS.map(
     (permission) => {
-      let enabled = host[permission.key];
-
-      // Owner-only permissions cannot be granted
-      if (permission.ownerOnly) {
-        enabled = false;
-      }
-
-      // SOS must always be available
-      if (
-        permission.key === "canReportIncidentSOS"
-      ) {
-        enabled = true;
-      }
-
       return {
         key: permission.key,
         label: permission.label,
-        enabled,
+        enabled: isHostPermissionEnabled(host, permission),
         ownerOnly: permission.ownerOnly,
       };
     },
@@ -95,7 +177,7 @@ export const getHostInvitationService = async (
       icon: "🎤",
 
       description:
-        "Runs assigned events — check-in, guest list, guest chat, run sheet / itinerary, stay and rooms. Can't create or edit events, and has no access to money.",
+        "Runs assigned events with the permissions granted by the organizer.",
     },
 
     events: {
@@ -489,20 +571,6 @@ export const acceptHostCodeOfConductService = async (
       validateAcceptedInvitation(host);
 
       /* -------------------------------------------------------------------- */
-      /*                         VALIDATE DOCUMENT VERSION                    */
-      /* -------------------------------------------------------------------- */
-
-      if (
-        payload.version !==
-        HOST_CODE_OF_CONDUCT_VERSION
-      ) {
-        throw new HostOnboardingError(
-          409,
-          "Code of conduct has been updated. Please review the latest version.",
-        );
-      }
-
-      /* -------------------------------------------------------------------- */
       /*                          ALREADY COMPLETED                           */
       /* -------------------------------------------------------------------- */
 
@@ -660,7 +728,7 @@ export const acceptHostCodeOfConductService = async (
 
           isAccepted: true,
 
-          documentVersion: payload.version,
+          documentVersion: HOST_CODE_OF_CONDUCT_VERSION,
 
           documentHash,
 

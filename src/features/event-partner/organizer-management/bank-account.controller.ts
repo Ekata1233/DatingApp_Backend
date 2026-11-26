@@ -1,7 +1,8 @@
 import { NextFunction, Response } from "express";
+import { ZodType } from "zod";
 import { PartnerRequest } from "../../../types/partnerAuth.types";
-import { addBankAccount, BankAccountError, findBankBranch, getBankAccount } from "./bank-account.service";
-import { bankAccountSchema, getDocumentExtension, ifscSchema } from "./bank-account.validation";
+import { addBankAccount, BankAccountError, editBankAccount, findBankBranch, getBankAccount } from "./bank-account.service";
+import { bankAccountSchema, editBankAccountSchema, getDocumentExtension, ifscSchema } from "./bank-account.validation";
 
 const handleError = (error: unknown, res: Response, next: NextFunction) => {
   if (error instanceof BankAccountError) {
@@ -33,8 +34,14 @@ export const getBankAccountController = async (req: PartnerRequest, res: Respons
   }
 };
 
-export const addBankAccountController = async (req: PartnerRequest, res: Response, next: NextFunction) => {
-  const input = bankAccountSchema.safeParse(req.body);
+const writeBankAccountController = <Input>(
+  schema: ZodType<Input>,
+  save: (businessId: string, input: Input, document?: Parameters<typeof addBankAccount>[2]) => Promise<unknown>,
+  statusCode: number,
+) => async (
+  req: PartnerRequest, res: Response, next: NextFunction,
+) => {
+  const input = schema.safeParse(req.body ?? {});
   if (!input.success) {
     return res.status(400).json({
       success: false,
@@ -64,9 +71,12 @@ export const addBankAccountController = async (req: PartnerRequest, res: Respons
       };
     }
 
-    const data = await addBankAccount(req.partner!.businessId!, input.data, document);
-    return res.status(201).json({ success: true, data });
+    const data = await save(req.partner!.businessId!, input.data, document);
+    return res.status(statusCode).json({ success: true, data });
   } catch (error) {
     return handleError(error, res, next);
   }
 };
+
+export const addBankAccountController = writeBankAccountController(bankAccountSchema, addBankAccount, 201);
+export const editBankAccountController = writeBankAccountController(editBankAccountSchema, editBankAccount, 200);

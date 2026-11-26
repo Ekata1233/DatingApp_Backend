@@ -224,6 +224,18 @@ export const getVerifiedGovernmentDocument = async (
         // =====================================
 
         const poi = uidData.Poi;
+        const poa = uidData.Poa;
+        const address = poa && typeof poa === "object" && !Array.isArray(poa)
+            ? {
+                city: (typeof poa.vtc === "string" && poa.vtc.trim()) ||
+                    (typeof poa.dist === "string" && poa.dist.trim()) || undefined,
+                state: typeof poa.state === "string" ? poa.state.trim() || undefined : undefined,
+            }
+            : undefined;
+        const uid = typeof uidData.uid === "string"
+            ? uidData.uid.replace(/[\s-]/g, "")
+            : "";
+        const aadhaarLastFour = /^(?:\d{8}|[Xx*]{8})?(\d{4})$/.exec(uid)?.[1];
 
         if (
             !poi ||
@@ -327,6 +339,8 @@ export const getVerifiedGovernmentDocument = async (
                 GovernmentIdType.AADHAAR,
 
             verifiedName,
+            aadhaarLastFour,
+            address,
 
             dateOfBirth,
             verifiedGender,

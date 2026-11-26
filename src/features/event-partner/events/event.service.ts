@@ -89,6 +89,7 @@ const validateHost = async (
     where: {
       id: hostId,
       businessId: businessId,
+      status: { not: "REMOVED" },
     },
     select: {
       id: true,

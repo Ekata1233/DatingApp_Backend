@@ -21,6 +21,7 @@ export interface VerifiedGovernmentDocument {
   documentType: GovernmentIdType;
 
   verifiedName: string;
+  aadhaarLastFour?: string;
 
   dateOfBirth: Date;
   verifiedGender: string;

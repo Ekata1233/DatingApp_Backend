@@ -8,6 +8,10 @@ export interface HostPermissions {
   canReportIncidentSOS: boolean;
   canMessageGuests: boolean;
   canReplyToReviews: boolean;
+  canCreateSubmitEvent: boolean;
+  canEditEvent: boolean;
+  canCancelEventRefund: boolean;
+  canManagePayouts: boolean;
 }
 
 export interface InviteHostInput {
@@ -26,6 +30,10 @@ export interface UpdateHostPermissionsInput {
   canViewRoomList?: boolean;
   canMessageGuests?: boolean;
   canReplyToReviews?: boolean;
+  canCreateSubmitEvent?: boolean;
+  canEditEvent?: boolean;
+  canCancelEventRefund?: boolean;
+  canManagePayouts?: boolean;
 }
 
 export interface GetHostsInput {
