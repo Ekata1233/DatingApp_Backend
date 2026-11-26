@@ -1,6 +1,16 @@
-import { EventHostStatus, EventStatus, HostActivityAction, HostRemovalReason, HostStatus, Prisma } from "@prisma/client";
+import {
+  EventHostStatus,
+  EventStatus,
+  HostActivityAction,
+  HostRemovalReason,
+  HostStatus,
+  Prisma,
+} from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
-import { getHostPermissionsService, HostServiceError } from "../host-management/host.service";
+import {
+  getHostPermissionsService,
+  HostServiceError,
+} from "../host-management/host.service";
 import {
   HOST_STEP_NUMBER,
   HOST_TOTAL_STEPS,
@@ -15,12 +25,25 @@ const pendingStatuses = new Set<HostStatus>([
   HostStatus.EXPIRED,
 ]);
 
-const teamMemberStatuses = [HostStatus.ACTIVE, HostStatus.PAUSED, ...pendingStatuses];
+const teamMemberStatuses = [
+  HostStatus.ACTIVE,
+  HostStatus.PAUSED,
+  ...pendingStatuses,
+];
 
-const getTeamMemberStatus = (status: HostStatus, invitationExpiresAt: Date, now: Date) =>
-  status === HostStatus.INVITED && invitationExpiresAt <= now ? HostStatus.EXPIRED : status;
+const getTeamMemberStatus = (
+  status: HostStatus,
+  invitationExpiresAt: Date,
+  now: Date,
+) =>
+  status === HostStatus.INVITED && invitationExpiresAt <= now
+    ? HostStatus.EXPIRED
+    : status;
 
-export const getOrganizerTeam = async (partnerId: string, businessId: string) => {
+export const getOrganizerTeam = async (
+  partnerId: string,
+  businessId: string,
+) => {
   const business = await prisma.businessDetails.findFirst({
     where: {
       id: businessId,
@@ -72,7 +95,11 @@ export const getOrganizerTeam = async (partnerId: string, businessId: string) =>
 
   const now = new Date();
   const coHosts = hosts.map((host) => {
-    const status = getTeamMemberStatus(host.status, host.invitationExpiresAt, now);
+    const status = getTeamMemberStatus(
+      host.status,
+      host.invitationExpiresAt,
+      now,
+    );
 
     const eventIds = new Set([
       ...host.primaryHostedEvents.map(({ id }) => id),
@@ -91,15 +118,16 @@ export const getOrganizerTeam = async (partnerId: string, businessId: string) =>
       invitedAt: host.invitedAt,
       invitationExpiresAt: host.invitationExpiresAt,
       acceptedAt: host.acceptedAt,
-      onboardingProgress: status === HostStatus.ONBOARDING
-        ? {
-            currentStep: host.onboardingStep,
-            completedSteps: host.onboardingCompleted
-              ? VERIFICATION_STEPS
-              : Math.max(0, HOST_STEP_NUMBER[host.onboardingStep] - 2),
-            totalSteps: VERIFICATION_STEPS,
-          }
-        : null,
+      onboardingProgress:
+        status === HostStatus.ONBOARDING
+          ? {
+              currentStep: host.onboardingStep,
+              completedSteps: host.onboardingCompleted
+                ? VERIFICATION_STEPS
+                : Math.max(0, HOST_STEP_NUMBER[host.onboardingStep] - 2),
+              totalSteps: VERIFICATION_STEPS,
+            }
+          : null,
     };
   });
 
@@ -108,7 +136,10 @@ export const getOrganizerTeam = async (partnerId: string, businessId: string) =>
     {
       id: partnerId,
       fullName:
-        business.partner.fullName ?? business.brandName ?? business.legalName ?? "Owner",
+        business.partner.fullName ??
+        business.brandName ??
+        business.legalName ??
+        "Owner",
       profilePhoto: business.partner.profilePhoto,
       role: "OWNER",
       isCurrentUser: true,
@@ -124,7 +155,8 @@ export const getOrganizerTeam = async (partnerId: string, businessId: string) =>
     summary: {
       seatsUsed: team.length + pending.length,
       seatLimit: SEAT_LIMIT,
-      activeCount: team.filter(({ status }) => status === HostStatus.ACTIVE).length,
+      activeCount: team.filter(({ status }) => status === HostStatus.ACTIVE)
+        .length,
       pendingCount: pending.length,
     },
     team,
@@ -137,7 +169,11 @@ export const getOrganizerTeamMember = async (
   businessId: string,
   hostId: string,
 ) => {
-  const eventWhere = { businessDetailsId: businessId, isDeleted: false, deletedAt: null };
+  const eventWhere = {
+    businessDetailsId: businessId,
+    isDeleted: false,
+    deletedAt: null,
+  };
   const eventSelect = { id: true, title: true, status: true } as const;
   const host = await prisma.host.findFirst({
     where: {
@@ -160,11 +196,16 @@ export const getOrganizerTeamMember = async (
   });
   if (!host) return null;
 
-  const events = new Map(host.primaryHostedEvents.map((event) => [event.id, event]));
+  const events = new Map(
+    host.primaryHostedEvents.map((event) => [event.id, event]),
+  );
   const completedEventIds = new Set<string>();
   for (const assignment of host.assignedEvents) {
     events.set(assignment.event.id, assignment.event);
-    if (assignment.status === EventHostStatus.COMPLETED && assignment.event.status !== EventStatus.CANCELLED) {
+    if (
+      assignment.status === EventHostStatus.COMPLETED &&
+      assignment.event.status !== EventStatus.CANCELLED
+    ) {
       completedEventIds.add(assignment.event.id);
     }
   }
@@ -176,12 +217,14 @@ export const getOrganizerTeamMember = async (
     if (!completedEventIds.has(event.id)) assignedEvents.push(event);
   }
 
-  const permissions = getHostPermissionsService().permissions.map(({ key, title, editable }) => ({
-    key,
-    title,
-    editable,
-    enabled: host[key as keyof typeof host] === true,
-  }));
+  const permissions = getHostPermissionsService().permissions.map(
+    ({ key, title, editable }) => ({
+      key,
+      title,
+      editable,
+      enabled: host[key as keyof typeof host] === true,
+    }),
+  );
 
   return {
     id: host.id,
@@ -189,11 +232,19 @@ export const getOrganizerTeamMember = async (
     phoneNumber: host.phoneNumber,
     gender: host.gender,
     role: "CO_HOST",
-    status: getTeamMemberStatus(host.status, host.invitationExpiresAt, new Date()),
+    status: getTeamMemberStatus(
+      host.status,
+      host.invitationExpiresAt,
+      new Date(),
+    ),
     invitedAt: host.invitedAt,
     invitationExpiresAt: host.invitationExpiresAt,
     acceptedAt: host.acceptedAt,
-    profile: { photoUrl: host.partner?.profilePhoto ?? null, bio: null, portfolio: null },
+    profile: {
+      photoUrl: host.partner?.profilePhoto ?? null,
+      bio: null,
+      portfolio: null,
+    },
     assignedEvents,
     assignedEventsCount: assignedEvents.length,
     permissions,
@@ -231,7 +282,10 @@ const loadManagedHost = async (
   return host;
 };
 
-const eligibleReplacements = (businessId: string, hostId: string): Prisma.HostWhereInput => ({
+const eligibleReplacements = (
+  businessId: string,
+  hostId: string,
+): Prisma.HostWhereInput => ({
   id: { not: hostId },
   businessId,
   status: HostStatus.ACTIVE,
@@ -245,79 +299,118 @@ const loadEventsForHandover = (
   businessId: string,
   hostId: string,
   now: Date,
-) => db.event.findMany({
-  where: {
-    businessDetailsId: businessId,
-    deletedAt: null,
-    isDeleted: false,
-    status: { notIn: [EventStatus.COMPLETED, EventStatus.CANCELLED] },
-    AND: [
-      { OR: [{ hostId }, { hosts: { some: { hostId, status: EventHostStatus.ACTIVE } } }] },
-      {
-        OR: [
-          { dates: { none: {} } },
-          {
-            dates: {
-              some: {
-                status: "SCHEDULED",
-                OR: [{ endDateTime: { gte: now } }, { endDateTime: null, startDateTime: { gte: now } }],
+) =>
+  db.event.findMany({
+    where: {
+      businessDetailsId: businessId,
+      deletedAt: null,
+      isDeleted: false,
+      status: { notIn: [EventStatus.COMPLETED, EventStatus.CANCELLED] },
+      AND: [
+        {
+          OR: [
+            { hostId },
+            { hosts: { some: { hostId, status: EventHostStatus.ACTIVE } } },
+          ],
+        },
+        {
+          OR: [
+            { dates: { none: {} } },
+            {
+              dates: {
+                some: {
+                  status: "SCHEDULED",
+                  OR: [
+                    { endDateTime: { gte: now } },
+                    { endDateTime: null, startDateTime: { gte: now } },
+                  ],
+                },
               },
             },
-          },
-        ],
+          ],
+        },
+      ],
+    },
+    select: {
+      id: true,
+      title: true,
+      hostId: true,
+      bookings: {
+        where: { status: "CONFIRMED" },
+        select: { userId: true },
+        distinct: ["userId"],
       },
-    ],
-  },
-  select: {
-    id: true,
-    title: true,
-    hostId: true,
-    bookings: { where: { status: "CONFIRMED" }, select: { userId: true }, distinct: ["userId"] },
-  },
-  orderBy: [{ title: "asc" }, { id: "asc" }],
-});
+    },
+    orderBy: [{ title: "asc" }, { id: "asc" }],
+  });
 
-const teamWriteOptions = { isolationLevel: Prisma.TransactionIsolationLevel.Serializable };
+const teamWriteOptions = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+};
 
 export const changeTeamMemberAccess = (
   partnerId: string,
   businessId: string,
   hostId: string,
   status: typeof HostStatus.PAUSED | typeof HostStatus.ACTIVE,
-) => prisma.$transaction(async (tx) => {
-  const host = await loadManagedHost(tx, partnerId, businessId, hostId);
-  const pausing = status === HostStatus.PAUSED;
+) =>
+  prisma.$transaction(async (tx) => {
+    const host = await loadManagedHost(tx, partnerId, businessId, hostId);
+    const pausing = status === HostStatus.PAUSED;
 
-  if (host.status === status) {
-    return { id: host.id, status, pausedAt: host.pausedAt, resumedAt: host.resumedAt };
-  }
-  if (pausing ? host.status !== HostStatus.ACTIVE : host.status !== HostStatus.PAUSED ||
-    !host.partnerId || !host.onboardingCompleted) {
-    throw new HostServiceError(409, pausing ? "Only active co-hosts can be paused" : "This co-host cannot be resumed");
-  }
+    if (host.status === status) {
+      return {
+        id: host.id,
+        status,
+        pausedAt: host.pausedAt,
+        resumedAt: host.resumedAt,
+      };
+    }
+    if (
+      pausing
+        ? host.status !== HostStatus.ACTIVE
+        : host.status !== HostStatus.PAUSED ||
+          !host.partnerId ||
+          !host.onboardingCompleted
+    ) {
+      throw new HostServiceError(
+        409,
+        pausing
+          ? "Only active co-hosts can be paused"
+          : "This co-host cannot be resumed",
+      );
+    }
 
-  const now = new Date();
-  const updated = await tx.host.update({
-    where: { id: hostId },
-    data: pausing ? { status, pausedAt: now } : { status, pausedAt: null, resumedAt: now },
-    select: { id: true, status: true, pausedAt: true, resumedAt: true },
-  });
+    const now = new Date();
+    const updated = await tx.host.update({
+      where: { id: hostId },
+      data: pausing
+        ? { status, pausedAt: now }
+        : { status, pausedAt: null, resumedAt: now },
+      select: { id: true, status: true, pausedAt: true, resumedAt: true },
+    });
 
-  await tx.hostActivityLog.create({
-    data: {
-      hostId,
-      businessId,
-      performedById: partnerId,
-      action: pausing ? HostActivityAction.PAUSED : HostActivityAction.RESUMED,
-      previousStatus: host.status,
-      newStatus: status,
-    },
-  });
+    await tx.hostActivityLog.create({
+      data: {
+        hostId,
+        businessId,
+        performedById: partnerId,
+        action: pausing
+          ? HostActivityAction.PAUSED
+          : HostActivityAction.RESUMED,
+        previousStatus: host.status,
+        newStatus: status,
+      },
+    });
 
-  return updated;
-}, teamWriteOptions);
+    return updated;
+  }, teamWriteOptions);
 
-export const previewTeamMemberRemoval = async (partnerId: string, businessId: string, hostId: string) => {
+export const previewTeamMemberRemoval = async (
+  partnerId: string,
+  businessId: string,
+  hostId: string,
+) => {
   await loadManagedHost(prisma, partnerId, businessId, hostId);
   const [events, replacements] = await Promise.all([
     loadEventsForHandover(prisma, businessId, hostId, new Date()),
@@ -331,7 +424,10 @@ export const previewTeamMemberRemoval = async (partnerId: string, businessId: st
     hostId,
     replacementRequired: events.length > 0,
     affectedEvents: events.map(({ id, title }) => ({ id, title })),
-    replacements: replacements.map((replacement) => ({ ...replacement, type: "CO_HOST" })),
+    replacements: replacements.map((replacement) => ({
+      ...replacement,
+      type: "CO_HOST",
+    })),
   };
 };
 
@@ -342,110 +438,164 @@ export const removeTeamMember = (
   reason: HostRemovalReason,
   note?: string,
   replacementHostId?: string,
-) => prisma.$transaction(async (tx) => {
-  const host = await loadManagedHost(tx, partnerId, businessId, hostId);
-  const now = new Date();
-  const events = await loadEventsForHandover(tx, businessId, hostId, now);
-  const replacement = replacementHostId && await tx.host.findFirst({
-    where: { AND: [eligibleReplacements(businessId, hostId), { id: replacementHostId }] },
-    select: { id: true, fullName: true },
-  });
+) =>
+  prisma.$transaction(async (tx) => {
+    const host = await loadManagedHost(tx, partnerId, businessId, hostId);
+    const now = new Date();
+    const events = await loadEventsForHandover(tx, businessId, hostId, now);
 
-  if (replacementHostId && !replacement) {
-    throw new HostServiceError(400, "Select an eligible co-host from this business");
-  }
-  if (events.length && !replacement) {
-    throw new HostServiceError(409, "Select a replacement for this co-host's events");
-  }
+    console.log("Host ID:", hostId);
+    console.log("Events count:", events.length);
+    console.log("Events:", JSON.stringify(events, null, 2));
+    console.log("Replacement Host ID:", replacementHostId);
 
-  const notifications = replacement ? events.flatMap((event) => event.bookings.map(({ userId }) => ({
-    receiver_id: userId,
-    type: "EVENT_HOST_CHANGED" as const,
-    title: "Your event host changed",
-    message: `${replacement.fullName} is now hosting ${event.title ?? "your event"}.`,
-    data: { eventId: event.id },
-  }))) : [];
+    const replacement =
+      replacementHostId &&
+      (await tx.host.findFirst({
+        where: {
+          AND: [
+            eligibleReplacements(businessId, hostId),
+            { id: replacementHostId },
+          ],
+        },
+        select: { id: true, fullName: true },
+      }));
 
-  if (notifications.length) {
-    const senderId = process.env.EVENT_NOTIFICATION_SENDER_USER_ID;
-    if (!senderId || !await tx.user.findUnique({ where: { id: senderId }, select: { id: true } })) {
-      throw new HostServiceError(503, "Event notifications are unavailable");
+    console.log("replacement : ", replacement);
+
+    if (replacementHostId && !replacement) {
+      throw new HostServiceError(
+        400,
+        "Select an eligible co-host from this business",
+      );
     }
-    await tx.notification.createMany({
-      data: notifications.map((notification) => ({ ...notification, sender_id: senderId })),
-    });
-  }
+    if (events.length && !replacement) {
+      throw new HostServiceError(
+        409,
+        "Select a replacement for this co-host's events",
+      );
+    }
 
-  if (replacement) {
-    for (const event of events) {
-      const assignmentData = {
-        status: EventHostStatus.ACTIVE,
-        assignedAt: now,
-        removedAt: null,
-        completedAt: null,
-        replacedByHostId: null,
-        replacementReason: null,
-      };
-      const existing = await tx.eventHost.findUnique({
-        where: { eventId_hostId: { eventId: event.id, hostId: replacement.id } },
-        select: { id: true, status: true },
+    const notifications = replacement
+      ? events.flatMap((event) =>
+          event.bookings.map(({ userId }) => ({
+            receiver_id: userId,
+            type: "EVENT_HOST_CHANGED" as const,
+            title: "Your event host changed",
+            message: `${replacement.fullName} is now hosting ${event.title ?? "your event"}.`,
+            data: { eventId: event.id },
+          })),
+        )
+      : [];
+
+    if (notifications.length) {
+      const senderId = process.env.EVENT_NOTIFICATION_SENDER_USER_ID;
+      if (
+        !senderId ||
+        !(await tx.user.findUnique({
+          where: { id: senderId },
+          select: { id: true },
+        }))
+      ) {
+        throw new HostServiceError(503, "Event notifications are unavailable");
+      }
+      await tx.notification.createMany({
+        data: notifications.map((notification) => ({
+          ...notification,
+          sender_id: senderId,
+        })),
       });
-      if (!existing) {
-        await tx.eventHost.create({ data: { eventId: event.id, hostId: replacement.id, ...assignmentData } });
-      } else if (existing.status !== EventHostStatus.ACTIVE) {
-        await tx.eventHost.update({ where: { id: existing.id }, data: assignmentData });
-      }
+    }
 
-      if (event.hostId === hostId) {
-        await tx.event.update({
-          where: { id: event.id },
-          data: {
-            hostId: replacement.id,
-            hostPhotoUrl: null,
-            hostTitle: null,
-            hostSpeciality: null,
-            hostLanguages: [],
-            hostMessage: null,
+    if (replacement) {
+      for (const event of events) {
+        const assignmentData = {
+          status: EventHostStatus.ACTIVE,
+          assignedAt: now,
+          removedAt: null,
+          completedAt: null,
+          replacedByHostId: null,
+          replacementReason: null,
+        };
+        const existing = await tx.eventHost.findUnique({
+          where: {
+            eventId_hostId: { eventId: event.id, hostId: replacement.id },
           },
+          select: { id: true, status: true },
         });
+        if (!existing) {
+          await tx.eventHost.create({
+            data: {
+              eventId: event.id,
+              hostId: replacement.id,
+              ...assignmentData,
+            },
+          });
+        } else if (existing.status !== EventHostStatus.ACTIVE) {
+          await tx.eventHost.update({
+            where: { id: existing.id },
+            data: assignmentData,
+          });
+        }
+
+        if (event.hostId === hostId) {
+          await tx.event.update({
+            where: { id: event.id },
+            data: {
+              hostId: replacement.id,
+              hostPhotoUrl: null,
+              hostTitle: null,
+              hostSpeciality: null,
+              hostLanguages: [],
+              hostMessage: null,
+            },
+          });
+        }
       }
     }
-  }
 
-  const eventIds = events.map(({ id }) => id);
-  await tx.eventHost.updateMany({
-    where: { hostId, status: EventHostStatus.ACTIVE, eventId: { in: eventIds } },
-    data: {
-      status: EventHostStatus.REMOVED,
-      removedAt: now,
-      replacedByHostId: replacementHostId,
-      replacementReason: reason,
-    },
-  });
-  const updated = await tx.host.update({
-    where: { id: hostId },
-    data: {
-      status: HostStatus.REMOVED,
-      removedAt: now,
-      removalReason: reason,
-      removalNote: note,
-      invitationTokenHash: null,
-    },
-    select: { id: true, status: true, removedAt: true },
-  });
-  await tx.hostActivityLog.create({
-    data: {
-      hostId,
-      businessId,
-      performedById: partnerId,
-      action: HostActivityAction.REMOVED,
-      previousStatus: host.status,
-      newStatus: HostStatus.REMOVED,
-      removalReason: reason,
-      note,
-      metadata: { eventIds, replacementHostId: replacementHostId ?? null },
-    },
-  });
+    const eventIds = events.map(({ id }) => id);
+    await tx.eventHost.updateMany({
+      where: {
+        hostId,
+        status: EventHostStatus.ACTIVE,
+        eventId: { in: eventIds },
+      },
+      data: {
+        status: EventHostStatus.REMOVED,
+        removedAt: now,
+        replacedByHostId: replacementHostId,
+        replacementReason: reason,
+      },
+    });
+    const updated = await tx.host.update({
+      where: { id: hostId },
+      data: {
+        status: HostStatus.REMOVED,
+        removedAt: now,
+        removalReason: reason,
+        removalNote: note,
+        invitationTokenHash: null,
+      },
+      select: { id: true, status: true, removedAt: true },
+    });
+    await tx.hostActivityLog.create({
+      data: {
+        hostId,
+        businessId,
+        performedById: partnerId,
+        action: HostActivityAction.REMOVED,
+        previousStatus: host.status,
+        newStatus: HostStatus.REMOVED,
+        removalReason: reason,
+        note,
+        metadata: { eventIds, replacementHostId: replacementHostId ?? null },
+      },
+    });
 
-  return { ...updated, reassignedEventIds: eventIds, notificationsCreated: notifications.length };
-}, teamWriteOptions);
+    return {
+      ...updated,
+      reassignedEventIds: eventIds,
+      notificationsCreated: notifications.length,
+    };
+  }, teamWriteOptions);

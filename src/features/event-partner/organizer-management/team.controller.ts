@@ -15,7 +15,7 @@ import {
 const removeTeamMemberSchema = z.object({
   reason: z.enum(HostRemovalReason),
   note: z.string().trim().max(500).optional(),
-  replacement: z.object({ type: z.literal("CO_HOST"), hostId: hostIdSchema }).strict().optional(),
+  replacementHostId: hostIdSchema.optional(),
 }).strict();
 
 const teamMemberAction = (
@@ -49,8 +49,8 @@ export const resumeTeamMemberController = teamMemberAction((partnerId, businessI
 );
 export const previewTeamMemberRemovalController = teamMemberAction(previewTeamMemberRemoval);
 export const removeTeamMemberController = teamMemberAction((partnerId, businessId, hostId, body) => {
-  const { reason, note, replacement } = removeTeamMemberSchema.parse(body);
-  return removeTeamMember(partnerId, businessId, hostId, reason, note, replacement?.hostId);
+  const { reason, note, replacementHostId } = removeTeamMemberSchema.parse(body);
+  return removeTeamMember(partnerId, businessId, hostId, reason, note, replacementHostId);
 });
 
 export const getOrganizerTeamController = async (
