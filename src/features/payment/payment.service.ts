@@ -1010,6 +1010,21 @@ export const createEventBookingForPayment =
       );
     }
 
+    // Payment requests currently identify the event only.
+    const eventDate = await prisma.eventDate.findFirst({
+      where: {
+        eventId: event.id,
+        status: "SCHEDULED",
+        startDateTime: { gte: new Date() },
+      },
+      orderBy: { startDateTime: "asc" },
+      select: { id: true },
+    });
+
+    if (!eventDate) {
+      throw new Error("Event has no upcoming scheduled date");
+    }
+
     // =====================================
     // TICKET COUNTS
     // =====================================
@@ -1411,6 +1426,7 @@ export const createEventBookingForPayment =
 
             eventId:
               event.id,
+            eventDateId: eventDate.id,
 
             bookingNumber,
 
