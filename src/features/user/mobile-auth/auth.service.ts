@@ -23,7 +23,7 @@ const HARDCODED_OTP = process.env.HARDCODED_OTP || "453525";
  */
 const isHardcodedOtpAllowed = () => {
   return (
-    process.env.NODE_ENV !== "production" &&
+    // process.env.NODE_ENV !== "production" &&
     process.env.ALLOW_HARDCODED_OTP === "true"
   );
 };
