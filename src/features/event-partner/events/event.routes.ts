@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 
 import {
@@ -6,15 +5,15 @@ import {
   getAllEventsController,
   getEventByIdController,
   deleteEventController,
+  submitEventController,
+  publishEventController,
+  completeEventController,
+  pauseEventController,
 } from "./event.controller";
-
-// Use your existing authentication middleware.
-// Adjust these import paths if required.
-
-
 
 import { partnerAuthMiddleware } from "../../../middleware/partnerAuth.middleware";
 import { requirePartnerRole } from "../../../middleware/partnerRole.middleware";
+import { createReactivationController, getAllReactivationsController, getReactivationByIdController, publishReactivationController, submitReactivationController, updateReactivationController } from "./event.reactivation.controller";
 
 const router = Router();
 
@@ -24,9 +23,15 @@ router.use(
   requirePartnerRole("ORGANIZER")
 );
 
-// CREATE + UPDATE
-router.patch(
+// CREATE EVENT
+router.post(
   "/events/create",
+  saveEventController
+);
+
+// UPDATE EVENT BY ID
+router.patch(
+  "/events/:eventId/update",
   saveEventController
 );
 
@@ -42,10 +47,79 @@ router.get(
   getEventByIdController
 );
 
+router.patch(
+  "/events/:eventId/submit",
+  submitEventController
+);
+
+// PUBLISH APPROVED EVENT
+router.patch(
+  "/events/:eventId/publish",
+  publishEventController
+);
+// Pause published event
+router.patch(
+  "/events/:eventId/pause",
+  pauseEventController
+);
+// Complete event occurrence
+router.patch(
+  "/events/:eventId/complete",
+  completeEventController
+);
 // SOFT DELETE
 router.delete(
   "/events/:eventId/delete",
   deleteEventController
+);
+
+
+
+
+// ======================================================
+// EVENT REACTIVATION ROUTES
+// ======================================================
+
+// Create draft
+
+router.post(
+  "/events/:eventId/reactivate/create",
+  createReactivationController
+);
+
+// Update proposed dates
+
+router.patch(
+  "/events/:eventId/reactivate/:reactivationId/update",
+  updateReactivationController
+);
+
+// Get all reactivations
+
+router.get(
+  "/events/:eventId/reactivate/get-all",
+  getAllReactivationsController
+);
+
+// Get reactivation details
+
+router.get(
+  "/events/:eventId/reactivate/:reactivationId/get",
+  getReactivationByIdController
+);
+
+// Submit to admin
+
+router.patch(
+  "/events/:eventId/reactivate/:reactivationId/submit",
+  submitReactivationController
+);
+
+// Publish approved reactivation
+
+router.patch(
+  "/events/:eventId/reactivate/:reactivationId/publish",
+  publishReactivationController
 );
 
 export default router;

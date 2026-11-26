@@ -18,6 +18,7 @@ import {
   TripStopTag,
   TripType,
   EventStatus,
+  EventReactiveStatus,
 } from "@prisma/client";
 
 // Common validators
@@ -137,12 +138,14 @@ const eventVenueSchema = z.object({
   longitude: z.number().min(-180).max(180).nullable().optional(),
 }).strict();
 
-// Event Experience
 const eventExperienceSchema = z.object({
+  icon: optionalText,
+  time: optionalText,
   title: optionalText,
   description: optionalText,
   photoUrl: optionalText,
   tags: stringArray.optional(),
+  location: optionalText,
   sortOrder,
 }).strict();
 
@@ -479,8 +482,33 @@ export const getEventsQuerySchema = z.object({
   categoryId: uuid.optional(),
 
   status: z.nativeEnum(EventStatus).optional(),
-
+eventReactiveStatus: z
+  .nativeEnum(EventReactiveStatus)
+  .optional(),
   search: z.string().trim().optional(),
 }).strict();
 
 export const eventIdSchema = uuid;
+
+
+// ======================================================
+// PAUSE EVENT VALIDATION
+// ======================================================
+
+export const pauseEventSchema = z.object({
+  pauseReason: z
+    .string()
+    .trim()
+    .min(1, "Pause reason is required")
+    .max(1000, "Pause reason cannot exceed 1000 characters"),
+}).strict();
+
+// ======================================================
+// COMPLETE EVENT VALIDATION
+// ======================================================
+
+export const completeEventSchema = z.object({
+  eventDateId: z
+    .string()
+    .uuid("Invalid event date ID"),
+}).strict();
