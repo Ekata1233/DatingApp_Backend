@@ -486,25 +486,49 @@ export const getAllEventsService = async (
     tripType,
     categoryId,
     status,
+    eventDateStatus,
     eventReactiveStatus,
     search,
   } = query;
 
+  // Event filters
   const where: Prisma.EventWhereInput = {
     businessDetailsId: businessId,
 
     isDeleted: false,
     deletedAt: null,
 
-    ...(eventDurationType ? { eventDurationType } : {}),
+    // Event duration filter
+    ...(eventDurationType
+      ? { eventDurationType }
+      : {}),
 
+    // Trip type filter
     ...(tripType ? { tripType } : {}),
 
+    // Category filter
     ...(categoryId ? { categoryId } : {}),
 
+    // Event status filter
     ...(status ? { status } : {}),
-    ...(eventReactiveStatus ? { eventReactiveStatus } : {}),
 
+    // Event date status filter
+    ...(eventDateStatus
+      ? {
+          dates: {
+            some: {
+              status: eventDateStatus,
+            },
+          },
+        }
+      : {}),
+
+    // Event reactivation status filter
+    ...(eventReactiveStatus
+      ? { eventReactiveStatus }
+      : {}),
+
+    // Search filter
     ...(search
       ? {
           OR: [
@@ -531,123 +555,59 @@ export const getAllEventsService = async (
       : {}),
   };
 
+  // Pagination
   const skip = (page - 1) * limit;
 
   const [events, total] = await prisma.$transaction([
     prisma.event.findMany({
       where,
+
       skip,
       take: limit,
 
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      orderBy: [
+        { updatedAt: "desc" },
+        { id: "desc" },
+      ],
 
       select: {
         id: true,
-        eventDurationType: true,
-        tripType: true,
         title: true,
-        tagline: true,
-        visibility: true,
+        totalCapacity: true,
+
+        // Event status
         status: true,
-        eventReactiveStatus: true,
 
-        reactivatedAt: true,
+        // Venue photo
+        venue: {
+          select: {
+            photoUrl: true,
+          },
+        },
 
-        pausedAt: true,
-        pauseReason: true,
+        // Event dates
+        dates: {
+          where: eventDateStatus
+            ? {
+                status: eventDateStatus,
+              }
+            : {},
 
-        expiredAt: true,
-        completedAt: true,
-
-        reactivations: {
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          orderBy: [
+            { startDateTime: "asc" },
+            { id: "asc" },
+          ],
 
           take: 1,
 
           select: {
             id: true,
+            startDateTime: true,
+            endDateTime: true,
+            timezone: true,
             status: true,
-            previousEventStatus: true,
-            submittedAt: true,
-            approvedAt: true,
-            rejectedAt: true,
-            rejectionReason: true,
-            publishedAt: true,
-
-            dates: {
-              orderBy: {
-                startDateTime: "asc",
-              },
-            },
           },
         },
-        categoryId: true,
-        category: true,
-
-        priceType: true,
-        totalCapacity: true,
-
-        menEntryPrice: true,
-        womenEntryPrice: true,
-        otherEntryPrice: true,
-        coupleEntryPrice: true,
-
-        menDiscountedPrice: true,
-        womenDiscountedPrice: true,
-        otherDiscountedPrice: true,
-        coupleDiscountedPrice: true,
-
-        averageRating: true,
-        totalReviews: true,
-
-        photos: {
-          where: {
-            photoType: "EVENT",
-          },
-
-          orderBy: {
-            sortOrder: "asc",
-          },
-
-          take: 1,
-        },
-
-        dates: {
-          where: {
-            status: "SCHEDULED",
-          },
-
-          orderBy: {
-            startDateTime: "asc",
-          },
-
-          take: 1,
-        },
-
-        venue: {
-          select: {
-            venueName: true,
-            fullAddress: true,
-          },
-        },
-
-        tripDetails: {
-          select: {
-            totalDays: true,
-            pickupCity: true,
-            destinationPlace: true,
-          },
-        },
-
-        _count: {
-          select: {
-            bookings: true,
-            reviews: true,
-          },
-        },
-
-        createdAt: true,
-        updatedAt: true,
       },
     }),
 
@@ -656,8 +616,86 @@ export const getAllEventsService = async (
     }),
   ]);
 
+  // Format API response
+  const items = events.map((event) => {
+    const eventDate = event.dates[0];
+
+    const timezone =
+      eventDate?.timezone || "Asia/Kolkata";
+
+    const startDateTime =
+      eventDate?.startDateTime ?? null;
+
+    const endDateTime =
+      eventDate?.endDateTime ?? null;
+
+    return {
+      id: event.id,
+
+      eventDateId: eventDate?.id ?? null,
+
+      title: event.title,
+
+      photoUrl: event.venue?.photoUrl ?? null,
+
+      totalCapacity: event.totalCapacity,
+
+      // Both statuses
+      status: event.status,
+
+      eventDateStatus: eventDate?.status ?? null,
+
+      // Original date and time
+      startDateTime,
+      endDateTime,
+
+      // Formatted date
+      date: startDateTime
+        ? startDateTime.toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            timeZone: timezone,
+          })
+        : null,
+
+      // Day name
+      day: startDateTime
+        ? startDateTime.toLocaleDateString("en-IN", {
+            weekday: "long",
+            timeZone: timezone,
+          })
+        : null,
+
+      // Start time
+      startTime: startDateTime
+        ? startDateTime
+            .toLocaleTimeString("en-IN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+              timeZone: timezone,
+            })
+            .toUpperCase()
+        : null,
+
+      // End time
+      endTime: endDateTime
+        ? endDateTime
+            .toLocaleTimeString("en-IN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+              timeZone: timezone,
+            })
+            .toUpperCase()
+        : null,
+    };
+  });
+
+  // Final response
   return {
-    items: events,
+    items,
 
     pagination: {
       page,

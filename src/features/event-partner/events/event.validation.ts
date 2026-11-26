@@ -18,6 +18,7 @@ import {
   TripStopTag,
   TripType,
   EventStatus,
+   EventDateStatus,
   EventReactiveStatus,
 } from "@prisma/client";
 
@@ -469,6 +470,7 @@ export const saveEventSchema = z.object({
 }).strict();
 
 // GET all events query validation
+// GET all events query validation
 export const getEventsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
 
@@ -481,10 +483,16 @@ export const getEventsQuerySchema = z.object({
 
   categoryId: uuid.optional(),
 
+  // Event status filter
   status: z.nativeEnum(EventStatus).optional(),
-eventReactiveStatus: z
-  .nativeEnum(EventReactiveStatus)
-  .optional(),
+
+  // Event date status filter - NEW
+  eventDateStatus: z.nativeEnum(EventDateStatus).optional(),
+
+  eventReactiveStatus: z
+    .nativeEnum(EventReactiveStatus)
+    .optional(),
+
   search: z.string().trim().optional(),
 }).strict();
 
