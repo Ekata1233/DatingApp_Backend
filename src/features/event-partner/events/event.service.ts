@@ -7,6 +7,8 @@ import {
   EventServiceError,
 } from "./event.types";
 
+import { syncPublishedReactivationLifecycle } from "./event.reactivation.lifecycle";
+
 import { prepareEventPricing } from "./event.pricing";
 
 import {
@@ -273,6 +275,8 @@ export const saveEventService = async (
             where: {
               id: eventId,
               businessDetailsId: businessId,
+
+              isDeleted: false,
               deletedAt: null,
             },
 
@@ -410,6 +414,8 @@ export const saveEventService = async (
           where: {
             id: existingEvent.id,
             businessDetailsId: businessId,
+
+            isDeleted: false,
             deletedAt: null,
             status: {
               in: ["DRAFT", "REJECTED"],
@@ -479,11 +485,14 @@ export const getAllEventsService = async (
     tripType,
     categoryId,
     status,
+    eventReactiveStatus,
     search,
   } = query;
 
   const where: Prisma.EventWhereInput = {
     businessDetailsId: businessId,
+
+    isDeleted: false,
     deletedAt: null,
 
     ...(eventDurationType ? { eventDurationType } : {}),
@@ -493,6 +502,7 @@ export const getAllEventsService = async (
     ...(categoryId ? { categoryId } : {}),
 
     ...(status ? { status } : {}),
+    ...(eventReactiveStatus ? { eventReactiveStatus } : {}),
 
     ...(search
       ? {
@@ -538,7 +548,38 @@ export const getAllEventsService = async (
         tagline: true,
         visibility: true,
         status: true,
+        eventReactiveStatus: true,
 
+        reactivatedAt: true,
+
+        pausedAt: true,
+        pauseReason: true,
+
+        expiredAt: true,
+        completedAt: true,
+
+        reactivations: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+
+          take: 1,
+
+          select: {
+            id: true,
+            status: true,
+            previousEventStatus: true,
+            submittedAt: true,
+            approvedAt: true,
+            rejectedAt: true,
+            rejectionReason: true,
+            publishedAt: true,
+
+            dates: {
+              orderBy: {
+                startDateTime: "asc",
+              },
+            },
+          },
+        },
         categoryId: true,
         category: true,
 
@@ -659,6 +700,8 @@ export const deleteEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+
+          isDeleted: false,
           deletedAt: null,
         },
 
@@ -696,6 +739,8 @@ export const deleteEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+
+          isDeleted: false,
           deletedAt: null,
           status: {
             in: ["DRAFT", "REJECTED"],
@@ -703,6 +748,7 @@ export const deleteEventService = async (
         },
 
         data: {
+          isDeleted: true,
           deletedAt,
         },
       });
@@ -742,6 +788,8 @@ export const submitEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+
+          isDeleted: false,
           deletedAt: null,
           isDeleted: false,
         },
@@ -777,6 +825,8 @@ export const submitEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+
+          isDeleted: false,
           deletedAt: null,
           isDeleted: false,
 
@@ -826,7 +876,7 @@ export const submitEventService = async (
 
 export const publishEventService = async (
   businessId: string,
-  eventId: string
+  eventId: string,
 ) => {
   return prisma.$transaction(
     async (tx) => {
@@ -835,6 +885,8 @@ export const publishEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+          isDeleted: false,
+
           isDeleted: false,
           deletedAt: null,
         },
@@ -851,25 +903,19 @@ export const publishEventService = async (
 
       // STEP 2 - Check event exists
       if (!existingEvent) {
-        throw new EventServiceError(
-          "Event not found",
-          404
-        );
+        throw new EventServiceError("Event not found", 404);
       }
 
       // STEP 3 - Prevent duplicate publishing
       if (existingEvent.status === "PUBLISHED") {
-        throw new EventServiceError(
-          "Event is already published",
-          409
-        );
+        throw new EventServiceError("Event is already published", 409);
       }
 
       // STEP 4 - Check rejected status
       if (existingEvent.status === "REJECTED") {
         throw new EventServiceError(
           "Rejected events cannot be published. Please update and resubmit the event for approval.",
-          409
+          409,
         );
       }
 
@@ -877,7 +923,7 @@ export const publishEventService = async (
       if (existingEvent.status !== "APPROVED") {
         throw new EventServiceError(
           "Only admin-approved events can be published",
-          409
+          409,
         );
       }
 
@@ -900,7 +946,7 @@ export const publishEventService = async (
       if (!upcomingDate) {
         throw new EventServiceError(
           "Event must have at least one upcoming scheduled date before publishing",
-          400
+          400,
         );
       }
 
@@ -912,6 +958,8 @@ export const publishEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+          isDeleted: false,
+
           isDeleted: false,
           deletedAt: null,
           status: "APPROVED",
@@ -928,7 +976,7 @@ export const publishEventService = async (
       if (updatedEvent.count !== 1) {
         throw new EventServiceError(
           "Event status has changed. Please refresh and try again.",
-          409
+          409,
         );
       }
 
@@ -956,13 +1004,12 @@ export const publishEventService = async (
     },
 
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
 
       maxWait: 5000,
 
       timeout: 30000,
-    }
+    },
   );
 };
 
@@ -973,7 +1020,7 @@ export const publishEventService = async (
 export const pauseEventService = async (
   businessId: string,
   eventId: string,
-  pauseReason: string
+  pauseReason: string,
 ) => {
   return prisma.$transaction(
     async (tx) => {
@@ -981,6 +1028,8 @@ export const pauseEventService = async (
         where: {
           id: eventId,
           businessDetailsId: businessId,
+          isDeleted: false,
+
           isDeleted: false,
           deletedAt: null,
         },
@@ -992,47 +1041,50 @@ export const pauseEventService = async (
       });
 
       if (!event) {
-        throw new EventServiceError(
-          "Event not found",
-          404
-        );
+        throw new EventServiceError("Event not found", 404);
       }
 
       if (event.status === "PAUSED") {
-        throw new EventServiceError(
-          "Event is already paused",
-          409
-        );
+        throw new EventServiceError("Event is already paused", 409);
       }
 
       if (event.status !== "PUBLISHED") {
-        throw new EventServiceError(
-          "Only published events can be paused",
-          400
-        );
+        throw new EventServiceError("Only published events can be paused", 400);
       }
+      const now = new Date();
 
+      const reason = pauseReason.trim();
+
+      if (!reason) {
+        throw new EventServiceError("Pause reason is required", 400);
+      }
       const updated = await tx.event.updateMany({
         where: {
           id: eventId,
           businessDetailsId: businessId,
+          isDeleted: false,
+
           isDeleted: false,
           deletedAt: null,
           status: "PUBLISHED",
         },
         data: {
           status: "PAUSED",
-          pausedAt: new Date(),
-          pauseReason: pauseReason.trim(),
+          pausedAt: now,
+          pauseReason: reason,
         },
       });
 
       if (updated.count !== 1) {
-        throw new EventServiceError(
-          "Event status changed. Please retry.",
-          409
-        );
+        throw new EventServiceError("Event status changed. Please retry.", 409);
       }
+      await syncPublishedReactivationLifecycle(
+        tx,
+        eventId,
+        "PAUSED",
+        now,
+        reason,
+      );
 
       return tx.event.findUniqueOrThrow({
         where: {
@@ -1042,6 +1094,7 @@ export const pauseEventService = async (
           id: true,
           title: true,
           status: true,
+          eventReactiveStatus: true,
           pausedAt: true,
           pauseReason: true,
           updatedAt: true,
@@ -1049,11 +1102,10 @@ export const pauseEventService = async (
       });
     },
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       maxWait: 5000,
       timeout: 15000,
-    }
+    },
   );
 };
 
@@ -1064,7 +1116,7 @@ export const pauseEventService = async (
 export const completeEventService = async (
   businessId: string,
   eventId: string,
-  eventDateId: string
+  eventDateId: string,
 ) => {
   return prisma.$transaction(
     async (tx) => {
@@ -1077,6 +1129,8 @@ export const completeEventService = async (
           id: eventId,
           businessDetailsId: businessId,
           isDeleted: false,
+
+          isDeleted: false,
           deletedAt: null,
         },
         select: {
@@ -1087,19 +1141,13 @@ export const completeEventService = async (
       });
 
       if (!event) {
-        throw new EventServiceError(
-          "Event not found",
-          404
-        );
+        throw new EventServiceError("Event not found", 404);
       }
 
-      if (
-        event.status !== "PUBLISHED" &&
-        event.status !== "PAUSED"
-      ) {
+      if (event.status !== "PUBLISHED" && event.status !== "PAUSED") {
         throw new EventServiceError(
           "Only published or paused events can be completed",
-          400
+          400,
         );
       }
 
@@ -1113,49 +1161,37 @@ export const completeEventService = async (
       });
 
       if (!eventDate) {
-        throw new EventServiceError(
-          "Event date not found",
-          404
-        );
+        throw new EventServiceError("Event date not found", 404);
       }
 
       if (eventDate.status === "COMPLETED") {
         throw new EventServiceError(
           "This event date is already completed",
-          409
+          409,
         );
       }
 
       if (eventDate.status !== "SCHEDULED") {
         throw new EventServiceError(
           `Cannot complete an event date with status ${eventDate.status}`,
-          400
+          400,
         );
       }
 
       // Prevent completion before event starts
 
       if (eventDate.startDateTime > now) {
-        throw new EventServiceError(
-          "Event has not started yet",
-          400
-        );
+        throw new EventServiceError("Event has not started yet", 400);
       }
 
       if (!eventDate.endDateTime) {
-        throw new EventServiceError(
-          "Event end date and time is required",
-          400
-        );
+        throw new EventServiceError("Event end date and time is required", 400);
       }
 
       // Event has already reached expiry time
 
       if (eventDate.endDateTime <= now) {
-        throw new EventServiceError(
-          "Event end time has passed",
-          409
-        );
+        throw new EventServiceError("Event end time has passed", 409);
       }
 
       // Complete selected event occurrence
@@ -1175,7 +1211,7 @@ export const completeEventService = async (
       if (updatedDate.count !== 1) {
         throw new EventServiceError(
           "Event date status changed. Please retry.",
-          409
+          409,
         );
       }
 
@@ -1197,6 +1233,8 @@ export const completeEventService = async (
             id: eventId,
             businessDetailsId: businessId,
             isDeleted: false,
+
+            isDeleted: false,
             deletedAt: null,
             status: {
               in: ["PUBLISHED", "PAUSED"],
@@ -1211,9 +1249,10 @@ export const completeEventService = async (
         if (updatedEvent.count !== 1) {
           throw new EventServiceError(
             "Event status changed. Please retry.",
-            409
+            409,
           );
         }
+        await syncPublishedReactivationLifecycle(tx, eventId, "COMPLETED", now);
       }
 
       const result = await tx.event.findUniqueOrThrow({
@@ -1224,6 +1263,7 @@ export const completeEventService = async (
           id: true,
           title: true,
           status: true,
+          eventReactiveStatus: true,
           completedAt: true,
           updatedAt: true,
         },
@@ -1238,11 +1278,10 @@ export const completeEventService = async (
       };
     },
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       maxWait: 5000,
       timeout: 15000,
-    }
+    },
   );
 };
 
@@ -1266,6 +1305,8 @@ export const expireEventsService = async () => {
 
       event: {
         is: {
+          isDeleted: false,
+
           isDeleted: false,
           deletedAt: null,
           status: {
@@ -1294,11 +1335,7 @@ export const expireEventsService = async () => {
 
   // Unique parent event IDs
 
-  const eventIds = [
-    ...new Set(
-      expiredDates.map((date) => date.eventId)
-    ),
-  ];
+  const eventIds = [...new Set(expiredDates.map((date) => date.eventId))];
 
   let expiredDateCount = 0;
   let expiredEventCount = 0;
@@ -1311,6 +1348,8 @@ export const expireEventsService = async () => {
           const event = await tx.event.findFirst({
             where: {
               id: eventId,
+              isDeleted: false,
+
               isDeleted: false,
               deletedAt: null,
               status: {
@@ -1332,20 +1371,19 @@ export const expireEventsService = async () => {
           // Expire all overdue scheduled dates
           // belonging to this event
 
-          const updatedDates =
-            await tx.eventDate.updateMany({
-              where: {
-                eventId: eventId,
-                status: "SCHEDULED",
-                endDateTime: {
-                  lte: now,
-                },
+          const updatedDates = await tx.eventDate.updateMany({
+            where: {
+              eventId: eventId,
+              status: "SCHEDULED",
+              endDateTime: {
+                lte: now,
               },
-              data: {
-                status: "EXPIRED",
-                expiredAt: now,
-              },
-            });
+            },
+            data: {
+              status: "EXPIRED",
+              expiredAt: now,
+            },
+          });
 
           if (updatedDates.count === 0) {
             return {
@@ -1356,13 +1394,12 @@ export const expireEventsService = async () => {
 
           // Check whether another occurrence remains
 
-          const remainingDates =
-            await tx.eventDate.count({
-              where: {
-                eventId: eventId,
-                status: "SCHEDULED",
-              },
-            });
+          const remainingDates = await tx.eventDate.count({
+            where: {
+              eventId: eventId,
+              status: "SCHEDULED",
+            },
+          });
 
           let updatedEventCount = 0;
 
@@ -1370,23 +1407,32 @@ export const expireEventsService = async () => {
           // all scheduled occurrences have ended
 
           if (remainingDates === 0) {
-            const updatedEvent =
-              await tx.event.updateMany({
-                where: {
-                  id: eventId,
-                  isDeleted: false,
-                  deletedAt: null,
-                  status: {
-                    in: ["PUBLISHED", "PAUSED"],
-                  },
+            const updatedEvent = await tx.event.updateMany({
+              where: {
+                id: eventId,
+                isDeleted: false,
+
+                isDeleted: false,
+                deletedAt: null,
+                status: {
+                  in: ["PUBLISHED", "PAUSED"],
                 },
-                data: {
-                  status: "EXPIRED",
-                  expiredAt: now,
-                },
-              });
+              },
+              data: {
+                status: "EXPIRED",
+                expiredAt: now,
+              },
+            });
 
             updatedEventCount = updatedEvent.count;
+            if (updatedEventCount > 0) {
+              await syncPublishedReactivationLifecycle(
+                tx,
+                eventId,
+                "EXPIRED",
+                now,
+              );
+            }
           }
 
           return {
@@ -1395,23 +1441,18 @@ export const expireEventsService = async () => {
           };
         },
         {
-          isolationLevel:
-            Prisma.TransactionIsolationLevel.Serializable,
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           maxWait: 5000,
           timeout: 15000,
-        }
+        },
       );
 
       expiredDateCount += result.expiredDates;
       expiredEventCount += result.expiredEvents;
-
     } catch (error) {
       failedEventCount++;
 
-      console.error(
-        `[EVENT EXPIRY] Failed for event ${eventId}:`,
-        error
-      );
+      console.error(`[EVENT EXPIRY] Failed for event ${eventId}:`, error);
     }
   }
 

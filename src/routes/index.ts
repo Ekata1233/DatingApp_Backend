@@ -267,6 +267,8 @@ import organizerBrandPageRoutes from "../features/event-partner/organizer-manage
 import { admin } from "googleapis/build/src/apis/admin";
 
 import adminEventRoutes from "../features/admin/events/adminEvent.routes"
+import adminEventReactivationRoutes from "../features/admin/events/adminEventReactivation.routes"
+
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
@@ -278,7 +280,7 @@ router.use("/event-partner", orgnizerPanVerificationRoutes , orgnizerGSTVerifica
 
 router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
 
-router.use("/admin/",adminEventRoutes)
+router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
 
 
 

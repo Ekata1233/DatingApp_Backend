@@ -35,7 +35,7 @@ import {
 // GET AUTHENTICATED ORGANIZER
 // ======================================================
 
-const getOrganizer = (req: Request): OrganizerContext => {
+export const getOrganizer = (req: Request): OrganizerContext => {
   const partner = (
     req as Request & {
       partner?: OrganizerContext;
@@ -61,7 +61,7 @@ const getOrganizer = (req: Request): OrganizerContext => {
 // COMMON ERROR HANDLER
 // ======================================================
 
-const handleEventError = (error: unknown, res: Response) => {
+export const handleEventError = (error: unknown, res: Response) => {
   // ZOD VALIDATION ERROR
 
   if (error instanceof ZodError) {

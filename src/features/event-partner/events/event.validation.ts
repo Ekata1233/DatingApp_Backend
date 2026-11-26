@@ -481,7 +481,9 @@ export const getEventsQuerySchema = z.object({
   categoryId: uuid.optional(),
 
   status: z.nativeEnum(EventStatus).optional(),
-
+eventReactiveStatus: z
+  .nativeEnum(EventReactiveStatus)
+  .optional(),
   search: z.string().trim().optional(),
 }).strict();
 
