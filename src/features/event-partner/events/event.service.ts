@@ -357,9 +357,9 @@ export const saveEventService = async (
       }
 
       // Host validation
-      if (mergedData.hostId) {
-        await validateHost(tx, mergedData.hostId, businessId);
-      }
+      // if (mergedData.hostId) {
+      //   await validateHost(tx, mergedData.hostId, businessId);
+      // }
 
       // Age validation
       if (
