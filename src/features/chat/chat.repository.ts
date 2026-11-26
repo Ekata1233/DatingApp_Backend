@@ -840,6 +840,14 @@ export const chatRepository = {
               // Only pending gifts
               isUnlocked: false,
 
+              chatMessage: {
+                is: {
+                  deletions: {
+                    none: { userId },
+                  },
+                },
+              },
+
               // Only non-expired gifts
               expiresAt: {
                 gt: new Date(),
@@ -898,6 +906,14 @@ export const chatRepository = {
 
               // Only pending roses
               isUnlocked: false,
+
+              chatMessage: {
+                is: {
+                  deletions: {
+                    none: { userId },
+                  },
+                },
+              },
 
               // Only non-expired roses (combine with the first OR using AND)
               AND: [

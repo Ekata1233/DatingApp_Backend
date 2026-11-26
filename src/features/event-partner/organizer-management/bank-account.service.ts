@@ -3,7 +3,7 @@ import { PartnerVerificationStatus, Prisma } from "@prisma/client";
 import axios from "axios";
 import { prisma } from "../../../prisma/prismaClient";
 import imagekit from "../../../utils/imagekit";
-import { BankAccountInput } from "./bank-account.validation";
+import { BankAccountInput, EditBankAccountInput } from "./bank-account.validation";
 
 export class BankAccountError extends Error {
   constructor(public readonly statusCode: number, message: string) {
@@ -75,6 +75,35 @@ export const getBankAccount = async (businessId: string) => {
   return formatBankAccountStatus(account);
 };
 
+const uploadBankDocument = async (businessId: string, document?: BankDocument) => {
+  if (!document) return undefined;
+
+  const uploaded = await imagekit.upload({
+    file: document.bytes,
+    fileName: `${randomUUID()}.${document.extension}`,
+    folder: `/event-partner/bank-documents/${businessId}`,
+    isPrivateFile: true,
+  }).catch(() => {
+    throw new BankAccountError(502, "Unable to store the bank document");
+  });
+  if (!uploaded.fileId) throw new BankAccountError(502, "Unable to store the bank document");
+  return uploaded.fileId;
+};
+
+const deleteBankDocument = async (key: string) => {
+  await imagekit.deleteFile(key).catch(() => {
+    console.error("Unable to delete a detached bank document");
+  });
+};
+
+const handleBankAccountWriteFailure = async (error: unknown, documentKey?: string): Promise<never> => {
+  if (documentKey) await deleteBankDocument(documentKey);
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+    throw new BankAccountError(409, "Bank account state changed. Refresh and try again.");
+  }
+  throw error;
+};
+
 export const addBankAccount = async (
   businessId: string,
   input: BankAccountInput,
@@ -88,19 +117,7 @@ export const addBankAccount = async (
 
   const accountNumberEncrypted = encryptAccountNumber(input.accountNumber);
   const branch = await findBankBranch(input.ifscCode);
-  let documentKey: string | undefined;
-  if (document) {
-    const uploaded = await imagekit.upload({
-      file: document.bytes,
-      fileName: `${randomUUID()}.${document.extension}`,
-      folder: `/event-partner/bank-documents/${businessId}`,
-      isPrivateFile: true,
-    }).catch(() => {
-      throw new BankAccountError(502, "Unable to store the bank document");
-    });
-    documentKey = uploaded.fileId;
-    if (!documentKey) throw new BankAccountError(502, "Unable to store the bank document");
-  }
+  const documentKey = await uploadBankDocument(businessId, document);
 
   try {
     const account = await prisma.$transaction(async (tx) => {
@@ -125,14 +142,72 @@ export const addBankAccount = async (
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return formatBankAccountStatus(account);
   } catch (error) {
-    if (documentKey) {
-      await imagekit.deleteFile(documentKey).catch(() => {
-        console.error("Unable to delete an unsaved bank document");
-      });
-    }
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
-      throw new BankAccountError(409, "Bank account state changed. Refresh and try again.");
-    }
-    throw error;
+    return handleBankAccountWriteFailure(error, documentKey);
   }
+};
+
+export const editBankAccount = async (
+  businessId: string,
+  input: EditBankAccountInput,
+  document?: BankDocument,
+) => {
+  const { accountHolderName, accountNumber, ifscCode, payoutCycle } = input;
+  if (!accountHolderName && !accountNumber && !ifscCode && !payoutCycle && !document) {
+    throw new BankAccountError(400, "Provide at least one bank account field or document to update");
+  }
+
+  const where = { businessId, isActive: true };
+  const current = await prisma.bankDetails.findFirst({
+    where,
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: { ...bankAccountSelect, updatedAt: true, cancelledChequeKey: true, bankStatementKey: true },
+  });
+  if (!current) throw new BankAccountError(404, "No active bank account found for this business");
+
+  const branch = ifscCode && ifscCode !== current.ifscCode ? await findBankBranch(ifscCode) : undefined;
+  const accountUpdate = accountNumber ? {
+    accountNumberEncrypted: encryptAccountNumber(accountNumber),
+    accountNumberLastFour: accountNumber.slice(-4),
+  } : undefined;
+  const bankDetailsChanged = Boolean(
+    accountUpdate || branch || (accountHolderName && accountHolderName !== current.accountHolderName),
+  );
+  const documentKey = await uploadBankDocument(businessId, document);
+  const documentUpdate = {
+    ...(bankDetailsChanged ? { cancelledChequeKey: null, bankStatementKey: null } : {}),
+    ...(document && documentKey ? { [document.field]: documentKey } : {}),
+  };
+
+  const account = await prisma.bankDetails.update({
+    where: { id: current.id, ...where, updatedAt: current.updatedAt },
+    data: {
+      accountHolderName,
+      payoutCycle,
+      ...branch,
+      ...accountUpdate,
+      ...documentUpdate,
+      ...(bankDetailsChanged || documentKey ? {
+        verificationStatus: PartnerVerificationStatus.NOT_STARTED,
+        isNameMatched: null,
+        providerReferenceId: null,
+        pennyDropVerifiedAt: null,
+        verifiedAt: null,
+        failureReason: null,
+      } : {}),
+    },
+    select: bankAccountSelect,
+  }).catch((error: unknown) => handleBankAccountWriteFailure(
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025"
+      ? new BankAccountError(409, "Bank account state changed. Refresh and try again.")
+      : error,
+    documentKey,
+  ));
+
+  const detachedKeys = new Set<string>();
+  for (const field of ["cancelledChequeKey", "bankStatementKey"] as const) {
+    const previousKey = current[field];
+    if (previousKey && (bankDetailsChanged || document?.field === field)) detachedKeys.add(previousKey);
+  }
+  await Promise.all([...detachedKeys].map(deleteBankDocument));
+  return formatBankAccountStatus(account);
 };

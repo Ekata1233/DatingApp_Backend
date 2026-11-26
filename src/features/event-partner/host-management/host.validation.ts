@@ -16,13 +16,13 @@ export const hostIdSchema = z.string().uuid({
 export const hostPermissionsSchema = z
   .object({
     // Co-host permissions
-    canViewGuestList: z.boolean().optional(),
+    canViewGuestList: z.literal(true).optional(),
 
-    canCheckInGuests: z.boolean().optional(),
+    canCheckInGuests: z.literal(true).optional(),
 
-    canUpdateRunSheetProgress: z.boolean().optional(),
+    canUpdateRunSheetProgress: z.literal(true).optional(),
 
-    canViewRoomList: z.boolean().optional(),
+    canViewRoomList: z.literal(true).optional(),
 
     canReportIncidentSOS: z.literal(true).optional(),
 
@@ -30,14 +30,13 @@ export const hostPermissionsSchema = z
 
     canReplyToReviews: z.boolean().optional(),
 
-    // Owner-only permissions
-    canCreateSubmitEvent: z.literal(false).optional(),
+    canCreateSubmitEvent: z.boolean().optional(),
 
-    canEditEvent: z.literal(false).optional(),
+    canEditEvent: z.boolean().optional(),
 
-    canCancelEventRefund: z.literal(false).optional(),
+    canCancelEventRefund: z.boolean().optional(),
 
-    canManagePayouts: z.literal(false).optional(),
+    canManagePayouts: z.boolean().optional(),
   })
   .strict();
 

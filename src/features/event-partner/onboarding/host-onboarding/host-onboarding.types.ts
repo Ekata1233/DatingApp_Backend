@@ -112,22 +112,22 @@ export const HOST_PERMISSION_OPTIONS = [
   {
     key: "canCreateSubmitEvent",
     label: "Create & submit events",
-    ownerOnly: true,
+    ownerOnly: false,
   },
   {
     key: "canEditEvent",
     label: "Edit event details & itinerary",
-    ownerOnly: true,
+    ownerOnly: false,
   },
   {
     key: "canCancelEventRefund",
     label: "Cancel events & refunds",
-    ownerOnly: true,
+    ownerOnly: false,
   },
   {
     key: "canManagePayouts",
     label: "Payouts, bank & invoices",
-    ownerOnly: true,
+    ownerOnly: false,
   },
 ] as const;
 

@@ -8,18 +8,27 @@ export const ifscSchema = z.string().trim().toUpperCase()
 const accountNumberSchema = z.string().trim()
   .regex(/^\d{4,34}$/, "Enter an account number with 4 to 34 digits");
 
-export const bankAccountSchema = z.object({
+const bankAccountFields = z.object({
   accountHolderName: z.string().trim().min(1).max(150),
   accountNumber: accountNumberSchema,
   confirmAccountNumber: accountNumberSchema,
   ifscCode: ifscSchema,
   payoutCycle: z.enum(PayoutCycle),
-}).refine(
+});
+
+export const bankAccountSchema = bankAccountFields.refine(
   (input) => input.accountNumber === input.confirmAccountNumber,
   { path: ["confirmAccountNumber"], message: "Account numbers must match" },
 );
 
 export type BankAccountInput = z.infer<typeof bankAccountSchema>;
+
+export const editBankAccountSchema = bankAccountFields.partial().refine(
+  (input) => input.accountNumber === input.confirmAccountNumber,
+  { path: ["confirmAccountNumber"], message: "Provide both account number fields with matching values" },
+);
+
+export type EditBankAccountInput = z.infer<typeof editBankAccountSchema>;
 
 export const getDocumentExtension = (file: UploadedFile) => {
   const { data } = file;

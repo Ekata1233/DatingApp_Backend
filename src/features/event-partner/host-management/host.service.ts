@@ -22,12 +22,16 @@ import {
 
 const INVITATION_VALIDITY_DAYS = 7;
 
-const DEFAULT_PERMISSIONS = {
+const REQUIRED_HOST_PERMISSIONS = {
   canViewGuestList: true,
   canCheckInGuests: true,
   canUpdateRunSheetProgress: true,
   canViewRoomList: true,
   canReportIncidentSOS: true,
+};
+
+const DEFAULT_PERMISSIONS = {
+  ...REQUIRED_HOST_PERMISSIONS,
   canMessageGuests: true,
   canReplyToReviews: false,
 
@@ -249,7 +253,7 @@ export const getHostPermissionsService = () => {
     title: "Co-host",
 
     description:
-      "Runs assigned events without access to money or event settings.",
+      "Runs assigned events with the permissions granted by the organizer.",
 
     permissions: [
       {
@@ -257,28 +261,28 @@ export const getHostPermissionsService = () => {
         title: "See the guest list",
         description: "First name, age and ticket ID only",
         enabled: true,
-        editable: true,
+        editable: false,
       },
       {
         key: "canCheckInGuests",
         title: "Check guests in",
         description: "Scan tickets and mark guest arrivals",
         enabled: true,
-        editable: true,
+        editable: false,
       },
       {
         key: "canUpdateRunSheetProgress",
         title: "Run sheet & itinerary",
         description: "View the plan and mark each step done",
         enabled: true,
-        editable: true,
+        editable: false,
       },
       {
         key: "canViewRoomList",
         title: "Stay & room list",
         description: "View guest room and tent assignments",
         enabled: true,
-        editable: true,
+        editable: false,
       },
       {
         key: "canReportIncidentSOS",
@@ -305,29 +309,29 @@ export const getHostPermissionsService = () => {
         key: "canCreateSubmitEvent",
         title: "Create & submit events",
         enabled: false,
-        editable: false,
-        ownerOnly: true,
+        editable: true,
+        ownerOnly: false,
       },
       {
         key: "canEditEvent",
         title: "Edit event details & itinerary",
         enabled: false,
-        editable: false,
-        ownerOnly: true,
+        editable: true,
+        ownerOnly: false,
       },
       {
         key: "canCancelEventRefund",
         title: "Cancel events & refunds",
         enabled: false,
-        editable: false,
-        ownerOnly: true,
+        editable: true,
+        ownerOnly: false,
       },
       {
         key: "canManagePayouts",
         title: "Payouts, bank & invoices",
         enabled: false,
-        editable: false,
-        ownerOnly: true,
+        editable: true,
+        ownerOnly: false,
       },
     ],
 
@@ -384,13 +388,7 @@ export const inviteHostService = async (
     ...payload.permissions,
 
     // Always enabled
-    canReportIncidentSOS: true,
-
-    // Owner-only permissions
-    canCreateSubmitEvent: false,
-    canEditEvent: false,
-    canCancelEventRefund: false,
-    canManagePayouts: false,
+    ...REQUIRED_HOST_PERMISSIONS,
   };
 
   const host = await prisma.host.create({
@@ -612,12 +610,7 @@ export const updateHostPermissionsService = async (
     data: {
       ...payload,
 
-      canReportIncidentSOS: true,
-
-      canCreateSubmitEvent: false,
-      canEditEvent: false,
-      canCancelEventRefund: false,
-      canManagePayouts: false,
+      ...REQUIRED_HOST_PERMISSIONS,
     },
 
     select: hostSelect,

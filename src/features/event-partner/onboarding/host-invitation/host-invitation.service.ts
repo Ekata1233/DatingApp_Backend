@@ -28,17 +28,21 @@ export const getHostInvitationsService = async (
     where: {
       phoneNumber,
 
-      status: HostStatus.INVITED,
-
-      onboardingStep: HostStep.INVITE_ACCEPTANCE,
-
-      onboardingCompleted: false,
-
-      invitationExpiresAt: {
-        gt: now,
-      },
-
-      acceptedAt: null,
+      OR: [
+        {
+          status: HostStatus.INVITED,
+          onboardingStep: HostStep.INVITE_ACCEPTANCE,
+          onboardingCompleted: false,
+          invitationExpiresAt: { gt: now },
+          acceptedAt: null,
+        },
+        {
+          acceptedAt: { not: null },
+          status: {
+            in: [HostStatus.ONBOARDING, HostStatus.ACTIVE, HostStatus.PAUSED],
+          },
+        },
+      ],
 
       declinedAt: null,
 
@@ -59,6 +63,7 @@ export const getHostInvitationsService = async (
 
     select: {
       id: true,
+      acceptedAt: true,
 
       businessId: true,
 
@@ -116,6 +121,7 @@ export const getHostInvitationsService = async (
 
     return {
       hostId: host.id,
+      isInvitationAccepted: host.acceptedAt !== null,
 
       businessId: business.id,
 

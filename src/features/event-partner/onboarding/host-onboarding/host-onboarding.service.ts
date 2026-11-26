@@ -177,7 +177,7 @@ export const getHostInvitationService = async (
       icon: "🎤",
 
       description:
-        "Runs assigned events — check-in, guest list, guest chat, run sheet / itinerary, stay and rooms. Can't create or edit events, and has no access to money.",
+        "Runs assigned events with the permissions granted by the organizer.",
     },
 
     events: {

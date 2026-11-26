@@ -130,6 +130,7 @@ export const deleteAccountService = async (userId: string) => {
       data: {
         account_status: "DELETED",
         deleted_at: new Date(),
+        email: null,
 
         // Remove pause state
         paused_at: null,
