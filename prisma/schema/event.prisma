@@ -111,18 +111,20 @@ model Event {
   publishedAt         DateTime?
   rejectionReason     String?
   eventReactiveStatus EventReactiveStatus?
+  organizerVenueId    String?              @db.Uuid
   isDeleted           Boolean              @default(false)
 
   // Relations
-  photos        EventPhoto[]
-  dates         EventDate[]
-  venue         EventVenue?
-  experience    EventExperience[]
-  tripDetails   TripDetails?
-  faqs          EventFAQ[]
-  hosts         EventHost[]
-  bookings      EventBooking[]
-  reactivations EventReactivation[]
+  photos         EventPhoto[]
+  dates          EventDate[]
+  venue          EventVenue?
+  experience     EventExperience[]
+  tripDetails    TripDetails?
+  faqs           EventFAQ[]
+  hosts          EventHost[]
+  bookings       EventBooking[]
+  reactivations  EventReactivation[]
+  organizerVenue OrganizerVenue?     @relation(fields: [organizerVenueId], references: [id], onDelete: Restrict)
 
   // Ratings Summary
   averageRating Decimal @default(0) @db.Decimal(3, 2)
@@ -142,6 +144,7 @@ model Event {
   ChatMessage   ChatMessage[]
 
   @@index([hostId])
+  @@index([organizerVenueId])
   @@index([businessDetailsId])
   @@index([categoryId])
   @@index([status])

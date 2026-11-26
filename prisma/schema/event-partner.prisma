@@ -91,6 +91,7 @@ model BusinessDetails {
   consents                 PartnerConsent[]
   reviews                  PartnerReview[]
   hostActivityLogs         HostActivityLog[]
+  venues                   OrganizerVenue[]
   verifyId                 VerifyId?
   yourEvents               YourEvents?
 
@@ -197,6 +198,54 @@ model YourEvents {
   categories            EventCategory[]   @relation("YourEventCategories")
 
   @@map("your_events")
+}
+
+model OrganizerVenue {
+  id              String           @id @default(uuid()) @db.Uuid
+  businessId      String           @db.Uuid
+  venueName       String
+  fullAddress     String
+  venueCapacity   Int
+  venueType       VenueType
+  arrangement     VenueArrangement
+  // NOC / Tie-up letter
+  nocDocumentKey  String?
+  nocDocumentName String?
+  // Location
+  latitude        Float?
+  longitude       Float?
+  googleMapsLink  String?
+  // Status
+  isActive        Boolean          @default(true)
+  isDeleted       Boolean          @default(false)
+  deletedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  business BusinessDetails       @relation(fields: [businessId], references: [id])
+  photos   OrganizerVenuePhoto[]
+  events   Event[]
+
+  @@index([businessId, isActive, isDeleted])
+  @@index([businessId, venueType])
+  @@map("organizer_venues")
+}
+
+model OrganizerVenuePhoto {
+  id        String  @id @default(uuid()) @db.Uuid
+  venueId   String  @db.Uuid
+  photoUrl  String
+  fileId    String?
+  sortOrder Int
+
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  venue     OrganizerVenue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, sortOrder])
+  @@map("organizer_venue_photos")
 }
 
 model EventCategory {
@@ -497,6 +546,12 @@ model HostActivityLog {
   @@index([businessId, createdAt])
   @@index([performedById])
   @@map("host_activity_logs")
+}
+
+enum VenueArrangement {
+  PARTNER_VENUE
+  OWNED_BY_US
+  PUBLIC_PLACE_TRAIL
 }
 
 enum HostActivityAction {

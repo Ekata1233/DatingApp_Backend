@@ -264,6 +264,7 @@ import eventsRoutes from "../features/event-partner/events/event.routes"
 import organizerBankAccountRoutes from "../features/event-partner/organizer-management/bank-account.routes"
 import organizerBrandPageRoutes from "../features/event-partner/organizer-management/brand-page.routes"
 import organizerTeamRoutes from "../features/event-partner/organizer-management/team.routes"
+import organizerVenueRoutes from "../features/event-partner/organizer-management/venue.routes"
 
 
 
@@ -271,6 +272,7 @@ router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerR
 router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
 router.use("/event-partner/organizer-management/brand-page", organizerBrandPageRoutes);
 router.use("/event-partner/organizer-management/team", organizerTeamRoutes);
+router.use("/event-partner/organizer-management/venues", organizerVenueRoutes);
 router.use("/event-partner/hosts", createHostRoutes)
 router.use("/event/hosts", hostOnboardingRoutes)
 router.use("/event/hosts/onboarding", scopedHostOnboardingRoutes);
