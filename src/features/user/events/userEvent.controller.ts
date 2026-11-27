@@ -23,15 +23,16 @@ import {
 
 export const getAllUserEventsController = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     console.log(
-      "[USER EVENTS] Get all events request received"
+      "[USER EVENTS] Get all events request received",
     );
 
-    // STEP 1 - Get authenticated user
-    const userId = (
+    // STEP 1 - Get optional authenticated user
+
+    const user = (
       req as Request & {
         user?: {
           userId?: string;
@@ -41,40 +42,42 @@ export const getAllUserEventsController = async (
     ).user;
 
     const authenticatedUserId =
-      userId?.userId ?? userId?.id;
+      user?.userId ?? user?.id ?? null;
 
-    if (!authenticatedUserId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized user",
-      });
-    }
+    console.log("[USER EVENTS] Request user:", {
+      userId: authenticatedUserId,
+      isAuthenticated: !!authenticatedUserId,
+    });
 
     // STEP 2 - Validate query
+
     const query = getUserEventsQuerySchema.parse(
-      req.query
+      req.query,
     );
 
-    // STEP 3 - Fetch user events
+    // STEP 3 - Fetch events
+
     const result = await getAllUserEventsService(
       authenticatedUserId,
-      query
+      query,
     );
 
     console.log(
       "[USER EVENTS] Events fetched successfully",
       {
         userId: authenticatedUserId,
+        isAuthenticated: !!authenticatedUserId,
         packageType: result.packageType,
         visibility: result.visibility,
         total: result.pagination.total,
-      }
+      },
     );
 
     // STEP 4 - Return response
+
     res.setHeader(
       "Cache-Control",
-      "private, no-store"
+      "private, no-store",
     );
 
     return res.status(200).json({
@@ -88,10 +91,11 @@ export const getAllUserEventsController = async (
   } catch (error) {
     console.error(
       "[USER EVENTS] Get all events error:",
-      error
+      error,
     );
 
     // VALIDATION ERROR
+
     if (error instanceof ZodError) {
       return res.status(400).json({
         success: false,
@@ -106,6 +110,7 @@ export const getAllUserEventsController = async (
     }
 
     // SERVICE ERROR
+
     if (error instanceof UserEventServiceError) {
       return res.status(error.statusCode).json({
         success: false,
@@ -115,6 +120,7 @@ export const getAllUserEventsController = async (
     }
 
     // INTERNAL SERVER ERROR
+
     return res.status(500).json({
       success: false,
 

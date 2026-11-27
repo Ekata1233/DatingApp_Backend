@@ -45,16 +45,36 @@ export const createRazorpayOrderSchema = z
     packagePriceId: z.string().uuid().optional(),
 
     // ========================================
-    // EVENT BOOKING
-    // ========================================
+// EVENT BOOKING
+// ========================================
 
-    eventId: z.string().uuid().optional(),
+eventId: z.string().uuid().optional(),
 
-    menTicketCount: z.number().int().min(0).default(0),
+eventDateId: z.string().uuid().optional(),
 
-    womenTicketCount: z.number().int().min(0).default(0),
+tickets: z
+  .array(
+    z.object({
+      ticketType: z.enum([
+        "MEN",
+        "WOMEN",
+        "OTHER",
+        "COUPLE",
+      ]),
 
-    otherTicketCount: z.number().int().min(0).default(0),
+      quantity: z.number().int().min(1).max(100),
+    }).strict(),
+  )
+  .min(1)
+  .max(4)
+  .optional(),
+
+couponCode: z
+  .string()
+  .trim()
+  .min(1)
+  .max(50)
+  .optional(),
 
     // ========================================
     // BOOST / SUPER BOOST
@@ -124,32 +144,67 @@ export const createRazorpayOrderSchema = z
       }
     }
 
-    // ========================================
-    // 3. EVENT BOOKING VALIDATION
-    // ========================================
+  // ========================================
+// 3. EVENT BOOKING VALIDATION
+// ========================================
+
+if (data.purpose === PaymentPurpose.EVENT_BOOKING) {
+  if (!data.eventId) {
+    addError(
+      "eventId",
+      "Valid event ID is required",
+    );
+  }
+
+  if (!data.eventDateId) {
+    addError(
+      "eventDateId",
+      "Valid event date ID is required",
+    );
+  }
+
+  if (!data.tickets || data.tickets.length === 0) {
+    addError(
+      "tickets",
+      "At least one ticket is required",
+    );
+  } else {
+    const selectedTypes = new Set<string>();
+
+    for (const ticket of data.tickets) {
+      if (selectedTypes.has(ticket.ticketType)) {
+        addError(
+          "tickets",
+          "Duplicate ticket type is not allowed",
+        );
+      }
+
+      selectedTypes.add(ticket.ticketType);
+    }
+
+    const ticketCount = data.tickets.reduce(
+      (total, ticket) => total + ticket.quantity,
+      0,
+    );
+
+    if (ticketCount < 1 || ticketCount > 10) {
+      addError(
+        "tickets",
+        "Total ticket count must be between 1 and 10",
+      );
+    }
 
     if (
-      data.purpose === PaymentPurpose.EVENT_BOOKING
+      selectedTypes.has("COUPLE") &&
+      selectedTypes.size > 1
     ) {
-      const count =
-        data.menTicketCount +
-        data.womenTicketCount +
-        data.otherTicketCount;
-
-      if (!data.eventId) {
-        addError(
-          "eventId",
-          "Valid event ID is required",
-        );
-      }
-
-      if (count < 1 || count > 10) {
-        addError(
-          "menTicketCount",
-          "Total ticket count must be between 1 and 10",
-        );
-      }
+      addError(
+        "tickets",
+        "Couple tickets cannot be combined with individual tickets",
+      );
     }
+  }
+}
 
     // ========================================
     // 4. BOOST / SUPER BOOST VALIDATION
@@ -247,12 +302,12 @@ export const createRazorpayOrderSchema = z
 
       [PaymentPurpose.PACKAGE]: ["packagePriceId"],
 
-      [PaymentPurpose.EVENT_BOOKING]: [
-        "eventId",
-        "menTicketCount",
-        "womenTicketCount",
-        "otherTicketCount",
-      ],
+     [PaymentPurpose.EVENT_BOOKING]: [
+  "eventId",
+  "eventDateId",
+  "tickets",
+  "couponCode",
+],
 
       [PaymentPurpose.BOOST]: ["boostOptionId"],
 
@@ -267,15 +322,18 @@ export const createRazorpayOrderSchema = z
       ],
     };
 
-    const productFields = [
-      "amount",
-      "packagePriceId",
-      "eventId",
-      "boostOptionId",
-      "datePlanPackageId",
-      "storePackId",
-      "purchaseType",
-    ] as const;
+   const productFields = [
+  "amount",
+  "packagePriceId",
+  "eventId",
+  "eventDateId",
+  "tickets",
+  "couponCode",
+  "boostOptionId",
+  "datePlanPackageId",
+  "storePackId",
+  "purchaseType",
+] as const;
 
     const allowed = allowedFields[data.purpose] ?? [];
 

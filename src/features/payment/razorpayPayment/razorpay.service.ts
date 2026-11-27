@@ -22,13 +22,14 @@ import { fulfillComplimentPayment } from "./handlers/compliment.handler";
 import { fulfillBoostPayment } from "./handlers/boost.handler";
 import { fulfillDatePlanPayment } from "./handlers/datePlan.handler";
 
-import { createEventBookingForPayment } from "../payment.service";
 
 import type {
   CreateRazorpayOrderDTO,
   VerifyRazorpayDTO,
 } from "./razorpay.validation";
-
+import {
+  createEventBookingForPayment,
+} from "../payment.service";
 // ============================================
 // CONFIGURATION
 // ============================================
@@ -315,44 +316,130 @@ export async function createRazorpayOrderService(
   // ==========================================
 }
  else if (data.purpose === PaymentPurpose.EVENT_BOOKING) {
-    const result = await createEventBookingForPayment(userId, {
+  // ==========================================
+  // 1. VALIDATE REQUIRED EVENT FIELDS
+  // ==========================================
+
+  if (!data.eventId) {
+    throw new Error("Event ID is required");
+  }
+
+  if (!data.eventDateId) {
+    throw new Error("Event date ID is required");
+  }
+
+  if (!data.tickets || data.tickets.length === 0) {
+    throw new Error("Tickets are required");
+  }
+
+  // ==========================================
+  // 2. CREATE EVENT BOOKING
+  // ==========================================
+
+  const result = await createEventBookingForPayment(
+    userId,
+    {
       purpose: PaymentPurpose.EVENT_BOOKING,
+
       currency: "INR",
-      eventId: data.eventId,
-      menTicketCount: data.menTicketCount,
-      womenTicketCount: data.womenTicketCount,
-      otherTicketCount: data.otherTicketCount,
-    });
 
-    amount = new Prisma.Decimal(result.amount);
-
-    referenceId = result.booking.id;
-    bookingId = result.booking.id;
-
-    const booking = result.booking;
-
-    eventBookingDetails = {
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber,
       eventId: data.eventId,
 
-      ticketCount: booking.ticketCount,
+      eventDateId: data.eventDateId,
 
-      ticketAmount: Number(booking.ticketAmount),
-      discountAmount: Number(booking.discountAmount),
-      platformFee: Number(booking.platformFee),
-      gstAmount: Number(booking.gstAmount),
-      totalAmount: Number(booking.totalAmount),
+      tickets: data.tickets,
 
-      tickets: booking.tickets,
-      status: booking.status,
-      currency: "INR",
-    };
+      couponCode: data.couponCode,
+    },
+  );
 
-    // ==========================================
-    // 4. BOOST / SUPER BOOST
-    // ==========================================
-  } else if (data.purpose === PaymentPurpose.BOOST) {
+  // ==========================================
+  // 3. SET PAYMENT AMOUNT
+  // ==========================================
+
+  amount = new Prisma.Decimal(result.amount);
+
+  referenceId = result.booking.id;
+
+  bookingId = result.booking.id;
+
+  const booking = result.booking;
+
+  const checkout = result.checkout;
+
+  // ==========================================
+  // 4. EVENT BOOKING RESPONSE DETAILS
+  // ==========================================
+
+  eventBookingDetails = {
+    bookingId: booking.id,
+
+    bookingNumber: booking.bookingNumber,
+
+    eventId: booking.eventId,
+
+    eventDateId: booking.eventDateId,
+
+    reactivationId: checkout.reactivationId,
+
+    title: checkout.title,
+
+    eventDurationType: checkout.eventDurationType,
+
+    tripType: checkout.tripType,
+
+    priceType: checkout.priceType,
+
+    startDateTime: checkout.startDateTime,
+
+    endDateTime: checkout.endDateTime,
+
+    timezone: checkout.timezone,
+
+    ticketCount: booking.ticketCount,
+
+    guestCount: checkout.guestCount,
+
+    ticketBreakdown: checkout.ticketBreakdown,
+
+    originalTicketAmount: Number(
+      checkout.originalTicketAmount,
+    ),
+
+    ticketAmount: Number(booking.ticketAmount),
+
+    discountAmount: Number(booking.discountAmount),
+
+    platformFee: Number(booking.platformFee),
+
+    subtotal: Number(checkout.subtotal),
+
+    gstPercentage: Number(checkout.gstPercentage),
+
+    gstAmount: Number(booking.gstAmount),
+
+    totalBeforeCoupon: Number(
+      checkout.totalBeforeCoupon,
+    ),
+
+    couponCode: booking.couponCode,
+
+    couponDiscount: Number(
+      checkout.couponDiscount,
+    ),
+
+    totalSavings: Number(checkout.totalSavings),
+
+    totalAmount: Number(booking.totalAmount),
+
+    tickets: booking.tickets,
+
+    status: booking.status,
+
+    currency: "INR",
+  };
+
+} else if (data.purpose === PaymentPurpose.BOOST) {
     const option = await prisma.boostOption.findFirst({
       where: {
         id: data.boostOptionId,
@@ -499,56 +586,137 @@ export async function createRazorpayOrderService(
     receipt: `WLV_${crypto.randomUUID().slice(0, 20)}`,
 
     notes: {
-      userId,
-      purpose: data.purpose,
-      referenceId: referenceId ?? "",
-      packagePriceId: packagePriceId ?? "",
+  userId,
 
-      purchaseType: purchaseMetadata.purchaseType ?? "",
-      boostOptionId: purchaseMetadata.boostOptionId ?? "",
-      datePlanPackageId: purchaseMetadata.datePlanPackageId ?? "",
-      storePackId: purchaseMetadata.storePackId ?? "",
-    },
+  purpose: data.purpose,
+
+  referenceId: referenceId ?? "",
+
+  packagePriceId: packagePriceId ?? "",
+
+  purchaseType: purchaseMetadata.purchaseType ?? "",
+
+  boostOptionId: purchaseMetadata.boostOptionId ?? "",
+
+  datePlanPackageId:
+    purchaseMetadata.datePlanPackageId ?? "",
+
+  storePackId: purchaseMetadata.storePackId ?? "",
+
+  // NEW: ONLY EVENT BOOKING
+  ...(data.purpose === PaymentPurpose.EVENT_BOOKING
+    ? {
+        eventId: data.eventId ?? "",
+
+        eventDateId: data.eventDateId ?? "",
+
+        bookingId: bookingId ?? "",
+      }
+    : {}),
+},
   });
 
   // ==========================================
   // 9. CREATE PAYMENT RECORD
   // ==========================================
 
-  const payment = await prisma.payment.create({
-    data: {
-      userId,
-      amount,
-      currency: "INR",
-      purpose: data.purpose,
-      status: PaymentStatus.PENDING,
+  const payment = await prisma.$transaction(
+  async (tx) => {
+    const createdPayment = await tx.payment.create({
+      data: {
+        userId,
 
-      // Pending = Razorpay order ID
-      payment_id: order.id,
+        amount,
 
-      referenceId,
-      packagePriceId,
+        currency: "INR",
 
-      gatewayResponse: {
-        ...JSON.parse(JSON.stringify(order)),
-        purchaseMetadata,
+        purpose: data.purpose,
+
+        status: PaymentStatus.PENDING,
+
+        payment_id: order.id,
+
+        referenceId,
+
+        packagePriceId,
+
+        gatewayResponse: {
+          ...JSON.parse(JSON.stringify(order)),
+          purchaseMetadata,
+        },
       },
-    },
-  });
+    });
+
+    // ONLY EVENT BOOKING
+    if (
+      data.purpose === PaymentPurpose.EVENT_BOOKING &&
+      bookingId
+    ) {
+      const updated = await tx.eventBooking.updateMany({
+        where: {
+          id: bookingId,
+
+          userId,
+
+          status: "PAYMENT_PENDING",
+
+          paymentId: null,
+        },
+
+        data: {
+          paymentId: createdPayment.id,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new Error(
+          "Failed to link payment with event booking",
+        );
+      }
+    }
+
+    return createdPayment;
+  },
+);
 
   // ==========================================
   // 10. RESPONSE
   // ==========================================
 
-  return {
-    paymentId: payment.id,
-    razorpayOrderId: order.id,
-    razorpayKeyId,
-    amount: amountPaise,
-    amountInRupees: amount.toString(),
-    currency: "INR",
-    bookingId: bookingId ?? null,
-  };
+ return {
+  paymentId: payment.id,
+  razorpayOrderId: order.id,
+  razorpayKeyId,
+  amount: amountPaise,
+  amountInRupees: amount.toString(),
+  currency: "INR",
+  bookingId: bookingId ?? null,
+
+  ...(data.purpose === PaymentPurpose.WALLET
+    ? { walletDetails }
+    : {}),
+
+  ...(data.purpose === PaymentPurpose.PACKAGE
+    ? { packageDetails }
+    : {}),
+
+  ...(data.purpose === PaymentPurpose.EVENT_BOOKING
+    ? { eventBookingDetails }
+    : {}),
+
+  ...(data.purpose === PaymentPurpose.BOOST
+    ? { boostDetails }
+    : {}),
+
+  ...(data.purpose === PaymentPurpose.OTHER &&
+  data.purchaseType === "DATE_PLAN"
+    ? { datePlanDetails }
+    : {}),
+
+  ...(data.purpose === PaymentPurpose.PURCHASE_STORE
+    ? { storeDetails }
+    : {}),
+};
 }
 
 // ============================================
