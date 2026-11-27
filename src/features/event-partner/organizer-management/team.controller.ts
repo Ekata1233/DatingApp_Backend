@@ -2,8 +2,8 @@ import { NextFunction, Response } from "express";
 import { HostRemovalReason, HostStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { PartnerRequest } from "../../../types/partnerAuth.types";
-import { HostServiceError } from "../host-management/host.service";
-import { hostIdSchema } from "../host-management/host.validation";
+import { HostServiceError, updateHostPermissionsService } from "../host-management/host.service";
+import { hostIdSchema, updateHostPermissionsSchema } from "../host-management/host.validation";
 import {
   changeTeamMemberAccess,
   getOrganizerTeam,
@@ -39,6 +39,10 @@ const teamMemberAction = (
     return next(error);
   }
 };
+
+export const updateTeamMemberPermissionsController = teamMemberAction((partnerId, businessId, hostId, body) =>
+  updateHostPermissionsService(partnerId, businessId, hostId, updateHostPermissionsSchema.parse(body)),
+);
 
 export const pauseTeamMemberController = teamMemberAction((partnerId, businessId, hostId) =>
   changeTeamMemberAccess(partnerId, businessId, hostId, HostStatus.PAUSED),

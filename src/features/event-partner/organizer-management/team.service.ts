@@ -53,9 +53,6 @@ export const getOrganizerTeam = async (
     },
     select: {
       id: true,
-      brandName: true,
-      legalName: true,
-      partner: { select: { fullName: true, profilePhoto: true } },
     },
   });
 
@@ -132,23 +129,7 @@ export const getOrganizerTeam = async (
   });
 
   const pending = coHosts.filter(({ status }) => pendingStatuses.has(status));
-  const team = [
-    {
-      id: partnerId,
-      fullName:
-        business.partner.fullName ??
-        business.brandName ??
-        business.legalName ??
-        "Owner",
-      profilePhoto: business.partner.profilePhoto,
-      role: "OWNER",
-      isCurrentUser: true,
-      status: HostStatus.ACTIVE,
-      allEvents: true,
-      assignedEventsCount: null,
-    },
-    ...coHosts.filter(({ status }) => !pendingStatuses.has(status)),
-  ];
+  const team = coHosts.filter(({ status }) => !pendingStatuses.has(status));
 
   return {
     businessId: business.id,

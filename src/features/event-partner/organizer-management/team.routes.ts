@@ -4,6 +4,7 @@ import { requirePartnerRole } from "../../../middleware/partnerRole.middleware";
 import {
   getOrganizerTeamController,
   getOrganizerTeamMemberController,
+  updateTeamMemberPermissionsController,
   pauseTeamMemberController,
   resumeTeamMemberController,
   previewTeamMemberRemovalController,
@@ -19,6 +20,7 @@ router.use(
 
 router.get("/", getOrganizerTeamController);
 router.get("/:hostId", getOrganizerTeamMemberController);
+router.patch("/:hostId/permissions", updateTeamMemberPermissionsController);
 router.patch("/:hostId/pause", pauseTeamMemberController);
 router.patch("/:hostId/resume", resumeTeamMemberController);
 router.get("/:hostId/removal-preview", previewTeamMemberRemovalController);
