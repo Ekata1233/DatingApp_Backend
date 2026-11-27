@@ -108,7 +108,6 @@ import usersRoutes from "../features/admin/onboarding/users/users.route"
 import activityRoutes from "../features/user/activity/activity.routes"
 
 import userEventRoutes from "../features/user/events/userEvent.routes"
-import eventCheckoutRoute from "../features/event-partner/events/event.routes"
 
 const router = Router();
 
@@ -140,7 +139,7 @@ router.use("/payment", razorpayRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes,  privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes,userEventRoutes,eventCheckoutRoute)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes,  privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes,userEventRoutes)
 
 router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes,  payoutMethodRoutes)
 router.use("/user", blockRoutes)
@@ -273,6 +272,7 @@ import adminEventRoutes from "../features/admin/events/adminEvent.routes"
 import adminEventReactivationRoutes from "../features/admin/events/adminEventReactivation.routes"
 import calculateRevenueRoutes from "../features/event-partner/events/revenue/revenue.routes"
 import invoicesRoutes from "../features/event-partner/organizer-management/invoices/invoice.routes"
+import eventCheckoutRoute from "../features/event-partner/events/event.routes"
 
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
@@ -290,6 +290,7 @@ router.use("/event-partner",calculateRevenueRoutes)
 
 router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
 router.use("/event-partner/organizer-management/", invoicesRoutes)
+router.use("/user/", eventCheckoutRoute)
 
 
 //===================================================
