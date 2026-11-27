@@ -900,6 +900,7 @@ import { razorpay } from "../../config/razorpay";
     EventStatus,
     PaymentPurpose,
     PaymentStatus,
+    Prisma,
     PurchasePaymentMethod,
     StoreItemType,
   } from "@prisma/client";
@@ -919,7 +920,13 @@ import type {
 } from "./payment.types";
   import {  confirmsEventBooking } from "./handlers/event.handler";
 
+import {
+  calculateEventCheckoutWithTx,
+} from "../user/events/userEvent.service";
 
+import type {
+  TicketInput,
+} from "../user/events/userEvent.types";
 
 // ============================================
 // MONEY HELPERS
@@ -955,632 +962,246 @@ const roundAmount = (
 // ============================================
 // CREATE EVENT BOOKING FOR PAYMENT
 // ============================================
-
-export const createEventBookingForPayment =
-  async (
-    userId: string,
-    data: CreatePaymentsOrderDTO,
-  ) => {
-    if (!data.eventId) {
-      throw new Error(
-        "Event ID is required",
-      );
-    }
-
-    // =====================================
-    // GET EVENT
-    // =====================================
-
-    const event =
-      await prisma.event.findUnique({
-        where: {
-          id: data.eventId,
-        },
-
-        select: {
-          id: true,
-          status: true,
-
-          menCapacity: true,
-          womenCapacity: true,
-          otherCapacity: true,
-
-          menEntryPrice: true,
-          womenEntryPrice: true,
-          otherEntryPrice: true,
-
-          menDiscountedPrice: true,
-          womenDiscountedPrice: true,
-          otherDiscountedPrice: true,
-        },
-      });
-
-    if (!event) {
-      throw new Error(
-        "Event not found",
-      );
-    }
-
-    if (
-      event.status !==
-      EventStatus.APPROVED
-    ) {
-      throw new Error(
-        "Event is not live",
-      );
-    }
-
-    // Payment requests currently identify the event only.
-    const eventDate = await prisma.eventDate.findFirst({
-      where: {
-        eventId: event.id,
-        status: "SCHEDULED",
-        startDateTime: { gte: new Date() },
-      },
-      orderBy: { startDateTime: "asc" },
-      select: { id: true },
-    });
-
-    if (!eventDate) {
-      throw new Error("Event has no upcoming scheduled date");
-    }
-
-    // =====================================
-    // TICKET COUNTS
-    // =====================================
-
-    const menTicketCount =
-      Number(
-        data.menTicketCount ?? 0,
-      );
-
-    const womenTicketCount =
-      Number(
-        data.womenTicketCount ?? 0,
-      );
-
-    const otherTicketCount =
-      Number(
-        data.otherTicketCount ?? 0,
-      );
-
-    if (
-      !Number.isInteger(
-        menTicketCount,
-      ) ||
-      !Number.isInteger(
-        womenTicketCount,
-      ) ||
-      !Number.isInteger(
-        otherTicketCount,
-      )
-    ) {
-      throw new Error(
-        "Ticket count must be a valid integer",
-      );
-    }
-
-    if (
-      menTicketCount < 0 ||
-      womenTicketCount < 0 ||
-      otherTicketCount < 0
-    ) {
-      throw new Error(
-        "Ticket count cannot be negative",
-      );
-    }
-
-    const ticketCount =
-      menTicketCount +
-      womenTicketCount +
-      otherTicketCount;
-
-    if (ticketCount <= 0) {
-      throw new Error(
-        "At least one ticket is required",
-      );
-    }
-
-    // =====================================
-    // ✅ NEW CHANGE
-    // GET GLOBAL GST + PLATFORM FEE
-    // =====================================
-
-    const globalAmount =
-      await prisma.globalAmount.findFirst();
-
-    if (!globalAmount) {
-      throw new Error(
-        "Global amount configuration not found",
-      );
-    }
-
-    const gstPercentage =
-      Number(
-        globalAmount.gst,
-      );
-
-    const eventPlatformFee =
-      Number(
-        globalAmount.eventPlatformFee,
-      );
-
-    if (
-      !Number.isFinite(
-        gstPercentage,
-      ) ||
-      gstPercentage < 0 ||
-      gstPercentage > 100
-    ) {
-      throw new Error(
-        "Invalid GST configuration",
-      );
-    }
-
-    if (
-      !Number.isFinite(
-        eventPlatformFee,
-      ) ||
-      eventPlatformFee < 0
-    ) {
-      throw new Error(
-        "Invalid event platform fee configuration",
-      );
-    }
-
-    // =====================================
-    // PRICE
-    // =====================================
-    // YOUR EXISTING LOGIC - UNCHANGED
-    // =====================================
-
-    const getFinalPrice = (
-      type:
-        | "MEN"
-        | "WOMEN"
-        | "OTHER",
-      entryPrice: any,
-      discountedPrice: any,
-    ) => {
-      if (entryPrice === null) {
-        throw new Error(
-          `${type} ticket price is unavailable`,
-        );
-      }
-
-      return discountedPrice !==
-        null
-        ? Number(
-            discountedPrice,
-          )
-        : Number(
-            entryPrice,
-          );
-    };
-
-    const menPrice =
-      menTicketCount > 0
-        ? getFinalPrice(
-            "MEN",
-            event.menEntryPrice,
-            event.menDiscountedPrice,
-          )
-        : 0;
-
-    const womenPrice =
-      womenTicketCount > 0
-        ? getFinalPrice(
-            "WOMEN",
-            event.womenEntryPrice,
-            event.womenDiscountedPrice,
-          )
-        : 0;
-
-    const otherPrice =
-      otherTicketCount > 0
-        ? getFinalPrice(
-            "OTHER",
-            event.otherEntryPrice,
-            event.otherDiscountedPrice,
-          )
-        : 0;
-
-    // =====================================
-    // CAPACITY
-    // =====================================
-    // YOUR EXISTING LOGIC - UNCHANGED
-    // =====================================
-
-   const checkCapacity = async (
-  ticketType:
-    | "MEN"
-    | "WOMEN"
-    | "OTHER",
-  requestedCount: number,
-  capacity: number | null,
-) => {
-  if (requestedCount <= 0) {
-    return;
-  }
-
-  if (
-    capacity === null ||
-    capacity <= 0
-  ) {
-    throw new Error(
-      `${ticketType} ticket capacity is not available`,
-    );
-  }
-
-  // =====================================
-  // ONLY CONFIRMED BOOKINGS COUNT
-  // =====================================
-
-  const alreadyBooked =
-    await prisma.eventBookingTicket.count({
-      where: {
-        booking: {
-          eventId: event.id,
-
-          status:
-            EventBookingStatus.CONFIRMED,
-        },
-
-        ticketType,
-      },
-    });
-
-  // =====================================
-  // LEFT SPOTS
-  // =====================================
-
-  const remaining = Math.max(
-    capacity - alreadyBooked,
-    0,
-  );
-
-  // =====================================
-  // DEBUG CONSOLE
-  // =====================================
-
-
-  if (
-    requestedCount >
-    remaining
-  ) {
-    throw new Error(
-      `Only ${remaining} ${ticketType} ticket(s) available`,
-    );
-  }
+type CreateEventBookingPaymentInput = {
+  purpose: typeof PaymentPurpose.EVENT_BOOKING;
+  currency: string;
+  eventId: string;
+  eventDateId: string;
+  tickets: TicketInput[];
+  couponCode?: string;
 };
 
-    await checkCapacity(
-      "MEN",
-      menTicketCount,
-      event.menCapacity,
-    );
+export const createEventBookingForPayment = async (
+  userId: string,
+  data: CreateEventBookingPaymentInput,
+) => {
+  // ==========================================
+  // STEP 1 - VALIDATE REQUIRED FIELDS
+  // ==========================================
 
-    await checkCapacity(
-      "WOMEN",
-      womenTicketCount,
-      event.womenCapacity,
-    );
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
 
-    await checkCapacity(
-      "OTHER",
-      otherTicketCount,
-      event.otherCapacity,
-    );
+  if (!data.eventId) {
+    throw new Error("Event ID is required");
+  }
 
-    // =====================================
-    // TOTAL
-    // =====================================
+  if (!data.eventDateId) {
+    throw new Error("Event date ID is required");
+  }
 
-    // YOUR EXISTING CALCULATION:
-    //
-    // menPrice / womenPrice / otherPrice
-    // already contain discounted price
-    // when discounted price exists.
-    //
-    // So ticketAmount is the final
-    // discounted ticket subtotal.
-    // =====================================
+  if (!Array.isArray(data.tickets) || !data.tickets.length) {
+    throw new Error("Tickets are required");
+  }
 
-    const ticketAmount =
-      menPrice *
-        menTicketCount +
-      womenPrice *
-        womenTicketCount +
-      otherPrice *
-        otherTicketCount;
+  if (data.currency !== "INR") {
+    throw new Error("Only INR currency is supported");
+  }
 
-    if (ticketAmount <= 0) {
-      throw new Error(
-        "Invalid event payment amount",
-      );
-    }
+  // ==========================================
+  // STEP 2 - TRANSACTION WITH RETRIES
+  // ==========================================
 
-    // =====================================
-    // ✅ NEW CHANGE
-    // ORIGINAL TICKET AMOUNT
-    // =====================================
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          // ==========================================
+          // STEP 3 - VALIDATE USER
+          // ==========================================
 
-    const originalTicketAmount =
-      Number(
-        event.menEntryPrice ??
-          0,
-      ) *
-        menTicketCount +
-      Number(
-        event.womenEntryPrice ??
-          0,
-      ) *
-        womenTicketCount +
-      Number(
-        event.otherEntryPrice ??
-          0,
-      ) *
-        otherTicketCount;
+          const user = await tx.user.findUnique({
+            where: {
+              id: userId,
+            },
 
-    // =====================================
-    // ✅ NEW CHANGE
-    // DISCOUNT AMOUNT
-    // =====================================
+            select: {
+              id: true,
+              account_status: true,
+            },
+          });
 
-    const discountAmount =
-      roundAmount(
-        Math.max(
-          0,
+          if (!user) {
+            throw new Error("User not found");
+          }
 
-          originalTicketAmount -
-            ticketAmount,
-        ),
-      );
+          if (user.account_status !== "ACTIVE") {
+            throw new Error("User account is not active");
+          }
 
-    // =====================================
-    // ✅ NEW CHANGE
-    // PLATFORM FEE
-    // =====================================
-    //
-    // Global platform fee is treated
-    // as PER BOOKING.
-    //
-    // Example:
-    // eventPlatformFee = 49
-    // 1 ticket = ₹49
-    // 3 tickets = ₹49
-    // =====================================
+          // ==========================================
+          // STEP 4 - CALCULATE EVENT CHECKOUT
+          // ==========================================
+          // Common checkout service handles:
+          // SINGLE_DAY
+          // MULTI_DAY GROUP_TRIP
+          // MULTI_DAY COUPLES_TRIP
+          // Reactivated events
+          // Event date validation
+          // Ticket capacity
+          // Maximum tickets per person
+          // Discounts
+          // Platform fee
+          // GST
+          // Coupon discount
+          // ==========================================
 
-    const platformFee =
-      roundAmount(
-        eventPlatformFee,
-      );
+          const checkout =
+            await calculateEventCheckoutWithTx(
+              tx,
+              data.eventId,
+              data.eventDateId,
+              userId,
+              data.tickets,
+              data.couponCode,
+            );
 
-    // =====================================
-    // ✅ NEW CHANGE
-    // TAXABLE AMOUNT
-    // =====================================
-    //
-    // Discounted ticket amount
-    // + platform fee
-    // =====================================
+          // ==========================================
+          // STEP 5 - VALIDATE FINAL PAYMENT AMOUNT
+          // ==========================================
 
-    const taxableAmount =
-      roundAmount(
-        ticketAmount +
-          platformFee,
-      );
+          const totalAmount = new Prisma.Decimal(
+            checkout.totalAmount,
+          );
 
-    // =====================================
-    // ✅ NEW CHANGE
-    // GST AMOUNT
-    // =====================================
+          if (totalAmount.lt(1)) {
+            throw new Error("Invalid event payment amount");
+          }
 
-    const gstAmount =
-      roundAmount(
-        (taxableAmount *
-          gstPercentage) /
-          100,
-      );
+          // ==========================================
+          // STEP 6 - GENERATE BOOKING NUMBER
+          // ==========================================
 
-    // =====================================
-    // ✅ NEW CHANGE
-    // FINAL TOTAL
-    // =====================================
+          const bookingNumber =
+            `EVT_${Date.now()}_${randomUUID()
+              .replace(/-/g, "")
+              .slice(0, 8)}`;
 
-    const totalAmount =
-      roundAmount(
-        taxableAmount +
-          gstAmount,
-      );
+          // ==========================================
+          // STEP 7 - PREPARE INDIVIDUAL TICKET RECORDS
+          // ==========================================
 
+          const ticketRecords:
+            Prisma.EventBookingTicketCreateWithoutBookingInput[] =
+            [];
 
+          for (const ticket of checkout.ticketBreakdown) {
+            for (let i = 0; i < ticket.quantity; i++) {
+              ticketRecords.push({
+                ticketId:
+                  `TKT_${randomUUID().replace(/-/g, "")}`,
 
-    // =====================================
-    // BOOKING NUMBER
-    // =====================================
-    // EXISTING LOGIC - UNCHANGED
-    // =====================================
+                ticketType: ticket.ticketType,
 
-    const bookingNumber =
-      `EVT_${Date.now()}_${randomUUID()
-        .replace(
-          /-/g,
-          "",
-        )
-        .slice(
-          0,
-          8,
-        )}`;
+                ticketAmount: new Prisma.Decimal(
+                  ticket.unitPrice,
+                ),
 
-    // =====================================
-    // CREATE BOOKING
-    // =====================================
+                status: "PENDING",
+              });
+            }
+          }
 
-    const booking =
-      await prisma
-        .eventBooking
-        .create({
-          data: {
-            userId,
+          if (ticketRecords.length !== checkout.ticketCount) {
+            throw new Error("Invalid generated ticket count");
+          }
 
-            eventId:
-              event.id,
-            eventDateId: eventDate.id,
+          // ==========================================
+          // STEP 8 - CREATE EVENT BOOKING
+          // ==========================================
 
-            bookingNumber,
+          const booking = await tx.eventBooking.create({
+            data: {
+              userId,
 
-            ticketCount,
+              eventId: checkout.eventId,
 
-            // Existing ticketAmount
-            // keeps discounted subtotal
-            ticketAmount:
-              roundAmount(
-                ticketAmount,
+              eventDateId: checkout.eventDateId,
+
+              bookingNumber,
+
+              ticketCount: checkout.ticketCount,
+
+              ticketAmount: new Prisma.Decimal(
+                checkout.ticketAmount,
               ),
 
-            // ✅ NEW CHANGE
-            discountAmount,
+              discountAmount: new Prisma.Decimal(
+                checkout.discountAmount,
+              ),
 
-            // ✅ NEW CHANGE
-            platformFee,
+              platformFee: new Prisma.Decimal(
+                checkout.platformFee,
+              ),
 
-            // ✅ NEW CHANGE
-            gstAmount,
+              gstAmount: new Prisma.Decimal(
+                checkout.gstAmount,
+              ),
 
-            // ✅ CHANGED
-            // Previously:
-            // totalAmount: ticketAmount
-            //
-            // Now:
-            // discounted ticket subtotal
-            // + platform fee
-            // + GST
-            totalAmount,
+              couponCode: checkout.couponCode,
 
-            paidAmount: 0,
+              totalAmount,
 
-            status:
-              EventBookingStatus
-                .PAYMENT_PENDING,
+              paidAmount: new Prisma.Decimal(0),
 
-            // =================================
-            // EXISTING TICKET CREATE LOGIC
-            // UNCHANGED
-            // =================================
+              status: EventBookingStatus.PAYMENT_PENDING,
 
-            tickets: {
-              create: [
-                ...Array.from(
-                  {
-                    length:
-                      menTicketCount,
-                  },
-                  () => ({
-                    ticketId:
-                      `TKT_${Date.now()}_${randomUUID()
-                        .replace(
-                          /-/g,
-                          "",
-                        )
-                        .slice(
-                          0,
-                          8,
-                        )}`,
+              // ======================================
+              // CREATE ALL TICKET RECORDS
+              // ======================================
 
-                    ticketType:
-                      "MEN" as const,
-
-                    ticketAmount:
-                      menPrice,
-
-                    status:
-                      "PENDING" as const,
-                  }),
-                ),
-
-                ...Array.from(
-                  {
-                    length:
-                      womenTicketCount,
-                  },
-                  () => ({
-                    ticketId:
-                      `TKT_${Date.now()}_${randomUUID()
-                        .replace(
-                          /-/g,
-                          "",
-                        )
-                        .slice(
-                          0,
-                          8,
-                        )}`,
-
-                    ticketType:
-                      "WOMEN" as const,
-
-                    ticketAmount:
-                      womenPrice,
-
-                    status:
-                      "PENDING" as const,
-                  }),
-                ),
-
-                ...Array.from(
-                  {
-                    length:
-                      otherTicketCount,
-                  },
-                  () => ({
-                    ticketId:
-                      `TKT_${Date.now()}_${randomUUID()
-                        .replace(
-                          /-/g,
-                          "",
-                        )
-                        .slice(
-                          0,
-                          8,
-                        )}`,
-
-                    ticketType:
-                      "OTHER" as const,
-
-                    ticketAmount:
-                      otherPrice,
-
-                    status:
-                      "PENDING" as const,
-                  }),
-                ),
-              ],
+              tickets: {
+                create: ticketRecords,
+              },
             },
-          },
 
-          include: {
-            tickets: true,
-          },
-        });
+            include: {
+              tickets: true,
+            },
+          });
 
-    // =====================================
-    // ✅ CHANGED
-    // =====================================
-    //
-    // Previously:
-    //
-    // amount: ticketAmount
-    //
-    // Now final total goes to Razorpay.
-    // =====================================
+          // ==========================================
+          // STEP 9 - RETURN BOOKING AND CHECKOUT
+          // ==========================================
 
-    return {
-      booking,
+          return {
+            booking,
 
-      amount:
-        totalAmount,
-    };
-  };
+            amount: totalAmount.toNumber(),
+
+            checkout,
+          };
+        },
+
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+
+          maxWait: 5000,
+
+          timeout: 30000,
+        },
+      );
+    } catch (error) {
+      // Retry concurrent transaction conflicts
+
+      if (
+        error instanceof
+          Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034" &&
+        attempt < 2
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Event booking transaction retry exhausted");
+};
+
 
 // ============================================
 // CREATE PAYMENT ORDER
@@ -1614,28 +1235,45 @@ export const createPaymentOrderService =
     // EVENT BOOKING
     // =========================================
 
-    if (
-      data.purpose ===
-      PaymentPurpose.EVENT_BOOKING
-    ) {
-      const eventResult =
-        await createEventBookingForPayment(
-          userId,
-          data,
-        );
+ if (
+  data.purpose === PaymentPurpose.EVENT_BOOKING
+) {
+  if (!data.eventId) {
+    throw new Error("Event ID is required");
+  }
 
-      // This now receives final total:
-      // ticket + platform fee + GST
-      amount =
-        eventResult.amount;
+  if (!data.eventDateId) {
+    throw new Error("Event date ID is required");
+  }
 
-      eventBooking =
-        eventResult.booking;
+  if (!data.tickets || data.tickets.length === 0) {
+    throw new Error("Tickets are required");
+  }
 
-      // VERY IMPORTANT
-      referenceId =
-        eventResult.booking.id;
-    } else {
+  const eventResult =
+    await createEventBookingForPayment(
+      userId,
+      {
+        purpose: PaymentPurpose.EVENT_BOOKING,
+
+        currency: data.currency || "INR",
+
+        eventId: data.eventId,
+
+        eventDateId: data.eventDateId,
+
+        tickets: data.tickets,
+
+        couponCode: data.couponCode,
+      },
+    );
+
+  amount = eventResult.amount;
+
+  eventBooking = eventResult.booking;
+
+  referenceId = eventResult.booking.id;
+}else {
       amount =
         Number(
           data.amount,
