@@ -187,6 +187,9 @@ const successfulRefundStatuses: Prisma.EventBookingWhereInput =
       by: ["eventId"],
 
       where: salesWhere,
+      orderBy: {
+    eventId: "asc",
+  },
     }),
 
     prisma.partnerAgreement.findMany({
