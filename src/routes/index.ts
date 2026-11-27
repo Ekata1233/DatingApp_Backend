@@ -107,7 +107,6 @@ import usersRoutes from "../features/admin/onboarding/users/users.route"
 
 import activityRoutes from "../features/user/activity/activity.routes"
 
-import userEventRoutes from "../features/user/events/userEvent.routes"
 
 const router = Router();
 
@@ -139,7 +138,7 @@ router.use("/payment", razorpayRoutes);
 
 // router.use("/users",usersRoutes)
 
-router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes,  privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes,userEventRoutes)
+router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, giftRoutes, datePlanUserBoostRoutes, compliRoutes,  privacyControlsRoutes, accountRoutes,boostPurchaseWallet,educationVefication,manualAadhaarRoutes)
 
 router.use("/user", mobileAuthRoutes, googleAuthRoutes, userManageRoutes, profileRoutes, referralRoutes, userWaitlistRoutes, roseRoutes, editProfileRoutes, compliRoutes,  payoutMethodRoutes)
 router.use("/user", blockRoutes)
@@ -274,7 +273,7 @@ import calculateRevenueRoutes from "../features/event-partner/events/revenue/rev
 import invoicesRoutes from "../features/event-partner/organizer-management/invoices/invoice.routes"
 import guestRoutes from "../features/event-partner/organizer-management/guests/guest.routes"
 import eventCheckoutRoute from "../features/event-partner/events/event.routes"
-
+import userEventRoutes from "../features/user/events/userEvent.routes"
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
@@ -291,8 +290,9 @@ router.use("/event-partner",calculateRevenueRoutes)
 
 router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
 router.use("/event-partner/organizer-management/", invoicesRoutes, guestRoutes)
-router.use("/user/", eventCheckoutRoute)
+router.use("/users/", eventCheckoutRoute,userEventRoutes)
 
+router.use("/users-event/",userEventRoutes)
 
 //===================================================
 //-----------------HOST ONBOARDING-------------------

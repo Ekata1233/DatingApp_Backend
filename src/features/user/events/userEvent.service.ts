@@ -1,5 +1,5 @@
 
-import { Prisma } from "@prisma/client";
+import { EventVisibility, Prisma } from "@prisma/client";
 
 import {
   GetUserEventsQuery,
@@ -43,28 +43,33 @@ const getDayName = (
 // GET USER EVENTS SERVICE
 // ======================================================
 
+
 export const getAllUserEventsService = async (
-  userId: string,
+  userId: string | null,
   query: GetUserEventsQuery,
 ) => {
   const now = new Date();
 
   const { page, limit } = query;
 
-  // STEP 1 - Get user's current membership
+  // STEP 1 - Resolve guest or authenticated user membership
 
-  const membership = await getUserEventMembership(
-    userId,
-    now,
-  );
+ const membership = userId
+  ? await getUserEventMembership(userId, now)
+  : {
+      packageType: "FREE" as const,
+
+      visibility: EventVisibility.FREE_AND_PREMIUM,
+    };
 
   console.log("[USER EVENTS] Membership:", {
     userId,
+    isAuthenticated: !!userId,
     packageType: membership.packageType,
     visibility: membership.visibility,
   });
 
-  // STEP 2 - Get published events
+  // STEP 2 - Get published events based on visibility
 
   const { events, total } =
     await findUserPublishedEvents(
@@ -285,6 +290,8 @@ export const getAllUserEventsService = async (
   // STEP 4 - Return response
 
   return {
+    isAuthenticated: !!userId,
+
     packageType: membership.packageType,
 
     visibility: membership.visibility,
