@@ -5,6 +5,8 @@ import {
   GetEventsQuery,
   EventFormat,
   EventServiceError,
+  CancelEventInput,
+  
 } from "./event.types";
 
 import { syncPublishedReactivationLifecycle } from "./event.reactivation.lifecycle";
@@ -1501,3 +1503,323 @@ export const expireEventsService = async () => {
     failedEventCount,
   };
 };
+
+// ======================================================
+// CANCEL NORMAL EVENT SERVICE
+// ======================================================
+
+export const cancelEventService = async (
+  businessId: string,
+  eventId: string,
+  input: CancelEventInput,
+) => {
+  return prisma.$transaction(
+    async (tx) => {
+      const now = new Date();
+
+      const {
+        eventDateId,
+        cancellationReason,
+      } = input;
+
+      // STEP 1 - Check event ownership
+
+      const event = await tx.event.findFirst({
+        where: {
+          id: eventId,
+          businessDetailsId: businessId,
+          isDeleted: false,
+          deletedAt: null,
+        },
+
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          eventReactiveStatus: true,
+        },
+      });
+
+      if (!event) {
+        throw new EventServiceError(
+          "Event not found",
+          404,
+        );
+      }
+
+      // STEP 2 - Prevent duplicate cancellation
+
+      if (event.status === "CANCELLED") {
+        throw new EventServiceError(
+          "Event is already cancelled",
+          409,
+        );
+      }
+
+      // STEP 3 - Validate parent event status
+
+      if (
+        event.status !== "PUBLISHED" &&
+        event.status !== "PAUSED"
+      ) {
+        throw new EventServiceError(
+          "Only published or paused events can be cancelled",
+          409,
+        );
+      }
+
+      // STEP 4 - Find selected event date
+
+      const eventDate = await tx.eventDate.findFirst({
+        where: {
+          id: eventDateId,
+          eventId,
+        },
+      });
+
+      if (!eventDate) {
+        throw new EventServiceError(
+          "Event date not found",
+          404,
+        );
+      }
+
+      // STEP 5 - Only allow original event dates
+
+      if (eventDate.reactivationId !== null) {
+        throw new EventServiceError(
+          "Please use the reactivation cancellation API for this event date",
+          409,
+        );
+      }
+
+      // STEP 6 - Prevent duplicate date cancellation
+
+      if (eventDate.status === "CANCELLED") {
+        throw new EventServiceError(
+          "This event date is already cancelled",
+          409,
+        );
+      }
+
+      // STEP 7 - Validate event date status
+
+      if (eventDate.status !== "SCHEDULED") {
+        throw new EventServiceError(
+          `Cannot cancel an event date with status ${eventDate.status}`,
+          409,
+        );
+      }
+
+      // STEP 8 - Validate event end time
+
+      if (
+        eventDate.endDateTime &&
+        eventDate.endDateTime <= now
+      ) {
+        throw new EventServiceError(
+          "Event end time has passed",
+          409,
+        );
+      }
+
+      // STEP 9 - Check active bookings
+
+      const activeBookings =
+        await tx.eventBooking.count({
+          where: {
+            eventId,
+            eventDateId,
+
+            status: {
+              in: [
+                "PENDING",
+                "PAYMENT_PENDING",
+                "CONFIRMED",
+                "REFUND_PENDING",
+                "ATTENDED",
+              ],
+            },
+          },
+        });
+
+      if (activeBookings > 0) {
+        throw new EventServiceError(
+          "This event date has active bookings. Resolve bookings and refunds before cancellation.",
+          409,
+        );
+      }
+
+      // STEP 10 - Cancel selected event date
+
+      const updatedDate =
+        await tx.eventDate.updateMany({
+          where: {
+            id: eventDateId,
+            eventId,
+            reactivationId: null,
+            status: "SCHEDULED",
+          },
+
+          data: {
+            status: "CANCELLED",
+            cancelledAt: now,
+            cancellationReason,
+          },
+        });
+
+      if (updatedDate.count !== 1) {
+        throw new EventServiceError(
+          "Event date status changed. Please retry.",
+          409,
+        );
+      }
+
+      // STEP 11 - Check remaining scheduled dates
+
+      const remainingDates =
+        await tx.eventDate.count({
+          where: {
+            eventId,
+            status: "SCHEDULED",
+          },
+        });
+
+      // STEP 12 - Finalize parent event only
+      // when no scheduled dates remain
+
+      if (remainingDates === 0) {
+        const originalDates =
+          await tx.eventDate.findMany({
+            where: {
+              eventId,
+              reactivationId: null,
+            },
+
+            select: {
+              status: true,
+            },
+          });
+
+        const hasCompletedDate =
+          originalDates.some(
+            (date) => date.status === "COMPLETED",
+          );
+
+        const hasExpiredDate =
+          originalDates.some(
+            (date) => date.status === "EXPIRED",
+          );
+
+        // Calculate final parent status
+
+        const finalStatus =
+          hasCompletedDate
+            ? "COMPLETED"
+            : hasExpiredDate
+              ? "EXPIRED"
+              : "CANCELLED";
+
+        const updatedEvent =
+          await tx.event.updateMany({
+            where: {
+              id: eventId,
+              businessDetailsId: businessId,
+              isDeleted: false,
+              deletedAt: null,
+              status: event.status,
+            },
+
+            data: {
+              status: finalStatus,
+
+              cancelledAt:
+                finalStatus === "CANCELLED"
+                  ? now
+                  : null,
+
+              cancellationReason:
+                finalStatus === "CANCELLED"
+                  ? cancellationReason
+                  : null,
+
+              completedAt:
+                finalStatus === "COMPLETED"
+                  ? now
+                  : null,
+
+              expiredAt:
+                finalStatus === "EXPIRED"
+                  ? now
+                  : null,
+            },
+          });
+
+        if (updatedEvent.count !== 1) {
+          throw new EventServiceError(
+            "Event status changed. Please retry.",
+            409,
+          );
+        }
+      }
+
+      // STEP 13 - Fetch updated event
+
+      const result =
+        await tx.event.findUniqueOrThrow({
+          where: {
+            id: eventId,
+          },
+
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            eventReactiveStatus: true,
+
+            cancelledAt: true,
+            cancellationReason: true,
+
+            pausedAt: true,
+            pauseReason: true,
+
+            completedAt: true,
+            expiredAt: true,
+
+            updatedAt: true,
+          },
+        });
+
+      // STEP 14 - Return response
+
+      return {
+        ...result,
+
+        eventDateId,
+
+        eventDateStatus: "CANCELLED",
+
+        eventDateCancelledAt: now,
+
+        eventDateCancellationReason:
+          cancellationReason,
+
+        remainingScheduledDates: remainingDates,
+      };
+    },
+
+    {
+      isolationLevel:
+        Prisma.TransactionIsolationLevel.Serializable,
+
+      maxWait: 5000,
+
+      timeout: 15000,
+    },
+  );
+};
+
+
+
+
+

@@ -121,10 +121,12 @@ export const reviewAdminEventController = async (
     );
 
     // STEP 4 - Prepare success message
-    const message =
-      event.status === "APPROVED"
-        ? "Event approved successfully"
-        : "Event rejected successfully";
+const message =
+  event.status === "UNDER_REVIEW"
+    ? "Event is now under review"
+    : event.status === "APPROVED"
+      ? "Event approved successfully"
+      : "Event rejected successfully";
 
     console.log(
       "[ADMIN EVENT REVIEW] Review completed",

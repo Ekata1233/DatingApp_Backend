@@ -520,3 +520,30 @@ export const completeEventSchema = z.object({
     .string()
     .uuid("Invalid event date ID"),
 }).strict();
+
+// ======================================================
+// CANCEL EVENT VALIDATION
+// ======================================================
+
+export const cancelEventSchema = z
+  .object({
+    eventDateId: z.string().uuid({
+      message: "Invalid event date ID",
+    }),
+
+    cancellationReason: z
+      .string()
+      .trim()
+      .min(1, "Cancellation reason is required")
+      .max(
+        1000,
+        "Cancellation reason cannot exceed 1000 characters",
+      ),
+  })
+  .strict();
+
+
+
+
+
+

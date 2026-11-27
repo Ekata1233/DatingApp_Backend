@@ -394,7 +394,16 @@ export const reviewAdminEventService = async (
           409
         );
       }
-
+// Prevent duplicate under-review status
+if (
+  existingEvent.status === "UNDER_REVIEW" &&
+  input.status === "UNDER_REVIEW"
+) {
+  throw new AdminEventServiceError(
+    "Event is already under review",
+    409
+  );
+}
       // STEP 5 - Validate current event status
       if (
         existingEvent.status !== "SUBMITTED" &&
@@ -406,19 +415,34 @@ export const reviewAdminEventService = async (
         );
       }
 
-      // STEP 6 - Prepare approval or rejection data
-      const updateData: Prisma.EventUpdateManyMutationInput =
-        input.status === "APPROVED"
-          ? {
-              status: "APPROVED",
-              approvedAt: new Date(),
-              rejectionReason: null,
-            }
-          : {
-              status: "REJECTED",
-              approvedAt: null,
-              rejectionReason: input.rejectionReason,
-            };
+    // STEP 6 - Prepare event review data
+let updateData: Prisma.EventUpdateManyMutationInput;
+
+switch (input.status) {
+  case "UNDER_REVIEW":
+    updateData = {
+      status: "UNDER_REVIEW",
+      approvedAt: null,
+      rejectionReason: null,
+    };
+    break;
+
+  case "APPROVED":
+    updateData = {
+      status: "APPROVED",
+      approvedAt: new Date(),
+      rejectionReason: null,
+    };
+    break;
+
+  case "REJECTED":
+    updateData = {
+      status: "REJECTED",
+      approvedAt: null,
+      rejectionReason: input.rejectionReason,
+    };
+    break;
+}
 
       // STEP 7 - Update event status
       const updatedEvent = await tx.event.updateMany({
@@ -428,12 +452,7 @@ export const reviewAdminEventService = async (
           isDeleted: false,
           deletedAt: null,
 
-          status: {
-            in: [
-              "SUBMITTED",
-              "UNDER_REVIEW",
-            ],
-          },
+          status: existingEvent.status,
         },
 
         data: updateData,

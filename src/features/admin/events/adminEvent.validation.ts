@@ -20,6 +20,11 @@ export const adminEventIdSchema = z.string().uuid({
 
 export const reviewAdminEventSchema = z
   .discriminatedUnion("status", [
+
+    // UNDER REVIEW EVENT
+z.object({
+  status: z.literal("UNDER_REVIEW"),
+}).strict(),
     // APPROVE EVENT
     z.object({
       status: z.literal("APPROVED"),

@@ -131,3 +131,50 @@ export const getReactivationQuerySchema = z
       .default(20),
   })
   .strict();
+
+  // ======================================================
+// PAUSE REACTIVATED EVENT VALIDATION
+// ======================================================
+
+export const pauseReactivationSchema = z
+  .object({
+    pauseReason: z
+      .string()
+      .trim()
+      .min(1, "Pause reason is required")
+      .max(1000, "Pause reason cannot exceed 1000 characters"),
+  })
+  .strict();
+
+// ======================================================
+// COMPLETE REACTIVATED EVENT VALIDATION
+// ======================================================
+
+export const completeReactivationSchema = z
+  .object({
+    eventDateId: z.string().uuid({
+      message: "Invalid event date ID",
+    }),
+  })
+  .strict();
+
+// ======================================================
+// CANCEL REACTIVATED EVENT VALIDATION
+// ======================================================
+
+export const cancelReactivationSchema = z
+  .object({
+    eventDateId: z.string().uuid({
+      message: "Invalid event date ID",
+    }),
+
+    cancellationReason: z
+      .string()
+      .trim()
+      .min(1, "Cancellation reason is required")
+      .max(
+        1000,
+        "Cancellation reason cannot exceed 1000 characters",
+      ),
+  })
+  .strict();

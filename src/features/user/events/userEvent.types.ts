@@ -35,3 +35,20 @@ export class UserEventServiceError extends Error {
     this.statusCode = statusCode;
   }
 }
+
+export interface TicketInput {
+  ticketType:
+    | "MEN"
+    | "WOMEN"
+    | "OTHER"
+    | "COUPLE";
+
+  quantity: number;
+}
+export interface CalculateEventCheckoutInput {
+  eventDateId: string;
+
+  tickets: TicketInput[];
+
+  couponCode?: string;
+}
