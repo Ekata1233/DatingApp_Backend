@@ -163,19 +163,19 @@ export const partnerAuthMiddleware = async (
     // SINGLE DEVICE SESSION
     // ==========================================
 
-    if (
-      !partner.sessionId ||
-      partner.sessionId !== decoded.sessionId
-    ) {
-      return res.status(401).json({
-        success: false,
+    // if (
+    //   !partner.sessionId ||
+    //   partner.sessionId !== decoded.sessionId
+    // ) {
+    //   return res.status(401).json({
+    //     success: false,
 
-        code: "SESSION_EXPIRED",
+    //     code: "SESSION_EXPIRED",
 
-        message:
-          "Session expired. Please login again",
-      });
-    }
+    //     message:
+    //       "Session expired. Please login again",
+    //   });
+    // }
 
     // ==========================================
     // ATTACH PARTNER TO REQUEST

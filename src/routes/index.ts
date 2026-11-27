@@ -272,6 +272,7 @@ import adminEventRoutes from "../features/admin/events/adminEvent.routes"
 import adminEventReactivationRoutes from "../features/admin/events/adminEventReactivation.routes"
 import calculateRevenueRoutes from "../features/event-partner/events/revenue/revenue.routes"
 import invoicesRoutes from "../features/event-partner/organizer-management/invoices/invoice.routes"
+import guestRoutes from "../features/event-partner/organizer-management/guests/guest.routes"
 import eventCheckoutRoute from "../features/event-partner/events/event.routes"
 
 
@@ -289,7 +290,7 @@ router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
 router.use("/event-partner",calculateRevenueRoutes)
 
 router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
-router.use("/event-partner/organizer-management/", invoicesRoutes)
+router.use("/event-partner/organizer-management/", invoicesRoutes, guestRoutes)
 router.use("/user/", eventCheckoutRoute)
 
 

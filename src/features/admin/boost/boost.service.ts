@@ -199,9 +199,10 @@ export const getAllBoostsService = async () => {
 
 // ✅ GET API for mob
 export const getBoostsService = async (
-  type?: BoostType
+  type?: BoostType,
+  userId?: string,
 ) => {
-  const [boosts, userBoosts] = await Promise.all([
+  const [boosts, balance] = await Promise.all([
     prisma.boost.findMany({
       where: {
         is_active: true,
@@ -226,25 +227,20 @@ export const getBoostsService = async (
       },
     }),
 
-    prisma.userBoost.findMany({
+    userId ? prisma.userBoost.aggregate({
       where: {
+        user_id: userId,
         is_active: true,
+        ...(type ? { Boost: { name: type } } : {}),
       },
-
-      select: {
+      _sum: {
         total_boosts: true,
       },
-    }),
+    }) : null,
   ]);
 
-  const availableBoost = userBoosts.reduce(
-    (total, boost) =>
-      total + boost.total_boosts,
-    0
-  );
-
   return {
-    availableBoost,
+    availableBoost: balance?._sum.total_boosts ?? 0,
 
     boosts: boosts.map((boost) => ({
       id: boost.id,
