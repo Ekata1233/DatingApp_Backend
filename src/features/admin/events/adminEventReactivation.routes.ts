@@ -9,17 +9,17 @@ import {
 const router = Router();
 
 router.get(
-  "/get-all",
+  "/event-reactivations/get-all",
   getAllAdminReactivationsController
 );
 
 router.get(
-  "/:reactivationId/get",
+  "/event-reactivations/:reactivationId/get",
   getAdminReactivationByIdController
 );
 
 router.patch(
-  "/:reactivationId/review",
+  "/event-reactivations/:reactivationId/review",
   reviewReactivationController
 );
 

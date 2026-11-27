@@ -36,11 +36,17 @@ const transactionOptions = {
 // VALIDATE ORIGINAL EVENT
 // ======================================================
 
+// ======================================================
+// VALIDATE ORIGINAL EVENT FOR REACTIVATION
+// ======================================================
+
 const validateOriginalEvent = async (
   tx: Prisma.TransactionClient,
   businessId: string,
   eventId: string
 ) => {
+  // 1. Validate event ownership
+
   const event = await tx.event.findFirst({
     where: {
       id: eventId,
@@ -57,17 +63,50 @@ const validateOriginalEvent = async (
     );
   }
 
- if (
-  event.status !== "COMPLETED" &&
-  event.status !== "EXPIRED" &&
-  event.status !== "PAUSED" &&
-  event.status !== "CANCELLED"
-) {
-  throw new EventServiceError(
-    "Only paused, completed, cancelled or expired events can be reactivated",
-    409,
-  );
-}
+  // 2. Prevent unapproved events from reactivation
+
+  if (
+    event.status !== "PUBLISHED" &&
+    event.status !== "COMPLETED" &&
+    event.status !== "EXPIRED" &&
+    event.status !== "PAUSED" &&
+    event.status !== "CANCELLED"
+  ) {
+    throw new EventServiceError(
+      "This event is not eligible for reactivation",
+      409
+    );
+  }
+
+  // 3. Check individual event date status
+
+  const eligibleEventDate = await tx.eventDate.findFirst({
+    where: {
+      eventId,
+
+      status: {
+        in: [
+          "CANCELLED",
+          "COMPLETED",
+          "EXPIRED",
+        ],
+      },
+    },
+
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+
+  if (!eligibleEventDate) {
+    throw new EventServiceError(
+      "Only cancelled, completed or expired event dates can be reactivated",
+      409
+    );
+  }
+
+  // 4. Return original event
 
   return event;
 };
@@ -159,22 +198,49 @@ const validateNewDates = async (
     );
   }
 
-  // Existing scheduled dates must not be silently
-  // replaced or republished.
+  // Prevent new dates from overlapping existing scheduled dates
 
-  const scheduledDates = await tx.eventDate.count({
+for (const date of dates) {
+  const overlappingDate = await tx.eventDate.findFirst({
     where: {
       eventId,
       status: "SCHEDULED",
+
+      startDateTime: {
+        lt: date.endDateTime,
+      },
+
+      OR: [
+        {
+          endDateTime: {
+            gt: date.startDateTime,
+          },
+        },
+        {
+          endDateTime: null,
+          startDateTime: {
+            gte: date.startDateTime,
+          },
+        },
+      ],
+    },
+
+    select: {
+      id: true,
+      startDateTime: true,
+      endDateTime: true,
     },
   });
 
-  if (scheduledDates > 0) {
+  if (overlappingDate) {
     throw new EventServiceError(
-      "Resolve existing scheduled dates before creating new event occurrences",
+      "New event date overlaps with an existing scheduled date",
       409
     );
   }
+}
+
+ 
 };
 
 // ======================================================
