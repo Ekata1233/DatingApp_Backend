@@ -22,6 +22,8 @@ const brandPageSelect = {
   tagline: true,
   description: true,
   instagramUrl: true,
+  website: true,
+  hostingSince: true,
 } as const satisfies Prisma.BusinessDetailsSelect;
 
 const formatBrandPage = ({
@@ -99,6 +101,8 @@ export const saveBrandPage = async (
         tagline: input.tagline,
         description: input.description === undefined ? undefined : input.description || null,
         instagramUrl: input.instagramUrl === undefined ? undefined : input.instagramUrl || null,
+        website: input.website === undefined ? undefined : input.website || null,
+        hostingSince: input.hostingSince === undefined ? undefined : input.hostingSince || null,
         logoUrl,
         coverPhotoUrl,
       },

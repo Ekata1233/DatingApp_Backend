@@ -11,6 +11,9 @@ export const brandPageSchema = z.object({
   description: z.string().trim().max(2000).nullish(),
   instagramUrl: z.string().trim().max(300)
     .pipe(z.union([z.literal(""), instagramUrlSchema])).nullish(),
+  website: z.string().trim().max(2048)
+    .pipe(z.union([z.literal(""), z.url({ protocol: /^https?$/ })])).nullish(),
+  hostingSince: z.string().trim().max(100).nullish(),
   removeCoverPhoto: z.union([z.literal("true"), z.literal("false"), z.boolean()])
     .optional().transform((value) => value === true || value === "true"),
 });

@@ -129,6 +129,8 @@ model User {
   relationshipsAsUser2             UserRelationship[]              @relation("RelationshipUser2")
   skills                           UserSkill[]
   verifications                    UserVerification[]
+  eventWaitlists                   EventWaitlist[]
+  eventBookingGuests               EventBookingGuest[]
   intention                        IntentionOption?                @relation(fields: [intentionId], references: [id])
   waitlist                         Waitlist?
 

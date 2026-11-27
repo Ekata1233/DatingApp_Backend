@@ -4,8 +4,27 @@ import { z } from "zod";
 import { PartnerRequest } from "../../../types/partnerAuth.types";
 import { getDocumentExtension } from "./bank-account.validation";
 import { getBrandImageExtension } from "./brand-page.validation";
-import { addOrganizerVenue, deleteOrganizerVenue, VenueUpload, VenueUploadError } from "./venue.service";
+import {
+  addOrganizerVenue,
+  deleteOrganizerVenue,
+  listOrganizerVenues,
+  VenueUpload,
+  VenueUploadError,
+} from "./venue.service";
 import { venueSchema } from "./venue.validation";
+
+export const listOrganizerVenuesController = async (
+  req: PartnerRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const data = await listOrganizerVenues(req.partner!.businessId!);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export const addOrganizerVenueController = async (
   req: PartnerRequest,

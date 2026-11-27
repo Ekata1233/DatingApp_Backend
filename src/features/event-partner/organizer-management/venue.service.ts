@@ -1,7 +1,31 @@
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../prisma/prismaClient";
 import imagekit from "../../../utils/imagekit";
 import { VenueInput } from "./venue.validation";
+
+const venueSelect = {
+  id: true,
+  businessId: true,
+  venueName: true,
+  fullAddress: true,
+  venueCapacity: true,
+  venueType: true,
+  arrangement: true,
+  nocDocumentName: true,
+  isActive: true,
+  photos: {
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, photoUrl: true, sortOrder: true },
+  },
+} satisfies Prisma.OrganizerVenueSelect;
+
+export const listOrganizerVenues = (businessId: string) =>
+  prisma.organizerVenue.findMany({
+    where: { businessId, isDeleted: false },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: venueSelect,
+  });
 
 export type VenueUpload = {
   bytes: Buffer;
@@ -71,21 +95,7 @@ export const addOrganizerVenue = async (
         nocDocumentName: noc?.originalName,
         photos: { create: photoRows },
       },
-      select: {
-        id: true,
-        businessId: true,
-        venueName: true,
-        fullAddress: true,
-        venueCapacity: true,
-        venueType: true,
-        arrangement: true,
-        nocDocumentName: true,
-        isActive: true,
-        photos: {
-          orderBy: { sortOrder: "asc" },
-          select: { id: true, photoUrl: true, sortOrder: true },
-        },
-      },
+      select: venueSelect,
     });
   } catch (error) {
     await Promise.all(uploadedIds.map((id) => imagekit.deleteFile(id).catch(() => {

@@ -113,6 +113,8 @@ model Event {
   eventReactiveStatus EventReactiveStatus?
   organizerVenueId    String?              @db.Uuid
   isDeleted           Boolean              @default(false)
+  cancelledAt         DateTime?
+  cancellationReason  String?
 
   // Relations
   photos         EventPhoto[]
@@ -173,14 +175,18 @@ model EventPhoto {
 }
 
 model EventDate {
-  id            String    @id @default(uuid()) @db.Uuid
-  eventId       String    @db.Uuid
-  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  startDateTime DateTime
-  endDateTime   DateTime?
-  gateOpensAt   DateTime?
-  timezone      String    @default("Asia/Kolkata")
-
+  id                 String          @id @default(uuid()) @db.Uuid
+  eventId            String          @db.Uuid
+  event              Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  startDateTime      DateTime
+  endDateTime        DateTime?
+  gateOpensAt        DateTime?
+  timezone           String          @default("Asia/Kolkata")
+  // Booking capacity and controls
+  totalGuestCapacity Int?
+  bookingOpensAt     DateTime?
+  bookingClosesAt    DateTime?
+  isBookingEnabled   Boolean         @default(true)
   status             EventDateStatus @default(SCHEDULED)
   isPrimary          Boolean         @default(false)
   isMoreDate         Boolean         @default(false)
@@ -188,9 +194,11 @@ model EventDate {
   cancellationReason String?
   reactivationId     String?         @db.Uuid
 
-  reviews      EventReview[]
-  bookings     EventBooking[]
-  reactivation EventReactivation? @relation(fields: [reactivationId], references: [id], onDelete: Restrict)
+  reviews           EventReview[]
+  bookings          EventBooking[]
+  ticketInventories EventTicketInventory[]
+  eventWaitlists    EventWaitlist[]
+  reactivation      EventReactivation?     @relation(fields: [reactivationId], references: [id], onDelete: Restrict)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -229,6 +237,7 @@ model EventReactivation {
   expiredAt           DateTime?
   completedAt         DateTime?
   cancelledAt         DateTime?
+  cancellationReason  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -524,59 +533,216 @@ model EventReview {
 }
 
 model EventBooking {
-  id                  String               @id @default(uuid()) @db.Uuid
-  userId              String               @db.Uuid
-  eventId             String               @db.Uuid
-  bookingNumber       String               @unique @db.VarChar(50)
-  ticketCount         Int                  @default(1)
-  ticketAmount        Decimal              @db.Decimal(10, 2)
-  platformFee         Decimal              @default(0) @db.Decimal(10, 2)
-  gstAmount           Decimal              @default(0) @db.Decimal(10, 2)
-  discountAmount      Decimal              @default(0) @db.Decimal(10, 2)
-  couponCode          String?              @db.VarChar(50)
-  totalAmount         Decimal              @db.Decimal(10, 2)
-  paidAmount          Decimal              @default(0) @db.Decimal(10, 2)
-  status              EventBookingStatus   @default(PENDING)
-  paymentId           String?              @unique @db.Uuid
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  cancellationComment String?              @db.VarChar(500)
-  cancellationReason  String?              @db.VarChar(100)
+  id                  String                    @id @default(uuid()) @db.Uuid
+  userId              String                    @db.Uuid
+  eventId             String                    @db.Uuid
+  bookingNumber       String                    @unique @db.VarChar(50)
+  ticketCount         Int                       @default(1)
+  ticketAmount        Decimal                   @db.Decimal(10, 2)
+  platformFee         Decimal                   @default(0) @db.Decimal(10, 2)
+  gstAmount           Decimal                   @default(0) @db.Decimal(10, 2)
+  discountAmount      Decimal                   @default(0) @db.Decimal(10, 2)
+  couponCode          String?                   @db.VarChar(50)
+  totalAmount         Decimal                   @db.Decimal(10, 2)
+  paidAmount          Decimal                   @default(0) @db.Decimal(10, 2)
+  paymentStatus       EventBookingPaymentStatus @default(UNPAID)
+  status              EventBookingStatus        @default(PENDING)
+  paymentId           String?                   @unique @db.Uuid
+  bookingSource       EventBookingSource        @default(MOBILE_APP)
+  confirmedAt         DateTime?
+  expiresAt           DateTime?
+  expiredAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  cancellationComment String?                   @db.VarChar(500)
+  cancellationReason  String?                   @db.VarChar(100)
   cancelledAt         DateTime?
-  refundAmount        Decimal?             @db.Decimal(10, 2)
+  eventSnapshot       Json?
+  pricingSnapshot     Json?
+  policySnapshot      Json?
+  // Terms acceptance
+  termsAcceptedAt     DateTime?
+  // Duplicate booking prevention
+  idempotencyKey      String?                   @unique
+  refundAmount        Decimal?                  @db.Decimal(10, 2)
   refundEligible      Boolean?
   refundReason        String?
-  refundReferenceId   String?              @db.VarChar(255)
+  refundReferenceId   String?                   @db.VarChar(255)
   refundRequestedAt   DateTime?
   refundedAt          DateTime?
-  event               Event                @relation(fields: [eventId], references: [id])
-  payment             Payment?             @relation(fields: [paymentId], references: [id])
-  user                User                 @relation(fields: [userId], references: [id])
-  eventDateId         String               @db.Uuid
-  eventDate           EventDate            @relation(fields: [eventDateId], references: [id], onDelete: Restrict)
+  refundStatus        EventBookingRefundStatus  @default(NOT_REQUESTED)
+  event               Event                     @relation(fields: [eventId], references: [id])
+  payment             Payment?                  @relation(fields: [paymentId], references: [id])
+  user                User                      @relation(fields: [userId], references: [id])
+  eventDateId         String                    @db.Uuid
+  eventDate           EventDate                 @relation(fields: [eventDateId], references: [id], onDelete: Restrict)
   tickets             EventBookingTicket[]
+  histories           EventBookingHistory[]
 
   @@index([userId])
   @@index([eventId])
   @@index([status])
   @@index([eventDateId, status])
+  @@index([userId, status, createdAt])
+  @@index([eventDateId, paymentStatus])
+  @@index([status, expiresAt])
+  @@index([createdAt])
 }
 
 model EventBookingTicket {
-  id           String            @id @default(uuid()) @db.Uuid
-  bookingId    String            @db.Uuid
-  ticketId     String            @unique @db.VarChar(50)
-  ticketType   EventTicketType
-  ticketAmount Decimal           @db.Decimal(10, 2)
-  qrCodeUrl    String?
-  status       EventTicketStatus @default(PENDING)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  booking      EventBooking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id                 String                 @id @default(uuid()) @db.Uuid
+  bookingId          String                 @db.Uuid
+  ticketId           String                 @unique @db.VarChar(50)
+  ticketType         EventTicketType
+  ticketAmount       Decimal                @db.Decimal(10, 2)
+  qrCodeUrl          String?
+  status             EventTicketStatus      @default(PENDING)
+  // Ticket pricing snapshot
+  basePrice          Decimal?               @db.Decimal(10, 2)
+  discountAmount     Decimal                @default(0) @db.Decimal(10, 2)
+  platformFee        Decimal                @default(0) @db.Decimal(10, 2)
+  gstAmount          Decimal                @default(0) @db.Decimal(10, 2)
+  totalAmount        Decimal?               @db.Decimal(10, 2)
+  // Number of guests covered by this ticket
+  guestCount         Int                    @default(1)
+  // Ticket security
+  qrTokenHash        String?                @unique
+  // Lifecycle
+  issuedAt           DateTime?
+  cancelledAt        DateTime?
+  checkedInAt        DateTime?
+  checkedOutAt       DateTime?
+  // Cancellation
+  cancellationReason String?
+  cancelledById      String?                @db.Uuid
+  cancelledByType    EventBookingActorType?
+  // Refund summary
+  refundedAmount     Decimal                @default(0) @db.Decimal(10, 2)
+  guests             EventBookingGuest[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  booking            EventBooking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 
   @@index([bookingId])
   @@index([ticketType])
   @@index([status])
+}
+
+enum EventTicketStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  CHECKED_IN
+  CHECKED_OUT
+  ATTENDED
+  NO_SHOW
+  EXPIRED
+}
+
+model EventBookingHistory {
+  id             String                @id @default(uuid()) @db.Uuid
+  bookingId      String                @db.Uuid
+  booking        EventBooking          @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  action         String
+  previousStatus EventBookingStatus?
+  newStatus      EventBookingStatus?
+  actorType      EventBookingActorType
+  actorId        String?               @db.Uuid
+  reason         String?
+  description    String?               @db.Text
+  previousData   Json?
+  newData        Json?
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+  @@index([actorType, actorId])
+  @@map("event_booking_histories")
+}
+
+model EventTicketInventory {
+  id                 String          @id @default(uuid()) @db.Uuid
+  eventDateId        String          @db.Uuid
+  eventDate          EventDate       @relation(fields: [eventDateId], references: [id], onDelete: Restrict)
+  ticketType         EventTicketType
+  totalCapacity      Int
+  reservedQuantity   Int             @default(0)
+  bookedQuantity     Int             @default(0)
+  // Number of guests per ticket
+  guestsPerTicket    Int             @default(1)
+  basePrice          Decimal         @db.Decimal(10, 2)
+  discountPercentage Decimal         @default(0) @db.Decimal(5, 2)
+  sellingPrice       Decimal         @db.Decimal(10, 2)
+  isActive           Boolean         @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventDateId, ticketType])
+  @@index([eventDateId, isActive])
+  @@map("event_ticket_inventories")
+}
+
+model EventBookingGuest {
+  id              String @id @default(uuid()) @db.Uuid
+  bookingTicketId String @db.Uuid
+
+  bookingTicket EventBookingTicket @relation(fields: [bookingTicketId], references: [id], onDelete: Restrict)
+
+  userId                String?   @db.Uuid
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  fullName              String
+  email                 String?
+  phoneNumber           String?
+  age                   Int?
+  gender                String?
+  isPrimaryGuest        Boolean   @default(false)
+  // Trip emergency contact
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  // Guest attendance
+  checkedInAt           DateTime?
+  checkedOutAt          DateTime?
+  isNoShow              Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingTicketId])
+  @@index([userId])
+  @@map("event_booking_guests")
+}
+
+model EventWaitlist {
+  id          String              @id @default(uuid()) @db.Uuid
+  eventDateId String              @db.Uuid
+  userId      String              @db.Uuid
+  eventDate   EventDate           @relation(fields: [eventDateId], references: [id], onDelete: Restrict)
+  user        User                @relation(fields: [userId], references: [id])
+  ticketType  EventTicketType
+  quantity    Int                 @default(1)
+  status      EventWaitlistStatus @default(WAITING)
+  offeredAt   DateTime?
+  expiresAt   DateTime?
+  convertedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventDateId, ticketType, status, createdAt])
+  @@index([userId, status])
+  @@map("event_waitlists")
+}
+
+enum EventWaitlistStatus {
+  WAITING
+  OFFERED
+  CONVERTED
+  EXPIRED
+  CANCELLED
 }
 
 enum EventReviewStatus {
@@ -727,11 +893,38 @@ enum EventBookingStatus {
   PENDING
   PAYMENT_PENDING
   CONFIRMED
+  PARTIALLY_CANCELLED
   CANCELLED
+  COMPLETED
+  EXPIRED
   REFUND_PENDING
   REFUNDED
   ATTENDED
-  EXPIRED
+}
+
+enum EventBookingPaymentStatus {
+  UNPAID
+  PROCESSING
+  PARTIALLY_PAID
+  PAID
+  FAILED
+}
+
+enum EventBookingRefundStatus {
+  NOT_REQUESTED
+  REQUESTED
+  PROCESSING
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+  REJECTED
+}
+
+enum EventBookingSource {
+  MOBILE_APP
+  WEBSITE
+  ORGANIZER
+  ADMIN
 }
 
 enum EventTicketType {
@@ -739,13 +932,6 @@ enum EventTicketType {
   WOMEN
   OTHER
   COUPLE
-}
-
-enum EventTicketStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  ATTENDED
 }
 
 enum EventAvailabilityStatus {
@@ -766,4 +952,13 @@ enum EventReactiveStatus {
   EXPIRED
   CANCELLED
   COMPLETED
+}
+
+enum EventBookingActorType {
+  USER
+  ORGANIZER
+  HOST
+  ADMIN
+  SYSTEM
+  PAYMENT_GATEWAY
 }
