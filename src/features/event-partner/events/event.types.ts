@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   saveEventSchema,
   getEventsQuerySchema,
+  cancelEventSchema,
 } from "./event.validation";
 
 export type SaveEventInput = z.infer<
@@ -45,4 +46,12 @@ export class EventServiceError extends Error {
     this.name = "EventServiceError";
     this.statusCode = statusCode;
   }
+
+
 }
+
+
+export type CancelEventInput = z.infer<
+  typeof cancelEventSchema
+>;
+

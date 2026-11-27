@@ -9,11 +9,14 @@ import {
   publishEventController,
   completeEventController,
   pauseEventController,
+  cancelEventController,
+  
 } from "./event.controller";
 
 import { partnerAuthMiddleware } from "../../../middleware/partnerAuth.middleware";
 import { requirePartnerRole } from "../../../middleware/partnerRole.middleware";
-import { createReactivationController, getAllReactivationsController, getReactivationByIdController, publishReactivationController, submitReactivationController, updateReactivationController } from "./event.reactivation.controller";
+import { cancelReactivationController, completeReactivationController, createReactivationController, getAllReactivationsController, getReactivationByIdController, pauseReactivationController, publishReactivationController, submitReactivationController, updateReactivationController } from "./event.reactivation.controller";
+import authMiddleware from "../../../middleware/auth.middleware";
 
 const router = Router();
 
@@ -67,11 +70,21 @@ router.patch(
   "/events/:eventId/complete",
   completeEventController
 );
+
+// ======================================================
+// CANCEL NORMAL EVENT
+// ======================================================
+
+router.patch(
+  "/events/:eventId/cancel",
+  cancelEventController,
+);
 // SOFT DELETE
 router.delete(
   "/events/:eventId/delete",
   deleteEventController
 );
+
 
 
 
@@ -120,6 +133,33 @@ router.patch(
 router.patch(
   "/events/:eventId/reactivate/:reactivationId/publish",
   publishReactivationController
+);
+
+// ======================================================
+// PAUSE REACTIVATED EVENT
+// ======================================================
+
+router.patch(
+  "/events/:eventId/reactivate/:reactivationId/pause",
+  pauseReactivationController,
+);
+
+// ======================================================
+// COMPLETE REACTIVATED EVENT
+// ======================================================
+
+router.patch(
+  "/events/:eventId/reactivate/:reactivationId/complete",
+  completeReactivationController,
+);
+
+// ======================================================
+// CANCEL REACTIVATED EVENT
+// ======================================================
+
+router.patch(
+  "/events/:eventId/reactivate/:reactivationId/cancel",
+  cancelReactivationController,
 );
 
 export default router;

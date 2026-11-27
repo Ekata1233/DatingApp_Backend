@@ -12,7 +12,7 @@ router.get(
   "/events/get-all-list",
   getAllAdminEventsController
 );
-
+// UNDER REVIEW / APPROVE / REJECT EVENT
 router.patch(
   "/events/:eventId/review",
   reviewAdminEventController

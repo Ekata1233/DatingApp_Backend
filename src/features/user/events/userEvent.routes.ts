@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  calculateEventCheckoutController,
   getAllUserEventsController,
 } from "./userEvent.controller";
 import authMiddleware from "../../../middleware/auth.middleware";
@@ -15,5 +16,9 @@ router.get(
   authMiddleware,
   getAllUserEventsController
 );
-
+router.post(
+  "/events/:eventId/checkout/calculate",
+  authMiddleware,
+  calculateEventCheckoutController,
+);
 export default router;

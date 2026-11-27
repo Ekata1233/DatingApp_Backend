@@ -197,46 +197,154 @@ export const reviewReactivationService = async (
 
       // APPROVE
 
-      else if (input.status === "APPROVED") {
-        if (
-          reactivation.event.status !== "COMPLETED" &&
-          reactivation.event.status !== "EXPIRED" &&
-          reactivation.event.status !== "PAUSED"
-        ) {
-          throw new EventServiceError(
-            "Original event is no longer eligible for reactivation",
-            409
-          );
-        }
+      // APPROVE
 
-        if (reactivation.dates.length === 0) {
-          throw new EventServiceError(
-            "Reactivation dates are missing",
-            400
-          );
-        }
+else if (input.status === "APPROVED") {
 
-        const invalidDate = reactivation.dates.some(
-          (date) =>
-            date.startDateTime <= now ||
-            date.endDateTime <= date.startDateTime
-        );
+  // 1. Validate main event status
 
-        if (invalidDate) {
-          throw new EventServiceError(
-            "Proposed dates have expired or are invalid. Reject the request and ask the organizer to update them.",
-            400
-          );
-        }
+  if (
+    reactivation.event.status !== "PUBLISHED" &&
+    reactivation.event.status !== "COMPLETED" &&
+    reactivation.event.status !== "EXPIRED" &&
+    reactivation.event.status !== "PAUSED" &&
+    reactivation.event.status !== "CANCELLED"
+  ) {
+    throw new EventServiceError(
+      "Original event is no longer eligible for reactivation",
+      409
+    );
+  }
 
-        updateData = {
-          status: "APPROVED",
-          reviewedAt: now,
-          approvedAt: now,
-          rejectedAt: null,
-          rejectionReason: null,
-        };
-      }
+  // 2. Validate existing event date status
+
+  const eligibleEventDate = await tx.eventDate.findFirst({
+    where: {
+      eventId: reactivation.eventId,
+
+      status: {
+        in: [
+          "CANCELLED",
+          "COMPLETED",
+          "EXPIRED",
+        ],
+      },
+    },
+
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+
+  if (!eligibleEventDate) {
+    throw new EventServiceError(
+      "Only cancelled, completed or expired event dates can be reactivated",
+      409
+    );
+  }
+
+  // 3. Validate proposed reactivation dates
+
+  if (reactivation.dates.length === 0) {
+    throw new EventServiceError(
+      "Reactivation dates are missing",
+      400
+    );
+  }
+
+  const invalidDate = reactivation.dates.some(
+    (date) =>
+      date.startDateTime <= now ||
+      date.endDateTime <= date.startDateTime
+  );
+
+  if (invalidDate) {
+    throw new EventServiceError(
+      "Proposed dates have expired or are invalid. Reject the request and ask the organizer to update them.",
+      400
+    );
+  }
+
+  // 4. Prevent duplicate dates
+
+  const duplicateDate = await tx.eventDate.findFirst({
+    where: {
+      eventId: reactivation.eventId,
+
+      startDateTime: {
+        in: reactivation.dates.map(
+          (date) => date.startDateTime
+        ),
+      },
+    },
+
+    select: {
+      id: true,
+    },
+  });
+
+  if (duplicateDate) {
+    throw new EventServiceError(
+      "One of the proposed dates already exists for this event",
+      409
+    );
+  }
+
+  // 5. Prevent overlap with existing scheduled dates
+
+  for (const date of reactivation.dates) {
+    const overlappingDate = await tx.eventDate.findFirst({
+      where: {
+        eventId: reactivation.eventId,
+
+        status: "SCHEDULED",
+
+        startDateTime: {
+          lt: date.endDateTime,
+        },
+
+        OR: [
+          {
+            endDateTime: {
+              gt: date.startDateTime,
+            },
+          },
+          {
+            endDateTime: null,
+
+            startDateTime: {
+              gte: date.startDateTime,
+            },
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+        startDateTime: true,
+        endDateTime: true,
+      },
+    });
+
+    if (overlappingDate) {
+      throw new EventServiceError(
+        "Proposed date overlaps with an existing scheduled event date",
+        409
+      );
+    }
+  }
+
+  // 6. Approve reactivation request
+
+  updateData = {
+    status: "APPROVED",
+    reviewedAt: now,
+    approvedAt: now,
+    rejectedAt: null,
+    rejectionReason: null,
+  };
+}
 
       // REJECT
 

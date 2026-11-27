@@ -11,6 +11,9 @@ import {
   reactivationIdSchema,
   saveReactivationSchema,
   getReactivationQuerySchema,
+  pauseReactivationSchema,
+  completeReactivationSchema,
+  cancelReactivationSchema,
 } from "./event.reactivation.validation";
 
 import {
@@ -20,6 +23,9 @@ import {
   publishReactivationService,
   getAllReactivationsService,
   getReactivationByIdService,
+  pauseReactivationService,
+  completeReactivationService,
+  cancelReactivationService,
 } from "./event.reactivation.service";
 
 // ======================================================
@@ -238,6 +244,153 @@ export const getReactivationByIdController = async (
       data: result,
     });
   } catch (error) {
+    return handleEventError(error, res);
+  }
+};
+
+
+// ======================================================
+// PAUSE REACTIVATED EVENT CONTROLLER
+// ======================================================
+
+export const pauseReactivationController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const organizer = getOrganizer(req);
+
+    const eventId = eventIdSchema.parse(
+      req.params.eventId,
+    );
+
+    const reactivationId = reactivationIdSchema.parse(
+      req.params.reactivationId,
+    );
+
+    const input = pauseReactivationSchema.parse(
+      req.body,
+    );
+
+    const result = await pauseReactivationService(
+      organizer.businessId,
+      eventId,
+      reactivationId,
+      input,
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Reactivated event paused successfully",
+
+      data: result,
+    });
+
+  } catch (error) {
+    console.error(
+      "[PAUSE REACTIVATION] Error:",
+      error,
+    );
+
+    return handleEventError(error, res);
+  }
+};
+
+// ======================================================
+// COMPLETE REACTIVATED EVENT CONTROLLER
+// ======================================================
+
+export const completeReactivationController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const organizer = getOrganizer(req);
+
+    const eventId = eventIdSchema.parse(
+      req.params.eventId,
+    );
+
+    const reactivationId = reactivationIdSchema.parse(
+      req.params.reactivationId,
+    );
+
+    const input = completeReactivationSchema.parse(
+      req.body,
+    );
+
+    const result = await completeReactivationService(
+      organizer.businessId,
+      eventId,
+      reactivationId,
+      input,
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Reactivated event date completed successfully",
+
+      data: result,
+    });
+
+  } catch (error) {
+    console.error(
+      "[COMPLETE REACTIVATION] Error:",
+      error,
+    );
+
+    return handleEventError(error, res);
+  }
+};
+
+// ======================================================
+// CANCEL REACTIVATED EVENT CONTROLLER
+// ======================================================
+
+export const cancelReactivationController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const organizer = getOrganizer(req);
+
+    const eventId = eventIdSchema.parse(
+      req.params.eventId,
+    );
+
+    const reactivationId = reactivationIdSchema.parse(
+      req.params.reactivationId,
+    );
+
+    const input = cancelReactivationSchema.parse(
+      req.body,
+    );
+
+    const result = await cancelReactivationService(
+      organizer.businessId,
+      eventId,
+      reactivationId,
+      input,
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Reactivated event date cancelled successfully",
+
+      data: result,
+    });
+
+  } catch (error) {
+    console.error(
+      "[CANCEL REACTIVATION] Error:",
+      error,
+    );
+
     return handleEventError(error, res);
   }
 };

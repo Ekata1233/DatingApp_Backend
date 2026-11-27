@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 
 import { Prisma } from "@prisma/client";
 
@@ -10,6 +10,8 @@ import {
   eventIdSchema,
   pauseEventSchema,
   completeEventSchema,
+  cancelEventSchema,
+  
 } from "./event.validation";
 
 import {
@@ -21,6 +23,8 @@ import {
   publishEventService,
   pauseEventService,
   completeEventService,
+  cancelEventService,
+  
 } from "./event.service";
 
 import { OrganizerContext, EventServiceError } from "./event.types";
@@ -909,6 +913,83 @@ export const completeEventController = async (
     console.error(
       "[COMPLETE EVENT] Failed:",
       error
+    );
+
+    return handleEventError(error, res);
+  }
+};
+
+// ======================================================
+// CANCEL NORMAL EVENT CONTROLLER
+// ======================================================
+
+export const cancelEventController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    console.log(
+      "[CANCEL EVENT] Request received",
+    );
+
+    // STEP 1 - Get authenticated organizer
+
+    const organizer = getOrganizer(req);
+
+    // STEP 2 - Validate event ID
+
+    const eventId = eventIdSchema.parse(
+      req.params.eventId,
+    );
+
+    // STEP 3 - Validate request body
+
+    const input = cancelEventSchema.parse(
+      req.body,
+    );
+
+    console.log("[CANCEL EVENT] Request details", {
+      businessId: organizer.businessId,
+      eventId,
+      eventDateId: input.eventDateId,
+    });
+
+    // STEP 4 - Cancel event date
+
+    const result = await cancelEventService(
+      organizer.businessId,
+      eventId,
+      input,
+    );
+
+    console.log(
+      "[CANCEL EVENT] Successfully cancelled",
+      {
+        eventId,
+        eventDateId: input.eventDateId,
+        status: result.status,
+        remainingScheduledDates:
+          result.remainingScheduledDates,
+      },
+    );
+
+    // STEP 5 - Return response
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        result.status === "CANCELLED"
+          ? "Event cancelled successfully"
+          : "Event date cancelled successfully",
+
+      data: result,
+    });
+
+  } catch (error) {
+    console.error(
+      "[CANCEL EVENT] Error:",
+      error,
     );
 
     return handleEventError(error, res);
