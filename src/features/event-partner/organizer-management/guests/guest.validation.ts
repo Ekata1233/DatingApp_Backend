@@ -5,7 +5,9 @@ export const guestListParamsSchema = z.object({
 });
 
 export const guestListQuerySchema = z.object({
-  eventDateId: z.string().uuid("Invalid event date ID"),
+  eventDateId: z
+    .string()
+    .uuid("Invalid event date ID"),
 
   type: z
     .enum([
@@ -16,7 +18,11 @@ export const guestListQuerySchema = z.object({
     ])
     .default("all"),
 
-  search: z.string().trim().max(100).optional(),
+  search: z
+    .string()
+    .trim()
+    .max(100)
+    .optional(),
 
   page: z.coerce
     .number()

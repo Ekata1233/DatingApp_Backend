@@ -22,6 +22,7 @@ export const getGuestListController = async (
   try {
     const partner = (req as any).partner;
 
+    // Authentication
     if (!partner?.id) {
       return res.status(401).json({
         success: false,
@@ -29,6 +30,7 @@ export const getGuestListController = async (
       });
     }
 
+    // Validate business access
     if (!partner.businessId) {
       return res.status(403).json({
         success: false,
@@ -36,11 +38,22 @@ export const getGuestListController = async (
       });
     }
 
+    // Validate partner role
+    if (
+      partner.role !== "ORGANIZER" &&
+      partner.role !== "HOST"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
 
-    // Validate route parameters
-
+    // Validate route params
     const paramsResult =
-      guestListParamsSchema.safeParse(req.params);
+      guestListParamsSchema.safeParse(
+        req.params,
+      );
 
     if (!paramsResult.success) {
       return res.status(400).json({
@@ -50,11 +63,11 @@ export const getGuestListController = async (
       });
     }
 
-
-    // Validate query parameters
-
+    // Validate query params
     const queryResult =
-      guestListQuerySchema.safeParse(req.query);
+      guestListQuerySchema.safeParse(
+        req.query,
+      );
 
     if (!queryResult.success) {
       return res.status(400).json({
@@ -63,7 +76,6 @@ export const getGuestListController = async (
         errors: queryResult.error.flatten(),
       });
     }
-
 
     const { eventId } = paramsResult.data;
 
@@ -75,19 +87,20 @@ export const getGuestListController = async (
       limit,
     } = queryResult.data;
 
-
-    // Call service
-
+    // Fetch guest list
     const data = await getGuestListService({
+      partnerId: partner.id,
       businessId: partner.businessId,
+      role: partner.role,
+
       eventId,
       eventDateId,
+
       type,
       search,
       page,
       limit,
     });
-
 
     return res.status(200).json({
       success: true,
@@ -95,8 +108,11 @@ export const getGuestListController = async (
       data,
     });
 
-  } catch (error: any) {
-    console.error("Get Guest List Error:", error);
+  } catch (error: unknown) {
+    console.error(
+      "Get Guest List Error:",
+      error,
+    );
 
     if (error instanceof GuestListError) {
       return res.status(error.statusCode).json({

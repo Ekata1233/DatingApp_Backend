@@ -10,8 +10,12 @@ export type GuestAttendanceStatus =
   | "CANCELLED"
   | "NO_SHOW";
 
+  export type GuestPartnerRole = "ORGANIZER" | "HOST";
+
 export interface GetGuestListParams {
+  partnerId: string;
   businessId: string;
+  role: GuestPartnerRole;
   eventId: string;
   eventDateId: string;
   type: GuestListType;
@@ -54,4 +58,18 @@ export interface GuestListItem {
   checkedOutAt: Date | null;
 
   canCheckIn: boolean;
+  isFirstWelvorsEvent: boolean | null;
+attendanceLabel: string;
+}
+
+export interface GuestPermissions {
+  canViewGuestList: boolean;
+  canCheckInGuests: boolean;
+}
+
+export interface GuestGenderCounts {
+  women: number;
+  men: number;
+  other: number;
+  unknown: number;
 }

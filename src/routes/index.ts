@@ -274,6 +274,8 @@ import calculateRevenueRoutes from "../features/event-partner/events/revenue/rev
 import invoicesRoutes from "../features/event-partner/organizer-management/invoices/invoice.routes"
 import guestRoutes from "../features/event-partner/organizer-management/guests/guest.routes"
 import eventCheckoutRoute from "../features/event-partner/events/event.routes"
+import myEventRoutes from "../features/event-partner/organizer-management/my-events/myEvent.routes"
+import hostEventRoutes from "../features/event-partner/host-management/host.routes"
 
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
@@ -290,7 +292,8 @@ router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
 router.use("/event-partner",calculateRevenueRoutes)
 
 router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
-router.use("/event-partner/organizer-management/", invoicesRoutes, guestRoutes)
+router.use("/event-partner/organizer-management/", invoicesRoutes, guestRoutes, myEventRoutes)
+router.use("/event-partner/host-management/", hostEventRoutes)
 router.use("/user/", eventCheckoutRoute)
 
 
