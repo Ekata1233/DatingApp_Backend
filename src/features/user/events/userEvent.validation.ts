@@ -77,3 +77,7 @@ export const calculateEventCheckoutSchema = z
 export const checkoutEventIdSchema = z.string().uuid({
   message: "Invalid event ID",
 });
+
+export const getUserEventIdSchema = z.string().uuid({
+  message: "Invalid event ID",
+});

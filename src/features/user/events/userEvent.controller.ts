@@ -5,12 +5,14 @@ import { ZodError } from "zod";
 import {
   calculateEventCheckoutSchema,
   checkoutEventIdSchema,
+  getUserEventIdSchema,
   getUserEventsQuerySchema,
 } from "./userEvent.validation";
 
 import {
   calculateEventCheckout,
   getAllUserEventsService,
+  getUserEventByIdService,
 } from "./userEvent.service";
 
 import {
@@ -125,6 +127,126 @@ export const getAllUserEventsController = async (
       success: false,
 
       message: "Failed to fetch events",
+    });
+  }
+};
+
+// ======================================================
+// GET USER EVENT DETAILS BY ID CONTROLLER
+// ======================================================
+
+export const getUserEventByIdController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    console.log(
+      "[USER EVENT DETAILS] Request received",
+    );
+
+    // ==================================================
+    // STEP 1 - GET OPTIONAL AUTHENTICATED USER
+    // ==================================================
+
+    const user = (
+      req as Request & {
+        user?: {
+          userId?: string;
+          id?: string;
+        };
+      }
+    ).user;
+
+    const authenticatedUserId =
+      user?.userId ?? user?.id ?? null;
+
+    // ==================================================
+    // STEP 2 - VALIDATE EVENT ID
+    // ==================================================
+
+    const eventId = getUserEventIdSchema.parse(
+      req.params.eventId,
+    );
+
+    console.log("[USER EVENT DETAILS] Request data:", {
+      eventId,
+      userId: authenticatedUserId,
+      isAuthenticated: !!authenticatedUserId,
+    });
+
+    // ==================================================
+    // STEP 3 - FETCH EVENT DETAILS
+    // ==================================================
+
+    const data = await getUserEventByIdService(
+      eventId,
+      authenticatedUserId,
+    );
+
+    // ==================================================
+    // STEP 4 - PREVENT USER SPECIFIC RESPONSE CACHING
+    // ==================================================
+
+    res.setHeader(
+      "Cache-Control",
+      "private, no-store",
+    );
+
+    // ==================================================
+    // STEP 5 - RETURN SUCCESS RESPONSE
+    // ==================================================
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Event details fetched successfully",
+
+      data,
+    });
+
+  } catch (error) {
+    console.error(
+      "[USER EVENT DETAILS] Error:",
+      error,
+    );
+
+    // ==================================================
+    // VALIDATION ERROR
+    // ==================================================
+
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+
+        message: "Invalid request parameters",
+
+        errors: error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
+    }
+
+    // ==================================================
+    // SERVICE ERROR
+    // ==================================================
+
+    if (error instanceof UserEventServiceError) {
+      return res.status(error.statusCode).json({
+        success: false,
+
+        message: error.message,
+      });
+    }
+
+    // ==================================================
+    // INTERNAL SERVER ERROR
+    // ==================================================
+
+    return res.status(500).json({
+      success: false,
+
+      message: "Failed to fetch event details",
     });
   }
 };

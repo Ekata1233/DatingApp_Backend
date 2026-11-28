@@ -4,6 +4,7 @@ import { EventVisibility, Prisma } from "@prisma/client";
 import {
   GetUserEventsQuery,
   TicketInput,
+  UserEventServiceError,
 } from "./userEvent.types";
 
 import {
@@ -311,6 +312,520 @@ export const getAllUserEventsService = async (
     },
   };
 };
+
+
+ // ======================================================
+// GET PUBLISHED USER EVENT DETAILS BY ID
+// ======================================================
+
+export const getUserEventByIdService = async (
+  eventId: string,
+  userId: string | null,
+) => {
+  const now = new Date();
+
+  console.log("[USER EVENT DETAILS] Request:", {
+    eventId,
+    userId,
+    isAuthenticated: !!userId,
+  });
+
+  // ====================================================
+  // STEP 1 - RESOLVE USER MEMBERSHIP
+  // ====================================================
+
+  const membership = userId
+    ? await getUserEventMembership(userId, now)
+    : {
+        packageType: "FREE" as const,
+
+        visibility:
+          EventVisibility.FREE_AND_PREMIUM,
+      };
+
+  console.log("[USER EVENT DETAILS] Membership:", {
+    packageType: membership.packageType,
+    visibility: membership.visibility,
+  });
+
+  // ====================================================
+  // STEP 2 - NORMALIZE EVENT VISIBILITY
+  // ====================================================
+
+  const allowedVisibilities: EventVisibility[] =
+    Array.isArray(membership.visibility)
+      ? membership.visibility
+      : [membership.visibility];
+
+  // ====================================================
+  // STEP 3 - AVAILABLE EVENT DATE FILTER
+  // ====================================================
+
+  const availableDateWhere: Prisma.EventDateWhereInput = {
+    status: "SCHEDULED",
+
+    startDateTime: {
+      gt: now,
+    },
+
+    OR: [
+      {
+        reactivationId: null,
+      },
+      {
+        reactivation: {
+          is: {
+            status: "PUBLISHED",
+          },
+        },
+      },
+    ],
+  };
+
+  // ====================================================
+  // STEP 4 - FETCH PUBLISHED EVENT DETAILS
+  // ====================================================
+
+  const event = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+
+      status: "PUBLISHED",
+
+      isDeleted: false,
+
+      deletedAt: null,
+
+      visibility: {
+        in: allowedVisibilities,
+      },
+
+      dates: {
+        some: availableDateWhere,
+      },
+    },
+
+    select: {
+      // ================================================
+      // BASIC EVENT DETAILS
+      // ================================================
+
+      id: true,
+      businessDetailsId: true,
+
+      eventDurationType: true,
+      tripType: true,
+
+      categoryId: true,
+
+      title: true,
+      tagline: true,
+      about: true,
+      visibility: true,
+
+      highlightsCaption: true,
+      experienceSubtitle: true,
+
+      // ================================================
+      // EVENT CATEGORY
+      // ================================================
+
+      category: {
+        select: {
+          id: true,
+          label: true,
+          value: true,
+          icon: true,
+          eventDurationType: true,
+          sortOrder: true,
+          isActive: true,
+        },
+      },
+
+      // ================================================
+      // EVENT AND HIGHLIGHT PHOTOS
+      // ================================================
+
+      photos: {
+        where: {
+          photoType: {
+            in: ["EVENT", "HIGHLIGHT"],
+          },
+        },
+
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          eventId: true,
+          photoUrl: true,
+          photoType: true,
+          sortOrder: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+
+      // ================================================
+      // EVENT DATES
+      // ================================================
+
+      dates: {
+        where: availableDateWhere,
+
+        orderBy: {
+          startDateTime: "asc",
+        },
+
+        select: {
+          id: true,
+          eventId: true,
+
+          startDateTime: true,
+          endDateTime: true,
+          gateOpensAt: true,
+
+          timezone: true,
+          status: true,
+
+          isPrimary: true,
+          isMoreDate: true,
+
+          reactivationId: true,
+        },
+      },
+
+      // ================================================
+      // EVENT VENUE
+      // ================================================
+
+      venue: {
+        select: {
+          id: true,
+
+          venueName: true,
+          fullAddress: true,
+          venueType: true,
+          venueCapacity: true,
+
+          whySpecial: true,
+          tags: true,
+          photoUrl: true,
+
+          exactMeetingPoint: true,
+          distanceFromCity: true,
+          landmark: true,
+          parking: true,
+          publicTransport: true,
+
+          googleMapsLink: true,
+          latitude: true,
+          longitude: true,
+        },
+      },
+
+      // ================================================
+      // EVENT EXPERIENCE
+      // ================================================
+
+      experience: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          icon: true,
+          time: true,
+          title: true,
+          description: true,
+          photoUrl: true,
+          tags: true,
+          location: true,
+          sortOrder: true,
+        },
+      },
+
+      // ================================================
+      // EVENT PRICE TYPE
+      // ================================================
+
+      priceType: true,
+
+      // ================================================
+      // EVENT CAPACITY
+      // ================================================
+
+      totalCapacity: true,
+
+      menCapacity: true,
+      womenCapacity: true,
+      otherCapacity: true,
+      coupleCapacity: true,
+
+      // ================================================
+      // ORIGINAL ENTRY PRICES
+      // ================================================
+
+      menEntryPrice: true,
+      womenEntryPrice: true,
+      otherEntryPrice: true,
+      coupleEntryPrice: true,
+
+      // ================================================
+      // DISCOUNT PERCENTAGES
+      // ================================================
+
+      menDiscountPercentage: true,
+      womenDiscountPercentage: true,
+      otherDiscountPercentage: true,
+      coupleDiscountPercentage: true,
+
+      // ================================================
+      // DISCOUNTED ENTRY PRICES
+      // ================================================
+
+      menDiscountedPrice: true,
+      womenDiscountedPrice: true,
+      otherDiscountedPrice: true,
+      coupleDiscountedPrice: true,
+
+      maxTicketsPerPerson: true,
+      waitlistEnabled: true,
+
+      // ================================================
+      // CROWD AND AGE DETAILS
+      // ================================================
+
+      crowdMix: true,
+      minAge: true,
+      maxAge: true,
+      groupSize: true,
+      intent: true,
+
+      // ================================================
+      // EVENT INCLUSIONS
+      // ================================================
+
+      included: true,
+      notIncluded: true,
+
+      // ================================================
+      // BEFORE YOU GO
+      // ================================================
+
+      whatToBring: true,
+      dressCode: true,
+
+      // ================================================
+      // GROUP CHAT DETAILS
+      // ================================================
+
+      groupChatTitle: true,
+      groupChatDescription: true,
+      groupChatOpensAt: true,
+
+      // ================================================
+      // EVENT REMINDERS
+      // ================================================
+
+      reminderTitle: true,
+      reminderDescription: true,
+      reminderTimes: true,
+
+      // ================================================
+      // PUBLIC HOST DETAILS
+      // ================================================
+
+      hostId: true,
+      hostPhotoUrl: true,
+      hostTitle: true,
+      hostSpeciality: true,
+      hostLanguages: true,
+      hostMessage: true,
+
+      host: {
+        select: {
+          id: true,
+        },
+      },
+
+      // ================================================
+      // AFTER EVENT
+      // ================================================
+
+      afterEventLine: true,
+
+      // ================================================
+      // EVENT POLICIES
+      // ================================================
+
+      cancellationPolicy: true,
+      cancellationDescription: true,
+      refundPolicy: true,
+      reschedulingPolicy: true,
+
+      // ================================================
+      // SAFETY AND RULES
+      // ================================================
+
+      rules: true,
+      safetyOptions: true,
+
+      // ================================================
+      // MULTI DAY TRIP DETAILS
+      // ================================================
+
+      tripDetails: {
+        select: {
+          totalDays: true,
+
+          journeyThere: true,
+          journeyBack: true,
+
+          pickupCity: true,
+          pickupPoint: true,
+          exactPickupSpot: true,
+
+          destinationPlace: true,
+          destinationArea: true,
+
+          stays: {
+            select: {
+              amenities: true,
+            },
+          },
+
+          days: {
+            orderBy: {
+              dayNumber: "asc",
+            },
+
+            select: {
+              dayNumber: true,
+
+              stay: {
+                select: {
+                  amenities: true,
+                },
+              },
+            },
+          },
+        },
+      },
+
+      // ================================================
+      // EVENT FAQS
+      // ================================================
+
+      faqs: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+
+        select: {
+          id: true,
+          question: true,
+          answer: true,
+          sortOrder: true,
+        },
+      },
+
+      // ================================================
+      // EVENT RATINGS
+      // ================================================
+
+      averageRating: true,
+      totalReviews: true,
+
+      // ================================================
+      // PUBLICATION STATUS
+      // ================================================
+
+      status: true,
+      publishedAt: true,
+    },
+  });
+
+  // ====================================================
+  // STEP 5 - VALIDATE EVENT ACCESS
+  // ====================================================
+
+  if (!event) {
+    console.log(
+      "[USER EVENT DETAILS] Event unavailable:",
+      eventId,
+    );
+
+    throw new UserEventServiceError(
+      "Event not found or currently unavailable",
+      404,
+    );
+  }
+
+  // ====================================================
+  // STEP 6 - GET NEAREST UPCOMING EVENT DATE
+  // ====================================================
+
+  const eventDate = event.dates[0] ?? null;
+
+  // ====================================================
+  // STEP 7 - PREPARE EVENT DETAILS RESPONSE
+  // ====================================================
+
+  const result = {
+    ...event,
+
+    isAuthenticated: !!userId,
+
+    packageType: membership.packageType,
+
+    currency: "INR",
+
+    // Selected upcoming event date
+
+    eventDateId: eventDate?.id ?? null,
+
+    startDateTime:
+      eventDate?.startDateTime ?? null,
+
+    endDateTime:
+      eventDate?.endDateTime ?? null,
+
+    startDay: eventDate
+      ? getDayName(
+          eventDate.startDateTime,
+          eventDate.timezone,
+        )
+      : null,
+
+    timezone:
+      eventDate?.timezone ?? null,
+
+    // Cover photo
+
+    coverPhoto:
+      event.photos.find(
+        (photo) => photo.photoType === "EVENT",
+      )?.photoUrl ?? null,
+  };
+
+  console.log(
+    "[USER EVENT DETAILS] Event fetched successfully:",
+    {
+      eventId: event.id,
+      title: event.title,
+      packageType: membership.packageType,
+      totalPhotos: event.photos.length,
+      totalDates: event.dates.length,
+    },
+  );
+
+  return result;
+};
+
 
 // ======================================================
 // CALCULATE EVENT CHECKOUT WITH EXISTING TRANSACTION
