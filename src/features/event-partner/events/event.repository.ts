@@ -225,15 +225,24 @@ export const saveTripDetails = async (
     });
   }
 
-  // Create places
-  if (places?.length) {
-    await tx.tripPlace.createMany({
-      data: places.map((place) => ({
-        ...place,
+ // Create places
+if (places?.length) {
+  await tx.tripPlace.createMany({
+    data: places.map((place) => {
+      const { whySpecial, ...placeData } = place;
+
+      return {
+        ...placeData,
+
+        whySpecial: whySpecial?.length
+          ? whySpecial.join(", ")
+          : null,
+
         tripDetailsId: trip.id,
-      })),
-    });
-  }
+      };
+    }),
+  });
+}
 
   // Create room options
   if (roomOptions?.length) {
