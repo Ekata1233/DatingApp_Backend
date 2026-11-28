@@ -124,7 +124,7 @@ const eventVenueSchema = z.object({
   venueType: z.nativeEnum(VenueType).nullable().optional(),
   venueCapacity: capacity,
 
-  whySpecial: optionalText,
+  whySpecial: stringArray.optional(),
   tags: stringArray.optional(),
   photoUrl: optionalText,
 
@@ -219,7 +219,7 @@ const tripPlaceSchema = z.object({
   icon: optionalText,
   name: optionalText,
   when: optionalText,
-  whySpecial: optionalText,
+  whySpecial: stringArray.optional(),
   tags: stringArray.optional(),
   photoUrl: optionalText,
   sortOrder,
@@ -439,7 +439,7 @@ export const saveEventSchema = z.object({
   hostSpeciality: optionalText,
   hostLanguages: stringArray.optional(),
   hostMessage: optionalText,
-  afterEventLine: optionalText,
+  afterEventLine: stringArray.optional(),
 
   // Cancellation
   cancellationPolicy: z.nativeEnum(

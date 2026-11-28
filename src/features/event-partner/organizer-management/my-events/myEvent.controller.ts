@@ -1,116 +1,116 @@
-import {
-  Request,
-  Response,
-} from "express";
-import { getAllOrganizerEventsSchema } from "./myEvent.validation";
-import { getAllOrganizerEventsService } from "./myEvent.service";
+// import {
+//   Request,
+//   Response,
+// } from "express";
+// import { getAllOrganizerEventsSchema } from "./myEvent.validation";
+// import { getAllOrganizerEventsService } from "./myEvent.service";
 
 
 
-// ============================================
-// GET ALL ORGANIZER EVENTS CONTROLLER
-// ============================================
+// // ============================================
+// // GET ALL ORGANIZER EVENTS CONTROLLER
+// // ============================================
 
-export const getAllOrganizerEventsController =
-  async (
-    req: Request,
-    res: Response,
-  ) => {
-    try {
-      const partner = (req as any).partner;
-
-
-      // ======================================
-      // 1. AUTHENTICATION
-      // ======================================
-
-      if (!partner?.id) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized",
-        });
-      }
+// export const getAllOrganizerEventsController =
+//   async (
+//     req: Request,
+//     res: Response,
+//   ) => {
+//     try {
+//       const partner = (req as any).partner;
 
 
-      // ======================================
-      // 2. ORGANIZER ROLE VALIDATION
-      // ======================================
+//       // ======================================
+//       // 1. AUTHENTICATION
+//       // ======================================
 
-      if (partner.role !== "ORGANIZER") {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Only organizers can access this API",
-        });
-      }
-
-
-      // ======================================
-      // 3. BUSINESS VALIDATION
-      // ======================================
-
-      if (!partner.businessId) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Business access not found",
-        });
-      }
+//       if (!partner?.id) {
+//         return res.status(401).json({
+//           success: false,
+//           message: "Unauthorized",
+//         });
+//       }
 
 
-      // ======================================
-      // 4. VALIDATE QUERY PARAMETERS
-      // ======================================
+//       // ======================================
+//       // 2. ORGANIZER ROLE VALIDATION
+//       // ======================================
 
-      const validation =
-        getAllOrganizerEventsSchema.safeParse(
-          req.query,
-        );
-
-      if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Invalid query parameters",
-
-          errors:
-            validation.error.flatten(),
-        });
-      }
+//       if (partner.role !== "ORGANIZER") {
+//         return res.status(403).json({
+//           success: false,
+//           message:
+//             "Only organizers can access this API",
+//         });
+//       }
 
 
-      // ======================================
-      // 5. CALL SERVICE
-      // ======================================
+//       // ======================================
+//       // 3. BUSINESS VALIDATION
+//       // ======================================
 
-      const data =
-        await getAllOrganizerEventsService({
-          businessId: partner.businessId,
-          ...validation.data,
-        });
+//       if (!partner.businessId) {
+//         return res.status(403).json({
+//           success: false,
+//           message:
+//             "Business access not found",
+//         });
+//       }
 
 
-      // ======================================
-      // 6. SUCCESS RESPONSE
-      // ======================================
+//       // ======================================
+//       // 4. VALIDATE QUERY PARAMETERS
+//       // ======================================
 
-      return res.status(200).json({
-        success: true,
-        message:
-          "Events fetched successfully",
-        data,
-      });
+//       const validation =
+//         getAllOrganizerEventsSchema.safeParse(
+//           req.query,
+//         );
 
-    } catch (error: unknown) {
-      console.error(
-        "Get All Organizer Events Error:",
-        error,
-      );
+//       if (!validation.success) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Invalid query parameters",
 
-      return res.status(500).json({
-        success: false,
-        message:
-          "Failed to fetch events",
-      });
-    }
-  };
+//           errors:
+//             validation.error.flatten(),
+//         });
+//       }
+
+
+//       // ======================================
+//       // 5. CALL SERVICE
+//       // ======================================
+
+//       const data =
+//         await getAllOrganizerEventsService({
+//           businessId: partner.businessId,
+//           ...validation.data,
+//         });
+
+
+//       // ======================================
+//       // 6. SUCCESS RESPONSE
+//       // ======================================
+
+//       return res.status(200).json({
+//         success: true,
+//         message:
+//           "Events fetched successfully",
+//         data,
+//       });
+
+//     } catch (error: unknown) {
+//       console.error(
+//         "Get All Organizer Events Error:",
+//         error,
+//       );
+
+//       return res.status(500).json({
+//         success: false,
+//         message:
+//           "Failed to fetch events",
+//       });
+//     }
+//   };

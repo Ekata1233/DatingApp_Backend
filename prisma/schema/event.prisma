@@ -84,7 +84,7 @@ model Event {
   hostSpeciality      String?
   hostLanguages       String[]   @default([])
   hostMessage         String?
-  afterEventLine      String?
+  afterEventLine      String[]   @default([])
 
   // Cancellation
   cancellationPolicy      EventCancellationPolicy?
@@ -277,7 +277,7 @@ model EventVenue {
   venueType         VenueType?
   venueCapacity     Int?
   // Venue Card
-  whySpecial        String?
+  whySpecial        String[]   @default([])
   tags              String[]   @default([])
   photoUrl          String?
   // Meeting Details

@@ -1,21 +1,21 @@
-import { Router } from "express";
-import { partnerAuthMiddleware } from "../../../../middleware/partnerAuth.middleware";
-import { requirePartnerRole } from "../../../../middleware/partnerRole.middleware";
-import { getAllOrganizerEventsController } from "./myEvent.controller";
+// import { Router } from "express";
+// import { partnerAuthMiddleware } from "../../../../middleware/partnerAuth.middleware";
+// import { requirePartnerRole } from "../../../../middleware/partnerRole.middleware";
+// import { getAllOrganizerEventsController } from "./myEvent.controller";
 
 
-const router = Router();
+// const router = Router();
 
 
-// ============================================
-// GET ALL ORGANIZER EVENTS
-// ============================================
+// // ============================================
+// // GET ALL ORGANIZER EVENTS
+// // ============================================
 
-router.get(
-  "/events/get-all",
-  partnerAuthMiddleware,
-  requirePartnerRole("ORGANIZER"),
-  getAllOrganizerEventsController,
-);
+// router.get(
+//   "/events/get-all",
+//   partnerAuthMiddleware,
+//   requirePartnerRole("ORGANIZER"),
+//   getAllOrganizerEventsController,
+// );
 
-export default router;
+// export default router;
