@@ -103,6 +103,7 @@ export const parseEventPayload = (
         "safetyOptions",
         "faqs",
         "completedSteps",
+        "afterEventLine"
       ]);
 
       // Numeric fields
