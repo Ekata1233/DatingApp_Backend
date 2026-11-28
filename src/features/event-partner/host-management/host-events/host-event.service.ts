@@ -567,13 +567,13 @@ const getLocationLabel = (
     return (
       pickup ||
       destination ||
-      event.venue?.venueName ||
+      event.venue?.fullAddress ||
       null
     );
   }
 
   return (
-    event.venue?.venueName ??
+    // event.venue?.venueName ??
     event.venue?.fullAddress ??
     null
   );
@@ -1383,28 +1383,25 @@ export const getAllHostEventsService = async (
   }
 
   counts.total =
-    counts.ongoing +
-    counts.upcoming;
+   counts.ongoing +
+  counts.upcoming +
+  counts.past;
 
 
-  // ==========================================
-  // 4. APPLY TYPE FILTER
-  // ==========================================
+// ==========================================
+// 4. APPLY TYPE FILTER
+// ==========================================
 
-  const filteredCards = cards.filter(
-    (card) => {
+const filteredCards = cards.filter(
+  (card) => {
 
-      if (type === "all") {
-        return (
-          card.group === "ongoing" ||
-          card.group === "upcoming"
-        );
-      }
+    if (type === "all") {
+      return true;
+    }
 
-      return card.group === type;
-    },
-  );
-
+    return card.group === type;
+  },
+);
 
   // ==========================================
   // 5. SORT EVENT CARDS

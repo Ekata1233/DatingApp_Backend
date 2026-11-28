@@ -15,7 +15,7 @@ const router = Router();
 // ============================================
 
 router.get(
-  "/get-all",
+  "/events/get-all",
   partnerAuthMiddleware,
   requirePartnerRole("HOST"),
   getAllHostEventsController,
