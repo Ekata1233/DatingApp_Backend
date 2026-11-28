@@ -409,9 +409,36 @@ export const getUserEventByIdService = async (
       // ================================================
       // BASIC EVENT DETAILS
       // ================================================
+id: true,
+businessDetailsId: true,
 
-      id: true,
-      businessDetailsId: true,
+// ================================================
+// ORGANIZER BUSINESS DETAILS
+// ================================================
+
+businessDetails: {
+  select: {
+    id: true,
+    legalName: true,
+    brandName: true,
+    logoUrl: true,
+
+    gstVerificationStatus: true,
+    panVerificationStatus: true,
+    mcaVerificationStatus: true,
+
+    _count: {
+      select: {
+        events: {
+          where: {
+            isDeleted: false,
+            deletedAt: null,
+          },
+        },
+      },
+    },
+  },
+},
 
       eventDurationType: true,
       tripType: true,
@@ -775,42 +802,68 @@ export const getUserEventByIdService = async (
   // STEP 7 - PREPARE EVENT DETAILS RESPONSE
   // ====================================================
 
-  const result = {
-    ...event,
+ const { businessDetails, ...eventDetails } = event;
 
-    isAuthenticated: !!userId,
+// ================================================
+// ORGANIZER VERIFICATION
+// ================================================
 
-    packageType: membership.packageType,
+const isVerifiedOrganizer = businessDetails
+  ? (
+      businessDetails.gstVerificationStatus === "VERIFIED" ||
+      businessDetails.panVerificationStatus === "VERIFIED"
+    ) &&
+    businessDetails.mcaVerificationStatus === "VERIFIED"
+  : false;
 
-    currency: "INR",
+// ================================================
+// PREPARE RESPONSE
+// ================================================
 
-    // Selected upcoming event date
+const result = {
+  ...eventDetails,
 
-    eventDateId: eventDate?.id ?? null,
+  organizer: businessDetails
+    ? {
+        businessId: businessDetails.id,
+        legalName: businessDetails.legalName,
+        brandName: businessDetails.brandName,
+        logoUrl: businessDetails.logoUrl,
 
-    startDateTime:
-      eventDate?.startDateTime ?? null,
+        isVerifiedOrganizer,
 
-    endDateTime:
-      eventDate?.endDateTime ?? null,
+        totalEvents: businessDetails._count.events,
+      }
+    : null,
 
-    startDay: eventDate
-      ? getDayName(
-          eventDate.startDateTime,
-          eventDate.timezone,
-        )
-      : null,
+  isAuthenticated: !!userId,
 
-    timezone:
-      eventDate?.timezone ?? null,
+  packageType: membership.packageType,
 
-    // Cover photo
+  currency: "INR",
 
-    coverPhoto:
-      event.photos.find(
-        (photo) => photo.photoType === "EVENT",
-      )?.photoUrl ?? null,
-  };
+  eventDateId: eventDate?.id ?? null,
+
+  startDateTime:
+    eventDate?.startDateTime ?? null,
+
+  endDateTime:
+    eventDate?.endDateTime ?? null,
+
+  startDay: eventDate
+    ? getDayName(
+        eventDate.startDateTime,
+        eventDate.timezone,
+      )
+    : null,
+
+  timezone: eventDate?.timezone ?? null,
+
+  coverPhoto:
+    event.photos.find(
+      (photo) => photo.photoType === "EVENT",
+    )?.photoUrl ?? null,
+};
 
   console.log(
     "[USER EVENT DETAILS] Event fetched successfully:",
