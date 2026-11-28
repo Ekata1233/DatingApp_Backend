@@ -275,6 +275,7 @@ import guestRoutes from "../features/event-partner/organizer-management/guests/g
 import eventCheckoutRoute from "../features/event-partner/events/event.routes"
 import userEventRoutes from "../features/user/events/userEvent.routes"
 import hostEventRoutes from "../features/event-partner/host-management/host-events/host-event.routes"
+import payoutRoutes from "../features/event-partner/events/payout/eventPayout.routes"
 
 router.use("/event-partner",partnerAuthRoutes,emailVerificationRoutes,organizerRoutes)
 router.use("/event-partner/organizer-management/bank-account", organizerBankAccountRoutes);
@@ -291,7 +292,7 @@ router.use("/event-partner",eventCategoryRoutes,eventsRoutes)
 router.use("/event-partner",calculateRevenueRoutes)
 
 router.use("/admin/",adminEventRoutes,adminEventReactivationRoutes)
-router.use("/event-partner/organizer-management/", invoicesRoutes, guestRoutes)
+router.use("/event-partner/organizer-management/", invoicesRoutes, guestRoutes, payoutRoutes)
 router.use("/event-partner/host-management", createHostRoutes)
 
 router.use("/users/", eventCheckoutRoute,userEventRoutes)

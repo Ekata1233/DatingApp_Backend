@@ -2354,15 +2354,19 @@ model SupportFaq {
 }
 
 model GlobalAmount {
-  id                   String   @id @default(uuid()) @db.Uuid
-  gst                  Decimal  @default(18) @db.Decimal(5, 2)
-  eventPlatformFee     Decimal  @default(2) @db.Decimal(10, 2)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  freeProfileLimit     Int      @default(0)
-  premiumProfileLimit  Int      @default(25)
-  vipEliteProfileLimit Int      @default(100)
-  vipProfileLimit      Int      @default(50)
+  id                   String  @id @default(uuid()) @db.Uuid
+  gst                  Decimal @default(18) @db.Decimal(5, 2)
+  gstTCS               Decimal @default(0.5) @db.Decimal(5, 2)
+  tds                  Decimal @default(0.1) @db.Decimal(5, 2)
+  eventPlatformFee     Decimal @default(2) @db.Decimal(10, 2)
+  welvorsCommission    Decimal @default(20) @db.Decimal(5, 2)
+  freeProfileLimit     Int     @default(0)
+  premiumProfileLimit  Int     @default(25)
+  vipEliteProfileLimit Int     @default(100)
+  vipProfileLimit      Int     @default(50)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("global_amount")
 }

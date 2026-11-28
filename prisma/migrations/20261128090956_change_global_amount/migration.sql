@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "global_amount" ADD COLUMN     "gstTCS" DECIMAL(5,2) NOT NULL DEFAULT 0.5,
+ADD COLUMN     "tds" DECIMAL(5,2) NOT NULL DEFAULT 0.1,
+ADD COLUMN     "welvorsCommission" DECIMAL(5,2) NOT NULL DEFAULT 20;
