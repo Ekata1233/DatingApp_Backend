@@ -9,9 +9,10 @@ import {
   GetGuestListParams,
   GuestListItem,
   GuestAttendanceStatus,
+  GuestPermissions,
+  GuestGenderCounts,
 } from "./guest.types";
 import { prisma } from "../../../../prisma/prismaClient";
-
 
 // ========================================
 // CUSTOM ERROR
@@ -27,6 +28,88 @@ export class GuestListError extends Error {
   }
 }
 
+const validateGuestListAccess = async (
+  params: GetGuestListParams,
+): Promise<GuestPermissions> => {
+  const { partnerId, businessId, role, eventId } = params;
+
+  // Organizer has full guest management access
+  if (role === "ORGANIZER") {
+    return {
+      canViewGuestList: true,
+      canCheckInGuests: true,
+    };
+  }
+
+  // Only organizer and host are allowed
+  if (role !== "HOST") {
+    throw new GuestListError("Access denied", 403);
+  }
+
+  // Find authenticated host
+  const host = await prisma.host.findFirst({
+    where: {
+      partnerId,
+      businessId,
+    },
+
+    select: {
+      id: true,
+      status: true,
+      onboardingCompleted: true,
+      removedAt: true,
+      canViewGuestList: true,
+      canCheckInGuests: true,
+    },
+  });
+
+  if (!host) {
+    throw new GuestListError("Host profile not found", 403);
+  }
+
+  // Validate host account status
+  if (host.status !== "ACTIVE" || host.removedAt !== null) {
+    throw new GuestListError("Host account is not active", 403);
+  }
+
+  // Validate onboarding
+  if (!host.onboardingCompleted) {
+    throw new GuestListError("Please complete host onboarding", 403);
+  }
+
+  // Validate guest list permission
+  if (!host.canViewGuestList) {
+    throw new GuestListError(
+      "You do not have permission to view the guest list",
+      403,
+    );
+  }
+
+  // Validate event assignment
+  const assignedEvent = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+      businessDetailsId: businessId,
+      isDeleted: false,
+      deletedAt: null,
+
+      hostId: host.id,
+    },
+
+    select: {
+      id: true,
+    },
+  });
+
+  if (!assignedEvent) {
+    throw new GuestListError("You are not assigned to this event", 403);
+  }
+
+  return {
+    canViewGuestList: host.canViewGuestList,
+    canCheckInGuests: host.canCheckInGuests,
+  };
+};
 
 // ========================================
 // GET INITIALS
@@ -41,7 +124,6 @@ const getInitials = (fullName: string): string => {
     .map((name) => name.charAt(0).toUpperCase())
     .join("");
 };
-
 
 // ========================================
 // GET BOOKING LABEL - IST
@@ -59,10 +141,9 @@ const getBookedLabel = (bookedAt: Date): string => {
   const bookingDay = formatter.format(bookedAt);
 
   const difference = Math.floor(
-    (
-      new Date(`${today}T00:00:00Z`).getTime() -
-      new Date(`${bookingDay}T00:00:00Z`).getTime()
-    ) / 86400000,
+    (new Date(`${today}T00:00:00Z`).getTime() -
+      new Date(`${bookingDay}T00:00:00Z`).getTime()) /
+      86400000,
   );
 
   if (difference <= 0) {
@@ -76,26 +157,15 @@ const getBookedLabel = (bookedAt: Date): string => {
   return `${difference}d ago`;
 };
 
-
 // ========================================
 // GET GUEST LIST SERVICE
 // ========================================
 
-export const getGuestListService = async (
-  params: GetGuestListParams,
-) => {
-  const {
-    businessId,
-    eventId,
-    eventDateId,
-    type,
-    search,
-    page,
-    limit,
-  } = params;
+export const getGuestListService = async (params: GetGuestListParams) => {
+  const { businessId, eventId, eventDateId, type, search, page, limit } =
+    params;
 
   const skip = (page - 1) * limit;
-
 
   // ======================================
   // 1. VALIDATE EVENT OWNERSHIP
@@ -133,12 +203,11 @@ export const getGuestListService = async (
   });
 
   if (!event) {
-    throw new GuestListError(
-      "Event not found or access denied",
-      404,
-    );
+    throw new GuestListError("Event not found or access denied", 404);
   }
 
+  // Validate organizer / host access
+  const permissions = await validateGuestListAccess(params);
 
   // ======================================
   // 2. VALIDATE EVENT DATE
@@ -162,12 +231,8 @@ export const getGuestListService = async (
   });
 
   if (!eventDate) {
-    throw new GuestListError(
-      "Event date not found",
-      404,
-    );
+    throw new GuestListError("Event date not found", 404);
   }
-
 
   // ======================================
   // 3. BASE WHERE CONDITION
@@ -181,7 +246,6 @@ export const getGuestListService = async (
       },
     },
   };
-
 
   // ======================================
   // 4. VALID BOOKED GUESTS
@@ -204,8 +268,7 @@ export const getGuestListService = async (
           },
 
           booking: {
-            paymentStatus:
-              EventBookingPaymentStatus.PAID,
+            paymentStatus: EventBookingPaymentStatus.PAID,
 
             status: {
               in: [
@@ -221,7 +284,6 @@ export const getGuestListService = async (
     ],
   };
 
-
   // ======================================
   // 5. CHECKED-IN GUESTS
   // ======================================
@@ -236,7 +298,6 @@ export const getGuestListService = async (
       },
     ],
   };
-
 
   // ======================================
   // 6. NOT ARRIVED GUESTS
@@ -258,7 +319,6 @@ export const getGuestListService = async (
       },
     ],
   };
-
 
   // ======================================
   // 7. CANCELLED GUESTS
@@ -293,7 +353,6 @@ export const getGuestListService = async (
     ],
   };
 
-
   // ======================================
   // 8. NO-SHOW GUESTS
   // ======================================
@@ -319,18 +378,13 @@ export const getGuestListService = async (
     ],
   };
 
-
   // ======================================
   // 9. ALL GUESTS
   // ======================================
 
   const allWhere: Prisma.EventBookingGuestWhereInput = {
-    OR: [
-      bookedWhere,
-      cancelledWhere,
-    ],
+    OR: [bookedWhere, cancelledWhere],
   };
-
 
   // ======================================
   // 10. TYPE FILTER
@@ -357,52 +411,46 @@ export const getGuestListService = async (
       break;
   }
 
-
   // ======================================
   // 11. SEARCH FILTER
   // ======================================
 
-  const searchWhere: Prisma.EventBookingGuestWhereInput =
-    search
-      ? {
-          OR: [
-            {
-              fullName: {
+  const searchWhere: Prisma.EventBookingGuestWhereInput = search
+    ? {
+        OR: [
+          {
+            fullName: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+
+          {
+            bookingTicket: {
+              ticketId: {
                 contains: search,
                 mode: "insensitive",
               },
             },
+          },
 
-            {
-              bookingTicket: {
-                ticketId: {
+          {
+            bookingTicket: {
+              booking: {
+                bookingNumber: {
                   contains: search,
                   mode: "insensitive",
                 },
               },
             },
-
-            {
-              bookingTicket: {
-                booking: {
-                  bookingNumber: {
-                    contains: search,
-                    mode: "insensitive",
-                  },
-                },
-              },
-            },
-          ],
-        }
-      : {};
+          },
+        ],
+      }
+    : {};
 
   const finalWhere: Prisma.EventBookingGuestWhereInput = {
-    AND: [
-      selectedWhere,
-      searchWhere,
-    ],
+    AND: [selectedWhere, searchWhere],
   };
-
 
   // ======================================
   // 12. FETCH COUNTS AND GUESTS
@@ -496,11 +544,9 @@ export const getGuestListService = async (
     ],
 
     {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.RepeatableRead,
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
     },
   );
-
 
   // ======================================
   // 13. CHECK-IN AVAILABILITY
@@ -508,20 +554,105 @@ export const getGuestListService = async (
 
   const now = new Date();
 
-  const checkInOpensAt =
-    eventDate.gateOpensAt ??
-    eventDate.startDateTime;
+  const checkInOpensAt = eventDate.gateOpensAt ?? eventDate.startDateTime;
 
   const isCheckInOpen =
     event.status === "PUBLISHED" &&
     eventDate.status === "SCHEDULED" &&
     now >= checkInOpensAt &&
-    (
-      !eventDate.endDateTime ||
-      now < eventDate.endDateTime
-    );
+    (!eventDate.endDateTime || now < eventDate.endDateTime);
 
+  // ========================================
+  // FIRST WELVORS EVENT CHECK
+  // ========================================
 
+  const guestUserIds = [
+    ...new Set(
+      guests
+        .map((guest) => guest.userId)
+        .filter((userId): userId is string => userId !== null),
+    ),
+  ];
+
+  const previousAttendees =
+    guestUserIds.length > 0
+      ? await prisma.eventBookingGuest.findMany({
+          where: {
+            userId: {
+              in: guestUserIds,
+            },
+
+            checkedInAt: {
+              not: null,
+            },
+
+            bookingTicket: {
+              booking: {
+                eventDateId: {
+                  not: eventDateId,
+                },
+
+                eventDate: {
+                  startDateTime: {
+                    lt: eventDate.startDateTime,
+                  },
+                },
+              },
+            },
+          },
+
+          select: {
+            userId: true,
+          },
+
+          distinct: ["userId"],
+        })
+      : [];
+
+  const previousAttendeeIds = new Set(
+    previousAttendees.map((guest) => guest.userId),
+  );
+
+  // ========================================
+  // GENDER-WISE BOOKED GUEST COUNTS
+  // ========================================
+
+  const genderGroups = await prisma.eventBookingGuest.groupBy({
+    by: ["gender"],
+
+    where: bookedWhere,
+
+    _count: {
+      _all: true,
+    },
+
+    orderBy: {
+      gender: "asc",
+    },
+  });
+
+  const genderCounts: GuestGenderCounts = {
+    women: 0,
+    men: 0,
+    other: 0,
+    unknown: 0,
+  };
+
+  for (const group of genderGroups) {
+    const gender = group.gender?.trim().toLowerCase();
+
+    const count = group._count._all;
+
+    if (gender === "woman" || gender === "women" || gender === "female") {
+      genderCounts.women += count;
+    } else if (gender === "man" || gender === "men" || gender === "male") {
+      genderCounts.men += count;
+    } else if (!gender) {
+      genderCounts.unknown += count;
+    } else {
+      genderCounts.other += count;
+    }
+  }
   // ======================================
   // 14. FORMAT GUEST RESPONSE
   // ======================================
@@ -541,10 +672,7 @@ export const getGuestListService = async (
       status = "CANCELLED";
     } else if (guest.checkedInAt) {
       status = "CHECKED_IN";
-    } else if (
-      guest.isNoShow ||
-      ticket.status === EventTicketStatus.NO_SHOW
-    ) {
+    } else if (guest.isNoShow || ticket.status === EventTicketStatus.NO_SHOW) {
       status = "NO_SHOW";
     } else {
       status = "NOT_ARRIVED";
@@ -571,6 +699,18 @@ export const getGuestListService = async (
       bookedLabel: getBookedLabel(booking.createdAt),
 
       status,
+      isFirstWelvorsEvent: guest.userId
+        ? !previousAttendeeIds.has(guest.userId)
+        : null,
+
+      attendanceLabel:
+        status === "CHECKED_IN"
+          ? "Checked in"
+          : status === "CANCELLED"
+            ? "Cancelled"
+            : status === "NO_SHOW"
+              ? "No show"
+              : "Not yet",
 
       isPrimaryGuest: guest.isPrimaryGuest,
 
@@ -580,22 +720,16 @@ export const getGuestListService = async (
       checkedOutAt: guest.checkedOutAt,
 
       canCheckIn:
+        permissions.canCheckInGuests &&
         isCheckInOpen &&
         status === "NOT_ARRIVED" &&
-        booking.paymentStatus ===
-          EventBookingPaymentStatus.PAID &&
-        (
-          booking.status === EventBookingStatus.CONFIRMED ||
-          booking.status ===
-            EventBookingStatus.PARTIALLY_CANCELLED
-        ) &&
-        (
-          ticket.status === EventTicketStatus.CONFIRMED ||
-          ticket.status === EventTicketStatus.CHECKED_IN
-        ),
+        booking.paymentStatus === EventBookingPaymentStatus.PAID &&
+        (booking.status === EventBookingStatus.CONFIRMED ||
+          booking.status === EventBookingStatus.PARTIALLY_CANCELLED) &&
+        (ticket.status === EventTicketStatus.CONFIRMED ||
+          ticket.status === EventTicketStatus.CHECKED_IN),
     };
   });
-
 
   // ======================================
   // 15. CHECK-IN PROGRESS
@@ -603,14 +737,8 @@ export const getGuestListService = async (
 
   const checkInPercentage =
     bookedCount > 0
-      ? Number(
-          (
-            (checkedInCount / bookedCount) *
-            100
-          ).toFixed(2),
-        )
+      ? Number(((checkedInCount / bookedCount) * 100).toFixed(2))
       : 0;
-
 
   // ======================================
   // 16. FINAL RESPONSE
@@ -628,20 +756,16 @@ export const getGuestListService = async (
       tripType: event.tripType,
 
       venueName:
-        event.venue?.venueName ??
-        event.tripDetails?.pickupPoint ??
-        null,
+        event.venue?.venueName ?? event.tripDetails?.pickupPoint ?? null,
 
-      venueAddress:
-        event.venue?.fullAddress ?? null,
+      venueAddress: event.venue?.fullAddress ?? null,
 
       startDateTime: eventDate.startDateTime,
       endDateTime: eventDate.endDateTime,
       gateOpensAt: eventDate.gateOpensAt,
       timezone: eventDate.timezone,
 
-      totalGuestCapacity:
-        eventDate.totalGuestCapacity,
+      totalGuestCapacity: eventDate.totalGuestCapacity,
 
       isCheckInOpen,
     },
@@ -653,6 +777,21 @@ export const getGuestListService = async (
       notArrived: notArrivedCount,
       cancelled: cancelledCount,
       noShow: noShowCount,
+    },
+
+    permissions: {
+      canViewGuestList: permissions.canViewGuestList,
+
+      canCheckInGuests: permissions.canCheckInGuests,
+    },
+
+    genderCounts: {
+      women: genderCounts.women,
+      men: genderCounts.men,
+      other: genderCounts.other,
+      unknown: genderCounts.unknown,
+
+      label: `${genderCounts.women} · ${genderCounts.men}`,
     },
 
     checkInProgress: {

@@ -14,9 +14,8 @@ const router = Router();
 // ========================================
 
 router.get(
-  "/:eventId/guest-list",
+  "/:eventId/guests",
   partnerAuthMiddleware,
-  requirePartnerRole("ORGANIZER"),
   getGuestListController,
 );
 
